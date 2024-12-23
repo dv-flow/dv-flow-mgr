@@ -1,0 +1,62 @@
+package:
+  name: example1
+  type: std.StdProject
+
+        
+
+  # Tasks are generally internal, unless their type is that
+  # of an ExportTask
+  tasks:
+    # Override a pre-defined task from std.StdProject
+    - override: design_src
+      # Override leaves most elements alone
+      # The type of this task is a 'combine' task that passes forward all filesets
+      depends:
+        - rtl # This is a task
+
+    - name: run_test
+      type: std.CmdLineFlow
+      args:
+        arguments: # Schema for command-line arguments
+        body:
+          - name: find_tests
+            parameters: ${{ spec }}
+
+    - override: testbench_src
+      depends:
+        - tb # This is a task
+
+    - name: tb
+      type: SvFileset
+      args:
+        includes:
+          - '*.sv'
+
+    - name: abc
+      type: def
+      # Use the schema from 'def' to evaluate parameters here
+
+      
+  include:
+    - rtl/rtl.flow
+    - tb/tb.flow
+
+
+package:
+  name: example1
+  super: SimFlow # <- SimFlow exposes a 'sim' parameter
+
+  flows:
+    - overide: design_src
+      depends:
+        # name | task (which produces output)
+        - name: rtl
+          type: SvFileset
+          includes:
+            - '*.sv'
+    - name: sim-image
+      parameters:
+        -name: top
+         value: top
+      depends:
+        - design_src

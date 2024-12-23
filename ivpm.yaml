@@ -1,0 +1,25 @@
+
+package:
+  name: pytest-fv
+
+  #  setup-deps:
+  #- ninja
+  #- cython
+
+  dep-sets:
+
+  - name: default
+    deps:
+    - name: pytest
+      src: pypi
+    - name: svdep
+      url: https://github.com/fvutils/svdep.git
+
+  - name: default-dev
+    deps:
+    - name: pytest
+      src: pypi
+    - name: svdep
+      url: https://github.com/fvutils/svdep.git
+
+

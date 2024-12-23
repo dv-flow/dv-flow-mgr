@@ -1,0 +1,111 @@
+import dataclasses as dc
+from typing import List
+
+def test_smoke():
+
+    @dc.dataclass
+    class Task(object):
+        # All tasks have inputs as part of their runtime
+        # persona. Upstream tasks can be directly added as 
+        # inputs to the task. The task's locally-declared 
+        # dependencies are also added as inputs
+        inputs : List['Task'] = dc.field(default_factory=list)
+
+        # Dependencies cause us to look up the task and 
+        # add it as an input
+        dependencies : List['Task'] = dc.field(default_factory=list)
+
+        # All tasks have a result
+        _result : object = dc.field(init=False, repr=False, default=None)
+
+        async def run(self) -> object:
+            # Get input objects
+
+            # If the result is null, or if any of the
+            # inputs timestamps is newer, then we need to rebuild
+            raise NotImplementedError()
+
+        pass
+
+    @dc.dataclass
+    class FileSetData(object):
+        type : str = None
+        path : str = None
+        includes : List[str] = dc.field(default_factory=list)
+        excludes : List[str] = dc.field(default_factory=list)
+
+    class FileSet(Task):
+        filesets : List[FileSetData] = dc.field(default_factory=list)
+
+
+    class FileSet1(FileSet):
+        filesets = [
+            FileSetData(
+                type="verilogSource",
+                path="src",
+                includes=["*.sv"]
+            )
+        ]
+
+    class Flow(object):
+
+        @dc.export
+        class rtl(FileSet):
+            # dc.export creates a factory for MyFileset
+            dependencies = [FileSet1]
+            pass
+
+    flow = SimFlow() # have a specific flow parameterization
+
+    run = flow.run()
+
+    # 
+
+    build = flow.build()
+
+
+
+
+    class FileSet2(FileSet):
+        dependencies = [FileSet1]
+        filesets = [
+            FileSetData(
+                type="verilogSource",
+                path="src",
+                includes=["*.sv"]
+            )
+        ]
+
+    # Exported Flow Tasks are task factories
+    # This allows us to extend a flow's task via inheritance or extension
+    # 
+    # Inheritance allows us to replace 
+    #
+    # SimFlow with actions
+    # - build (exported)
+    # - run (exported)
+    # - compile
+    # - elaborate
+    #
+    # Need a factory for SimFlow, such that we can select an appropriate version
+    #
+    # Need to inject a dependency on compile such that 
+    # - Our PSS tool's dependencies are added to compilation (? Actually, I think we want the user to do this)
+    # 
+    # Want to have extension later. May be okay wih inheritance for now
+
+
+    class SimFlow(object):
+        # Defines 
+        pass
+
+    class MyTest(SimFlow):
+
+
+    # MyTestFlow
+    # - 
+    class MyFlow(SimFlow, PssFlow):
+
+        pass
+
+    pass
