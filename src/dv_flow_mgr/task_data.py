@@ -1,5 +1,5 @@
 #****************************************************************************
-#* flow.py
+#* task_data.py
 #*
 #* Copyright 2023 Matthew Ballance and Contributors
 #*
@@ -19,41 +19,26 @@
 #*     Author: 
 #*
 #****************************************************************************
-from pydantic import BaseModel, Field
-from typing import ClassVar
-#from .task import Task
+import pydantic.dataclasses as dc
+from pydantic import BaseModel
+from typing import Any, Dict, List, Tuple
+from .fileset import FileSet
 
-class Flow(BaseModel):
-    # - Parameters are user-facing 
-    # - Any implementation data must be stored elsewhere, such that it isn't
-    #   checked for equality...
-    name : str
-    description : str = Field(None)
+class TaskData(BaseModel):
+    task_id : int = -1
+    params : Dict[str,Any] = dc.Field(default_factory=dict)
+    deps : List['TaskData'] = dc.Field(default_factory=list)
+    changed : bool = False
 
+    def clone(self) -> 'TaskData':
+        ret = TaskData()
+        ret.taskid = self.taskid
+        ret.params = self.params.copy()
+        for d in self.deps:
+            ret.deps.append(d.clone())
+        ret.changed = self.changed
+        return ret
 
-    @classmethod
-    def mk(cls, *args, **kwargs):
-        pass
-
-    async def my_method(self):
-        return Task(a,b,c)(self, input)
-
-#@extend(target)
-#class FlowExt(object):
-#    pass
-
-
-class Flow2(Flow):
-    description : str = "abc"
-
-    async def my_method(self):
-        super().my_method()
-
-f = Flow2(name="foo")
-
-#for d in dir(f):
-#    if not d.startswith("_"):
-#        print("%s: %s" % (d, str(getattr(f, d))))
 
 
 

@@ -19,16 +19,17 @@
 #*     Author: 
 #*
 #****************************************************************************
-import dataclasses as dc
+import pydantic.dataclasses as dc
 import json
+from pydantic import BaseModel
 from typing import Any, Dict, List
 from .flow import Flow
-from .task import Task
+from .task import Task, TaskSpec
 
 @dc.dataclass
 class PackageSpec(object):
     name : str
-    params : Dict[str,Any] = dc.field(default_factory=dict)
+    params : Dict[str,Any] = dc.Field(default_factory=dict)
     _fullname : str = None
 
     def get_fullname(self) -> str:
@@ -47,12 +48,21 @@ class PackageSpec(object):
     def __eq__(self, value):
         return isinstance(value, PackageSpec) and value.get_fullname() == self.get_fullname()
 
-@dc.dataclass
-class Package(object):
+class PackageImportSpec(PackageSpec):
+    alias : str = dc.Field(default=None, alias="as")
+
+class Package(BaseModel):
     name : str
-    params : Dict[str,Any] = dc.field(default_factory=dict)
-    type : List[PackageSpec] = dc.field(default_factory=list)
-    tasks : Dict[str,Task] = dc.field(default_factory=dict)
+    params : Dict[str,Any] = dc.Field(default_factory=dict)
+    type : List[PackageSpec] = dc.Field(default_factory=list)
+    tasks : List[Task] = dc.Field(default_factory=dict)
+    imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="import")
+    pythonpath : List[str] = dc.Field(default_factory=list)
+
+    def getTask(self, name : str) -> 'Task':
+        for t in self.tasks:
+            if t.name == name:
+                return t
 
     @staticmethod
     def mk(self, doc, filename) -> 'Package':

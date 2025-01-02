@@ -19,44 +19,35 @@
 #*     Author: 
 #*
 #****************************************************************************
-import dataclasses as dc
+import asyncio
+import pydantic.dataclasses as dc
+from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 
-
 @dc.dataclass
-class Task(object):
+class TaskSpec(object):
     name : str
-    override : bool = False
-    type : List[Tuple[str,'Task']] = dc.field(default_factory=list)
-    depends : List[Tuple[str,'Task']] = dc.field(default_factory=list)
-    args : Dict[str,Any] = dc.field(default_factory=dict)
 
-    @staticmethod 
-    def mk(doc, filename) -> 'Task':
-        task = None
-        if "name" in doc.keys():
-            task = Task(doc["name"])
-            if "type" in doc.keys():
-                for t in doc["type"]:
-                    task.type.append((t, None))
-        elif "override" in doc.keys():
-            task = Task(doc["override"], override=True)
-            if "type" in doc.keys():
-                raise Exception("Task 'override' cannot have a 'type' key in %s" % filename)
+
+class Task(BaseModel, extra='allow'):
+    name : str
+    type : (TaskSpec|List[TaskSpec]) = dc.Field(default_factory=list)
+    depends : List[(str|TaskSpec)] = dc.Field(default_factory=list)
+
+    # Implementation data below
+    basedir : str = dc.Field(default=None)
+    impl : str = None
+    body: Dict[str,Any] = dc.Field(default_factory=dict)
+    impl_t : Any = None
+
+    def getField(self, name : str) -> Any:
+        if name in self.__dict__.keys():
+            return self.__dict__[name]
+        elif name in self.__pydantic_extra__.keys():
+            return self.__pydantic_extra__[name]
         else:
-            raise Exception("Missing task 'name' or 'override' key in %s" % filename)
+            raise Exception("No such field %s" % name)
         
-        if "depends" in doc.keys():
-            for d in doc["depends"]:
-                task.depends.append((d, None))
-        
-        if "args" in doc.keys():
-            task.args = doc["args"].copy()
-        
-        return task
-    
-    def elab(self, session):
-        # 
-        pass
+
 
 

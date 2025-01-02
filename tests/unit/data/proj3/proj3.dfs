@@ -1,0 +1,27 @@
+
+package:
+    name: proj3
+
+    tasks:
+      - name: files1
+        impl: FileSet
+        paths:
+           - "a"
+           - "b"
+
+      - name: files2
+        impl: FileSet
+        depends:
+           - files1
+        paths:
+           - "c"
+           - "d"
+
+      - name: hello
+        impl: SayHello
+        depends:
+        - files1
+        - files2
+        msg: |
+           Hello from the SayHello task
+
