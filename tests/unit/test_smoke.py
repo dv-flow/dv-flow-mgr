@@ -5,7 +5,7 @@ import dataclasses as dc
 import pytest
 from typing import List
 import yaml
-from dv_flow_mgr import FileSet, Package, Session, TaskData, TaskImpl
+from dv_flow_mgr import FileSet, PackageDef, Session, TaskData, TaskImpl
 from pydantic import BaseModel
 from shutil import copytree
 
@@ -18,7 +18,7 @@ package:
     data = yaml.load(io.StringIO(file), Loader=yaml.FullLoader)
     print("data: %s" % str(data))
 
-    file = Package(**(data["package"]))
+    file = PackageDef(**(data["package"]))
 
 def test_smoke_2():
     file = """
@@ -107,6 +107,9 @@ def test_smoke_5(tmpdir):
         os.path.join(datadir, "proj3"),
         os.path.join(tmpdir, "proj3"))
     
+    class Test(PackageDef):
+        pass
+    
     class FileSetTask(TaskImpl):
         
         async def run(self) -> TaskData:
@@ -134,6 +137,7 @@ def test_smoke_5(tmpdir):
             print("Hello: %s" % self.spec.msg)
 
     session = Session()
+    session.addPackageDef()
     session.addImpl("SayHello", HelloTask)
     session.addImpl("FileSet", FileSetTask)
     session.load(os.path.join(tmpdir, "proj3"))

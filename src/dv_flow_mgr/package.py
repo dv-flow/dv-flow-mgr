@@ -19,87 +19,89 @@
 #*     Author: 
 #*
 #****************************************************************************
-import pydantic.dataclasses as dc
+import dataclasses as dc
 import json
 from pydantic import BaseModel
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Tuple
 from .flow import Flow
-from .task import Task, TaskSpec
+from .task_def import TaskDef
+
+class PackageAcc(object):
+    pkg_spec : 'PackageSpec'
+    session : 'Session'
+    pkg : 'Package' = None
+
+    def getPackage(self) -> 'Package':
+        if self.pkg is None:
+            self.pkg = self.session.getPackage(self.pkg_spec)
+        return self.pkg
+
+class TaskCtor(object):
+    def mkTaskParams(self, params : Dict) -> Dict:
+        raise NotImplementedError()
+    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
+        raise NotImplementedError()         
+    
+class TaskParamCtor(object):
+    base : TaskCtor
+    params : Dict[str,Any]
+
+    def mkTaskParams(self, params : Dict) -> Dict:
+        # First, apply the task-specific parameters
+        params_p = self.base.mkTaskParams(self.params)
+
+        # Then, apply the parameters passed in
+        # TODO:
+
+        return params_p
+
+    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
+        return self.base.mkTask(name, task_id, session, params, depends)
 
 @dc.dataclass
-class PackageSpec(object):
+class PackageTaskCtor(TaskCtor):
     name : str
-    params : Dict[str,Any] = dc.Field(default_factory=dict)
-    _fullname : str = None
+    pkg : 'Package'
 
-    def get_fullname(self) -> str:
-        if self._fullname is None:
-            if len(self.params) != 0:
-                self._fullname = "%s%s}" % (
-                    self.name,
-                    json.dumps(self.params, separators=(',', ':')))
-            else:
-                self._fullname = self.name
-        return self._fullname    
-    
+    def mkTaskParams(self, params : Dict) -> Dict:
+        return self.pkg.mkTaskParams(self.name, params)
+    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
+        return self.pkg.mkTask(self.name, task_id, session, params, depends)
+
+
+@dc.dataclass
+class Package(object):
+    name : str
+    params : Dict[str,Any] = dc.field(default_factory=dict)
+    # Package holds constructors for tasks
+    # - Dict holds the default parameters for the task
+    tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
+    imports : List['PackageAcc'] = dc.field(default_factory=list)
+
+    def getPackage(self, name : str) -> 'Package':
+        for p in self.imports:
+            if p.name == name:
+                return p.getPackage()
+            
+    def getTaskCtor(self, name : str) -> TaskCtor:
+        return self.tasks[name]
+            
+    def mkTaskParams(self, name : str, params : Dict) -> Dict:
+        ret = dict(self.params)
+        if name in self.tasks:
+            ret.update(self.tasks[name][0])
+        ret.update(params)
+        return ret
+            
+    def mkTask(self, 
+               name : str, 
+               task_id : int, 
+               session : 'Session',
+               params : Dict,
+               depends : List['Task']) -> 'Task':
+        # TODO: combine parameters to create the full taskname
+        return self.tasks[name].mkTask(name, task_id, session, params, depends)
+
     def __hash__(self):
-        return hash(self.get_fullname())
-
-    def __eq__(self, value):
-        return isinstance(value, PackageSpec) and value.get_fullname() == self.get_fullname()
-
-class PackageImportSpec(PackageSpec):
-    alias : str = dc.Field(default=None, alias="as")
-
-class Package(BaseModel):
-    name : str
-    params : Dict[str,Any] = dc.Field(default_factory=dict)
-    type : List[PackageSpec] = dc.Field(default_factory=list)
-    tasks : List[Task] = dc.Field(default_factory=dict)
-    imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="import")
-    pythonpath : List[str] = dc.Field(default_factory=list)
-
-    def getTask(self, name : str) -> 'Task':
-        for t in self.tasks:
-            if t.name == name:
-                return t
-
-    @staticmethod
-    def mk(self, doc, filename) -> 'Package':
-        if "package" not in doc.keys():
-            raise Exception("Missing 'package' key in %s" % filename)
-        pkg_e = doc["package"]
-
-        if "name" not in pkg_e.keys():
-            raise Exception("Missing package 'name' key in %s" % filename)
-        
-        pkg = Package(pkg_e["name"])
-
-        if "type" not in pkg_e.keys():
-            raise Exception("Missing package 'type' key in %s" % filename)
-        
-        # Type could either by just a value or a list of values
-        if isinstance(pkg_e["type"], str):
-            pkg.type.append(PackageSpec(pkg_e["type"]))
-        else:
-            for t in pkg_e["type"]:
-                pkg.type.append(PackageSpec(t))
-        
-        if "tasks" in pkg_e.keys():
-            for t in pkg_e["tasks"]:
-                task = Task.mk(t, filename)
-                if task.name in pkg.tasks.keys():
-                    raise Exception("Duplicate task %s in %s" % (task.name, filename))
-                pkg.tasks[task.name] = task
-
-        return pkg
-
-
-    def elab(self, session):
-        # TODO: determine which tasks stay, and what (if any)
-        # changes are made in them
-        # - Ensure we have bases
-        # - Populate the tasks lists bottom-up, linking sub->super
-        pass
-
+        return hash(self.fullname())
 

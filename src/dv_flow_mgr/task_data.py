@@ -30,7 +30,16 @@ class TaskData(BaseModel):
     deps : List['TaskData'] = dc.Field(default_factory=list)
     changed : bool = False
 
-    def clone(self) -> 'TaskData':
+    def hasParam(self, name: str) -> bool:
+        return name in self.params
+    
+    def getParam(self, name: str) -> Any:
+        return self.params[name]
+    
+    def setParam(self, name: str, value: Any):
+        self.params[name] = value
+
+    def copy(self) -> 'TaskData':
         ret = TaskData()
         ret.taskid = self.taskid
         ret.params = self.params.copy()
@@ -38,7 +47,16 @@ class TaskData(BaseModel):
             ret.deps.append(d.clone())
         ret.changed = self.changed
         return ret
-
-
-
+    
+    def merge(self, other):
+        for k,v in other.params.items():
+            if k not in self.params:
+                if hasattr(v, "copy"):
+                    self.params[k] = v.copy()
+                else:
+                    self.params[k] = v
+            elif hasattr(self.params[k], "merge"):
+                self.params[k].merge(v)
+            elif self.params[k] != v:
+                raise Exception("Parameter %s has conflicting values" % k)
 

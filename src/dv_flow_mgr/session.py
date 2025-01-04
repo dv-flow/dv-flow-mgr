@@ -24,8 +24,9 @@ import copy
 import yaml
 import dataclasses as dc
 from typing import Any, Dict, List
-from .package import Package, PackageSpec
-from .task_impl import TaskImpl
+from .package import Package
+from .package_def import PackageDef, PackageSpec
+from .task import Task,TaskSpec
 
 @dc.dataclass
 class Session(object):
@@ -33,15 +34,19 @@ class Session(object):
 
     # Search path for .dfs files
     package_path : List[str] = dc.field(default_factory=list)
-    package_map : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
-    package : Package = None
-    task_impl_m : Dict[str,TaskImpl] = dc.field(default_factory=dict)
+    package : PackageDef = None
     _root_dir : str = None
     _pkg_s : List[Package] = dc.field(default_factory=list)
+    _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
+    _pkg_def_s : List[PackageDef] = dc.field(default_factory=list)
+    _pkg_def_m : Dict[str,PackageDef] = dc.field(default_factory=dict)
+    _task_list : List[Task] = dc.field(default_factory=list)
+    _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
     _task_id : int = 0
 
-    def addImpl(self, name : str, impl : TaskImpl):
-        self.task_impl_m[name] = impl
+    def __post_init__(self):
+        from .tasklib.std.pkg_std import PackageStd
+        self._pkg_m[PackageSpec("std")] = PackageStd("std")
 
     def load(self, root : str):
         if os.path.isdir(root):
@@ -60,11 +65,13 @@ class Session(object):
 
         self.package = self._load_package(root, [])
 
-    def mkTaskGraph(self, task : str, tasks : Dict[str,TaskImpl]=None) -> TaskImpl:
+    def mkTaskGraph(self, task : str) -> Task:
+        self._pkg_s.clear()
+        self._task_m.clear()
 
-        if tasks is None:
-            self._pkg_s.clear()
-            tasks = {}
+        return self._mkTaskGraph(task)
+        
+    def _mkTaskGraph(self, task : str) -> Task:
 
         elems = task.split(".")
 
@@ -77,43 +84,51 @@ class Session(object):
             pkg = self._pkg_s[-1]
         else:
             pkg = self.getPackage(PackageSpec(pkg_name))
-        task = pkg.getTask(task_name)
-
-        print("Append package %s" % pkg.name)
+        
         self._pkg_s.append(pkg)
 
-        if task.impl is None:
-            raise Exception("Task %s does not have an implementation" % task_name)
-        
-        if task.impl not in self.task_impl_m.keys():
-            raise Exception("Task implementation %s not found" % task.impl)
-        
-        impl = self.task_impl_m[task.impl]
-        impl_o = impl(task, self)
+        #task_def = pkg.getTask(task_name)
 
-        for d in task.depends:
-            if d in tasks.keys():
-                impl_o.addDep(tasks[d])
-            else:
-                impl_o.addDep(self.mkTaskGraph(d, tasks))
+        depends = []
+        # for d in task_def.depends:
+        #     if d in self._task_m.keys():
+        #         depends.append(self._task_m[d])
+        #     else:
+        #         depends.append(self._mkTaskGraph(d))
+
+        task_id = self.mkTaskId(None)
+#        task_name = "%s.%s" % (pkg.name, task_def.name)
+
+        # The returned task should have all param references resolved
+        task = pkg.mkTask(
+            task_name,
+            task_id,
+            self,
+            {}, # TODO:
+            depends)
         
-        tasks[task.name] = impl_o
+        for i,d in enumerate(task.depend_refs):
+            if d in self._task_m.keys():
+                task.depends[i] = self._task_m[d]
+            else:
+                task.depends[i] = self._mkTaskGraph(d)
+
+        self._task_m[task.name] = task
 
         self._pkg_s.pop()
 
-        return impl_o
+        return task
     
     def mkTaskId(self, task : 'Task') -> int:
         self._task_id += 1
         # TODO: save task <-> id map for later?
         return self._task_id
 
-    async def run(self, task : str):
+    async def run(self, task : str) -> 'TaskData':
         impl = self.mkTaskGraph(task)
-
         return await impl.do_run()
 
-    def _load_package(self, root : str, file_s : List[str]) -> Package:
+    def _load_package(self, root : str, file_s : List[str]) -> PackageDef:
         if root in file_s:
             raise Exception("Recursive file processing @ %s: %s" % (root, ",".join(self._file_s)))
         file_s.append(root)
@@ -122,43 +137,50 @@ class Session(object):
             doc = yaml.load(fp, Loader=yaml.FullLoader)
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
-            pkg = Package(**(doc["package"]))
+            pkg = PackageDef(**(doc["package"]))
 
             for t in pkg.tasks:
                 t.basedir = os.path.dirname(root)
 
-        if not len(self._pkg_s):
-            self._pkg_s.append(pkg)
-            self.package_map[PackageSpec(pkg.name)] = pkg
+        if not len(self._pkg_def_s):
+            self._pkg_def_s.append(pkg)
+            self._pkg_def_m[PackageSpec(pkg.name)] = pkg
         else:
-            if self._pkg_s[0].name != pkg.name:
-                raise Exception("Package name mismatch: %s != %s" % (self._pkg_s[0].name, pkg.name))
+            if self._pkg_def_s[0].name != pkg.name:
+                raise Exception("Package name mismatch: %s != %s" % (self._pkg_m[0].name, pkg.name))
             else:
                 # TODO: merge content
-                self._pkg_s.append(pkg)
+                self._pkg_def_s.append(pkg)
 
         print("pkg: %s" % str(pkg))
         
         # TODO: read in sub-files
 
-        self._pkg_s.pop()
+        self._pkg_def_s.pop()
         file_s.pop()
 
     def getPackage(self, spec : PackageSpec) -> Package:
-        if spec in self.package_map.keys():
-            return self.package_map[spec]
+        if spec in self._pkg_m.keys():
+            return self._pkg_m[spec]
         else:
             base_spec = PackageSpec(spec.name)
-            if not base_spec in self.package_map.keys():
+            if not base_spec in self._pkg_def_m.keys():
                 # Template is not present. Go find it...
 
                 # If not found...
                 raise Exception("Package %s not found" % spec.name)
 
-            base = self.package_map[PackageSpec(spec.name)]
-            base_c = copy.deepcopy(base)
-            base_c.params.update(spec.params)
-            base_c.elab(self)
-            self.package_map[spec] = base_c
-            return base_c
+            base = self._pkg_def_m[PackageSpec(spec.name)]
+            pkg = base.mkPackage(self, spec.params)
+            self._pkg_m[spec] = pkg
+            return pkg
+        
+    def getTaskCtor(self, spec : TaskSpec, pkg : PackageDef) -> 'TaskCtor':
+        spec_e = spec.name.split(".")
+        task_name = spec_e[-1]
+        pkg_name = ".".join(spec_e[0:-1])
+
+        pkg = self.getPackage(PackageSpec(pkg_name))
+
+        return pkg.getTaskCtor(task_name)
 
