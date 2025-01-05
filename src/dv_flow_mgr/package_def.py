@@ -25,8 +25,8 @@ from pydantic import BaseModel
 from typing import Any, Dict, List
 from .flow import Flow
 from .package import Package
+from .task import TaskParamCtor
 from .task_def import TaskDef, TaskSpec
-from .task_template import TaskTemplate
 
 @dc.dataclass
 class PackageSpec(object):
@@ -60,12 +60,14 @@ class PackageDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(default_factory=list)
     imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="import")
 
+    basedir : str = None
+
     def getTask(self, name : str) -> 'TaskDef':
         for t in self.tasks:
             if t.name == name:
                 return t
             
-    def mkPackage(self, session, params : Dict[str,Any] = None) -> 'PackageDef':
+    def mkPackage(self, session, params : Dict[str,Any] = None) -> 'Package':
         ret = Package(self.name)
 
         for task in self.tasks:
@@ -76,6 +78,11 @@ class PackageDef(BaseModel):
                 # Only call getTaskCtor if the task is in a different package
                 task_t = task.type if isinstance(task.type, TaskSpec) else TaskSpec(task.type)
                 ctor_t = session.getTaskCtor(task_t, self)
+
+                ctor_t = TaskParamCtor(
+                    base=ctor_t, 
+                    params=task.params, 
+                    basedir=self.basedir)
             else:
                 raise Exception("")
             ret.tasks[task.name] = ctor_t

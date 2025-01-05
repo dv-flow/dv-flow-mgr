@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 
 class FileSet(BaseModel):
-    src : Any
+    src : str
     type : str
     basedir : str
     files : List[str] = dc.Field(default_factory=list)

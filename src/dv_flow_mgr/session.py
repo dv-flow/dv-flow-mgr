@@ -32,6 +32,8 @@ from .task import Task,TaskSpec
 class Session(object):
     """Manages the running of a flow"""
 
+    rundir : str
+
     # Search path for .dfs files
     package_path : List[str] = dc.field(default_factory=list)
     package : PackageDef = None
@@ -43,6 +45,7 @@ class Session(object):
     _task_list : List[Task] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
     _task_id : int = 0
+    _rundir_s : List[str] = dc.field(default_factory=list)
 
     def __post_init__(self):
         from .tasklib.std.pkg_std import PackageStd
@@ -69,14 +72,19 @@ class Session(object):
         self._pkg_s.clear()
         self._task_m.clear()
 
+        self._rundir_s.clear()
+        self._rundir_s.append(self.rundir)
+
         return self._mkTaskGraph(task)
         
-    def _mkTaskGraph(self, task : str) -> Task:
+    def _mkTaskGraph(self, task : str, params : dict = None) -> Task:
 
         elems = task.split(".")
 
         pkg_name = ".".join(elems[0:-1])
         task_name = elems[-1]
+
+        self._rundir_s.append(os.path.join(self._rundir_s[-1], pkg_name, task_name))
 
         if pkg_name == "":
             if len(self._pkg_s) == 0:
@@ -90,11 +98,8 @@ class Session(object):
         #task_def = pkg.getTask(task_name)
 
         depends = []
-        # for d in task_def.depends:
-        #     if d in self._task_m.keys():
-        #         depends.append(self._task_m[d])
-        #     else:
-        #         depends.append(self._mkTaskGraph(d))
+
+        params = pkg.mkTaskParams(task_name)
 
         task_id = self.mkTaskId(None)
 #        task_name = "%s.%s" % (pkg.name, task_def.name)
@@ -104,8 +109,9 @@ class Session(object):
             task_name,
             task_id,
             self,
-            {}, # TODO:
+            params,
             depends)
+        task.rundir = self._rundir_s[-1]
         
         for i,d in enumerate(task.depend_refs):
             if d in self._task_m.keys():
@@ -116,6 +122,7 @@ class Session(object):
         self._task_m[task.name] = task
 
         self._pkg_s.pop()
+        self._rundir_s.pop()
 
         return task
     
@@ -138,9 +145,10 @@ class Session(object):
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
             pkg = PackageDef(**(doc["package"]))
+            pkg.basedir = os.path.dirname(root)
 
-            for t in pkg.tasks:
-                t.basedir = os.path.dirname(root)
+#            for t in pkg.tasks:
+#                t.basedir = os.path.dirname(root)
 
         if not len(self._pkg_def_s):
             self._pkg_def_s.append(pkg)

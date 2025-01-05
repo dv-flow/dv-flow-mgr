@@ -29,7 +29,7 @@ class TaskSpec(object):
     name : str
 
 
-class TaskDef(BaseModel, extra='allow'):
+class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str
     type : (str|TaskSpec) = dc.Field(default_factory=list)

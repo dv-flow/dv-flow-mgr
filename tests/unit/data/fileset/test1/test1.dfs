@@ -4,7 +4,9 @@ package:
   tasks:
     - name: files1
       type: std.FileSet
-      basedir: files1
-      include: "*.sv"
+      params:
+        base: files1
+        type: systemVerilogSource
+        include: "*.sv"
 
 

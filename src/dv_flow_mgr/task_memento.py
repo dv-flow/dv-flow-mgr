@@ -24,14 +24,10 @@ from pydantic import BaseModel
 from typing import Any, Dict, List
 
 class TaskMemento(BaseModel):
-    dep_ids : List[int] = dc.Field(default_factory=list)
-    params : Dict[str,Any] = dc.Field(default_factory=dict)
+#    dep_ids : List[int] = dc.Field(default_factory=list)
+#    params : Dict[str,Any] = dc.Field(default_factory=dict)
 
-    def clone(self) -> 'TaskMemento':
-        ret = TaskMemento()
-        ret.params = self.params.copy()
-        ret.dep_ids = self.dep_ids.copy()
-        return ret
+    pass
 
 
 

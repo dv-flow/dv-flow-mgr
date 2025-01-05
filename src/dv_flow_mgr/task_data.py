@@ -39,6 +39,11 @@ class TaskData(BaseModel):
     def setParam(self, name: str, value: Any):
         self.params[name] = value
 
+    def addFileSet(self, fs : FileSet):
+        if "filesets" not in self.params:
+            self.params["filesets"] = []
+        self.params["filesets"].append(fs)
+
     def copy(self) -> 'TaskData':
         ret = TaskData()
         ret.taskid = self.taskid

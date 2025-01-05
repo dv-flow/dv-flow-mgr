@@ -24,6 +24,7 @@ import json
 from pydantic import BaseModel
 from typing import Any, Callable, Dict, List, Tuple
 from .flow import Flow
+from .task import TaskParams, TaskCtor
 from .task_def import TaskDef
 
 class PackageAcc(object):
@@ -35,38 +36,6 @@ class PackageAcc(object):
         if self.pkg is None:
             self.pkg = self.session.getPackage(self.pkg_spec)
         return self.pkg
-
-class TaskCtor(object):
-    def mkTaskParams(self, params : Dict) -> Dict:
-        raise NotImplementedError()
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
-        raise NotImplementedError()         
-    
-class TaskParamCtor(object):
-    base : TaskCtor
-    params : Dict[str,Any]
-
-    def mkTaskParams(self, params : Dict) -> Dict:
-        # First, apply the task-specific parameters
-        params_p = self.base.mkTaskParams(self.params)
-
-        # Then, apply the parameters passed in
-        # TODO:
-
-        return params_p
-
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
-        return self.base.mkTask(name, task_id, session, params, depends)
-
-@dc.dataclass
-class PackageTaskCtor(TaskCtor):
-    name : str
-    pkg : 'Package'
-
-    def mkTaskParams(self, params : Dict) -> Dict:
-        return self.pkg.mkTaskParams(self.name, params)
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
-        return self.pkg.mkTask(self.name, task_id, session, params, depends)
 
 
 @dc.dataclass
@@ -86,18 +55,21 @@ class Package(object):
     def getTaskCtor(self, name : str) -> TaskCtor:
         return self.tasks[name]
             
-    def mkTaskParams(self, name : str, params : Dict) -> Dict:
-        ret = dict(self.params)
-        if name in self.tasks:
-            ret.update(self.tasks[name][0])
-        ret.update(params)
-        return ret
-            
+    def mkTaskParams(self, name : str) -> TaskParams:
+        if name not in self.tasks:
+            raise Exception("Task " + name + " not found")
+        return self.tasks[name].mkTaskParams()
+    
+    def setTaskParams(self, name : str, params : TaskParams, pvals : Dict[str,Any]):
+        if name not in self.tasks:
+            raise Exception("Task " + name + " not found")
+        self.tasks[name].setTaskParams(params, pvals)
+
     def mkTask(self, 
                name : str, 
                task_id : int, 
                session : 'Session',
-               params : Dict,
+               params : TaskParams,
                depends : List['Task']) -> 'Task':
         # TODO: combine parameters to create the full taskname
         return self.tasks[name].mkTask(name, task_id, session, params, depends)
