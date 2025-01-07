@@ -40,7 +40,7 @@ class Session(object):
     _root_dir : str = None
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
-    _pkg_def_s : List[PackageDef] = dc.field(default_factory=list)
+    _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _pkg_def_m : Dict[str,PackageDef] = dc.field(default_factory=dict)
     _task_list : List[Task] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
@@ -49,7 +49,9 @@ class Session(object):
 
     def __post_init__(self):
         from .tasklib.std.pkg_std import PackageStd
+        from .tasklib.hdl.sim.vlt_pkg import VltPackage
         self._pkg_m[PackageSpec("std")] = PackageStd("std")
+        self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
 
     def load(self, root : str):
         if not os.path.isdir(root):
@@ -82,11 +84,13 @@ class Session(object):
         self._rundir_s.append(os.path.join(self._rundir_s[-1], pkg_name, task_name))
 
         if pkg_name == "":
-            if len(self._pkg_s) == 0:
+            if len(self._pkg_spec_s) == 0:
                 raise Exception("No package context for %s" % task)
-            pkg = self._pkg_s[-1]
+            pkg_spec = self._pkg_spec_s[-1]
         else:
-            pkg = self.getPackage(PackageSpec(pkg_name))
+            pkg_spec = PackageSpec(pkg_name)
+            self._pkg_spec_s.append(pkg_spec)
+        pkg = self.getPackage(pkg_spec)
         
         self._pkg_s.append(pkg)
 
@@ -117,6 +121,7 @@ class Session(object):
         self._task_m[task.name] = task
 
         self._pkg_s.pop()
+        self._pkg_spec_s.pop()
         self._rundir_s.pop()
 
         return task
@@ -145,48 +150,81 @@ class Session(object):
 #            for t in pkg.tasks:
 #                t.basedir = os.path.dirname(root)
 
-        if not len(self._pkg_def_s):
-            self._pkg_def_s.append(pkg)
+        if not len(self._pkg_spec_s):
+            self._pkg_spec_s.append(PackageSpec(pkg.name))
             self._pkg_def_m[PackageSpec(pkg.name)] = pkg
         else:
-            if self._pkg_def_s[0].name != pkg.name:
+            if self._pkg_spec_s[0].name != pkg.name:
                 raise Exception("Package name mismatch: %s != %s" % (self._pkg_m[0].name, pkg.name))
             else:
                 # TODO: merge content
-                self._pkg_def_s.append(pkg)
+                self._pkg_spec_s.append(PackageSpec(pkg.name))
 
         print("pkg: %s" % str(pkg))
         
-        # TODO: read in sub-files
+        # TODO: read in fragments
 
-        self._pkg_def_s.pop()
+        self._pkg_spec_s.pop()
         file_s.pop()
 
         return pkg
 
     def getPackage(self, spec : PackageSpec) -> Package:
-        pkg_def = self._pkg_def_s[-1]
+        pkg_spec = self._pkg_spec_s[-1]
+        pkg_def = self._pkg_def_m[pkg_spec]
 
-        for imp in pkg_def.imports:
-            if imp.alias is not None and imp.alias == spec.name:
-                # Found the alias name
-                return self.getPackage
-            if imp.name == spec.name:
-                return self.getPackage(imp
+        # Need a stack to track which package we are currently in
+        # Need a map to get a concrete package from a name with parameterization
+
+        # Note: _pkg_m needs to be context specific, such that imports from
+        # one package don't end up visible in another
         if spec in self._pkg_m.keys():
-            return self._pkg_m[spec]
-        else:
-            base_spec = PackageSpec(spec.name)
-            if not base_spec in self._pkg_def_m.keys():
-                # Template is not present. Go find it...
-
-                # If not found...
-                raise Exception("Package %s not found" % spec.name)
-
-            base = self._pkg_def_m[PackageSpec(spec.name)]
-            pkg = base.mkPackage(self, spec.params)
+            pkg = self._pkg_m[spec]
+        elif spec in self._pkg_def_m.keys():
+            pkg = self._pkg_def_m[spec].mkPackage(self)
             self._pkg_m[spec] = pkg
-            return pkg
+        else:
+            pkg = None
+            print("imports: %s" % str(pkg_def.imports))
+            for imp in pkg_def.imports:
+                print("imp: %s" % str(imp))
+                if imp.alias is not None and imp.alias == spec.name:
+                    # Found the alias name. Just need to get an instance of this package
+                    tgt_pkg_spec = PackageSpec(imp.name)
+                    if tgt_pkg_spec in self._pkg_m.keys():
+                        pkg = self._pkg_m[tgt_pkg_spec]
+                    elif tgt_pkg_spec in self._pkg_def_m.keys():
+                        base = self._pkg_def_m[tgt_pkg_spec]
+                        pkg = base.mkPackage(self, spec.params)
+                        self._pkg_m[spec] = pkg
+                    elif imp.path is not None:
+                        # See if we can load the package
+                        print("TODO: load referenced package")
+                    else:
+                        raise Exception("Import alias %s not found" % imp.name)
+                    break
+                else:
+                    # Need to compare the spec with the full import spec
+                    imp_spec = PackageSpec(imp.name)
+                    # TODO: set parameters
+                    if imp_spec == spec:
+                        base = self._pkg_def_m[PackageSpec(spec.name)]
+                        pkg = base.mkPackage(self, spec.params)
+                        self._pkg_m[spec] = pkg
+                        break
+
+            if pkg is None:
+                raise Exception("Failed to find package %s from package %s" % (
+                    spec.name, pkg_def.name))
+
+#            base_spec = PackageSpec(spec.name)
+#            if not base_spec in self._pkg_def_m.keys():
+#                # Template is not present. Go find it...
+#
+#                # If not found...
+#                raise Exception("Package %s not found" % spec.name)
+
+        return pkg
         
     def getTaskCtor(self, spec : TaskSpec, pkg : PackageDef) -> 'TaskCtor':
         spec_e = spec.name.split(".")

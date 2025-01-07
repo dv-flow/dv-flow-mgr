@@ -1,6 +1,8 @@
-from ....package_def import PackageDef
+import dataclasses as dc
+from ....package import Package
 
-class PackageHdlSim(PackageDef):
+@dc.dataclass
+class PackageHdlSim(Package):
     # TODO: parameter to select proper implementation
     pass
 

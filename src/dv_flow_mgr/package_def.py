@@ -50,7 +50,9 @@ class PackageSpec(object):
     def __eq__(self, value):
         return isinstance(value, PackageSpec) and value.get_fullname() == self.get_fullname()
 
+@dc.dataclass
 class PackageImportSpec(PackageSpec):
+    path : str = dc.Field(default=None, alias="from")
     alias : str = dc.Field(default=None, alias="as")
 
 class PackageDef(BaseModel):
@@ -58,7 +60,7 @@ class PackageDef(BaseModel):
     params : Dict[str,Any] = dc.Field(default_factory=dict)
     type : List[PackageSpec] = dc.Field(default_factory=list)
     tasks : List[TaskDef] = dc.Field(default_factory=list)
-    imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="import")
+    imports : List[PackageImportSpec] = dc.Field(default_factory=list)
     fragments: List[str] = dc.Field(default_factory=list)
 
 #    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
@@ -69,7 +71,7 @@ class PackageDef(BaseModel):
         for t in self.tasks:
             if t.name == name:
                 return t
-            
+    
     def mkPackage(self, session, params : Dict[str,Any] = None) -> 'Package':
         ret = Package(self.name)
 
