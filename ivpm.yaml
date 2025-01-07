@@ -23,5 +23,9 @@ package:
       url: https://github.com/fvutils/svdep.git
     - name: pyyaml
       src: pypi
+    - name: Sphinx
+      src: pypi
+    - name: sphinx-jsonschema
+      src: pypi
 
 

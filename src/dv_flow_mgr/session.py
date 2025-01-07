@@ -20,7 +20,6 @@
 #*
 #****************************************************************************
 import os
-import copy
 import yaml
 import dataclasses as dc
 from typing import Any, Dict, List
@@ -32,6 +31,7 @@ from .task import Task,TaskSpec
 class Session(object):
     """Manages the running of a flow"""
 
+    srcdir : str
     rundir : str
 
     # Search path for .dfs files
@@ -52,21 +52,16 @@ class Session(object):
         self._pkg_m[PackageSpec("std")] = PackageStd("std")
 
     def load(self, root : str):
-        if os.path.isdir(root):
-            root_f = []
-            for f in os.listdir(root):
-                if f.endswith(".dfs"):
-                    root_f.append(os.path.join(root, f))
-            if len(root_f) == 0:
-                raise Exception("No .dfs files found in " + root)
-            elif len(root_f) > 1:
-                raise Exception("Multiple .dfs files found in " + root + "(" + ",".join(root_f) + ")")
-            else:
-                root = root_f[0]
+        if not os.path.isdir(root):
+            raise Exception("Root directory %s does not exist" % root)
+
+        if not os.path.isfile(os.path.join(root, "flow.yaml")):
+            raise Exception("No root flow file")
 
         self._root_dir = os.path.dirname(root)
+        self.package = self._load_package(os.path.join(root, "flow.yaml"), [])
 
-        self.package = self._load_package(root, [])
+        return self.package
 
     def mkTaskGraph(self, task : str) -> Task:
         self._pkg_s.clear()
@@ -167,7 +162,17 @@ class Session(object):
         self._pkg_def_s.pop()
         file_s.pop()
 
+        return pkg
+
     def getPackage(self, spec : PackageSpec) -> Package:
+        pkg_def = self._pkg_def_s[-1]
+
+        for imp in pkg_def.imports:
+            if imp.alias is not None and imp.alias == spec.name:
+                # Found the alias name
+                return self.getPackage
+            if imp.name == spec.name:
+                return self.getPackage(imp
         if spec in self._pkg_m.keys():
             return self._pkg_m[spec]
         else:
@@ -188,7 +193,11 @@ class Session(object):
         task_name = spec_e[-1]
         pkg_name = ".".join(spec_e[0:-1])
 
-        pkg = self.getPackage(PackageSpec(pkg_name))
+        try:
+            pkg = self.getPackage(PackageSpec(pkg_name))
+        except Exception as e:
+            print("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
+            raise e
 
         return pkg.getTaskCtor(task_name)
 

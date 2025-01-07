@@ -1,0 +1,163 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://fvutils.github.io/dv-flow-mgr/flow.json",
+    "title": "Flow-specification schema",
+    "description": "Flow-specification schema",
+    "type": "object",
+    "properties": {
+        "package": {
+            "$ref": "#/defs/package-def"
+        },
+        "fragment": {
+            "$ref": "#/defs/fragment-def"
+        },
+        "oneOf": [
+            {"required": ["package"]},
+            {"required": ["fragment"]}
+        ]
+    },
+    "defs": {
+
+        "package-def": {
+            "title": "Package Definition",
+            "$$target": "#/defs/package-def",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "imports": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/import-def"
+                    }
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/param"
+                    }
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/task-def"
+                    }
+                },
+                "fragments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+
+        "import-def": {
+            "title": "Import Definition",
+            "$$target": "#/defs/import-def",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "as": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/param"
+                    }
+                },
+                "from": {
+                    "type": "string"
+                }
+            }
+        },
+
+        "fragment-def": {
+            "title": "Fragment Definition",
+            "$$target": "#/defs/fragment-def",
+            "type": "object",
+            "properties": {
+                "imports": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/task-def"
+                    }
+                },
+                "fragments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "param": {
+            "title": "Parameter Definition",
+            "$$target": "#/defs/param",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "task-dep": {
+            "title": "Task dependency specification",
+            "$$target": "#/defs/task-dep",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/param"
+                    }
+                }
+            }
+        },
+        "task-def": {
+            "title": "Task Definition",
+            "$$target": "#/defs/task-def",
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/param"
+                    }
+                },
+                "depends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/defs/task-dep"
+                    }
+                }
+            }
+        }
+    }
+}
+

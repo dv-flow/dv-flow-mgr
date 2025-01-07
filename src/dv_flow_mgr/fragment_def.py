@@ -1,5 +1,5 @@
 #****************************************************************************
-#* fileset.py
+#* fragment_def.py
 #*
 #* Copyright 2023 Matthew Ballance and Contributors
 #*
@@ -20,12 +20,27 @@
 #*
 #****************************************************************************
 import pydantic.dataclasses as dc
+import json
 from pydantic import BaseModel
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
+from .flow import Flow
+from .package import Package
+from .package_def import PackageImportSpec
+from .task import TaskParamCtor
+from .task_def import TaskDef, TaskSpec
 
-class FileSet(BaseModel):
-    src : str
-    type : str
-    basedir : str
-    files : List[str] = dc.Field(default_factory=list)
-    params : Dict[str,str] = dc.Field(default_factory=dict)
+class FragmentDef(BaseModel):
+    tasks : List[TaskDef] = dc.Field(default_factory=list)
+    imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="imports")
+    fragments: List[str] = dc.Field(default_factory=list)
+
+    basedir : str = None
+
+    def getTask(self, name : str) -> 'TaskDef':
+        for t in self.tasks:
+            if t.name == name:
+                return t
+            
+    def apply(self, session, pkg : Package):
+        pass
+            

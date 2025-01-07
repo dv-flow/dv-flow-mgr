@@ -35,15 +35,38 @@ class TaskSpec(object):
 class TaskParams(BaseModel):
     pass
 
+@dc.dataclass
 class TaskCtor(object):
     def mkTaskParams(self) -> TaskParams:
         raise NotImplementedError()
     
     def setTaskParams(self, params : TaskParams, pvals : Dict[str,Any]):
-        raise NotImplementedError()         
+        for p in pvals.keys():
+            if not hasattr(params, p):
+                raise Exception("Unsupported parameter: " + p)
+            else:
+                setattr(params, p, pvals[p])
 
     def mkTask(self, name : str, task_id : int, session : 'Session', params : TaskParams, depends : List['Task']) -> 'Task':
-        raise NotImplementedError()         
+        raise NotImplementedError()
+
+@dc.dataclass
+class TaskCtorT(TaskCtor):
+    TaskParamsT : TaskParams
+    TaskT : 'Task'
+
+    def mkTaskParams(self) -> TaskParams:
+        return self.TaskParamsT()
+
+    def mkTask(self, name : str, task_id : int, session : 'Session', params : TaskParams, depends : List['Task']) -> 'Task':
+        task = self.TaskT(
+            name=name, 
+            task_id=task_id, 
+            session=session, 
+            params=params, 
+            depends=depends)
+        task.depends.extend(depends)
+        return task
 
 @dc.dataclass
 class TaskParamCtor(object):

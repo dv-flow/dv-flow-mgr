@@ -37,7 +37,6 @@ class PackageAcc(object):
             self.pkg = self.session.getPackage(self.pkg_spec)
         return self.pkg
 
-
 @dc.dataclass
 class Package(object):
     name : str

@@ -17,7 +17,6 @@ class TaskFileSet(Task):
         ))
 
         glob_root = os.path.join(self.basedir, self.params.base)
-#        glob_root = os.path.join(os.getcwd(), self.params.base)
 
         ex_memento = self.getMemento(TaskFileSetMemento)
 
@@ -56,7 +55,6 @@ class TaskFileSetParams(TaskParams):
 class TaskFileSetMemento(TaskMemento):
     files : List[Tuple[str,float]] = dc.Field(default_factory=list)
 
-
 class TaskFileSetCtor(TaskCtor):
 
     def mkTaskParams(self) -> TaskParams:
@@ -70,7 +68,6 @@ class TaskFileSetCtor(TaskCtor):
                 setattr(params, p, pvals[p])
 
     def mkTask(self, name : str, task_id : int, session : 'Session', params : TaskParams, depends : List['Task']) -> 'Task':
-        
         task = TaskFileSet(
             name=name, 
             task_id=task_id, 
@@ -78,8 +75,6 @@ class TaskFileSetCtor(TaskCtor):
             params=params,
             basedir=os.path.dirname(os.path.abspath(__file__)),
             srcdir=os.path.dirname(os.path.abspath(__file__)))
-
         task.depends.extend(depends)
-
         return task
     

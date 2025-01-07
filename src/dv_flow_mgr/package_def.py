@@ -59,6 +59,9 @@ class PackageDef(BaseModel):
     type : List[PackageSpec] = dc.Field(default_factory=list)
     tasks : List[TaskDef] = dc.Field(default_factory=list)
     imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="import")
+    fragments: List[str] = dc.Field(default_factory=list)
+
+#    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
 
     basedir : str = None
 
