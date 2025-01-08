@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Quickstart &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Flow-Spec Reference" href="reference.html" />
+    <link rel="prev" title="DV Flow Manager" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">¶</a></h1>
+<section id="installing-dv-flow-manager">
+<h2>Installing DV Flow Manager<a class="headerlink" href="#installing-dv-flow-manager" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager is most-easily installed from the PyPi repository:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dv-flow-mgr
+</pre></div>
+</div>
+<p>Once installed, DV Flow Mananager can be invoked using the <cite>dvfm</cite> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dvfm<span class="w"> </span>--help
+</pre></div>
+</div>
+</section>
+<section id="your-first-flow">
+<h2>Your First Flow<a class="headerlink" href="#your-first-flow" title="Link to this heading">¶</a></h2>
+<p>When starting a hardware project, it’s often easy to first create a little
+compile script for the HDL sources. Over time, that script becomes larger and
+larger until we realize that it’s time to create a proper build system for our
+design, its testbench, synthesis flows, etc.</p>
+<p>A key goal of DV Flow Manager is to be easy enough to use that there is no need
+to create the <cite>runit.sh</cite> shell script in the first place. We can start by creating
+a <cite>flow.yaml</cite> file and just continue evolving our flow definition as the project grows.</p>
+<p>Let’s create a little top-level module for our design named <cite>top.sv</cite>:</p>
+<div class="highlight-systemverilog notranslate"><div class="highlight"><pre><span></span><span class="k">module</span><span class="w"> </span><span class="n">top</span><span class="p">;</span>
+<span class="w">    </span><span class="k">initial</span><span class="w"> </span><span class="k">begin</span>
+<span class="w">        </span><span class="p">$</span><span class="n">display</span><span class="p">(</span><span class="s">&quot;Hello, World!&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="p">$</span><span class="n">finish</span><span class="p">;</span>
+<span class="w">    </span><span class="k">end</span>
+<span class="k">endmodule</span>
+</pre></div>
+</div>
+<p>Now, we’ll create a minimal <cite>flow.yaml</cite> file that will allow us to compile and
+simulate this module.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
+<span class="w">        </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-image</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimImage</span>
+<span class="w">        </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-run</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimRun</span>
+<span class="w">        </span><span class="nt">depends</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim-image</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>If we run the <cite>dvfm run</cite> command, DV Flow Manager will:</p>
+<ul class="simple">
+<li><p>Find all files with a <cite>.sv</cite> extension in the current directory</p></li>
+<li><p>Compile them into a simulation image</p></li>
+<li><p>Run the simulation image</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dvfm<span class="w"> </span>run
+</pre></div>
+</div>
+<p>The command should complete successfully, and we should see the following</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installing-dv-flow-manager">Installing DV Flow Manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#your-first-flow">Your First Flow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">DV Flow Manager</a></li>
+      <li>Next: <a href="reference.html" title="next chapter">Flow-Spec Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/quickstart.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
