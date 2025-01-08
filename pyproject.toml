@@ -9,6 +9,7 @@ version = "0.0.1"
 dependencies = [
     "pyyaml",
     "toposort",
+    "svdep"
 ]
 authors = [
     {name = "Matthew Ballance", email = "matt.ballance@gmail.com"},

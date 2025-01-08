@@ -14,7 +14,7 @@ jobs:
         # Install dependencies required to load ivpm.yaml file
         python3 -m venv packages/python
         ./packages/python/bin/python -m pip install ivpm setuptools build --upgrade
-        ./packages/python/bin/python3 -m ivpm update
+        ./packages/python/bin/python3 -m ivpm update -a
 #    - name: Run Tests
 #      run: |
 #        export PYTHONPATH=$(pwd)/src:$(pwd)/test
