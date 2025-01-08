@@ -5,15 +5,17 @@
     "description": "Flow-specification schema",
     "type": "object",
     "properties": {
-        "package": {
-            "$ref": "#/defs/package-def"
-        },
-        "fragment": {
-            "$ref": "#/defs/fragment-def"
-        },
         "oneOf": [
-            {"required": ["package"]},
-            {"required": ["fragment"]}
+            {
+                "package": {
+                    "$ref": "#/defs/package-def"
+                }
+            },
+            {
+                "fragment": {
+                    "$ref": "#/defs/fragment-def"
+                }
+            }
         ]
     },
     "defs": {
