@@ -4,20 +4,24 @@
     "title": "Flow-specification schema",
     "description": "Flow-specification schema",
     "type": "object",
-    "properties": {
-        "oneOf": [
-            {
+    "oneOf": [
+        {
+            "properties": {
                 "package": {
-                    "$ref": "#/defs/package-def"
+                    "$ref": "#/defs/package-def",
+                    "title": "Package Definition",
+                    "description": "Package Definition"
                 }
-            },
-            {
+            }
+        },
+        {
+            "properties": {
                 "fragment": {
                     "$ref": "#/defs/fragment-def"
                 }
             }
-        ]
-    },
+        }
+    ],
     "defs": {
 
         "package-def": {
