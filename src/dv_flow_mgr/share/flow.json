@@ -32,7 +32,7 @@
                         "$ref": "#/defs/import-def"
                     }
                 },
-                "params": {
+                "with": {
                     "type": "array",
                     "items": {
                         "$ref": "#/defs/param"
@@ -64,7 +64,7 @@
                 "as": {
                     "type": "string"
                 },
-                "params": {
+                "with": {
                     "type": "array",
                     "items": {
                         "$ref": "#/defs/param"
@@ -125,7 +125,7 @@
                 "name": {
                     "type": "string"
                 },
-                "params": {
+                "with": {
                     "type": "array",
                     "items": {
                         "$ref": "#/defs/param"
@@ -144,17 +144,26 @@
                 "type": {
                     "type": "string"
                 },
-                "params": {
+                "with": {
                     "type": "array",
                     "items": {
                         "$ref": "#/defs/param"
                     }
                 },
                 "depends": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/defs/task-dep"
-                    }
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/defs/task-dep"
+                            }
+                        }, {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    ]
                 }
             }
         }

@@ -155,4 +155,9 @@ package:
 
 # Differences
 - Goal is to build data packages to pass to a task, or tasks, instead of building a single global data structure
+
+
+# DV Flow Manager 1.0.0
+- Packages and Fragments
+- Package Import
 - 

@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'DV Flow Manager'
-copyright = '2025, Matthew Ballance'
+copyright = '2023-2025, Matthew Ballance'
 author = 'Matthew Ballance'
 
 # -- General configuration ---------------------------------------------------

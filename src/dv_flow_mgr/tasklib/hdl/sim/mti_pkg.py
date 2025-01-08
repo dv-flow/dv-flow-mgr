@@ -5,9 +5,7 @@ from .mti_task_sim_run import TaskMtiSimRunCtor
 
 @dc.dataclass
 class MtiPackage(PackageHdlSim):
-
     def __post_init__(self):
         self.tasks["SimImage"] = TaskMtiSimImageCtor()
         self.tasks["SimRun"] = TaskMtiSimRunCtor()
-    pass
 
