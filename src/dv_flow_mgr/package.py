@@ -71,7 +71,8 @@ class Package(object):
                params : TaskParams,
                depends : List['Task']) -> 'Task':
         # TODO: combine parameters to create the full taskname
-        return self.tasks[name].mkTask(name, task_id, session, params, depends)
+        task =  self.tasks[name].mkTask(name, task_id, session, params, depends)
+        return task
 
     def __hash__(self):
         return hash(self.fullname())

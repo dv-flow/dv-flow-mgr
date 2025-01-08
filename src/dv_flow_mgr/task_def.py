@@ -34,7 +34,7 @@ class TaskDef(BaseModel):
     name : str
     type : (str|TaskSpec) = dc.Field(default_factory=list)
     depends : List[(str|TaskSpec)] = dc.Field(default_factory=list)
-    params: Dict[str,Any] = dc.Field(default_factory=dict)
+    params: Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
 
     def copy(self) -> 'TaskDef':
         ret = TaskDef(

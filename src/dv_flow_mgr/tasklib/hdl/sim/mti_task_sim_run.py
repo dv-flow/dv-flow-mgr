@@ -8,7 +8,7 @@ from ....task_data import TaskData
 from ....task_memento import TaskMemento
 from typing import List, Tuple
 
-class TaskVltSimRun(Task):
+class TaskMtiSimRun(Task):
 
     async def run(self, input : TaskData) -> TaskData:
         vl_fileset = input.getFileSets("verilatorBinary")
@@ -16,7 +16,9 @@ class TaskVltSimRun(Task):
         build_dir = vl_fileset[0].basedir
 
         cmd = [
-            os.path.join(build_dir, 'obj_dir/simv'),
+            'vsim', '-batch', '-do', 'run -all; quit -f',
+            '-work', os.path.join(build_dir, 'work'),
+            'simv_opt'
         ]
 
         fp = open(os.path.join(self.rundir, 'sim.log'), "w")
@@ -33,13 +35,13 @@ class TaskVltSimRun(Task):
 
         return output
 
-class TaskVltSimRunParams(TaskParams):
+class TaskMtiSimRunParams(TaskParams):
     pass
 
-class TaskVltSimRunMemento(TaskMemento):
+class TaskMtiSimRunMemento(TaskMemento):
     pass
 
-class TaskVltSimRunCtor(TaskCtorT):
+class TaskMtiSimRunCtor(TaskCtorT):
     def __init__(self):
-        super().__init__(TaskVltSimRunParams, TaskVltSimRun)
+        super().__init__(TaskMtiSimRunParams, TaskMtiSimRun)
 

@@ -20,5 +20,9 @@ class CmdRun(object):
             graphs.append(subgraph)
 
         awaitables = [subgraph.do_run() for subgraph in graphs]
-        out = asyncio.gather(*awaitables)
+        print("%d awaitables" % len(awaitables))
+
+        out = asyncio.get_event_loop().run_until_complete(asyncio.gather(*awaitables))
+
+        print("out: %s" % str(out))
 

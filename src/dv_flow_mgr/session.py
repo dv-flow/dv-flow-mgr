@@ -19,10 +19,11 @@
 #*     Author: 
 #*
 #****************************************************************************
+import asyncio
 import os
 import yaml
 import dataclasses as dc
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .task import Task,TaskSpec
@@ -37,6 +38,7 @@ class Session(object):
     # Search path for .dfs files
     package_path : List[str] = dc.field(default_factory=list)
     package : PackageDef = None
+    create_subprocess : Callable = asyncio.create_subprocess_exec
     _root_dir : str = None
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
@@ -50,7 +52,9 @@ class Session(object):
     def __post_init__(self):
         from .tasklib.std.pkg_std import PackageStd
         from .tasklib.hdl.sim.vlt_pkg import VltPackage
+        from .tasklib.hdl.sim.mti_pkg import MtiPackage
         self._pkg_m[PackageSpec("std")] = PackageStd("std")
+        self._pkg_m[PackageSpec("hdl.sim.mti")] = MtiPackage("hdl.sim.mti")
         self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
 
     def load(self, root : str):
@@ -89,7 +93,8 @@ class Session(object):
             pkg_spec = self._pkg_spec_s[-1]
         else:
             pkg_spec = PackageSpec(pkg_name)
-            self._pkg_spec_s.append(pkg_spec)
+
+        self._pkg_spec_s.append(pkg_spec)
         pkg = self.getPackage(pkg_spec)
         
         self._pkg_s.append(pkg)
@@ -114,9 +119,10 @@ class Session(object):
         
         for i,d in enumerate(task.depend_refs):
             if d in self._task_m.keys():
-                task.depends[i] = self._task_m[d]
+                task.depends.append(self._task_m[d])
             else:
-                task.depends[i] = self._mkTaskGraph(d)
+                print("mkTaskGraph: %s" % d)
+                task.depends.append(self._mkTaskGraph(d))
 
         self._task_m[task.name] = task
 

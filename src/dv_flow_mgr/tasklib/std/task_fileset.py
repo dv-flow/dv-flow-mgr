@@ -1,4 +1,5 @@
 import os
+import glob
 import fnmatch
 import pydantic.dataclasses as dc
 from ...fileset import FileSet
@@ -26,11 +27,19 @@ class TaskFileSet(Task):
             basedir=glob_root)
         print("glob_root: %s" % glob_root)
 
+        if not isinstance(self.params.include, list):
+            self.params.include = [self.params.include]
+
+        included_files = []
+        for pattern in self.params.include:
+            print("pattern: %s" % pattern)
+            included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
+
         memento = TaskFileSetMemento()
-        for root, _, files in os.walk(glob_root):
-            for f in files:
-                print("File: %s" % f)
-                memento.files.append((f, os.path.getmtime(os.path.join(root, f))))
+        for file in included_files:
+            if not any(glob.fnmatch.fnmatch(file, os.path.join(glob_root, pattern)) for pattern in self.params.exclude):
+                memento.files.append((file, os.path.getmtime(os.path.join(glob_root, file))))
+                fs.files.append(file[len(glob_root):])
 
         # Check to see if the filelist or fileset have changed
         # Only bother doing this if the upstream task data has not changed
@@ -47,7 +56,7 @@ class TaskFileSet(Task):
         return input
 
 class TaskFileSetParams(TaskParams):
-    base : str = "${{ task.basedir }}"
+    base : str = ""
     type : str = "Unknown"
     include : List[str] = dc.Field(default_factory=list)
     exclude : List[str] = dc.Field(default_factory=list)

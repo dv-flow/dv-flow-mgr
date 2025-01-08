@@ -73,6 +73,7 @@ class TaskParamCtor(object):
     base : TaskCtor
     params : Dict[str,Any]
     basedir : str
+    depend_refs : List['TaskSpec']
 
     def mkTaskParams(self) -> TaskParams:
         params = self.base.mkTaskParams()
@@ -90,6 +91,7 @@ class TaskParamCtor(object):
             params=params, 
             depends=depends)
         task.basedir = self.basedir
+        task.depend_refs.extend(self.depend_refs)
         return task
 
 @dc.dataclass
@@ -114,6 +116,7 @@ class Task(object):
     memento : TaskMemento = None
     depend_refs : List['TaskSpec'] = dc.field(default_factory=list)
     depends : List[int] = dc.field(default_factory=list)
+    running : bool = False
     output_set : bool = False
     output : Any = None
     output_ev : Any = asyncio.Event()
@@ -141,12 +144,18 @@ class Task(object):
         self.memento = memento
 
     async def do_run(self) -> TaskData:
+        print("do_run: %s - %d depends" % (self.name, len(self.depends)))
         if len(self.depends) > 0:
             awaitables = [dep.waitOutput() for dep in self.depends]
             deps_o = await asyncio.gather(*awaitables)
 
+            print("deps_o: %s" % str(deps_o))
+
             # Merge the output of the dependencies into a single input data
-            input = None
+#            if len(self.depends) > 1:
+#                raise Exception("TODO: handle >1 inputs")
+
+            input = self.depends[0].output.copy()
         else:
             input = TaskData()
 
@@ -174,6 +183,8 @@ class Task(object):
             with open(os.path.join(self.rundir, "memento.json"), "w") as fp:
                 fp.write(self.memento.model_dump_json(indent=2))
 
+        self.running = False
+
         # Combine data from the deps to produce a result
         return result
 
@@ -188,11 +199,13 @@ class Task(object):
 
     async def waitOutput(self) -> TaskData:
         if not self.output_set:
-            if self.task_id != -1:
+            if self.running:
                 # Task is already running
+                print("wait")
                 await self.output_ev.wait()
             else:
-                self.task_id = 0
+                self.running = True
+                print("start task")
                 await self.do_run()
         return self.output
     

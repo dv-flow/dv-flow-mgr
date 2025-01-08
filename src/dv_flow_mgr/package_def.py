@@ -87,7 +87,8 @@ class PackageDef(BaseModel):
                 ctor_t = TaskParamCtor(
                     base=ctor_t, 
                     params=task.params, 
-                    basedir=self.basedir)
+                    basedir=self.basedir,
+                    depend_refs=task.depends)
             else:
                 raise Exception("")
             ret.tasks[task.name] = ctor_t

@@ -21,7 +21,7 @@
 #****************************************************************************
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Set, List, Tuple
 from .fileset import FileSet
 
 class TaskData(BaseModel):
@@ -44,9 +44,19 @@ class TaskData(BaseModel):
             self.params["filesets"] = []
         self.params["filesets"].append(fs)
 
+    def getFileSets(self, type : (str|Set[str])=None) -> List[FileSet]:
+        ret = []
+
+        if "filesets" in self.params:
+            for fs in self.params["filesets"]:
+                if type is None or fs.type in type:
+                    ret.append(fs)
+        
+        return ret
+
     def copy(self) -> 'TaskData':
         ret = TaskData()
-        ret.taskid = self.taskid
+        ret.task_id = self.task_id
         ret.params = self.params.copy()
         for d in self.deps:
             ret.deps.append(d.clone())
