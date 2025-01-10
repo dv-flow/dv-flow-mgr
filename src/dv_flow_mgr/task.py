@@ -143,6 +143,9 @@ class Task(object):
     def setMemento(self, memento : TaskMemento):
         self.memento = memento
 
+    async def isUpToDate(self, memento) -> bool:
+        return False
+
     async def do_run(self) -> TaskData:
         print("do_run: %s - %d depends" % (self.name, len(self.depends)))
         if len(self.depends) > 0:

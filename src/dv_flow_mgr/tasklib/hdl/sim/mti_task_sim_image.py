@@ -15,10 +15,10 @@ from svdep import FileCollection, TaskCheckUpToDate, TaskBuildFileCollection
 class TaskMtiSimImage(VlTaskSimImage):
 
     def getRefTime(self):
-        if os.path.isdir(os.path.join(self.rundir, 'work.d')):
+        if os.path.isfile(os.path.join(self.rundir, 'work.d')):
             return os.path.getmtime(os.path.join(self.rundir, 'work.d'))
         else:
-            raise Exception("work.d not found")
+            raise Exception("work.d not found (%s)")
     
     async def build(self, files : List[str], incdirs : List[str]):
         if not os.path.isdir(os.path.join(self.rundir, 'work')):
@@ -53,7 +53,7 @@ class TaskMtiSimImage(VlTaskSimImage):
         await proc.wait()
 
         with open(os.path.join(self.rundir, 'work.d'), "w") as fp:
-            pass
+            fp.write("\n")
 
         if proc.returncode != 0:
             raise Exception("Questa opt failed")

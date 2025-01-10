@@ -60,16 +60,19 @@ simulate this module.
         tasks:
           - name: rtl
             type: std.FileSet
-            params:
+            with:
+              type: "systemVerilogSource"
               include: "*.sv"
 
           - name: sim-image
             type: hdl.sim.SimImage
-            depends: [rtl]
+            with:
+              - top: [top]
+            needs: [rtl]
 
           - name: sim-run
             type: hdl.sim.SimRun
-            depends: [sim-image]
+            needs: [sim-image]
 
 
 If we run the `dvfm run` command, DV Flow Manager will:
@@ -80,6 +83,52 @@ If we run the `dvfm run` command, DV Flow Manager will:
 
 .. code-block:: bash
 
-    % dvfm run
+    % dvfm run sim-run
 
-The command should complete successfully, and we should see the following
+This will compile the source, build a simulation image for module `top`,
+and run the resulting image. Not too bad for 20-odd lines of build specification.
+
+A Bit More Detail
+=================
+Let's break this down just a bit:
+
+.. code-block:: yaml
+
+    package:
+        name: my_design
+
+        imports:
+          - name: hdl.sim.vlt
+            as: hdl.sim
+
+DV Flow Manager views the world as a series of *packages* that reference each
+other and contain *tasks* to operate on sources within the *packages*.
+
+Here, we have declared a new package (my_design) and specified that it 
+references a built-in package named `hdl.sim.vlt`. This is a package that
+implements tasks for performing HDL simulation with the Verilator simulator.
+
+Note that we specify an alias (hdl.sim) for the package when importing it.
+This will allow us to easily swap in a different simulator without changing
+anything else within our package definition.
+
+.. code-block:: yaml
+    :highlight: 8,12
+
+    package:
+        name: my_design
+
+        imports:
+          - name: hdl.sim.vlt
+            as: hdl.sim
+
+        tasks:
+          - name: rtl
+            type: std.FileSet
+            with:
+              type: "systemVerilogSource"
+              include: "*.sv"
+
+Our first task is to specify the sources we want to process. This is done
+by specifying a `FileSet` task. The parameters of this task specify where
+the task should look for sources and which sources it should include

@@ -41,7 +41,7 @@ class VlTaskSimImage(Task):
                 info = FileCollection.from_dict(ex_memento.svdeps)
                 in_changed = not TaskCheckUpToDate(files, incdirs).check(info, ref_mtime)
             except Exception as e:
-                print("Unexpected output-directory format. Rebuilding")
+                print("Unexpected output-directory format (%s). Rebuilding" % str(e))
                 shutil.rmtree(self.rundir)
                 os.makedirs(self.rundir)
                 in_changed = True
@@ -56,7 +56,7 @@ class VlTaskSimImage(Task):
             await self.build(files, incdirs) 
 
         output = TaskData()
-        output.addFileSet(FileSet(src=self.name, type="verilatorBinary", basedir=self.rundir))
+        output.addFileSet(FileSet(src=self.name, type="simDir", basedir=self.rundir))
         output.changed = in_changed
 
         self.setMemento(memento)

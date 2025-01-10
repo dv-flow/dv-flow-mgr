@@ -24,36 +24,12 @@ import json
 from pydantic import BaseModel
 from typing import Any, Dict, List
 from .flow import Flow
+from .fragment_def import FragmentDef
 from .package import Package
+from .package_import_spec import PackageImportSpec, PackageSpec
 from .task import TaskParamCtor
 from .task_def import TaskDef, TaskSpec
 
-@dc.dataclass
-class PackageSpec(object):
-    name : str
-    params : Dict[str,Any] = dc.Field(default_factory=dict)
-    _fullname : str = None
-
-    def get_fullname(self) -> str:
-        if self._fullname is None:
-            if len(self.params) != 0:
-                self._fullname = "%s%s}" % (
-                    self.name,
-                    json.dumps(self.params, separators=(',', ':')))
-            else:
-                self._fullname = self.name
-        return self._fullname    
-    
-    def __hash__(self):
-        return hash(self.get_fullname())
-
-    def __eq__(self, value):
-        return isinstance(value, PackageSpec) and value.get_fullname() == self.get_fullname()
-
-@dc.dataclass
-class PackageImportSpec(PackageSpec):
-    path : str = dc.Field(default=None, alias="from")
-    alias : str = dc.Field(default=None, alias="as")
 
 class PackageDef(BaseModel):
     name : str
@@ -62,6 +38,8 @@ class PackageDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(default_factory=list)
     imports : List[PackageImportSpec] = dc.Field(default_factory=list)
     fragments: List[str] = dc.Field(default_factory=list)
+
+    fragment_l : List['FragmentDef'] = dc.Field(default_factory=list, exclude=True)
 
 #    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
 
@@ -90,8 +68,31 @@ class PackageDef(BaseModel):
                     basedir=self.basedir,
                     depend_refs=task.depends)
             else:
+                # We use the Null task from the std package
                 raise Exception("")
             ret.tasks[task.name] = ctor_t
+
+        for frag in self.fragment_l:
+            for task in frag.tasks:
+                if task.type is not None:
+                    # Find package (not package_def) that implements this task
+                    # Insert an indirect reference to that tasks's constructor
+
+                    # Only call getTaskCtor if the task is in a different package
+                    task_t = task.type if isinstance(task.type, TaskSpec) else TaskSpec(task.type)
+                    ctor_t = session.getTaskCtor(task_t, self)
+
+                    ctor_t = TaskParamCtor(
+                        base=ctor_t, 
+                        params=task.params, 
+                        basedir=frag.basedir,
+                        depend_refs=task.depends)
+                else:
+                    # We use the Null task from the std package
+                    raise Exception("")
+                if task.name in ret.tasks:
+                    raise Exception("Task %s already defined" % task.name)
+                ret.tasks[task.name] = ctor_t
 
         return ret
 

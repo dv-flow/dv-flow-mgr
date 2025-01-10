@@ -24,6 +24,7 @@ import os
 import yaml
 import dataclasses as dc
 from typing import Any, Callable, Dict, List
+from .fragment_def import FragmentDef
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .task import Task,TaskSpec
@@ -47,14 +48,15 @@ class Session(object):
     _task_list : List[Task] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
     _task_id : int = 0
-    _rundir_s : List[str] = dc.field(default_factory=list)
 
     def __post_init__(self):
         from .tasklib.std.pkg_std import PackageStd
+        from .tasklib.hdl.sim.vcs_pkg import VcsPackage
         from .tasklib.hdl.sim.vlt_pkg import VltPackage
         from .tasklib.hdl.sim.mti_pkg import MtiPackage
         self._pkg_m[PackageSpec("std")] = PackageStd("std")
         self._pkg_m[PackageSpec("hdl.sim.mti")] = MtiPackage("hdl.sim.mti")
+        self._pkg_m[PackageSpec("hdl.sim.vcs")] = VcsPackage("hdl.sim.vcs")
         self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
 
     def load(self, root : str):
@@ -73,26 +75,24 @@ class Session(object):
         self._pkg_s.clear()
         self._task_m.clear()
 
-        self._rundir_s.clear()
-        self._rundir_s.append(self.rundir)
-
-        return self._mkTaskGraph(task)
+        return self._mkTaskGraph(task, self.rundir)
         
-    def _mkTaskGraph(self, task : str, params : dict = None) -> Task:
+    def _mkTaskGraph(self, task : str, parent_rundir : str, params : dict = None) -> Task:
 
         elems = task.split(".")
 
         pkg_name = ".".join(elems[0:-1])
         task_name = elems[-1]
 
-        self._rundir_s.append(os.path.join(self._rundir_s[-1], pkg_name, task_name))
-
         if pkg_name == "":
             if len(self._pkg_spec_s) == 0:
                 raise Exception("No package context for %s" % task)
             pkg_spec = self._pkg_spec_s[-1]
+            pkg_name = pkg_spec.name
         else:
             pkg_spec = PackageSpec(pkg_name)
+
+        rundir = os.path.join(parent_rundir, pkg_name, task_name)
 
         self._pkg_spec_s.append(pkg_spec)
         pkg = self.getPackage(pkg_spec)
@@ -115,20 +115,19 @@ class Session(object):
             self,
             params,
             depends)
-        task.rundir = self._rundir_s[-1]
+        task.rundir = rundir
         
         for i,d in enumerate(task.depend_refs):
             if d in self._task_m.keys():
                 task.depends.append(self._task_m[d])
             else:
                 print("mkTaskGraph: %s" % d)
-                task.depends.append(self._mkTaskGraph(d))
+                task.depends.append(self._mkTaskGraph(d, parent_rundir))
 
         self._task_m[task.name] = task
 
         self._pkg_s.pop()
         self._pkg_spec_s.pop()
-        self._rundir_s.pop()
 
         return task
     
@@ -147,6 +146,7 @@ class Session(object):
         file_s.append(root)
         ret = None
         with open(root, "r") as fp:
+            print("open %s" % root)
             doc = yaml.load(fp, Loader=yaml.FullLoader)
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
@@ -167,13 +167,55 @@ class Session(object):
                 self._pkg_spec_s.append(PackageSpec(pkg.name))
 
         print("pkg: %s" % str(pkg))
-        
-        # TODO: read in fragments
+
+        print("fragments: %s" % str(pkg.fragments))
+        for spec in pkg.fragments:
+            self._load_fragment_spec(pkg, spec, file_s)
 
         self._pkg_spec_s.pop()
         file_s.pop()
 
         return pkg
+    
+    def _load_fragment_spec(self, pkg : PackageDef, spec : str, file_s : List[str]):
+
+        # We're either going to have:
+        # - File path
+        # - Directory path
+
+        if os.path.isfile(os.path.join(pkg.basedir, spec)):
+            self._load_fragment_file(pkg, spec, file_s)
+        elif os.path.isdir(os.path.join(pkg.basedir, spec)):
+            self._load_fragment_dir(pkg, os.path.join(pkg.basedir, spec), file_s)
+        else:
+            raise Exception("Fragment spec %s not found" % spec)
+        
+
+    def _load_fragment_dir(self, pkg : PackageDef, dir : str, file_s : List[str]):
+
+        for file in os.listdir(dir):
+            if os.path.isdir(os.path.join(dir, file)):
+                self._load_fragment_dir(pkg, os.path.join(dir, file), file_s)
+            elif os.path.isfile(os.path.join(dir, file)):
+                self._load_fragment_file(pkg, os.path.join(dir, file), file_s)
+
+    def _load_fragment_file(self, pkg : PackageDef, file : str, file_s : List[str]):
+
+        if file in file_s:
+            raise Exception("Recursive file processing @ %s: %s" % (file, ",".join(self._file_s)))
+        file_s.append(file)
+
+        with open(file, "r") as fp:
+            doc = yaml.load(fp, Loader=yaml.FullLoader)
+            if "fragment" in doc.keys():
+                # Merge the package definition
+                frag = FragmentDef(**(doc["fragment"]))
+                frag.basedir = os.path.dirname(file)
+                pkg.fragment_l.append(frag)
+            else:
+                print("Warning: file %s is not a fragment" % file)
+        
+
 
     def getPackage(self, spec : PackageSpec) -> Package:
         pkg_spec = self._pkg_spec_s[-1]

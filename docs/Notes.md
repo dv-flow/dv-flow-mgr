@@ -160,4 +160,35 @@ package:
 # DV Flow Manager 1.0.0
 - Packages and Fragments
 - Package Import
+- Python implementation of YAML-defined tasks
+- Parameters and Properties
+- Modifying the value of input parameters
+- Strategy for tool-specific options
+- Tasks for reusable sim-image components (sim-image, library, ip)
+- Work-avoidance schemes for SV
+
+## Use Cases
+- Compile simulation image (debug, optimized)
+- Run user-specified simulations
+
+# DV Flow Manager 2.0.0
+- Package inheritance ("project templates")
+- VSCode log browser - visualize task graph ; navigate / view individual task logs
+  - See execution times
+  - See which tasks performed real work (output of 'changed')
+- Task/sub-graph execution delegation interface (implementation for LSF, SLURM, etc)
 - 
+
+# DV Flow Manager 3.0.0
+
+# DV Flow Manager 4.0.0
+- VSCode flow-file development support (error checking, completion, navigation)
+- VSCode run integration (launch run from VSCode ; monitor execution/completion)
+
+# DV Flow Manager 5.0.0
+- VSCode debug support (step through task graph ; inspect variable values)
+
+
+
+
+

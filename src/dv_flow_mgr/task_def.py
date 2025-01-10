@@ -33,7 +33,7 @@ class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str
     type : (str|TaskSpec) = dc.Field(default_factory=list)
-    depends : List[(str|TaskSpec)] = dc.Field(default_factory=list)
+    depends : List[(str|TaskSpec)] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
 
     def copy(self) -> 'TaskDef':
