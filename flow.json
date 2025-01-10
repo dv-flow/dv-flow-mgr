@@ -23,7 +23,6 @@
         }
     ],
     "defs": {
-
         "package-def": {
             "title": "Package Definition",
             "$$target": "#/defs/package-def",
@@ -156,21 +155,23 @@
                         "$ref": "#/defs/param"
                     }
                 },
-                "depends": {
-                    "oneOf": [
-                        {
+                "oneOf": [
+                    {
+                        "needs": {
                             "type": "array",
                             "items": {
                                 "$ref": "#/defs/task-dep"
                             }
-                        }, {
+                        }
+                    }, {
+                        "needs": {
                             "type": "array",
                             "items": {
                                 "type": "string"
                             }
                         }
-                    ]
-                }
+                    }
+                ]
             }
         }
     }
