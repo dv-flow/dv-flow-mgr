@@ -18,6 +18,12 @@ are evaluated.
 - Package "uses" (type/inheritance)
 - Task "with"-data definition (tasks can add their own parameters)
 - Task Groups / Sub-DAG
+- Coarse/fine-grained dependency management
+  - Mark task dependency as having a "coarse" requirement. Causes 
+    the task to be run if it hasn't been run already. Doesn't perform
+    exhaustive analysis.
+  - Maybe allow subtree dependency analysis? Single analysis point to
+    determine up-to-date status on a whole collection of source
 
 ## 3.0.0
 - JQ-based data extraction
@@ -72,4 +78,18 @@ are evaluated.
 
 ## 5.0.0
 - Need some form of site settings
+
+
+# Core Principles
+- Relevant DAG can be constructed statically
+  - Tasks are not inferred based on dataflow content
+  - Tasks may be created based on statically-available data
+- Dataflow is dynamically typed (union of content)
+- Tasks pass-through filesets that are not relevant for them
+  - Enables injecting new data when convenient, even if it won't be used until later
+  - Can have 'filter' tasks if there is a need to clean-up
+- Dependency analysis is not delegated 
+  - Allows static DAG construction
+- Extensible -- by users and organizations
+- Implementation independent (not tied to a specific implementation language)
 

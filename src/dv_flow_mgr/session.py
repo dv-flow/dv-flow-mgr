@@ -196,7 +196,7 @@ class Session(object):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
                 self._load_fragment_dir(pkg, os.path.join(dir, file), file_s)
-            elif os.path.isfile(os.path.join(dir, file)):
+            elif os.path.isfile(os.path.join(dir, file)) and file == "flow.yaml":
                 self._load_fragment_file(pkg, os.path.join(dir, file), file_s)
 
     def _load_fragment_file(self, pkg : PackageDef, file : str, file_s : List[str]):
@@ -207,6 +207,7 @@ class Session(object):
 
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=yaml.FullLoader)
+            print("doc: %s" % str(doc), flush=True)
             if "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))

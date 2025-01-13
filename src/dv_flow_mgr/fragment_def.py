@@ -22,14 +22,14 @@
 import pydantic.dataclasses as dc
 import json
 from pydantic import BaseModel
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from .package import Package
 from .package_import_spec import PackageImportSpec
 from .task_def import TaskDef
 
 class FragmentDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(default_factory=list)
-    imports : List[(str|PackageImportSpec)] = dc.Field(default_factory=list, alias="imports")
+    imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list, alias="imports")
     fragments: List[str] = dc.Field(default_factory=list)
 
     basedir : str = None

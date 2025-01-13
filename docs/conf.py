@@ -14,7 +14,8 @@ author = 'Matthew Ballance'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx-jsonschema'
+    'sphinx-jsonschema',
+    'sphinxcontrib.mermaid'
 ]
 
 templates_path = ['_templates']

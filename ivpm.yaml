@@ -21,11 +21,16 @@ package:
       src: pypi
     - name: svdep
       url: https://github.com/fvutils/svdep.git
+      anonymous: True
+    - name: ply 
+      src: pypi
     - name: pyyaml
       src: pypi
     - name: Sphinx
       src: pypi
     - name: sphinx-jsonschema
+      src: pypi
+    - name: sphinxcontrib-mermaid
       src: pypi
 
 

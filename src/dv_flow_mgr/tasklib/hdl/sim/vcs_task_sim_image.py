@@ -15,7 +15,7 @@ from svdep import FileCollection, TaskCheckUpToDate, TaskBuildFileCollection
 class TaskVcsSimImage(VlTaskSimImage):
 
     def getRefTime(self):
-        if os.path.isdir(os.path.join(self.rundir, 'simv')):
+        if os.path.isfile(os.path.join(self.rundir, 'simv')):
             return os.path.getmtime(os.path.join(self.rundir, 'simv'))
         else:
             raise Exception

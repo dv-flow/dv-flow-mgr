@@ -12,8 +12,9 @@ from typing import List, Tuple
 class TaskFileSet(Task):
 
     async def run(self, input : TaskData) -> TaskData:
-        print("run: %s: base=%s type=%s include=%s" % (
+        print("TaskFileSet run: %s: basedir=%s, base=%s type=%s include=%s" % (
             self.name,
+            self.basedir,
             self.params.base, self.params.type, str(self.params.include)
         ))
 

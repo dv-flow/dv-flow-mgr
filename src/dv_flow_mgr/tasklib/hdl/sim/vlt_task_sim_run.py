@@ -11,7 +11,7 @@ from typing import List, Tuple
 class TaskVltSimRun(Task):
 
     async def run(self, input : TaskData) -> TaskData:
-        vl_fileset = input.getFileSets("simBinary")
+        vl_fileset = input.getFileSets("simDir")
 
         build_dir = vl_fileset[0].basedir
 

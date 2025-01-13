@@ -152,15 +152,35 @@ class Task(object):
             awaitables = [dep.waitOutput() for dep in self.depends]
             deps_o = await asyncio.gather(*awaitables)
 
+            # Merge filesets. A fileset with the same
             print("deps_o: %s" % str(deps_o))
+
+            # First, merge the dep maps of all the inputs
+            deps_m = self.depends[0].output.deps.copy()
+            for deps in map(lambda d: d.deps, self.depends[1:]):
+                for k,v in deps.items():
+                    if k in deps_m:
+                        deps_m[k].add(v)
+                    else:
+                        deps_m[k] = set(v)
+
+            print("deps_m: %s" % str(deps_m))
 
             # Merge the output of the dependencies into a single input data
 #            if len(self.depends) > 1:
 #                raise Exception("TODO: handle >1 inputs")
 
+            # Now that we have a clean input object, we need
+            # to build the dep map
+
             input = self.depends[0].output.copy()
         else:
             input = TaskData()
+        
+
+
+        # Mark the source of this data as being this task
+        input.src = self.name
 
         if not os.path.isdir(self.rundir):
             os.makedirs(self.rundir)
@@ -196,7 +216,7 @@ class Task(object):
     
     def setOutput(self, output : TaskData):
         self.output_set = True
-        output.task_id = self.task_id
+        output.src = self.name
         self.output = output
         self.output_ev.set()
 

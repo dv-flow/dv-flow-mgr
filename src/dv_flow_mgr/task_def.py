@@ -21,7 +21,7 @@
 #****************************************************************************
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Union, Tuple
 from .task import Task
 
 @dc.dataclass
@@ -32,8 +32,8 @@ class TaskSpec(object):
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str
-    type : (str|TaskSpec) = dc.Field(default_factory=list)
-    depends : List[(str|TaskSpec)] = dc.Field(default_factory=list, alias="needs")
+    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
+    depends : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
 
     def copy(self) -> 'TaskDef':

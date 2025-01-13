@@ -3,6 +3,7 @@ import fnmatch
 import dataclasses
 import shutil
 import pydantic.dataclasses as dc
+from toposort import toposort
 from ....fileset import FileSet
 from ....package import TaskCtor
 from ....task import Task, TaskParams, TaskCtorT
@@ -31,9 +32,8 @@ class VlTaskSimImage(Task):
         incdirs = []
         memento = ex_memento
 
-        vl_filesets = input.getFileSets(("verilogSource", "systemVerilogSource"))
-        for file in vl_filesets[0].files:
-            files.append(os.path.join(vl_filesets[0].basedir, file))
+
+        self._gatherSvSources(files, incdirs, input)
 
         if not in_changed:
             try:
@@ -61,6 +61,30 @@ class VlTaskSimImage(Task):
 
         self.setMemento(memento)
         return output
+    
+    def _gatherSvSources(self, files, incdirs, input):
+        # input must represent dependencies for all tasks related to filesets
+        # references must support transitivity
+
+        vl_filesets = input.getFileSets(("verilogSource", "systemVerilogSource"))
+        fs_tasks = [fs.src for fs in vl_filesets]
+
+        # Want dependencies just for the filesets
+        # - key is the task associated with a filelist
+        # - deps is the dep-set of the on the incoming
+        #
+        # -> Send output set of dependencies
+        # - Task -> deps map
+        #     "task" : ["dep1", "dep2", ...],
+        #     "task2" : 
+        # - All tasks are represented in the map
+        # -> Assume projects will often flatten before exporting
+
+        # Sort the deps
+        order = list(toposort(input.deps))
+
+        print("order: %s" % str(order))
+
 
 
 class VlTaskSimImageParams(TaskParams):

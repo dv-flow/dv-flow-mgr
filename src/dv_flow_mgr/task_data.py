@@ -19,15 +19,31 @@
 #*     Author: 
 #*
 #****************************************************************************
+import enum
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
 from typing import Any, Dict, Set, List, Tuple
 from .fileset import FileSet
 
+class TaskDataParamOpE(enum.Enum):
+    Set = enum.auto()
+    Append = enum.auto()
+    Prepend = enum.auto()
+    PathAppend = enum.auto()
+    PathPrepend = enum.auto()
+
+class TaskDataParamOp(BaseModel):
+    op : TaskDataParamOpE
+    value : Any
+
+class TaskDataParam(BaseModel):
+    value : Any
+    ops : List[TaskDataParamOp] = dc.Field(default_factory=list)
+
 class TaskData(BaseModel):
-    task_id : int = -1
+    src : str = None
     params : Dict[str,Any] = dc.Field(default_factory=dict)
-    deps : List['TaskData'] = dc.Field(default_factory=list)
+    deps : Dict[str,Set[str]] = dc.Field(default_factory=dict)
     changed : bool = False
 
     def hasParam(self, name: str) -> bool:
@@ -40,11 +56,12 @@ class TaskData(BaseModel):
         self.params[name] = value
 
     def addFileSet(self, fs : FileSet):
+        fs.src = self.src
         if "filesets" not in self.params:
             self.params["filesets"] = []
         self.params["filesets"].append(fs)
 
-    def getFileSets(self, type : (str|Set[str])=None) -> List[FileSet]:
+    def getFileSets(self, type=None) -> List[FileSet]:
         ret = []
 
         if "filesets" in self.params:
@@ -56,7 +73,7 @@ class TaskData(BaseModel):
 
     def copy(self) -> 'TaskData':
         ret = TaskData()
-        ret.task_id = self.task_id
+        ret.src = self.src
         ret.params = self.params.copy()
         for d in self.deps:
             ret.deps.append(d.clone())
