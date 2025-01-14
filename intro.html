@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Introduction &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.4/dist/mermaid-layout-elk.esm.min.mjs"></script>
+    <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs";import elkLayouts from "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.4/dist/mermaid-layout-elk.esm.min.mjs";mermaid.registerLayoutLoaders(elkLayouts);mermaid.initialize({startOnLoad:false});</script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs";
+window.addEventListener("load", () => mermaid.run());
+</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Flow-Spec Reference" href="reference.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h1>
+<p>Many software languages have co-evolved with a build system. For example, C/C++
+has Make and CMake. Java has ANT, Maven, and Gradle. All of these build systems
+provide features that cater to specific ways that a given language is processed,
+and provide built-in notions to make setting up simple cases as easy as possible.</p>
+<p>One simple example is Make and a single-file C program. Take the code below:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hello, world!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Make provides enough built-in features that are C/C++-specific that we can create
+an executable from this source file (assume it’s named hello.c) simply by running:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>hello
+</pre></div>
+</div>
+<p>Make knows about C files, it knows about the existance of a C compiler, and it knows
+that an executable can be created from a C file of the same name.</p>
+<section id="meanwhile-in-silicon-engineering-land">
+<h2>Meanwhile, in Silicon Engineering Land…<a class="headerlink" href="#meanwhile-in-silicon-engineering-land" title="Link to this heading">¶</a></h2>
+<p>Much like software languages, the languages, tools, and flows used in silicon engineering
+have their own unique characteristics. For example, in a silicon-design environment, many
+flows are run over the same source files – possibly with different configurations.</p>
+<ul class="simple">
+<li><p>We compile our design with a UVM testbench to run dynamic (simulation-based) verification</p></li>
+<li><p>We compile our design with different testbenches to run formal verification</p></li>
+<li><p>We likely use slightly different subset when targeting synthesis</p></li>
+</ul>
+<p>In addition, we also need to be flexible when it comes to tooling. Over time, we’ll likely
+use different tools from different providers, and want our projects to adapt as easily as
+possible to a change of tool. It’s also likely that we will either want to add new tools
+to our environment over time, or adapt our environment to take advantage of new
+productivity-enhancing tool features.</p>
+<p>DV Flow Manager is designed to be the ‘make’ for silicon engineering. There are three
+aspects to the tool:</p>
+<ul class="simple">
+<li><p><strong>Flow Specification</strong> - Processing steps for a given project are captured in a hierarchy
+of YAML files. The flow-specification schema is designed to be tool-independent, such
+that multiple tools can be implemented that comprehend a flow specification.</p></li>
+<li><p><strong>Task Library</strong> - Processing steps are implemented as <cite>tasks</cite>. A library of common tasks
+is defined to cover common cases, such as creating a simulation image. External libraries
+of tasks are supported, such that tools can bundle a task library along with the tool installation.</p></li>
+<li><p><strong>Tools</strong> - The Python implementation of DV Flow Manager is one example of a tool. Other tools
+may be added in the future to provide visualization, simplify development, etc.</p></li>
+</ul>
+</section>
+<section id="key-concepts">
+<h2>Key Concepts<a class="headerlink" href="#key-concepts" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager has three key concepts:
+* <strong>Package</strong> - A packages is parameterizd namespace that contain tasks.
+* <strong>Task</strong> - A task is a processing step in a flow. Tasks represent a data-processing step, which</p>
+<blockquote>
+<div><p>might be as simple as building a list of files, or might be a complex as creating a hardened macro
+from multiple source collections.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>Dataflow Dependencies</strong> - Tasks are related by dataflow dependencies. In order for a task to
+execute, the data from all of its dependencies must be available. Each task also produces a
+dataflow object that can be consumed by other tasks.</p></li>
+</ul>
+<p>Let’s look at an example to better-understand these concepts.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_ip</span>
+
+<span class="w">  </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
+<span class="w">    </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Fileset</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtl&quot;</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tb</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Fileset</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tb&quot;</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimImage</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tb</span><span class="p p-Indicator">]</span>
+
+<span class="w">    </span><span class="nt">-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test1</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">uses</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.RunSim</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">needs</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>The code above specifies two collections of source code –
+one for the design and one for the testbench. This source
+code is compiled into as simulation image using the
+pre-defined task named <cite>hdl.sim.SimImage</cite>. After,
+we execute the simulation image.</p>
+<pre  class="mermaid">
+        flowchart TD
+  A[rtl] --&gt; B[tb]
+  B[tb] --&gt; E[sim]
+  E --&gt; F[test1]
+    </pre><p>The task graph for this flow is shown above. Each step depends on the
+prior step, so there is no opportunity for concurrent execution.</p>
+<p>Now, let’s say that we want to run a series of tests. We can add
+a new task per tests, where we customize the activity that is run
+by passing arguments to the simulation.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="c1"># ...</span>
+<span class="w">    </span><span class="nt">-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test1</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">uses</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.RunSim</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">needs</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test2</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">uses</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.RunSim</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">needs</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test3</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">uses</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.RunSim</span>
+<span class="w">      </span><span class="l l-Scalar l-Scalar-Plain">needs</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<pre  class="mermaid">
+        flowchart TD
+  A[rtl] --&gt; B[tb]
+  B[tb] --&gt; E[sim]
+  E --&gt; F[test1]
+  E --&gt; G[test2]
+  E --&gt; H[test3]
+    </pre><p>Our task graph now looks like the above. Our build tasks are sequential,
+while our test tasks only depend on the simulation image being
+up-to-date, and and can execute concurrently.</p>
+<p>## Dataflow</p>
+<p>What ties all the tasks above together is dependency-based dataflow.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tb</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Fileset</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tb&quot;</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimImage</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tb</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>When the <cite>sim</cite> task places dependencies on the <cite>rtl</cite> and <cite>tb</cite>
+tasks, it receives the output from those tasks as input. In
+this case, that means that the simulation-image compilation
+task has a list of all of the source files that it needs to
+compile. The <cite>sim</cite> task also produces an output, which contains
+a reference to the directory where the simulation image resides.
+The <cite>test</cite> tasks use this input to locate the simulation image.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#meanwhile-in-silicon-engineering-land">Meanwhile, in Silicon Engineering Land…</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#key-concepts">Key Concepts</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="quickstart.html" title="previous chapter">Quickstart</a></li>
+      <li>Next: <a href="reference.html" title="next chapter">Flow-Spec Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/intro.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

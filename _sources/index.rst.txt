@@ -6,9 +6,9 @@
 DV Flow Manager
 ===============
 
-DV Flow Manager helps users capture the tasks and dataflow in their
-design and verification (DV) flows. You can think of DV Flow Manager as a 
-sort of "make for silicon engineering".
+DV Flow Manager provides a "make for silicon engineering": a specification
+for capturing design and verification (DV) tasks and dataflow in a way that
+enables concurrent execution and efficient avoidance of redundant work.
 
 .. mermaid::
 
@@ -28,4 +28,5 @@ sort of "make for silicon engineering".
    :caption: Contents:
 
    quickstart
+   intro
    reference
