@@ -155,14 +155,6 @@ class Task(object):
             # Merge filesets. A fileset with the same
             print("deps_o: %s" % str(deps_o))
 
-            # First, merge the dep maps of all the inputs
-            deps_m = self.depends[0].output.deps.copy()
-            for deps in map(lambda d: d.deps, self.depends[1:]):
-                for k,v in deps.items():
-                    if k in deps_m:
-                        deps_m[k].add(v)
-                    else:
-                        deps_m[k] = set(v)
 
             print("deps_m: %s" % str(deps_m))
 
@@ -182,8 +174,7 @@ class Task(object):
         # Mark the source of this data as being this task
         input.src = self.name
 
-        if not os.path.isdir(self.rundir):
-            os.makedirs(self.rundir)
+        self.init_rundir()
 
         result = await self.run(input)
 
@@ -202,9 +193,7 @@ class Task(object):
             result = self.getOutput()
 
         # Write-back the memento, if specified
-        if self.memento is not None:
-            with open(os.path.join(self.rundir, "memento.json"), "w") as fp:
-                fp.write(self.memento.model_dump_json(indent=2))
+        self.save_memento()
 
         self.running = False
 
@@ -213,6 +202,15 @@ class Task(object):
 
     async def run(self, input : TaskData) -> TaskData:
         raise NotImplementedError("TaskImpl.run() not implemented")
+    
+    def init_rundir(self):
+        if not os.path.isdir(self.rundir):
+            os.makedirs(self.rundir)
+
+    def save_memento(self):
+        if self.memento is not None:
+            with open(os.path.join(self.rundir, "memento.json"), "w") as fp:
+                fp.write(self.memento.model_dump_json(indent=2))
     
     def setOutput(self, output : TaskData):
         self.output_set = True

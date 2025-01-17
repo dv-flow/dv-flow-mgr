@@ -29,6 +29,11 @@ are evaluated.
 - JQ-based data extraction
 - YAML task templates / expansions
 - Support for annotating job requirements 
+- Mark tasks as producing and accepting certain data
+  - FileSet task `produces` fileset of `type`
+  - SimImage task `accepts` systemVerilogSource, verilogSource, verilogPreCompLib, etc
+  => Mostly useful for checking and suggestion
+  => As more are marked, can treat as more binding
 
 # Library
 

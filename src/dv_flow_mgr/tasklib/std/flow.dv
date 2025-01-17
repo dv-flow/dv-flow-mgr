@@ -1,0 +1,12 @@
+
+package:
+  name: std
+
+  tasks:
+  - name: Exec
+    uses: builtin.PyClass
+    params:
+    - name: cmd
+      type: string
+    - name: pyclass
+      type: string
