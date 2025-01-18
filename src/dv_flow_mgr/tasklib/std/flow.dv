@@ -9,4 +9,4 @@ package:
     - name: cmd
       type: string
     - name: pyclass
-      type: string
+      value: dv_flow_mgr.tasklib.std.Exec

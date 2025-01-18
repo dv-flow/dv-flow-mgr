@@ -1,10 +1,6 @@
 
 package:
-  name: pytest-fv
-
-  #  setup-deps:
-  #- ninja
-  #- cython
+  name: dv-flow-mgr
 
   dep-sets:
 
@@ -22,6 +18,8 @@ package:
     - name: svdep
       url: https://github.com/fvutils/svdep.git
       anonymous: True
+    - name: dv-flow-lib-hdlsim
+      url: http://github.com/dv-flow/dv-flow-lib-hdlsim.git
     - name: ply 
       src: pypi
     - name: pyyaml

@@ -59,15 +59,15 @@ class Session(object):
         self._pkg_m[PackageSpec("hdl.sim.vcs")] = VcsPackage("hdl.sim.vcs")
         self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
 
-    def load(self, root : str):
-        if not os.path.isdir(root):
-            raise Exception("Root directory %s does not exist" % root)
+    def load(self):
+        if not os.path.isdir(self.srcdir):
+            raise Exception("Root directory %s does not exist" % self.srcdir)
 
-        if not os.path.isfile(os.path.join(root, "flow.yaml")):
+        if not os.path.isfile(os.path.join(self.srcdir, "flow.dv")):
             raise Exception("No root flow file")
 
-        self._root_dir = os.path.dirname(root)
-        self.package = self._load_package(os.path.join(root, "flow.yaml"), [])
+        self._root_dir = os.path.dirname(self.srcdir)
+        self.package = self._load_package(os.path.join(self.srcdir, "flow.dv"), [])
 
         return self.package
 

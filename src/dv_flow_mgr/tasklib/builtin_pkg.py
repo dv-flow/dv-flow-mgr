@@ -45,6 +45,7 @@ class TaskPyClass(Task):
 
 class TaskPyClassParams(TaskParams):
     pyclass : str
+#    pyparam : str = ""
 
 class TaskPyClassMemento(TaskMemento):
     pass
