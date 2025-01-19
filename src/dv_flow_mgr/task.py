@@ -24,7 +24,7 @@ import json
 import asyncio
 import dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 from .task_data import TaskData
 from .task_memento import TaskMemento
 
@@ -37,78 +37,23 @@ class TaskParams(BaseModel):
 
 @dc.dataclass
 class TaskCtor(object):
-    def mkTaskParams(self) -> TaskParams:
-        raise NotImplementedError()
-    
-    def setTaskParams(self, params : TaskParams, pvals : Dict[str,Any]):
-        for p in pvals.keys():
-            if not hasattr(params, p):
-                raise Exception("Unsupported parameter: " + p)
-            else:
-                setattr(params, p, pvals[p])
+    task_ctor : Callable
+    param_ctor : Callable
+    params : Dict[str,Any] = None
+    depends : List[TaskSpec] = dc.field(default_factory=list)
 
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : TaskParams, depends : List['Task']) -> 'Task':
-        raise NotImplementedError()
-
-@dc.dataclass
-class TaskCtorT(TaskCtor):
-    TaskParamsT : TaskParams
-    TaskT : 'Task'
-
-    def mkTaskParams(self) -> TaskParams:
-        return self.TaskParamsT()
-
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : TaskParams, depends : List['Task']) -> 'Task':
-        task = self.TaskT(
-            name=name, 
-            task_id=task_id, 
-            session=session, 
-            params=params, 
-            depends=depends)
-        task.depends.extend(depends)
-        return task
-
-@dc.dataclass
-class TaskParamCtor(object):
-    base : TaskCtor
-    params : Dict[str,Any]
-    basedir : str
-    depend_refs : List['TaskSpec']
-
-    def mkTaskParams(self) -> TaskParams:
-        params = self.base.mkTaskParams()
-        self.base.setTaskParams(params, self.params)
-        return params
-    
-    def setTaskParams(self, params : Dict, pvals : Dict[str,Any]):
-        pass
-
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
-        task =  self.base.mkTask(
-            name=name, 
-            task_id=task_id, 
-            session=session, 
-            params=params, 
-            depends=depends)
-        task.basedir = self.basedir
-        task.depend_refs.extend(self.depend_refs)
-        return task
-
-@dc.dataclass
-class PackageTaskCtor(TaskCtor):
-    name : str
-    pkg : 'Package'
-
-    def mkTaskParams(self, params : Dict) -> Dict:
-        return self.pkg.mkTaskParams(self.name, params)
-    def mkTask(self, name : str, task_id : int, session : 'Session', params : Dict, depends : List['Task']) -> 'Task':
-        return self.pkg.mkTask(self.name, task_id, session, params, depends)
+    def mkParams(self):
+        print("mkParams: %s" % str(self.params))
+        ret = self.param_ctor()
+        if self.params is not None:
+            for k,v in self.params.items():
+                setattr(ret, k, v)
+        return ret
 
 @dc.dataclass
 class Task(object):
     """Executable view of a task"""
     name : str
-    task_id : int
     session : 'Session'
     params : TaskParams
     basedir : str

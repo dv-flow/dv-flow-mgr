@@ -27,7 +27,7 @@ from typing import Any, Callable, Dict, List
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_def import PackageDef, PackageSpec
-from .task import Task,TaskSpec
+from .task import Task, TaskSpec, TaskCtor
 
 @dc.dataclass
 class Session(object):
@@ -45,19 +45,26 @@ class Session(object):
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _pkg_def_m : Dict[str,PackageDef] = dc.field(default_factory=dict)
+    _pkg_file_m : Dict[str,str] = dc.field(default_factory=dict)
+    _pkg_path : List[str] = dc.field(default_factory=list)
     _task_list : List[Task] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
     _task_id : int = 0
 
     def __post_init__(self):
-        from .tasklib.std.pkg_std import PackageStd
-        from .tasklib.hdl.sim.vcs_pkg import VcsPackage
-        from .tasklib.hdl.sim.vlt_pkg import VltPackage
-        from .tasklib.hdl.sim.mti_pkg import MtiPackage
-        self._pkg_m[PackageSpec("std")] = PackageStd("std")
-        self._pkg_m[PackageSpec("hdl.sim.mti")] = MtiPackage("hdl.sim.mti")
-        self._pkg_m[PackageSpec("hdl.sim.vcs")] = VcsPackage("hdl.sim.vcs")
-        self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
+        # Add a reference to the built-in 'std' package
+        this_dir = os.path.dirname(os.path.abspath(__file__))
+        self._pkg_file_m["std"] = os.path.join(this_dir, "tasklib/std/flow.dv")
+
+        # from .tasklib.std.pkg_std import PackageStd
+        # from .tasklib.hdl.sim.vcs_pkg import VcsPackage
+        # from .tasklib.hdl.sim.vlt_pkg import VltPackage
+        # from .tasklib.hdl.sim.mti_pkg import MtiPackage
+        # self._pkg_m[PackageSpec("std")] = PackageStd("std")
+        # self._pkg_m[PackageSpec("hdl.sim.mti")] = MtiPackage("hdl.sim.mti")
+        # self._pkg_m[PackageSpec("hdl.sim.vcs")] = VcsPackage("hdl.sim.vcs")
+        # self._pkg_m[PackageSpec("hdl.sim.vlt")] = VltPackage("hdl.sim.vlt")
+        pass
 
     def load(self):
         if not os.path.isdir(self.srcdir):
@@ -77,7 +84,7 @@ class Session(object):
 
         return self._mkTaskGraph(task, self.rundir)
         
-    def _mkTaskGraph(self, task : str, parent_rundir : str, params : dict = None) -> Task:
+    def _mkTaskGraph(self, task : str, parent_rundir : str) -> Task:
 
         elems = task.split(".")
 
@@ -99,23 +106,18 @@ class Session(object):
         
         self._pkg_s.append(pkg)
 
-        #task_def = pkg.getTask(task_name)
+        ctor_t : TaskCtor = pkg.getTaskCtor(task_name)
 
         depends = []
 
-        params = pkg.mkTaskParams(task_name)
-
-        task_id = self.mkTaskId(None)
-#        task_name = "%s.%s" % (pkg.name, task_def.name)
-
         # The returned task should have all param references resolved
-        task = pkg.mkTask(
-            task_name,
-            task_id,
-            self,
-            params,
-            depends)
-        task.rundir = rundir
+        print("task_ctor=%s" % str(ctor_t.task_ctor), flush=True)
+        task = ctor_t.task_ctor(
+            name=task_name,
+            session=self,
+            params=ctor_t.mkParams(),
+            depends=depends,
+            rundir=rundir)
         
         for i,d in enumerate(task.depend_refs):
             if d in self._task_m.keys():
@@ -130,6 +132,15 @@ class Session(object):
         self._pkg_spec_s.pop()
 
         return task
+
+    def push_package(self, pkg : Package):
+        self._pkg_s.append(pkg)
+
+    def pop_package(self, pkg : Package):
+        self._pkg_s.pop()
+
+    def package(self):
+        return self._pkg_s[-1]
     
     def mkTaskId(self, task : 'Task') -> int:
         self._task_id += 1
@@ -158,13 +169,13 @@ class Session(object):
 
         if not len(self._pkg_spec_s):
             self._pkg_spec_s.append(PackageSpec(pkg.name))
-            self._pkg_def_m[PackageSpec(pkg.name)] = pkg
         else:
-            if self._pkg_spec_s[0].name != pkg.name:
-                raise Exception("Package name mismatch: %s != %s" % (self._pkg_m[0].name, pkg.name))
+            if self._pkg_spec_s[-1].name != pkg.name:
+                raise Exception("Package name mismatch: %s != %s" % (self._pkg_spec_s[-1].name, pkg.name))
             else:
                 # TODO: merge content
                 self._pkg_spec_s.append(PackageSpec(pkg.name))
+        self._pkg_def_m[PackageSpec(pkg.name)] = pkg
 
         print("pkg: %s" % str(pkg))
 
@@ -219,8 +230,11 @@ class Session(object):
 
 
     def getPackage(self, spec : PackageSpec) -> Package:
+        # Obtain the active package definition
         pkg_spec = self._pkg_spec_s[-1]
         pkg_def = self._pkg_def_m[pkg_spec]
+
+        print("spec: %s ; _pkg_def_m: %s" % (str(spec), str(self._pkg_def_m.keys())))
 
         # Need a stack to track which package we are currently in
         # Need a map to get a concrete package from a name with parameterization
@@ -261,30 +275,49 @@ class Session(object):
                         pkg = base.mkPackage(self, spec.params)
                         self._pkg_m[spec] = pkg
                         break
+            
+            if pkg is None:
+                # Look in the set of registered packages
+                if spec.name in self._pkg_file_m.keys():
+                    # Load the package
+                    self._pkg_spec_s.append(spec)
+                    pkg_def = self._load_package(
+                        self._pkg_file_m[spec.name], 
+                        [])
+
+                    self._pkg_spec_s.pop()
+
+                    # The definition is now in the map, so recurse to create it
+                    pkg = self.getPackage(spec)
+                else:
+                    # Go search the package path
+                    pass
+                
+
 
             if pkg is None:
                 raise Exception("Failed to find package %s from package %s" % (
                     spec.name, pkg_def.name))
-
-#            base_spec = PackageSpec(spec.name)
-#            if not base_spec in self._pkg_def_m.keys():
-#                # Template is not present. Go find it...
-#
-#                # If not found...
-#                raise Exception("Package %s not found" % spec.name)
 
         return pkg
         
     def getTaskCtor(self, spec : TaskSpec, pkg : PackageDef) -> 'TaskCtor':
         spec_e = spec.name.split(".")
         task_name = spec_e[-1]
-        pkg_name = ".".join(spec_e[0:-1])
 
-        try:
-            pkg = self.getPackage(PackageSpec(pkg_name))
-        except Exception as e:
-            print("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
-            raise e
+        if len(spec_e) == 1:
+            # Just have a task name. Use the current package
+            if len(self._pkg_s) == 0:
+                raise Exception("No package context for task %s" % spec.name)
+            pkg = self._pkg_s[-1]
+        else:
+            pkg_name = ".".join(spec_e[0:-1])
+
+            try:
+                pkg = self.getPackage(PackageSpec(pkg_name))
+            except Exception as e:
+                print("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
+                raise e
 
         return pkg.getTaskCtor(task_name)
 

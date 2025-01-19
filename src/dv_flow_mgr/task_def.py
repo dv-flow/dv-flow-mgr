@@ -28,7 +28,6 @@ from .task import Task
 class TaskSpec(object):
     name : str
 
-
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str

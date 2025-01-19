@@ -54,26 +54,6 @@ class Package(object):
     def getTaskCtor(self, name : str) -> TaskCtor:
         return self.tasks[name]
             
-    def mkTaskParams(self, name : str) -> TaskParams:
-        if name not in self.tasks:
-            raise Exception("Task " + name + " not found")
-        return self.tasks[name].mkTaskParams()
-    
-    def setTaskParams(self, name : str, params : TaskParams, pvals : Dict[str,Any]):
-        if name not in self.tasks:
-            raise Exception("Task " + name + " not found")
-        self.tasks[name].setTaskParams(params, pvals)
-
-    def mkTask(self, 
-               name : str, 
-               task_id : int, 
-               session : 'Session',
-               params : TaskParams,
-               depends : List['Task']) -> 'Task':
-        # TODO: combine parameters to create the full taskname
-        task =  self.tasks[name].mkTask(name, task_id, session, params, depends)
-        return task
-
     def __hash__(self):
         return hash(self.fullname())
 
