@@ -9,3 +9,18 @@ package:
       msg:
         type: str
         value: ""
+  - name: FileSet
+    pyclass: fileset.FileSet
+    with:
+      base:
+        type: str
+        value: ""
+      type:
+        type: str
+        value: ""
+      include:
+        type: str
+        value: ""
+      exclude:
+        type: str
+        value: ""

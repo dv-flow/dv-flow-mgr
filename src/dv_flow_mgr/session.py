@@ -117,7 +117,8 @@ class Session(object):
             session=self,
             params=ctor_t.mkParams(),
             depends=depends,
-            rundir=rundir)
+            rundir=rundir,
+            srcdir=ctor_t.srcdir)
         
         for i,d in enumerate(task.depend_refs):
             if d in self._task_m.keys():

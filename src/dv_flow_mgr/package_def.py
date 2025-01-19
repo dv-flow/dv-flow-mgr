@@ -59,7 +59,7 @@ class PackageDef(BaseModel):
 
         session.push_package(ret)
 
-        tasks_m : Dict[str,TaskCtor]= {}
+        tasks_m : Dict[str,str,TaskCtor]= {}
 
         for task in self.tasks:
             if task.name in tasks_m.keys():
@@ -85,7 +85,7 @@ class PackageDef(BaseModel):
 
         return ret
     
-    def mkTaskCtor(self, session, task, basedir, tasks_m) -> TaskCtor:
+    def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
         ctor_t : TaskCtor = None
 
         if task.uses is not None:
@@ -105,21 +105,29 @@ class PackageDef(BaseModel):
                 if pkg is None:
                     raise Exception("Failed to find package %s" % pkg_name)
                 ctor_t = pkg.getTaskCtor(task_name)
+                ctor_t = ctor_t.copy()
+                ctor_t.srcdir = srcdir
             else:
                 if task_name not in tasks_m.keys():
                     raise Exception("Failed to find task %s" % task_name)
                 if len(tasks_m[task_name]) == 3:
-                    ctor_t = tasks_m[task_name][2]
+                    ctor_t = tasks_m[task_name][2].copy()
+                    ctor_t.srcdir = srcdir
                 else:
                     task_i = tasks_m[task_name]
-                    ctor_t = self.mkTaskCtor(session, task_i[0], task_i[1], tasks_m)
+                    ctor_t = self.mkTaskCtor(
+                        session, 
+                        task=task_i[0], 
+                        srcdir=srcdir,
+                        tasks_m=tasks_m)
                     tasks_m[task_name] = ctor_t
 
         if ctor_t is None:
             # Provide a default implementation
             ctor_t = TaskCtor(
                 task_ctor=TaskNull,
-                param_ctor=TaskParams)
+                param_ctor=TaskParams,
+                srcdir=srcdir)
 
         if task.pyclass is not None:
             # Built-in impl

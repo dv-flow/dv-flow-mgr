@@ -17,16 +17,20 @@ def test_fileset_1(tmpdir):
         os.path.join(datadir, "test1"), 
         os.path.join(tmpdir, "test1"))
     
-    session = Session(os.path.join(tmpdir, "rundir"))
-    session.load(os.path.join(tmpdir, "test1"))
+    session = Session(
+        os.path.join(tmpdir, "test1"),
+        os.path.join(tmpdir, "rundir"))
+    session.load()
 
     out = asyncio.run(session.run("test1.files1"))
     assert out.changed == True
 
     # Now, re-run using the same run directory.
     # Since the files haven't changed, the output must indicate that
-    session = Session(os.path.join(tmpdir, "rundir"))
-    session.load(os.path.join(tmpdir, "test1"))
+    session = Session(
+        os.path.join(tmpdir, "test1"),
+        os.path.join(tmpdir, "rundir"))
+    session.load()
 
     out = asyncio.run(session.run("test1.files1"))
     assert out.changed == False
@@ -35,8 +39,10 @@ def test_fileset_1(tmpdir):
     with open(os.path.join(tmpdir, "test1", "files1", "file1_1.sv"), "w") as f:
         f.write("// file1_1.sv\n")
 
-    session = Session(os.path.join(tmpdir, "rundir"))
-    session.load(os.path.join(tmpdir, "test1"))
+    session = Session(
+        os.path.join(tmpdir, "test1"),
+        os.path.join(tmpdir, "rundir"))
+    session.load()
 
     out = asyncio.run(session.run("test1.files1"))
     assert out.changed == True

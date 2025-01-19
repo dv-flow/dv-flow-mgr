@@ -40,7 +40,16 @@ class TaskCtor(object):
     task_ctor : Callable
     param_ctor : Callable
     params : Dict[str,Any] = None
+    srcdir : str = None
     depends : List[TaskSpec] = dc.field(default_factory=list)
+
+    def copy(self):
+        return TaskCtor(
+            task_ctor=self.task_ctor,
+            param_ctor=self.param_ctor,
+            params=self.params,
+            srcdir=self.srcdir,
+            depends=self.depends.copy())
 
     def mkParams(self):
         print("mkParams: %s" % str(self.params))
