@@ -4,13 +4,13 @@ package:
 
   tasks:
   - name: Message
-    pyclass: message.Message
+    pyclass: dv_flow.mgr.std.message.Message
     with:
       msg:
         type: str
         value: ""
   - name: FileSet
-    pyclass: fileset.FileSet
+    pyclass: dv_flow.mgr.std.fileset.FileSet
     with:
       base:
         type: str
@@ -24,3 +24,7 @@ package:
       exclude:
         type: str
         value: ""
+#  - name: Exec
+#    pyclass: dv_flow.mgr.std.exec.Exec
+#    with: {}
+      

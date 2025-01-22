@@ -34,7 +34,8 @@ class TaskDef(BaseModel):
 #    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
     uses : str = dc.Field(default=None)
     pyclass : str = dc.Field(default=None)
-    doc : str = dc.Field(default=None)
+    desc : str = dc.Field(default="")
+    doc : str = dc.Field(default="")
     depends : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
 

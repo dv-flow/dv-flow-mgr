@@ -18,8 +18,8 @@ description = "DV Flow Manager is a build system for silicon design"
 license = {file = "LICENSE" }
 
 [project.scripts]
-dvfm = "dv_flow_mgr.__main__:main"
+dfm = "dv_flow.mgr.__main__:main"
 
 [tool.setuptools.package-data]
-dv_Flow_mgr = ['share/*']
+"dv_flow.mgr" = ['share/*']
 

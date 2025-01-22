@@ -4,8 +4,8 @@ import fnmatch
 import glob
 import pydantic.dataclasses as dc
 from typing import List, Tuple
-from dv_flow_mgr import Task, TaskData, TaskMemento
-from dv_flow_mgr import FileSet as _FileSet
+from dv_flow.mgr import Task, TaskData, TaskMemento
+from dv_flow.mgr import FileSet as _FileSet
 
 class TaskFileSetMemento(TaskMemento):
     files : List[Tuple[str,float]] = dc.Field(default_factory=list)
@@ -45,7 +45,7 @@ class FileSet(Task):
             for file in included_files:
                 if not any(glob.fnmatch.fnmatch(file, os.path.join(glob_root, pattern)) for pattern in self.params.exclude):
                     memento.files.append((file, os.path.getmtime(os.path.join(glob_root, file))))
-                    fs.files.append(file[len(glob_root):])
+                    fs.files.append(file[len(glob_root)+1:])
 
         # Check to see if the filelist or fileset have changed
         # Only bother doing this if the upstream task data has not changed

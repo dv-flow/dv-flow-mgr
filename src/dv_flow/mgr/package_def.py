@@ -19,7 +19,9 @@
 #*     Author: 
 #*
 #****************************************************************************
+import os
 import json
+import yaml
 import importlib
 import sys
 import pydantic
@@ -32,7 +34,7 @@ from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .task import TaskCtor, TaskParams
 from .task_def import TaskDef, TaskSpec
-from .tasklib.builtin_pkg import TaskNull
+from .std.task_null import TaskNull
 
 
 class PackageDef(BaseModel):
@@ -144,7 +146,8 @@ class PackageDef(BaseModel):
                 else:
                     mod = sys.modules[modname]
             except ModuleNotFoundError as e:
-                raise Exception("Failed to import module %s" % modname)
+                raise Exception("Failed to import module %s (basedir=%s): %s" % (
+                    modname, self.basedir, str(e)))
                 
             if not hasattr(mod, clsname):
                 raise Exception("Class %s not found in module %s" % (clsname, modname))
@@ -170,7 +173,15 @@ class PackageDef(BaseModel):
                 "str" : str,
                 "int" : int,
                 "float" : float,
-                "bool" : bool
+                "bool" : bool,
+                "list" : List
+            }
+            pdflt_m = {
+                "str" : "",
+                "int" : 0,
+                "float" : 0.0,
+                "bool" : False,
+                "list" : []
             }
             for p in task.params.keys():
                 param = task.params[p]
@@ -185,7 +196,7 @@ class PackageDef(BaseModel):
                     if "value" in param.keys():
                         field_m[p] = (ptype, param["value"])
                     else:
-                        field_m[p] = (ptype, )
+                        field_m[p] = (ptype, pdflt_m[ptype_s])
                 else:
                     if p not in field_m.keys():
                         raise Exception("Field %s not found" % p)
@@ -208,3 +219,84 @@ class PackageDef(BaseModel):
 
         return ctor_t
 
+    @staticmethod
+    def load(path, exp_pkg_name=None):
+        return PackageDef._loadPkgDef(path, exp_pkg_name, [])
+        pass
+
+    @staticmethod
+    def _loadPkgDef(root, exp_pkg_name, file_s):
+        if root in file_s:
+            raise Exception("Recursive file processing @ %s: %s" % (root, ",".join(file_s)))
+        file_s.append(root)
+        ret = None
+        with open(root, "r") as fp:
+            print("open %s" % root)
+            doc = yaml.load(fp, Loader=yaml.FullLoader)
+            if "package" not in doc.keys():
+                raise Exception("Missing 'package' key in %s" % root)
+            pkg = PackageDef(**(doc["package"]))
+            pkg.basedir = os.path.dirname(root)
+
+#            for t in pkg.tasks:
+#                t.basedir = os.path.dirname(root)
+
+        if exp_pkg_name is not None:
+            if exp_pkg_name != pkg.name:
+                raise Exception("Package name mismatch: %s != %s" % (exp_pkg_name, pkg.name))
+            # else:
+            #     self._pkg_m[exp_pkg_name] = [PackageSpec(pkg.name)
+            #     self._pkg_spec_s.append(PackageSpec(pkg.name))
+
+        # if not len(self._pkg_spec_s):
+        #     self._pkg_spec_s.append(PackageSpec(pkg.name))
+        # else:
+        # self._pkg_def_m[PackageSpec(pkg.name)] = pkg
+
+        print("pkg: %s" % str(pkg))
+
+        print("fragments: %s" % str(pkg.fragments))
+        for spec in pkg.fragments:
+            PackageDef._loadFragmentSpec(pkg, spec, file_s)
+
+        file_s.pop()
+
+        return pkg
+    
+    @staticmethod
+    def _loadFragmentSpec(pkg, spec, file_s):
+        # We're either going to have:
+        # - File path
+        # - Directory path
+
+        if os.path.isfile(os.path.join(pkg.basedir, spec)):
+            PackageDef._loadFragmentFile(pkg, spec, file_s)
+        elif os.path.isdir(os.path.join(pkg.basedir, spec)):
+            PackageDef._loadFragmentDir(pkg, os.path.join(pkg.basedir, spec), file_s)
+        else:
+            raise Exception("Fragment spec %s not found" % spec)
+
+    @staticmethod
+    def _loadFragmentDir(pkg, dir, file_s):
+        for file in os.listdir(dir):
+            if os.path.isdir(os.path.join(dir, file)):
+                PackageDef._loadFragmentDir(pkg, os.path.join(dir, file), file_s)
+            elif os.path.isfile(os.path.join(dir, file)) and file == "flow.dv":
+                PackageDef._loadFragmentFile(pkg, os.path.join(dir, file), file_s)
+
+    @staticmethod
+    def _loadFragmentFile(pkg, file, file_s):
+        if file in file_s:
+            raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(file_s)))
+        file_s.append(file)
+
+        with open(file, "r") as fp:
+            doc = yaml.load(fp, Loader=yaml.FullLoader)
+            print("doc: %s" % str(doc), flush=True)
+            if "fragment" in doc.keys():
+                # Merge the package definition
+                frag = FragmentDef(**(doc["fragment"]))
+                frag.basedir = os.path.dirname(file)
+                pkg.fragment_l.append(frag)
+            else:
+                print("Warning: file %s is not a fragment" % file)

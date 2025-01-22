@@ -63,10 +63,10 @@ class TaskCtor(object):
 class Task(object):
     """Executable view of a task"""
     name : str
-    session : 'Session'
     params : TaskParams
-    basedir : str
     srcdir : str = None
+    session : 'TaskGraphRunner' = None
+    basedir : str = None
     memento : TaskMemento = None
     depend_refs : List['TaskSpec'] = dc.field(default_factory=list)
     depends : List[int] = dc.field(default_factory=list)
@@ -81,6 +81,10 @@ class Task(object):
     impl : str = None
     body: Dict[str,Any] = dc.field(default_factory=dict)
     impl_t : Any = None
+
+    def init(self, runner, basedir):
+        self.session = runner
+        self.basedir = basedir
 
     def getMemento(self, T) -> TaskMemento:
         if os.path.isfile(os.path.join(self.rundir, "memento.json")):
@@ -110,7 +114,7 @@ class Task(object):
             print("deps_o: %s" % str(deps_o))
 
 
-            print("deps_m: %s" % str(deps_m))
+#            print("deps_m: %s" % str(deps_m))
 
             # Merge the output of the dependencies into a single input data
 #            if len(self.depends) > 1:
@@ -119,7 +123,10 @@ class Task(object):
             # Now that we have a clean input object, we need
             # to build the dep map
 
-            input = self.depends[0].output.copy()
+#            input = self.depends[0].output.copy()
+            input = TaskData.merge(deps_o)
+            input.src = self.name
+            input.deps[self.name] = list(inp.name for inp in self.depends)
         else:
             input = TaskData()
         

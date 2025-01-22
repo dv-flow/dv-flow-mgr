@@ -69,20 +69,34 @@ class TaskData(BaseModel):
     def getFileSets(self, type=None, order=True) -> List[FileSet]:
         ret = []
 
+        print("getFileSets: filesets=%s" % str(self.filesets))
+
         if order:
             # The deps map specifies task dependencies
 
             candidate_fs = []
             for fs in self.filesets:
+                print("fs: %s" % str(fs))
                 if type is None or fs.type in type:
                     candidate_fs.append(fs)
-
+            print("self.deps: %s" % str(self.deps))
             order = toposort(self.deps)
 
+            print("order: %s" % str(order))
+
             for order_s in order:
-                for fs in candidate_fs:
+                print("order_s: %s" % str(order_s))
+                i = 0
+                while i < len(candidate_fs):
+                    fs = candidate_fs[i]
+                    print("fs.src: %s" % fs.src)
                     if fs.src in order_s:
+                            print("Add fileset")
                             ret.append(fs)
+                            candidate_fs.pop(i)
+                    else:
+                        i += 1
+            ret.extend(candidate_fs)
         else:
             for fs in self.filesets:
                 if type is None or fs.type in type:
@@ -93,7 +107,9 @@ class TaskData(BaseModel):
     def copy(self) -> 'TaskData':
         ret = TaskData()
         ret.src = self.src
+        ret.basedir = self.basedir
         ret.params = self.params.copy()
+        ret.filesets = self.filesets.copy()
         for d in self.deps:
             ret.deps.append(d.clone())
         ret.changed = self.changed

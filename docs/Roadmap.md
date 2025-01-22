@@ -12,6 +12,18 @@ are evaluated.
   - Operations on input and output data
   - Operations on task parameters
 - Package fragments
+- Define task status. Tasks can have at least two types of failures
+  - Pass/Fail: Fail halts successors
+    - Fail must come with a message and extra info
+  - Status markers/counters
+    - errors / warnings / notes 
+  - Want known fileset to capture logfiles and related info
+  - Central params and datasets?
+    - Datasets preserve dependency relationships
+    - Datasets are the best way to aggregate settings
+  - Typed parameter sets
+  - Dependencies provide order in which to evaluate
+  - Operations on variables
 
 ## 2.0.0
 - Parameterized package definition and use
@@ -29,11 +41,13 @@ are evaluated.
 - JQ-based data extraction
 - YAML task templates / expansions
 - Support for annotating job requirements 
+- Support capturing schema for structured task data
 - Mark tasks as producing and accepting certain data
   - FileSet task `produces` fileset of `type`
   - SimImage task `accepts` systemVerilogSource, verilogSource, verilogPreCompLib, etc
   => Mostly useful for checking and suggestion
   => As more are marked, can treat as more binding
+- 
 
 # Library
 
