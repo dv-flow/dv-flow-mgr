@@ -54,7 +54,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
 
 
     async def exec(self, *args, **kwargs):
-        return self.create_subprocess(*args, **kwargs)
+        return await self.create_subprocess(*args, **kwargs)
 
     async def run(self, task : Union[Task,List[Task]]) -> List['TaskData']:
         if isinstance(task, Task):

@@ -22,11 +22,11 @@ class TaskGraphBuilder(object):
         if self.pkg_rgy is None:
             self.pkg_rgy = PkgRgy.inst()
 
-        self._pkg_spec_s.append(self.root_pkg)
-        pkg = self.root_pkg.mkPackage(self)
-        self._pkg_spec_s.pop()
-        self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
-        print("pkg_m: %s" % self.root_pkg.name)
+        if self.root_pkg is not None:
+            self._pkg_spec_s.append(self.root_pkg)
+            pkg = self.root_pkg.mkPackage(self)
+            self._pkg_spec_s.pop()
+            self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
 
     def push_package(self, pkg : Package):
         self._pkg_s.append(pkg)
@@ -157,6 +157,7 @@ class TaskGraphBuilder(object):
                             break
             
             if pkg is None:
+                print("Checking registry")
                 p_def =  self.pkg_rgy.getPackage(spec.name)
 
                 if p_def is not None:
