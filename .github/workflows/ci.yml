@@ -29,7 +29,7 @@ jobs:
       run: |
         cd docs
         make html
-        cp ../src/dv_flow_mgr/share/flow.json _build/html/
+        cp ../src/dv_flow/mgr/share/flow.json _build/html/
         touch _build/html/.nojekyll
 
     - name: Publish to PyPi
