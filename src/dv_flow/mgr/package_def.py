@@ -215,7 +215,7 @@ class PackageDef(BaseModel):
             if len(task.params) > 0:
                 ctor_t.params = task.params
             if len(task.depends) > 0:
-                ctor_t.depends.extends(task.depends)
+                ctor_t.depends.extend(task.depends)
 
         return ctor_t
 

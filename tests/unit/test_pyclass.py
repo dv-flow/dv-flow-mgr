@@ -193,3 +193,52 @@ class foo(Task):
 
     task = builder.mkTaskGraph("pkg1.foo2")
     output = asyncio.run(runner.run(task))
+
+def test_broad_parallel(tmpdir):
+    # Test that we can 
+    flow = """
+package:
+  name: pkg1
+  tasks:
+  - name: foo
+    pyclass: my_module.foo
+    with:
+      param1:
+        type: str
+        value: "1"
+"""
+
+    count = 1000
+
+    for t in range(count):
+        flow += "  - name: foo_%02d\n" % t
+        flow += "    uses: foo\n"
+        flow += "    with:\n"
+        flow += "      param1: \"%d\"\n" % t
+    flow += "  - name: final\n"
+    flow += "    needs: [" + ",".join("foo_%02d" % t for t in range(count)) + "]\n"
+
+    module = """
+from dv_flow.mgr import Task, TaskData
+
+class foo(Task):
+    async def run(self, input : TaskData) -> TaskData:
+        print("foo::run", flush=True)
+        print("params: %s" % str(self.params), flush=True)
+        return input
+"""
+
+    with open(os.path.join(tmpdir, "my_module.py"), "w") as f:
+        f.write(module)
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow)
+
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
+
+    task = builder.mkTaskGraph("pkg1.final")
+    output = asyncio.run(runner.run(task))
+

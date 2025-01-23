@@ -70,6 +70,13 @@ class TaskGraphBuilder(object):
 
         depends = []
 
+        for dep in ctor_t.depends:
+            if not dep in self._task_m.keys():
+                task = self._mkTaskGraph(dep, rundir)
+                self._task_m[dep] = task
+                pass
+            depends.append(self._task_m[dep])
+
         # The returned task should have all param references resolved
         print("task_ctor=%s" % str(ctor_t.task_ctor), flush=True)
         task = ctor_t.task_ctor(

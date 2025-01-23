@@ -23,7 +23,8 @@ import asyncio
 import os
 import yaml
 import dataclasses as dc
-from typing import Any, Callable, ClassVar, Dict, List, Union
+from toposort import toposort
+from typing import Any, Callable, ClassVar, Coroutine, Dict, List, Tuple, Union
 from .fragment_def import FragmentDef
 from .package import Package
 from .pkg_rgy import PkgRgy
@@ -37,7 +38,8 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
     """Session manages execution of a task graph"""
 
     rundir : str
-    nproc : int = -1
+    nproc : int = 4
+    done_task_m : Dict = dc.field(default_factory=dict)
     _workers : List = dc.field(default_factory=list)
 
     _inst : ClassVar['TaskGraphRunner'] = None
@@ -62,15 +64,62 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
             task = [task]
         else:
             unwrap = False
-        
-        run_o = list(t.do_run() for t in task)
 
-        ret = await asyncio.gather(*run_o)
+        dep_m = {}
+        task_m = {}
+
+        for t in task:
+            self._mkDeps(dep_m, task_m, t)
+
+        print("dep_m: %s" % str(dep_m))
+
+        order = list(toposort(dep_m))
+
+        active_task_l : List[Tuple[Task,Coroutine]]= []
+        # Now, iterate over the concurrent sets
+        for active_s in order:
+
+            # Check to see if all tasks are complete
+            done = True
+            for t in active_s:
+                while len(active_task_l) >= self.nproc and t not in self.done_task_m.keys():
+                    # Wait for at least one job to complete
+                    done, pending = await asyncio.wait(at[1] for at in active_task_l)
+                    for d in done:
+                        for i in range(len(active_task_l)):
+                            if active_task_l[i][1] == d:
+                                tt = active_task_l[i][0]
+                                self.done_task_m[tt.name] = tt
+                                active_task_l.pop(i)
+                                break
+                if t not in self.done_task_m.keys():
+                    task = task_m[t]
+                    coro = asyncio.Task(task.do_run())
+                    active_task_l.append((task, coro))
+               
+            # Now, wait for tasks to complete
+            if len(active_task_l):
+                coros = list(at[1] for at in active_task_l)
+                res = await asyncio.gather(*coros)
+
+#        print("order: %s" % str(order))
+#        
+#        run_o = list(t.do_run() for t in task)
+
+#        ret = await asyncio.gather(*run_o)
+        ret = None
 
         if unwrap:
-            return ret[0]
+            return task.output
         else:
-            return ret
+            return list(t.output for t in task)
+        
+    def _mkDeps(self, dep_m, task_m, task):
+        if task.name not in dep_m.keys():
+            task_m[task.name] = task
+            dep_m[task.name] = set(t.name for t in task.depends)
+            for d in task.depends:
+                self._mkDeps(dep_m, task_m, d)
     
     async def runTask(self, task : Task) -> 'TaskData':
         return await task.do_run()
@@ -82,6 +131,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
 @dc.dataclass
 class LocalRunnerWorker(object):
     runner : TaskGraphRunnerLocal
-    pass
+    task_s : List = dc.field(default_factory=list)
+
 
 
