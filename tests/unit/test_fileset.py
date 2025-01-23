@@ -5,7 +5,7 @@ import dataclasses as dc
 import pytest
 from typing import List
 import yaml
-from dv_flow_mgr import FileSet, PackageDef, Session, TaskData
+from dv_flow.mgr import PackageDef, TaskGraphBuilder, TaskGraphRunnerLocal
 from pydantic import BaseModel
 from shutil import copytree
 
@@ -17,32 +17,38 @@ def test_fileset_1(tmpdir):
         os.path.join(datadir, "test1"), 
         os.path.join(tmpdir, "test1"))
     
-    session = Session(
-        os.path.join(tmpdir, "test1"),
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    builder = TaskGraphBuilder(
+        pkg_def,
         os.path.join(tmpdir, "rundir"))
-    session.load()
+    task = builder.mkTaskGraph("test1.files1")
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    out = asyncio.run(session.run("test1.files1"))
+    out = asyncio.run(runner.run(task))
     assert out.changed == True
 
     # Now, re-run using the same run directory.
     # Since the files haven't changed, the output must indicate that
-    session = Session(
-        os.path.join(tmpdir, "test1"),
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    builder = TaskGraphBuilder(
+        pkg_def,
         os.path.join(tmpdir, "rundir"))
-    session.load()
+    task = builder.mkTaskGraph("test1.files1")
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    out = asyncio.run(session.run("test1.files1"))
+    out = asyncio.run(runner.run(task))
     assert out.changed == False
 
-    # Now, manually change one of the files
-    with open(os.path.join(tmpdir, "test1", "files1", "file1_1.sv"), "w") as f:
-        f.write("// file1_1.sv\n")
+    # Now, add a files
+    with open(os.path.join(tmpdir, "test1", "files1", "file1_3.sv"), "w") as f:
+        f.write("// file1_3.sv\n")
 
-    session = Session(
-        os.path.join(tmpdir, "test1"),
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    builder = TaskGraphBuilder(
+        pkg_def,
         os.path.join(tmpdir, "rundir"))
-    session.load()
+    task = builder.mkTaskGraph("test1.files1")
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    out = asyncio.run(session.run("test1.files1"))
+    out = asyncio.run(runner.run(task))
     assert out.changed == True

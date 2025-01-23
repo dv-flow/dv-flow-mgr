@@ -15,12 +15,7 @@ package:
     deps:
     - name: pytest
       src: pypi
-    - name: svdep
-      url: https://github.com/fvutils/svdep.git
-      anonymous: True
-    - name: dv-flow-lib-hdlsim
-      url: http://github.com/dv-flow/dv-flow-lib-hdlsim.git
-    - name: ply 
+    - name: pydantic
       src: pypi
     - name: pyyaml
       src: pypi

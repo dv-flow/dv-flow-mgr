@@ -5,10 +5,9 @@ import dataclasses as dc
 import pytest
 from typing import List
 import yaml
-from dv_flow_mgr import TaskData, FileSet, Session, TaskData, TaskDataParamKindE
+from dv_flow.mgr import TaskData, FileSet, TaskData, TaskDataParamKindE
 from pydantic import BaseModel
 from shutil import copytree
-from .tasklib import TaskNull
 
 def test_empty_in():
 

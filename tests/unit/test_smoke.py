@@ -5,7 +5,7 @@ import dataclasses as dc
 import pytest
 from typing import List
 import yaml
-from dv_flow_mgr import FileSet, PackageDef, Session, TaskData
+from dv_flow.mgr import FileSet, PackageDef, TaskData
 from pydantic import BaseModel
 from shutil import copytree
 

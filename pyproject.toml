@@ -7,7 +7,8 @@ build-backend = "setuptools.build_meta"
 name = "dv-flow-mgr"
 version = "0.0.1"
 dependencies = [
-    "pyyaml",
+    'pydantic',
+    'pyyaml',
     "toposort",
     "svdep"
 ]

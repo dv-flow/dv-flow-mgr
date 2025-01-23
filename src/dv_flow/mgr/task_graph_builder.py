@@ -99,7 +99,6 @@ class TaskGraphBuilder(object):
         print("getPackage: %s len: %d" % (spec.name, len(self._pkg_spec_s)))
         if len(self._pkg_spec_s) > 0:
             pkg_spec = self._pkg_spec_s[-1]
-            print("pkg_spec: %s ; root_pkg: %s" % (pkg_spec.name, self.root_pkg.name))
             if self.root_pkg.name == pkg_spec.name:
                 pkg_def = self.root_pkg
             else:

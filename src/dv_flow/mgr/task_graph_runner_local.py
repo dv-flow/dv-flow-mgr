@@ -1,5 +1,5 @@
 #****************************************************************************
-#* session.py
+#* task_graph_runner_local.py
 #*
 #* Copyright 2023 Matthew Ballance and Contributors
 #*
@@ -58,11 +58,19 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
 
     async def run(self, task : Union[Task,List[Task]]) -> List['TaskData']:
         if isinstance(task, Task):
+            unwrap = True
             task = [task]
+        else:
+            unwrap = False
         
         run_o = list(t.do_run() for t in task)
 
-        return await asyncio.gather(*run_o)
+        ret = await asyncio.gather(*run_o)
+
+        if unwrap:
+            return ret[0]
+        else:
+            return ret
     
     async def runTask(self, task : Task) -> 'TaskData':
         return await task.do_run()

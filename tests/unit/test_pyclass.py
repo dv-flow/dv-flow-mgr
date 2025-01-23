@@ -2,7 +2,7 @@
 import os
 import asyncio
 import pytest
-from dv_flow_mgr import Session, TaskData
+from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
 #from dv_flow_mgr.tasklib.builtin_pkg import TaskPyClass, TaskPyClassParams
 
 # def test_smoke(tmpdir):
@@ -43,7 +43,7 @@ package:
         value: "1"
 """
     module = """
-from dv_flow_mgr import Task, TaskData
+from dv_flow.mgr import Task, TaskData
 
 class foo(Task):
     async def run(self, input : TaskData) -> TaskData:
@@ -58,10 +58,15 @@ class foo(Task):
         f.write(flow)
 
     rundir = os.path.join(tmpdir, "rundir")
-    session = Session(os.path.join(tmpdir), rundir)
-    session.load()
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    output = asyncio.run(session.run("pkg1.foo"))
+    task = builder.mkTaskGraph("pkg1.foo")
+    output = asyncio.run(runner.run(task))
+
 
 def test_class_use(tmpdir):
     # Test that we can 
@@ -79,7 +84,7 @@ package:
     uses: foo
 """
     module = """
-from dv_flow_mgr import Task, TaskData
+from dv_flow.mgr import Task, TaskData
 
 class foo(Task):
     async def run(self, input : TaskData) -> TaskData:
@@ -93,11 +98,14 @@ class foo(Task):
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    rundir = os.path.join(tmpdir, "rundir")
-    session = Session(os.path.join(tmpdir), rundir)
-    session.load()
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    output = asyncio.run(session.run("pkg1.foo2"))
+    task = builder.mkTaskGraph("pkg1.foo2")
+    output = asyncio.run(runner.run(task))
 
 def test_class_use_with(tmpdir):
     # Test that we can 
@@ -118,7 +126,7 @@ package:
 
 """
     module = """
-from dv_flow_mgr import Task, TaskData
+from dv_flow.mgr import Task, TaskData
 
 class foo(Task):
     async def run(self, input : TaskData) -> TaskData:
@@ -132,11 +140,14 @@ class foo(Task):
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    rundir = os.path.join(tmpdir, "rundir")
-    session = Session(os.path.join(tmpdir), rundir)
-    session.load()
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    output = asyncio.run(session.run("pkg1.foo2"))
+    task = builder.mkTaskGraph("pkg1.foo")
+    output = asyncio.run(runner.run(task))
 
 def test_class_use_with_new_param(tmpdir):
     # Test that we can 
@@ -160,7 +171,7 @@ package:
 
 """
     module = """
-from dv_flow_mgr import Task, TaskData
+from dv_flow.mgr import Task, TaskData
 
 class foo(Task):
     async def run(self, input : TaskData) -> TaskData:
@@ -174,8 +185,11 @@ class foo(Task):
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    rundir = os.path.join(tmpdir, "rundir")
-    session = Session(os.path.join(tmpdir), rundir)
-    session.load()
+    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
 
-    output = asyncio.run(session.run("pkg1.foo2"))
+    task = builder.mkTaskGraph("pkg1.foo2")
+    output = asyncio.run(runner.run(task))

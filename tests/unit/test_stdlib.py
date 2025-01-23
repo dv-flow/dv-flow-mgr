@@ -1,7 +1,8 @@
 import os
 import asyncio
 import pytest
-from dv_flow_mgr import Session, TaskData
+from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
+from dv_flow.mgr.util import loadProjPkgDef
 
 def test_message(tmpdir, capsys):
     flow = """
@@ -18,10 +19,17 @@ package:
         f.write(flow)
 
     rundir = os.path.join(tmpdir, "rundir")
-    session = Session(os.path.join(tmpdir), rundir)
-    session.load()
 
-    output = asyncio.run(session.run("pkg1.foo"))
+    pkg_def = loadProjPkgDef(os.path.join(tmpdir))
+    assert pkg_def is not None
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=rundir)
+    runner = TaskGraphRunnerLocal(rundir=rundir)
+
+    task = builder.mkTaskGraph("pkg1.foo")
+
+    output = asyncio.run(runner.run(task))
 
     captured = capsys.readouterr()
     assert captured.out.find("Hello, World!") >= 0
