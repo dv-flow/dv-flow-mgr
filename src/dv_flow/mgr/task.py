@@ -68,12 +68,8 @@ class Task(object):
     session : 'TaskGraphRunner' = None
     basedir : str = None
     memento : TaskMemento = None
-    depend_refs : List['TaskSpec'] = dc.field(default_factory=list)
-    depends : List[int] = dc.field(default_factory=list)
-    running : bool = False
-    output_set : bool = False
+    depends : List['Task'] = dc.field(default_factory=list)
     output : Any = None
-    output_ev : Any = asyncio.Event()
 
     # Implementation data below
     basedir : str = dc.field(default=None)
@@ -107,23 +103,16 @@ class Task(object):
     async def do_run(self) -> TaskData:
         print("do_run: %s - %d depends" % (self.name, len(self.depends)))
         if len(self.depends) > 0:
-            awaitables = [dep.waitOutput() for dep in self.depends]
-            deps_o = await asyncio.gather(*awaitables)
+            deps_o = []
+            for d in self.depends:
+                dep_o = d.getOutput()
+                if dep_o is None:
+                    raise Exception("Null output for %s" % d.name)
+                deps_o.append(dep_o)
 
             # Merge filesets. A fileset with the same
             print("deps_o: %s" % str(deps_o))
 
-
-#            print("deps_m: %s" % str(deps_m))
-
-            # Merge the output of the dependencies into a single input data
-#            if len(self.depends) > 1:
-#                raise Exception("TODO: handle >1 inputs")
-
-            # Now that we have a clean input object, we need
-            # to build the dep map
-
-#            input = self.depends[0].output.copy()
             input = TaskData.merge(deps_o)
             input.src = self.name
             input.deps[self.name] = list(inp.name for inp in self.depends)
@@ -137,29 +126,17 @@ class Task(object):
 
         self.init_rundir()
 
-        result = await self.run(input)
+        self.output = await self.run(input)
 
-        if not self.output_set:
-            if result is None:
-                result = TaskData()
-
-            # We perform an auto-merge algorithm if the task 
-            # doesn't take control
-#            for dep_o in deps_o:
-#                result.deps.append(dep_o.clone())
-
-            self.setOutput(result)
-        else:
-            # The task has taken control of the output
-            result = self.getOutput()
+        if self.output is None:
+            raise Exception("No output produced by %s" % self.name)
+            result = TaskData()
 
         # Write-back the memento, if specified
         self.save_memento()
 
-        self.running = False
-
         # Combine data from the deps to produce a result
-        return result
+        return self.output
 
     async def run(self, input : TaskData) -> TaskData:
         raise NotImplementedError("TaskImpl.run() not implemented")
@@ -172,24 +149,6 @@ class Task(object):
         if self.memento is not None:
             with open(os.path.join(self.rundir, "memento.json"), "w") as fp:
                 fp.write(self.memento.model_dump_json(indent=2))
-    
-    def setOutput(self, output : TaskData):
-        self.output_set = True
-        output.src = self.name
-        self.output = output
-        self.output_ev.set()
-
-    async def waitOutput(self) -> TaskData:
-        if not self.output_set:
-            if self.running:
-                # Task is already running
-                print("wait")
-                await self.output_ev.wait()
-            else:
-                self.running = True
-                print("start task")
-                await self.do_run()
-        return self.output
     
     def getOutput(self) -> TaskData:
         return self.output

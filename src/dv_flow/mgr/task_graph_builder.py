@@ -87,13 +87,6 @@ class TaskGraphBuilder(object):
             rundir=rundir,
             srcdir=ctor_t.srcdir)
         
-        for i,d in enumerate(task.depend_refs):
-            if d in self._task_m.keys():
-                task.depends.append(self._task_m[d])
-            else:
-                print("mkTaskGraph: %s" % d)
-                task.depends.append(self._mkTaskGraph(d, parent_rundir))
-
         self._task_m[task.name] = task
 
         self._pkg_s.pop()
