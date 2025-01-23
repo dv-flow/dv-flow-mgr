@@ -28,7 +28,6 @@ import pydantic
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
 from typing import Any, Dict, List, Callable, Tuple
-from .flow import Flow
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec

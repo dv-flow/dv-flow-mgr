@@ -110,9 +110,6 @@ class Task(object):
                     raise Exception("Null output for %s" % d.name)
                 deps_o.append(dep_o)
 
-            # Merge filesets. A fileset with the same
-            print("deps_o: %s" % str(deps_o))
-
             input = TaskData.merge(deps_o)
             input.src = self.name
             input.deps[self.name] = list(inp.name for inp in self.depends)

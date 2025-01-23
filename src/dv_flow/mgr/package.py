@@ -20,22 +20,8 @@
 #*
 #****************************************************************************
 import dataclasses as dc
-import json
-from pydantic import BaseModel
-from typing import Any, Callable, Dict, List, Tuple
-from .flow import Flow
-from .task import TaskParams, TaskCtor
-from .task_def import TaskDef
-
-class PackageAcc(object):
-    pkg_spec : 'PackageSpec'
-    session : 'Session'
-    pkg : 'Package' = None
-
-    def getPackage(self) -> 'Package':
-        if self.pkg is None:
-            self.pkg = self.session.getPackage(self.pkg_spec)
-        return self.pkg
+from typing import Any, Dict
+from .task import TaskCtor
 
 @dc.dataclass
 class Package(object):
@@ -44,13 +30,7 @@ class Package(object):
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
-    imports : List['PackageAcc'] = dc.field(default_factory=list)
 
-    def getPackage(self, name : str) -> 'Package':
-        for p in self.imports:
-            if p.name == name:
-                return p.getPackage()
-            
     def getTaskCtor(self, name : str) -> TaskCtor:
         return self.tasks[name]
             
