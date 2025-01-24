@@ -153,7 +153,10 @@ class TaskGraphBuilder(object):
                             pkg = self._pkg_m[tgt_pkg_spec]
                         elif self.pkg_rgy.hasPackage(tgt_pkg_spec.name):
                             base = self.pkg_rgy.getPackage(tgt_pkg_spec.name)
+                            pkg_m = self._pkg_m
+                            self._pkg_m = {}
                             pkg = base.mkPackage(self, spec.params)
+                            self._pkg_m = pkg_m
                             self._pkg_m[spec] = pkg
                         elif imp.path is not None:
                             # See if we can load the package
@@ -172,6 +175,9 @@ class TaskGraphBuilder(object):
                             if base is None:
                                 raise Exception("Failed to find imported package %s" % spec.name)
                             pkg = base.mkPackage(self, spec.params)
+                            pkg_m = self._pkg_m
+                            self._pkg_m = {}
+                            self._pkg_m = pkg_m
                             self._pkg_m[spec] = pkg
                             break
             
@@ -180,7 +186,11 @@ class TaskGraphBuilder(object):
                 p_def =  self.pkg_rgy.getPackage(spec.name)
 
                 if p_def is not None:
+                    pkg_m = self._pkg_m
+                    self._pkg_m = {}
                     pkg = p_def.mkPackage(self)
+                    self._pkg_m = pkg_m
+                    self._pkg_m[spec] = pkg
 
             if pkg is None:
                 raise Exception("Failed to find package %s from package %s" % (
