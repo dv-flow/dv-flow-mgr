@@ -25,21 +25,21 @@ class FileSet(Task):
 
         if self.params is not None:
             glob_root = os.path.join(self.srcdir, self.params.base)
+            glob_root = glob_root.strip()
 
-            print("glob_root: %s" % glob_root)
+            if glob_root[-1] == '/' or glob_root == '\\':
+                glob_root = glob_root[:-1]
 
             fs = _FileSet(
                 src=self.name, 
                 type=self.params.type,
                 basedir=glob_root)
-            print("glob_root: %s" % glob_root)
 
             if not isinstance(self.params.include, list):
                 self.params.include = [self.params.include]
 
             included_files = []
             for pattern in self.params.include:
-                print("pattern: %s" % pattern)
                 included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
 
             for file in included_files:
