@@ -74,6 +74,8 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
         print("dep_m: %s" % str(dep_m))
 
         order = list(toposort(dep_m))
+        
+        print("order: %s" % str(order))
 
         active_task_l : List[Tuple[Task,Coroutine]]= []
         # Now, iterate over the concurrent sets
@@ -93,9 +95,9 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
                                 active_task_l.pop(i)
                                 break
                 if t not in self.done_task_m.keys():
-                    task = task_m[t]
-                    coro = asyncio.Task(task.do_run())
-                    active_task_l.append((task, coro))
+                    task_t = task_m[t]
+                    coro = asyncio.Task(task_t.do_run())
+                    active_task_l.append((task_t, coro))
                
             # Now, wait for tasks to complete
             if len(active_task_l):
@@ -110,7 +112,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
         ret = None
 
         if unwrap:
-            return task.output
+            return task[0].output
         else:
             return list(t.output for t in task)
         

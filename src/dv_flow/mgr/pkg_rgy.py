@@ -31,13 +31,11 @@ class PkgRgy(object):
         self._pkgpath = []
         self._pkg_m : Dict[str, Tuple[str,PackageDef]] = {}
 
-    def hasPackage(self, name, search_path=False):
+    def hasPackage(self, name, search_path=True):
         if name in self._pkg_m.keys():
             return True
-        elif search_path:
-            for p in self._pkgpath:
-                if os.path.exists(os.path.join(p, name)):
-                    return True
+        elif search_path and self._findOnPath(name) is not None:
+            return True
         else:
             return False
     
@@ -50,11 +48,33 @@ class PkgRgy(object):
                     self._pkg_m[name][0],
                     pkg_def
                 )
-                pass
             return self._pkg_m[name][1]
         else:
-            # Go search the package path
-            return None
+            return self._findOnPath(name)
+        
+    def _findOnPath(self, name):
+        name_s = name.split('.')
+        name_dir = "/".join(name_s)
+        if len(name_s) > 1:
+            name_pref = "/".join(name_s[:-1])
+        else:
+            name_pref = None
+
+        pkg = None
+
+        for path in self._pkgpath:
+            if os.path.isfile(os.path.join(path, name_dir, "flow.dv")):
+                pkg = PackageDef.load(os.path.join(path, name_dir, "flow.dv"))
+            elif name_pref is not None and os.path.isfile(os.path.join(path, name_pref, name_s[-1] + ".dv")):
+                pkg = PackageDef.load(os.path.join(path, name_pref, name_s[-1] + ".dv"))
+            elif os.path.isfile(os.path.join(path, name + ".dv")):
+                pkg = PackageDef.load(os.path.join(path, name + ".dv"))
+
+            if pkg is not None:
+                self._pkg_m[name] = (pkg.name, pkg)
+                break
+
+        return pkg
 
     def registerPackage(self, pkg_def):
         if pkg_def.name in self._pkg_m.keys():
@@ -64,6 +84,10 @@ class PkgRgy(object):
     def _discover_plugins(self):
         # Register built-in package
         self._pkg_m["std"] = (os.path.join(os.path.dirname(__file__), "std/flow.dv"), None)
+
+        if "DV_FLOW_PATH" in os.environ.keys() and os.environ["DV_FLOW_PATH"] != "":
+            paths = os.environ["DV_FLOW_PATH"].split(':')
+            self._pkgpath.extend(paths)
 
         if sys.version_info < (3,10):
             from importlib_metadata import entry_points

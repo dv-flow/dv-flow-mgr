@@ -59,6 +59,8 @@ class CmdRun(object):
         tasks = []
 
         for spec in args.tasks:
+            if spec.find('.') == -1:
+                spec = pkg.name + "." + spec
             task = builder.mkTaskGraph(spec)
             tasks.append(task)
 

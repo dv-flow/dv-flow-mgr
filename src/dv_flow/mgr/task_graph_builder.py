@@ -35,7 +35,6 @@ class TaskGraphBuilder(object):
     pkg_rgy : PkgRgy = None
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
-    _pkg_def_m : Dict[str,PackageDef] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
 
@@ -127,8 +126,6 @@ class TaskGraphBuilder(object):
         else:
             pkg_def = None
 
-        print("spec: %s ; _pkg_def_m: %s" % (str(spec), str(self._pkg_def_m.keys())))
-
         # Need a stack to track which package we are currently in
         # Need a map to get a concrete package from a name with parameterization
 
@@ -140,8 +137,9 @@ class TaskGraphBuilder(object):
             pkg = self._pkg_s[-1]
         if spec in self._pkg_m.keys():
             pkg = self._pkg_m[spec]
-        elif spec in self._pkg_def_m.keys():
-            pkg = self._pkg_def_m[spec].mkPackage(self)
+        elif self.pkg_rgy.hasPackage(spec.name):
+            pkg_def = self.pkg_rgy.getPackage(spec.name)
+            pkg = pkg_def.mkPackage(self)
             self._pkg_m[spec] = pkg
         else:
             pkg = None
@@ -156,22 +154,26 @@ class TaskGraphBuilder(object):
                         tgt_pkg_spec = PackageSpec(imp.name)
                         if tgt_pkg_spec in self._pkg_m.keys():
                             pkg = self._pkg_m[tgt_pkg_spec]
-                        elif tgt_pkg_spec in self._pkg_def_m.keys():
-                            base = self._pkg_def_m[tgt_pkg_spec]
+                        elif self.pkg_rgy.hasPackage(tgt_pkg_spec.name):
+                            base = self.pkg_rgy.getPackage(tgt_pkg_spec.name)
                             pkg = base.mkPackage(self, spec.params)
                             self._pkg_m[spec] = pkg
                         elif imp.path is not None:
                             # See if we can load the package
                             print("TODO: load referenced package")
                         else:
-                            raise Exception("Import alias %s not found" % imp.name)
+                            raise Exception("Failed to resolve target (%s) of import alias %s" % (
+                                imp.name,
+                                imp.alias))
                         break
                     else:
                         # Need to compare the spec with the full import spec
                         imp_spec = PackageSpec(imp.name)
                         # TODO: set parameters
                         if imp_spec == spec:
-                            base = self._pkg_def_m[PackageSpec(spec.name)]
+                            base = self.pkg_rgy.getPackage(spec.name)
+                            if base is None:
+                                raise Exception("Failed to find imported package %s" % spec.name)
                             pkg = base.mkPackage(self, spec.params)
                             self._pkg_m[spec] = pkg
                             break
