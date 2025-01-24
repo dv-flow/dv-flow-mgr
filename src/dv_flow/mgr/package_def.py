@@ -252,9 +252,6 @@ class PackageDef(BaseModel):
         # else:
         # self._pkg_def_m[PackageSpec(pkg.name)] = pkg
 
-        print("pkg: %s" % str(pkg))
-
-        print("fragments: %s" % str(pkg.fragments))
         for spec in pkg.fragments:
             PackageDef._loadFragmentSpec(pkg, spec, file_s)
 

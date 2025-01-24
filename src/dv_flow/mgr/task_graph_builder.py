@@ -136,10 +136,6 @@ class TaskGraphBuilder(object):
             pkg = self._pkg_s[-1]
         if spec in self._pkg_m.keys():
             pkg = self._pkg_m[spec]
-        elif self.pkg_rgy.hasPackage(spec.name):
-            pkg_def = self.pkg_rgy.getPackage(spec.name)
-            pkg = pkg_def.mkPackage(self)
-            self._pkg_m[spec] = pkg
         else:
             pkg = None
 
