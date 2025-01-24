@@ -96,6 +96,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
                                 break
                 if t not in self.done_task_m.keys():
                     task_t = task_m[t]
+                    task_t.session = self
                     coro = asyncio.Task(task_t.do_run())
                     active_task_l.append((task_t, coro))
                

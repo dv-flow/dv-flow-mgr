@@ -101,7 +101,6 @@ class TaskGraphBuilder(object):
         print("task_ctor=%s" % str(ctor_t.task_ctor), flush=True)
         task = ctor_t.task_ctor(
             name=task_name,
-            session=self,
             params=ctor_t.mkParams(),
             depends=depends,
             rundir=rundir,
