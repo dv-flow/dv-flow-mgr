@@ -48,8 +48,10 @@ class TaskGraphBuilder(object):
             self._pkg_spec_s.pop()
             self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
 
-    def push_package(self, pkg : Package):
+    def push_package(self, pkg : Package, add=False):
         self._pkg_s.append(pkg)
+        if add:
+            self._pkg_m[PackageSpec(pkg.name, pkg.params)] = pkg
 
     def pop_package(self, pkg : Package):
         self._pkg_s.pop()

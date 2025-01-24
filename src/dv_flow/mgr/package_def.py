@@ -58,7 +58,7 @@ class PackageDef(BaseModel):
     def mkPackage(self, session, params : Dict[str,Any] = None) -> 'Package':
         ret = Package(self.name)
 
-        session.push_package(ret)
+        session.push_package(ret, add=True)
 
         tasks_m : Dict[str,str,TaskCtor]= {}
 
