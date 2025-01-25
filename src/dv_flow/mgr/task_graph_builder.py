@@ -21,6 +21,7 @@
 #****************************************************************************
 import os
 import dataclasses as dc
+import logging
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
@@ -37,10 +38,13 @@ class TaskGraphBuilder(object):
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
+    _logger : logging.Logger = None
 
     def __post_init__(self):
         if self.pkg_rgy is None:
             self.pkg_rgy = PkgRgy.inst()
+
+        self._logger = logging.getLogger(type(self).__name__)
 
         if self.root_pkg is not None:
             self._pkg_spec_s.append(self.root_pkg)
@@ -82,7 +86,7 @@ class TaskGraphBuilder(object):
 
         rundir = os.path.join(parent_rundir, pkg_name, task_name)
 
-        print("pkg_spec: %s" % str(pkg_spec))
+        self._logger.debug("pkg_spec: %s" % str(pkg_spec))
         self._pkg_spec_s.append(pkg_spec)
         pkg = self.getPackage(pkg_spec)
         
@@ -100,7 +104,7 @@ class TaskGraphBuilder(object):
             depends.append(self._task_m[dep])
 
         # The returned task should have all param references resolved
-        print("task_ctor=%s" % str(ctor_t.task_ctor), flush=True)
+        self._logger.debug("task_ctor=%s" % str(ctor_t.task_ctor))
         task = ctor_t.task_ctor(
             name=task_name,
             params=ctor_t.mkParams(),
@@ -117,7 +121,7 @@ class TaskGraphBuilder(object):
 
     def getPackage(self, spec : PackageSpec) -> Package:
         # Obtain the active package definition
-        print("getPackage: %s len: %d" % (spec.name, len(self._pkg_spec_s)))
+        self._logger.debug("--> getPackage: %s len: %d" % (spec.name, len(self._pkg_spec_s)))
         if len(self._pkg_spec_s) > 0:
             pkg_spec = self._pkg_spec_s[-1]
             if self.root_pkg.name == pkg_spec.name:
@@ -130,7 +134,8 @@ class TaskGraphBuilder(object):
         # Need a stack to track which package we are currently in
         # Need a map to get a concrete package from a name with parameterization
 
-        print("pkg_s: %d %s" % (len(self._pkg_s), (self._pkg_s[-1].name if len(self._pkg_s) else "<unknown>")))
+        self._logger.debug("pkg_s: %d %s" % (
+            len(self._pkg_s), (self._pkg_s[-1].name if len(self._pkg_s) else "<unknown>")))
 
         # Note: _pkg_m needs to be context specific, such that imports from
         # one package don't end up visible in another
@@ -143,9 +148,9 @@ class TaskGraphBuilder(object):
 
             if pkg_def is not None:
                 # Look for an import alias
-                print("imports: %s" % str(pkg_def.imports))
+                self._logger.debug("imports: %s" % str(pkg_def.imports))
                 for imp in pkg_def.imports:
-                    print("imp: %s" % str(imp))
+                    self._logger.debug("imp: %s" % str(imp))
                     if imp.alias is not None and imp.alias == spec.name:
                         # Found the alias name. Just need to get an instance of this package
                         tgt_pkg_spec = PackageSpec(imp.name)
@@ -153,14 +158,12 @@ class TaskGraphBuilder(object):
                             pkg = self._pkg_m[tgt_pkg_spec]
                         elif self.pkg_rgy.hasPackage(tgt_pkg_spec.name):
                             base = self.pkg_rgy.getPackage(tgt_pkg_spec.name)
-                            pkg_m = self._pkg_m
-                            self._pkg_m = {}
+                            self._pkg_spec_s.append(base)
                             pkg = base.mkPackage(self, spec.params)
-                            self._pkg_m = pkg_m
-                            self._pkg_m[spec] = pkg
+                            self._pkg_spec_s.pop()
                         elif imp.path is not None:
                             # See if we can load the package
-                            print("TODO: load referenced package")
+                            self._logger.critical("TODO: load referenced package")
                         else:
                             raise Exception("Failed to resolve target (%s) of import alias %s" % (
                                 imp.name,
@@ -174,27 +177,27 @@ class TaskGraphBuilder(object):
                             base = self.pkg_rgy.getPackage(spec.name)
                             if base is None:
                                 raise Exception("Failed to find imported package %s" % spec.name)
+                            self._pkg_spec_s.append(base)
                             pkg = base.mkPackage(self, spec.params)
-                            pkg_m = self._pkg_m
-                            self._pkg_m = {}
-                            self._pkg_m = pkg_m
                             self._pkg_m[spec] = pkg
+                            self._pkg_spec_s.pop()
                             break
             
             if pkg is None:
-                print("Checking registry")
+                self._logger.debug("Checking registry")
                 p_def =  self.pkg_rgy.getPackage(spec.name)
 
                 if p_def is not None:
-                    pkg_m = self._pkg_m
-                    self._pkg_m = {}
+                    self._pkg_spec_s.append(p_def)
                     pkg = p_def.mkPackage(self)
-                    self._pkg_m = pkg_m
+                    self._pkg_spec_s.pop()
                     self._pkg_m[spec] = pkg
 
             if pkg is None:
                 raise Exception("Failed to find package %s from package %s" % (
                     spec.name, (pkg_def.name if pkg_def is not None else "<null>")))
+
+        self._logger.debug("<-- getPackage: %s" % str(pkg))
 
         return pkg
         
@@ -213,7 +216,7 @@ class TaskGraphBuilder(object):
             try:
                 pkg = self.getPackage(PackageSpec(pkg_name))
             except Exception as e:
-                print("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
+                self._logger.critical("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
                 raise e
 
         return pkg.getTaskCtor(task_name)

@@ -23,11 +23,12 @@ import os
 import json
 import yaml
 import importlib
+import logging
 import sys
 import pydantic
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, List, Callable, Tuple
+from typing import Any, Dict, List, Callable, Tuple, ClassVar
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
@@ -49,6 +50,7 @@ class PackageDef(BaseModel):
 #    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
 
     basedir : str = None
+    _log : ClassVar = logging.getLogger("PackageDef")
 
     def getTask(self, name : str) -> 'TaskDef':
         for t in self.tasks:
@@ -56,6 +58,7 @@ class PackageDef(BaseModel):
                 return t
     
     def mkPackage(self, session, params : Dict[str,Any] = None) -> 'Package':
+        self._log.debug("--> mkPackage %s" % self.name)
         ret = Package(self.name)
 
         session.push_package(ret, add=True)
@@ -84,6 +87,7 @@ class PackageDef(BaseModel):
 
         session.pop_package(ret)
 
+        self._log.debug("<-- mkPackage %s" % self.name)
         return ret
     
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
@@ -166,7 +170,7 @@ class PackageDef(BaseModel):
             field_m = {}
             # First, add parameters from the base class
             for fname,info in ctor_t.param_ctor.model_fields.items():
-                print("Field: %s (%s)" % (fname, info.default))
+                self._log.debug("Field: %s (%s)" % (fname, info.default))
                 field_m[fname] = (info.annotation, info.default)
             ptype_m = {
                 "str" : str,
@@ -207,7 +211,7 @@ class PackageDef(BaseModel):
                         raise Exception("No value specified for param %s: %s" % (
                             p, str(param)))
                     field_m[p] = (field_m[p][0], value)
-            print("field_m: %s" % str(field_m))
+            self._log.debug("field_m: %s" % str(field_m))
             ctor_t.param_ctor = pydantic.create_model(
                 "Task%sParams" % task.name, **field_m)
         else:
@@ -230,7 +234,7 @@ class PackageDef(BaseModel):
         file_s.append(root)
         ret = None
         with open(root, "r") as fp:
-            print("open %s" % root)
+            PackageDef._log.debug("open %s" % root)
             doc = yaml.load(fp, Loader=yaml.FullLoader)
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
@@ -288,7 +292,7 @@ class PackageDef(BaseModel):
 
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=yaml.FullLoader)
-            print("doc: %s" % str(doc), flush=True)
+            PackageDef._log.debug("doc: %s" % str(doc), flush=True)
             if "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))

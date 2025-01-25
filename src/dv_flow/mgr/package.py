@@ -32,6 +32,8 @@ class Package(object):
     tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
 
     def getTaskCtor(self, name : str) -> TaskCtor:
+        if name not in self.tasks.keys():
+            raise Exception("Task %s not present in package %s" % (name, self.name))
         return self.tasks[name]
             
     def __hash__(self):

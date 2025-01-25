@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import os
+import logging
 import sys
 from typing import Dict, Tuple
 from .package_def import PackageDef
@@ -30,6 +31,7 @@ class PkgRgy(object):
     def __init__(self):
         self._pkgpath = []
         self._pkg_m : Dict[str, Tuple[str,PackageDef]] = {}
+        self._log = logging.getLogger(type(self).__name__)
 
     def hasPackage(self, name, search_path=True):
         if name in self._pkg_m.keys():
@@ -108,7 +110,7 @@ class PkgRgy(object):
                                 name, self._pkg_m[name][0], path))
                         self._pkg_m[name] = (path, None)
             except Exception as e:
-                print("Error loading plugin %s: %s" % (p.name, str(e)))
+                self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e
 
         # self._pkgs = {}
