@@ -124,7 +124,7 @@ class TaskGraphBuilder(object):
         self._logger.debug("--> getPackage: %s len: %d" % (spec.name, len(self._pkg_spec_s)))
         if len(self._pkg_spec_s) > 0:
             pkg_spec = self._pkg_spec_s[-1]
-            if self.root_pkg.name == pkg_spec.name:
+            if self.root_pkg is not None and self.root_pkg.name == pkg_spec.name:
                 pkg_def = self.root_pkg
             else:
                 pkg_def = self.pkg_rgy.getPackage(pkg_spec.name)
