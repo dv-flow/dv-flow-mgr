@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Callable, Tuple, ClassVar
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
-from .task import TaskCtor, TaskParams
+from .task import TaskCtor, TaskCtorProxy, TaskCtorCls, TaskCtorParam, TaskCtorParamCls
 from .task_def import TaskDef, TaskSpec
 from .std.task_null import TaskNull
 
@@ -90,53 +90,131 @@ class PackageDef(BaseModel):
         self._log.debug("<-- mkPackage %s" % self.name)
         return ret
     
+    def getTaskCtor(self, session, task_name, tasks_m):
+        self._log.debug("--> getTaskCtor")
+        # Find package (not package_def) that implements this task
+        # Insert an indirect reference to that tasks's constructor
+        last_dot = task_name.rfind('.')
+
+        if last_dot != -1:
+            pkg_name = task_name[:last_dot]
+            task_name = task_name[last_dot+1:]
+        else:
+            pkg_name = None
+
+        if pkg_name is not None:
+            self._log.debug("Package-qualified 'uses'")
+            pkg = session.getPackage(PackageSpec(pkg_name))
+            if pkg is None:
+                raise Exception("Failed to find package %s" % pkg_name)
+            ctor_t = pkg.getTaskCtor(task_name)
+        else:
+            self._log.debug("Unqualified 'uses'")
+            if task_name not in tasks_m.keys():
+                raise Exception("Failed to find task %s" % task_name)
+            if len(tasks_m[task_name]) != 3:
+                raise Exception("Task %s not fully defined" % task_name)
+
+            ctor_t = tasks_m[task_name][2]
+        return ctor_t
+
+    def handleParams(self, task, ctor_t):
+
+        if task.params is not None and len(task.params) > 0:
+            decl_params = False
+
+            # First, add in a parameter-setting stage 
+            ctor_t = TaskCtorParam(
+                name=ctor_t.name,
+                uses=ctor_t,
+                srcdir=ctor_t.srcdir)
+#            ctor_t.params.update(task.params)
+
+            for value in task.params.values():
+                if "type" in value:
+                    decl_params = True
+                    break
+
+            if decl_params:
+                # We need to combine base parameters with new parameters
+                field_m = {}
+                # First, add parameters from the base class
+                base_o = ctor_t.mkParams()
+                for fname,info in base_o.model_fields.items():
+                    self._log.debug("Field: %s (%s)" % (fname, info.default))
+                    field_m[fname] = (info.annotation, info.default)
+                ptype_m = {
+                    "str" : str,
+                    "int" : int,
+                    "float" : float,
+                    "bool" : bool,
+                    "list" : List
+                }
+                pdflt_m = {
+                    "str" : "",
+                    "int" : 0,
+                    "float" : 0.0,
+                    "bool" : False,
+                    "list" : []
+                }
+                for p in task.params.keys():
+                    param = task.params[p]
+                    if type(param) == dict and "type" in param.keys():
+                        ptype_s = param["type"]
+                        if ptype_s not in ptype_m.keys():
+                            raise Exception("Unknown type %s" % ptype_s)
+                        ptype = ptype_m[ptype_s]
+
+                        if p in field_m.keys():
+                            raise Exception("Duplicate field %s" % p)
+                        if "value" in param.keys():
+                            field_m[p] = (ptype, param["value"])
+                        else:
+                            field_m[p] = (ptype, pdflt_m[ptype_s])
+                    else:
+                        if p not in field_m.keys():
+                            raise Exception("Field %s not found" % p)
+                        if type(param) != dict:
+                            value = param
+                        elif "value" in param.keys():
+                            value = param["value"]
+                        else:
+                            raise Exception("No value specified for param %s: %s" % (
+                                p, str(param)))
+                        field_m[p] = (field_m[p][0], value)
+                self._log.debug("field_m: %s" % str(field_m))
+                param_t = pydantic.create_model(
+                    "Task%sParams" % task.name, **field_m)
+                ctor_t = TaskCtorParamCls(
+                    name=ctor_t.name,
+                    uses=ctor_t,
+                    params_ctor=param_t)
+            else: # no new parameters declared
+                for p in task.params.keys():
+                    param = task.params[p]
+                    if p not in field_m.keys():
+                        raise Exception("Field %s not found" % p)
+                    if type(param) != dict:
+                        value = param
+                    elif "value" in param.keys():
+                        value = param["value"]
+                    else:
+                        raise Exception("No value specified for param %s: %s" % (
+                            p, str(param)))
+                    field_m[p] = (field_m[p][0], value)
+                ctor_t.params[p] = value
+
+        return ctor_t
+
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+        self._log.debug("--> %s::mkTaskCtor %s" % (self.name, task.name))
         ctor_t : TaskCtor = None
 
-        if task.uses is not None:
-            # Find package (not package_def) that implements this task
-            # Insert an indirect reference to that tasks's constructor
-            last_dot = task.uses.rfind('.')
-
-            if last_dot != -1:
-                pkg_name = task.uses[:last_dot]
-                task_name = task.uses[last_dot+1:]
-            else:
-                pkg_name = None
-                task_name = task.uses
-
-            if pkg_name is not None:
-                pkg = session.getPackage(PackageSpec(pkg_name))
-                if pkg is None:
-                    raise Exception("Failed to find package %s" % pkg_name)
-                ctor_t = pkg.getTaskCtor(task_name)
-                ctor_t = ctor_t.copy()
-                ctor_t.srcdir = srcdir
-            else:
-                if task_name not in tasks_m.keys():
-                    raise Exception("Failed to find task %s" % task_name)
-                if len(tasks_m[task_name]) == 3:
-                    ctor_t = tasks_m[task_name][2].copy()
-                    ctor_t.srcdir = srcdir
-                else:
-                    task_i = tasks_m[task_name]
-                    ctor_t = self.mkTaskCtor(
-                        session, 
-                        task=task_i[0], 
-                        srcdir=srcdir,
-                        tasks_m=tasks_m)
-                    tasks_m[task_name] = ctor_t
-
-        if ctor_t is None:
-            # Provide a default implementation
-            ctor_t = TaskCtor(
-                task_ctor=TaskNull,
-                param_ctor=TaskParams,
-                srcdir=srcdir)
-
+        # Determine the implementation constructor first
         if task.pyclass is not None:
             # Built-in impl
             # Now, lookup the class
+            self._log.debug("Use PyClass implementation")
             last_dot = task.pyclass.rfind('.')
             clsname = task.pyclass[last_dot+1:]
             modname = task.pyclass[:last_dot]
@@ -154,72 +232,36 @@ class PackageDef(BaseModel):
                 
             if not hasattr(mod, clsname):
                 raise Exception("Class %s not found in module %s" % (clsname, modname))
-            ctor_t.task_ctor = getattr(mod, clsname)
+            task_ctor = getattr(mod, clsname)
 
-            if task.uses is None:
-                ctor_t.param_ctor = TaskParams
+            # Determine if we need to use a new 
 
-        decl_params = False
-        for value in task.params.values():
-            if "type" in value:
-                decl_params = True
-                break
-        
-        if decl_params:
-            # We need to combine base parameters with new parameters
-            field_m = {}
-            # First, add parameters from the base class
-            for fname,info in ctor_t.param_ctor.model_fields.items():
-                self._log.debug("Field: %s (%s)" % (fname, info.default))
-                field_m[fname] = (info.annotation, info.default)
-            ptype_m = {
-                "str" : str,
-                "int" : int,
-                "float" : float,
-                "bool" : bool,
-                "list" : List
-            }
-            pdflt_m = {
-                "str" : "",
-                "int" : 0,
-                "float" : 0.0,
-                "bool" : False,
-                "list" : []
-            }
-            for p in task.params.keys():
-                param = task.params[p]
-                if type(param) == dict and "type" in param.keys():
-                    ptype_s = param["type"]
-                    if ptype_s not in ptype_m.keys():
-                        raise Exception("Unknown type %s" % ptype_s)
-                    ptype = ptype_m[ptype_s]
+            if task.uses is not None:
+                uses = self.getTaskCtor(session, task.uses, tasks_m)
+            else:
+                uses = None
 
-                    if p in field_m.keys():
-                        raise Exception("Duplicate field %s" % p)
-                    if "value" in param.keys():
-                        field_m[p] = (ptype, param["value"])
-                    else:
-                        field_m[p] = (ptype, pdflt_m[ptype_s])
-                else:
-                    if p not in field_m.keys():
-                        raise Exception("Field %s not found" % p)
-                    if type(param) != dict:
-                        value = param
-                    elif "value" in param.keys():
-                        value = param["value"]
-                    else:
-                        raise Exception("No value specified for param %s: %s" % (
-                            p, str(param)))
-                    field_m[p] = (field_m[p][0], value)
-            self._log.debug("field_m: %s" % str(field_m))
-            ctor_t.param_ctor = pydantic.create_model(
-                "Task%sParams" % task.name, **field_m)
+            ctor_t = TaskCtorCls(
+                name=task.name,
+                uses=uses,
+                task_ctor=task_ctor,
+                srcdir=srcdir)
+        elif task.uses is not None:
+            # Use the existing (base) to create the implementation
+            ctor_t = TaskCtor(
+                name=task.name,
+                uses=self.getTaskCtor(session, task.uses, tasks_m),
+                srcdir=srcdir)
         else:
-            if len(task.params) > 0:
-                ctor_t.params = task.params
-            if len(task.depends) > 0:
-                ctor_t.depends.extend(task.depends)
+            self._log.debug("Use 'Null' as the class implementation")
+            ctor_t = TaskCtorCls(
+                name=task.name,
+                task_ctor=TaskNull,
+                srcdir=srcdir)
 
+        ctor_t = self.handleParams(task, ctor_t)
+
+        self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
 
     @staticmethod

@@ -23,6 +23,7 @@ import asyncio
 import os
 import yaml
 import dataclasses as dc
+import logging
 from toposort import toposort
 from typing import Any, Callable, ClassVar, Coroutine, Dict, List, Tuple, Union
 from .fragment_def import FragmentDef
@@ -47,6 +48,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
     # Search path for .dfs files
     create_subprocess : Callable = asyncio.create_subprocess_exec
     _root_dir : str = None
+    _log : ClassVar = logging.getLogger("TaskGraphRunnerLocal")
 
     def __post_init__(self):
         if self.nproc == -1:
@@ -71,11 +73,11 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
         for t in task:
             self._mkDeps(dep_m, task_m, t)
 
-        print("dep_m: %s" % str(dep_m))
+        self._log.debug("dep_m: %s" % str(dep_m))
 
         order = list(toposort(dep_m))
         
-        print("order: %s" % str(order))
+        self._log.debug("order: %s" % str(order))
 
         active_task_l : List[Tuple[Task,Coroutine]]= []
         # Now, iterate over the concurrent sets
@@ -96,8 +98,7 @@ class TaskGraphRunnerLocal(TaskGraphRunner):
                                 break
                 if t not in self.done_task_m.keys():
                     task_t = task_m[t]
-                    task_t.session = self
-                    coro = asyncio.Task(task_t.do_run())
+                    coro = asyncio.Task(task_t.do_run(self))
                     active_task_l.append((task_t, coro))
                
             # Now, wait for tasks to complete

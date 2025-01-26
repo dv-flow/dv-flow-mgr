@@ -20,10 +20,17 @@
 #*
 #****************************************************************************
 import argparse
+import logging
 from .cmds.cmd_run import CmdRun
 
 def get_parser():
     parser = argparse.ArgumentParser(description='dv_flow_mgr')
+    parser.add_argument("-d", "--debug", 
+                        help="Enable debug",
+                        action="store_true")
+    parser.add_argument("-v", "--verbose", 
+                        help="Enable verbose output",
+                        action="store_true")
     subparsers = parser.add_subparsers(required=True)
 
     run_parser = subparsers.add_parser('run', help='run a flow')
@@ -35,6 +42,12 @@ def get_parser():
 def main():
     parser = get_parser()
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+    elif args.verbose:
+        logging.basicConfig(level=logging.INFO)
+
     args.func(args)
 
 if __name__ == "__main__":

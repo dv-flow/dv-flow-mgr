@@ -2,8 +2,9 @@
 import os
 import fnmatch
 import glob
+import logging
 import pydantic.dataclasses as dc
-from typing import List, Tuple
+from typing import ClassVar, List, Tuple
 from dv_flow.mgr import Task, TaskData, TaskMemento
 from dv_flow.mgr import FileSet as _FileSet
 
@@ -12,8 +13,10 @@ class TaskFileSetMemento(TaskMemento):
 
 class FileSet(Task):
 
+    _log : ClassVar = logging.getLogger("FileSet")
+
     async def run(self, input : TaskData) -> TaskData:
-        print("TaskFileSet run: %s: basedir=%s, base=%s type=%s include=%s" % (
+        self._log.debug("TaskFileSet run: %s: basedir=%s, base=%s type=%s include=%s" % (
             self.name,
             self.srcdir,
             self.params.base, self.params.type, str(self.params.include)
@@ -52,8 +55,8 @@ class FileSet(Task):
         if ex_memento is not None and not input.changed:
             ex_memento.files.sort(key=lambda x: x[0])
             memento.files.sort(key=lambda x: x[0])
-            print("ex_memento.files: %s" % str(ex_memento.files))
-            print("memento.files: %s" % str(memento.files))
+            self._log.debug("ex_memento.files: %s" % str(ex_memento.files))
+            self._log.debug("memento.files: %s" % str(memento.files))
             input.changed = ex_memento != memento
         else:
             input.changed = True

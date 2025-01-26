@@ -6,5 +6,6 @@ class TaskNull(Task):
 
     async def run(self, input : TaskData) -> TaskData:
         # No memento ; data pass-through
+        self._log.debug("%s: TaskNull.run" % self.name)
         return input
 

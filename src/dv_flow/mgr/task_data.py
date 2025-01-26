@@ -20,9 +20,10 @@
 #*
 #****************************************************************************
 import enum
+import logging
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, Set, List, Tuple
+from typing import Any, ClassVar, Dict, Set, List, Tuple
 from .fileset import FileSet
 from toposort import toposort
 
@@ -54,6 +55,8 @@ class TaskData(BaseModel):
     filesets : List[FileSet] = dc.Field(default_factory=list)
     changed : bool = False
 
+    _log : ClassVar = logging.getLogger("TaskData")
+
     def hasParam(self, name: str) -> bool:
         return name in self.params
     
@@ -69,29 +72,29 @@ class TaskData(BaseModel):
     def getFileSets(self, type=None, order=True) -> List[FileSet]:
         ret = []
 
-        print("getFileSets: filesets=%s" % str(self.filesets))
+        self._log.debug("getFileSets: filesets=%s" % str(self.filesets))
 
         if order:
             # The deps map specifies task dependencies
 
             candidate_fs = []
             for fs in self.filesets:
-                print("fs: %s" % str(fs))
+                self._log.debug("fs: %s" % str(fs))
                 if type is None or fs.type in type:
                     candidate_fs.append(fs)
-            print("self.deps: %s" % str(self.deps))
+            self._log.debug("self.deps: %s" % str(self.deps))
             order = toposort(self.deps)
 
-            print("order: %s" % str(order))
+            self._log.debug("order: %s" % str(order))
 
             for order_s in order:
-                print("order_s: %s" % str(order_s))
+                self._log.debug("order_s: %s" % str(order_s))
                 i = 0
                 while i < len(candidate_fs):
                     fs = candidate_fs[i]
-                    print("fs.src: %s" % fs.src)
+                    self._log.debug("fs.src: %s" % fs.src)
                     if fs.src in order_s:
-                            print("Add fileset")
+                            self._log.debug("Add fileset")
                             ret.append(fs)
                             candidate_fs.pop(i)
                     else:

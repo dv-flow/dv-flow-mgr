@@ -20,7 +20,8 @@
 #*
 #****************************************************************************
 import dataclasses as dc
-from typing import Any, Dict
+import logging
+from typing import Any, ClassVar, Dict
 from .task import TaskCtor
 
 @dc.dataclass
@@ -30,8 +31,10 @@ class Package(object):
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
+    _log : ClassVar = logging.getLogger("Package")
 
     def getTaskCtor(self, name : str) -> TaskCtor:
+        self._log.debug("-- %s::getTaskCtor: %s" % (self.name, name))
         if name not in self.tasks.keys():
             raise Exception("Task %s not present in package %s" % (name, self.name))
         return self.tasks[name]

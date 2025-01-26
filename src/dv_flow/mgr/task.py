@@ -21,10 +21,10 @@
 #****************************************************************************
 import os
 import json
-import asyncio
 import dataclasses as dc
+import logging
 from pydantic import BaseModel
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskData
 from .task_memento import TaskMemento
 
@@ -35,29 +35,147 @@ class TaskSpec(object):
 class TaskParams(BaseModel):
     pass
 
+
 @dc.dataclass
 class TaskCtor(object):
-    task_ctor : Callable
-    param_ctor : Callable
-    params : Dict[str,Any] = None
+    name : str
+    uses : 'TaskCtor' = None
     srcdir : str = None
     depends : List[TaskSpec] = dc.field(default_factory=list)
 
-    def copy(self):
-        return TaskCtor(
-            task_ctor=self.task_ctor,
-            param_ctor=self.param_ctor,
-            params=self.params,
-            srcdir=self.srcdir,
-            depends=self.depends.copy())
+    _log : ClassVar = logging.getLogger("TaskCtor")
 
+    def mkTask(self, name : str, depends, rundir, srcdir=None, params=None):
+        if srcdir is None:
+            srcdir = self.srcdir
+        if params is None:
+            params = self.mkParams()
+
+        if self.uses is not None:
+            return self.uses.mkTask(name, depends, rundir, srcdir, params)
+        else:
+            raise NotImplementedError("TaskCtor.mkTask() not implemented for %s" % str(type(self)))
+    
     def mkParams(self):
-        print("mkParams: %s" % str(self.params))
-        ret = self.param_ctor()
+        self._log.debug("--> %s::mkParams" % self.name)
+        if self.uses is not None:
+            params = self.uses.mkParams()
+        else:
+            params = TaskParams()
+        self._log.debug("<-- %s::mkParams: %s" % (self.name, str(params)))
+
+        return params
+
+    def applyParams(self, params):
+        if self.uses is not None:
+            self.uses.applyParams(params)
+
+
+@dc.dataclass
+class TaskCtorParam(TaskCtor):
+    params : Dict[str,Any] = dc.field(default_factory=dict)
+
+    _log : ClassVar = logging.getLogger("TaskCtorParam")
+
+    def mkTask(self, name : str, depends, rundir, srcdir=None, params=None):
+        self._log.debug("--> %s::mkTask" % self.name)
+        if params is None:
+            params = self.mkParams()
+        if srcdir is None:
+            srcdir = self.srcdir
+
+        ret = self.uses.mkTask(name, depends, rundir, srcdir, params)
+
+        self.applyParams(ret.params)
+        self._log.debug("<-- %s::mkTask" % self.name)
+
+        return ret
+
+    def applyParams(self, params):
+        self._log.debug("--> %s::applyParams: %s %s" % (self.name, str(type(self.params)), str(type(params))))
         if self.params is not None:
             for k,v in self.params.items():
-                setattr(ret, k, v)
+                self._log.debug("  change %s %s=>%s" % (
+                    k, 
+                    str(getattr(params, k)),
+                    str(v)))
+                setattr(params, k, v)
+        else:
+            self._log.debug("  no params")
+        self._log.debug("<-- %s::applyParams: %s" % (self.name, str(self.params)))
+
+@dc.dataclass
+class TaskCtorParamCls(TaskCtor):
+    params_ctor : Callable = None
+
+    _log : ClassVar = logging.getLogger("TaskCtorParamType")
+
+    def mkParams(self):
+        self._log.debug("--> %s::mkParams" % str(self.name))
+        params = self.params_ctor()
+        self._log.debug("<-- %s::mkParams: %s" % (str(self.name), str(type(params))))
+        return params
+
+@dc.dataclass
+class TaskCtorCls(TaskCtor):
+    task_ctor : Callable = None
+
+    _log : ClassVar = logging.getLogger("TaskCtorCls")
+
+    def mkTask(self, name : str, depends, rundir, srcdir=None, params=None):
+        self._log.debug("--> %s::mkTask (%s)" % (self.name, str(self.task_ctor)))
+
+        if srcdir is None:
+            srcdir = self.srcdir
+
+        if params is None:
+            params = self.mkParams()
+
+        ret = self.task_ctor(
+            name=name, 
+            depends=depends, 
+            rundir=rundir, 
+            srcdir=srcdir, 
+            params=params)
+        ret.srcdir = self.srcdir
+
+        # Update parameters on the way back
+        self.applyParams(ret.params)
+
+        self._log.debug("<-- %s::mkTask" % self.name)
         return ret
+
+@dc.dataclass
+class TaskCtorProxy(TaskCtor):
+    task_ctor : TaskCtor = None
+    param_ctor : Callable = None
+
+    _log : ClassVar = logging.getLogger("TaskCtorProxy")
+
+    def mkTask(self, *args, **kwargs):
+        self._log.debug("--> %s::mkTask" % self.name)
+        ret = self.task_ctor.mkTask(*args, **kwargs)
+        self._log.debug("<-- %s::mkTask" % self.name)
+        return ret
+
+    def mkParams(self, params=None):
+        self._log.debug("--> %s::mkParams: %s" % (self.name, str(self.params)))
+
+        if params is None and self.param_ctor is not None:
+            params = self.param_ctor()
+
+        params = self.task_ctor.mkParams(params)
+
+        if self.params is not None:
+            for k,v in self.params.items():
+                self._log.debug("  change %s %s=>%s" % (
+                    k, 
+                    str(getattr(params, k)),
+                    str(v)))
+                setattr(params, k, v)
+        self._log.debug("<-- %s::mkParams: %s" % (self.name, str(self.params)))
+        return params
+
 
 @dc.dataclass
 class Task(object):
@@ -78,6 +196,8 @@ class Task(object):
     body: Dict[str,Any] = dc.field(default_factory=dict)
     impl_t : Any = None
 
+    _log : ClassVar = logging.getLogger("Task")
+
     def init(self, runner, basedir):
         self.session = runner
         self.basedir = basedir
@@ -89,7 +209,7 @@ class Task(object):
                     data = json.load(fp)
                     self.memento = T(**data)
                 except Exception as e:
-                    print("Failed to load memento %s: %s" % (
+                    self._log.critical("Failed to load memento %s: %s" % (
                         os.path.join(self.rundir, "memento.json"), str(e)))
                     os.unlink(os.path.join(self.rundir, "memento.json"))
         return self.memento
@@ -100,8 +220,14 @@ class Task(object):
     async def isUpToDate(self, memento) -> bool:
         return False
 
-    async def do_run(self) -> TaskData:
-        print("do_run: %s - %d depends" % (self.name, len(self.depends)))
+    async def do_run(self, session) -> TaskData:
+        self._log.info("--> %s (%s) do_run - %d depends" % (
+            self.name, 
+            str(type(self)),
+            len(self.depends)))
+
+        self.session = session
+
         if len(self.depends) > 0:
             deps_o = []
             for d in self.depends:
@@ -115,7 +241,6 @@ class Task(object):
             input.deps[self.name] = list(inp.name for inp in self.depends)
         else:
             input = TaskData()
-        
 
 
         # Mark the source of this data as being this task
@@ -133,6 +258,10 @@ class Task(object):
         self.save_memento()
 
         # Combine data from the deps to produce a result
+        self._log.info("<-- %s (%s) do_run - %d depends" % (
+            self.name, 
+            str(type(self)),
+            len(self.depends)))
         return self.output
 
     async def run(self, input : TaskData) -> TaskData:

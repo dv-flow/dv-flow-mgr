@@ -1,5 +1,7 @@
 import asyncio
 import os
+import logging
+from typing import ClassVar
 from ..task_graph_runner import TaskGraphRunner
 from ..util import loadProjPkgDef
 from ..task_graph_builder import TaskGraphBuilder
@@ -8,6 +10,7 @@ from ..pkg_rgy import PkgRgy
 
 
 class CmdRun(object):
+    _log : ClassVar = logging.getLogger("CmdRun")
 
     def __call__(self, args):
 
@@ -17,7 +20,7 @@ class CmdRun(object):
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
 
-        print("pkg: %s" % pkg.name)
+        self._log.debug("Root flow file defines package: %s" % pkg.name)
 
         if len(args.tasks) > 0:
             pass

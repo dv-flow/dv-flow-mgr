@@ -94,6 +94,8 @@ class TaskGraphBuilder(object):
 
         ctor_t : TaskCtor = pkg.getTaskCtor(task_name)
 
+        self._logger.debug("ctor_t: %s" % ctor_t.name)
+
         depends = []
 
         for dep in ctor_t.depends:
@@ -104,13 +106,10 @@ class TaskGraphBuilder(object):
             depends.append(self._task_m[dep])
 
         # The returned task should have all param references resolved
-        self._logger.debug("task_ctor=%s" % str(ctor_t.task_ctor))
-        task = ctor_t.task_ctor(
+        task = ctor_t.mkTask(
             name=task_name,
-            params=ctor_t.mkParams(),
             depends=depends,
-            rundir=rundir,
-            srcdir=ctor_t.srcdir)
+            rundir=rundir)
         
         self._task_m[task.name] = task
 
@@ -137,71 +136,45 @@ class TaskGraphBuilder(object):
         self._logger.debug("pkg_s: %d %s" % (
             len(self._pkg_s), (self._pkg_s[-1].name if len(self._pkg_s) else "<unknown>")))
 
+        # First, check the active pkg_def to see if any aliases
+        # Should be considered
+        pkg_name = spec.name
+        if pkg_def is not None:
+            # Look for an import alias
+            self._logger.debug("Search package %s for import alias %s" % (
+                pkg_def.name, pkg_spec.name))
+            for imp in pkg_def.imports:
+                self._logger.debug("imp: %s" % str(imp))
+                if imp.alias is not None and imp.alias == spec.name:
+                    # Found the alias name. Just need to get an instance of this package
+                    self._logger.debug("Found alias %s -> %s" % (imp.alias, imp.name))
+                    pkg_name = imp.name
+                    break
+
         # Note: _pkg_m needs to be context specific, such that imports from
         # one package don't end up visible in another
-        if len(self._pkg_s) and spec.name == self._pkg_s[-1].name:
-            pkg = self._pkg_s[-1]
+        spec.name = pkg_name
+
         if spec in self._pkg_m.keys():
+            self._logger.debug("Found cached package instance")
             pkg = self._pkg_m[spec]
+        elif self.pkg_rgy.hasPackage(spec.name):
+            self._logger.debug("Registry has a definition")
+            p_def =  self.pkg_rgy.getPackage(spec.name)
+
+            self._pkg_spec_s.append(p_def)
+            pkg = p_def.mkPackage(self)
+            self._pkg_spec_s.pop()
+            self._pkg_m[spec] = pkg
         else:
-            pkg = None
-
-            if pkg_def is not None:
-                # Look for an import alias
-                self._logger.debug("imports: %s" % str(pkg_def.imports))
-                for imp in pkg_def.imports:
-                    self._logger.debug("imp: %s" % str(imp))
-                    if imp.alias is not None and imp.alias == spec.name:
-                        # Found the alias name. Just need to get an instance of this package
-                        tgt_pkg_spec = PackageSpec(imp.name)
-                        if tgt_pkg_spec in self._pkg_m.keys():
-                            pkg = self._pkg_m[tgt_pkg_spec]
-                        elif self.pkg_rgy.hasPackage(tgt_pkg_spec.name):
-                            base = self.pkg_rgy.getPackage(tgt_pkg_spec.name)
-                            self._pkg_spec_s.append(base)
-                            pkg = base.mkPackage(self, spec.params)
-                            self._pkg_spec_s.pop()
-                        elif imp.path is not None:
-                            # See if we can load the package
-                            self._logger.critical("TODO: load referenced package")
-                        else:
-                            raise Exception("Failed to resolve target (%s) of import alias %s" % (
-                                imp.name,
-                                imp.alias))
-                        break
-                    else:
-                        # Need to compare the spec with the full import spec
-                        imp_spec = PackageSpec(imp.name)
-                        # TODO: set parameters
-                        if imp_spec == spec:
-                            base = self.pkg_rgy.getPackage(spec.name)
-                            if base is None:
-                                raise Exception("Failed to find imported package %s" % spec.name)
-                            self._pkg_spec_s.append(base)
-                            pkg = base.mkPackage(self, spec.params)
-                            self._pkg_m[spec] = pkg
-                            self._pkg_spec_s.pop()
-                            break
-            
-            if pkg is None:
-                self._logger.debug("Checking registry")
-                p_def =  self.pkg_rgy.getPackage(spec.name)
-
-                if p_def is not None:
-                    self._pkg_spec_s.append(p_def)
-                    pkg = p_def.mkPackage(self)
-                    self._pkg_spec_s.pop()
-                    self._pkg_m[spec] = pkg
-
-            if pkg is None:
-                raise Exception("Failed to find package %s from package %s" % (
-                    spec.name, (pkg_def.name if pkg_def is not None else "<null>")))
+            raise Exception("Failed to find definition of package %s" % spec.name)
 
         self._logger.debug("<-- getPackage: %s" % str(pkg))
 
         return pkg
         
     def getTaskCtor(self, spec : TaskSpec, pkg : PackageDef = None) -> 'TaskCtor':
+        self._logger.debug("--> getTaskCtor %s" % spec.name)
         spec_e = spec.name.split(".")
         task_name = spec_e[-1]
 
@@ -219,4 +192,7 @@ class TaskGraphBuilder(object):
                 self._logger.critical("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
                 raise e
 
-        return pkg.getTaskCtor(task_name)
+        ctor = pkg.getTaskCtor(task_name)
+
+        self._logger.debug("--> getTaskCtor %s" % spec.name)
+        return ctor
