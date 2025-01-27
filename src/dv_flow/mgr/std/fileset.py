@@ -26,12 +26,17 @@ class FileSet(Task):
         ex_memento = self.getMemento(TaskFileSetMemento)
         memento = TaskFileSetMemento()
 
+        self._log.debug("ex_memento: %s" % str(ex_memento))
+        self._log.debug("params: %s" % str(self.params))
+
         if self.params is not None:
             glob_root = os.path.join(self.srcdir, self.params.base)
             glob_root = glob_root.strip()
 
             if glob_root[-1] == '/' or glob_root == '\\':
                 glob_root = glob_root[:-1]
+
+            self._log.debug("glob_root: %s" % glob_root)
 
             fs = _FileSet(
                 src=self.name, 
@@ -44,6 +49,8 @@ class FileSet(Task):
             included_files = []
             for pattern in self.params.include:
                 included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
+
+            self._log.debug("included_files: %s" % str(included_files))
 
             for file in included_files:
                 if not any(glob.fnmatch.fnmatch(file, os.path.join(glob_root, pattern)) for pattern in self.params.exclude):

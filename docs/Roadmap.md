@@ -53,9 +53,10 @@ are evaluated.
 
 ## 1.0.0
 - Std
-  - Null (combine dependencies, set variables). Implements tasks that do not specify 'uses'
+  * Null (combine dependencies, set variables). Implements tasks that do not specify 'uses'
   - Exec
-  - FileSet
+  - Make
+  * FileSet
   - PyClass - implement a task as a Python class (load from a module)
 
 - HdlSim
@@ -112,3 +113,14 @@ are evaluated.
 - Extensible -- by users and organizations
 - Implementation independent (not tied to a specific implementation language)
 
+
+# TODO
+- Need some way to signal rough core consumption. Challenge is to complete
+  build as quickly as possible via coarse and fine-grained parallelism
+  - Parallelism tends to follow exponential curve. High parallelism early ; Low later
+  - Reasoning about curves may guide resource over-subscription
+- Each task needs memory hints / requirements as well
+- Dependency strategy for Exec/Make
+  - Specify dependency file created by task
+  - When the timestamp is updated, task is known to have been rebuilt
+- 

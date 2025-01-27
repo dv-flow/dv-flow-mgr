@@ -39,7 +39,7 @@ def test_fileset_1(tmpdir):
     out = asyncio.run(runner.run(task))
     assert out.changed == False
 
-    # Now, add a files
+    # Now, add a file
     with open(os.path.join(tmpdir, "test1", "files1", "file1_3.sv"), "w") as f:
         f.write("// file1_3.sv\n")
 

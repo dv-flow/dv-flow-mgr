@@ -123,7 +123,7 @@ class TaskCtorCls(TaskCtor):
     _log : ClassVar = logging.getLogger("TaskCtorCls")
 
     def mkTask(self, name : str, depends, rundir, srcdir=None, params=None):
-        self._log.debug("--> %s::mkTask (%s)" % (self.name, str(self.task_ctor)))
+        self._log.debug("--> %s::mkTask (%s) srcdir=%s" % (self.name, str(self.task_ctor), srcdir))
 
         if srcdir is None:
             srcdir = self.srcdir
@@ -137,7 +137,6 @@ class TaskCtorCls(TaskCtor):
             rundir=rundir, 
             srcdir=srcdir, 
             params=params)
-        ret.srcdir = self.srcdir
 
         # Update parameters on the way back
         self.applyParams(ret.params)

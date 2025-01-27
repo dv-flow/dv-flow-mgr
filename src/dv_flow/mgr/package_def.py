@@ -119,6 +119,7 @@ class PackageDef(BaseModel):
         return ctor_t
 
     def handleParams(self, task, ctor_t):
+        self._log.debug("--> handleParams %s params=%s" % (task.name, str(task.params)))
 
         if task.params is not None and len(task.params) > 0:
             decl_params = False
@@ -131,7 +132,8 @@ class PackageDef(BaseModel):
 #            ctor_t.params.update(task.params)
 
             for value in task.params.values():
-                if "type" in value:
+                self._log.debug("value: %s" % str(value))
+                if type(value) == dict and "type" in value.keys():
                     decl_params = True
                     break
 
@@ -143,6 +145,7 @@ class PackageDef(BaseModel):
                 field_m[fname] = (info.annotation, info.default)
 
             if decl_params:
+                self._log.debug("Type declares new parameters")
                 # We need to combine base parameters with new parameters
                 ptype_m = {
                     "str" : str,
@@ -160,6 +163,7 @@ class PackageDef(BaseModel):
                 }
                 for p in task.params.keys():
                     param = task.params[p]
+                    self._log.debug("param: %s" % str(param))
                     if type(param) == dict and "type" in param.keys():
                         ptype_s = param["type"]
                         if ptype_s not in ptype_m.keys():
@@ -191,6 +195,7 @@ class PackageDef(BaseModel):
                     uses=ctor_t,
                     params_ctor=param_t)
             else: # no new parameters declared
+                self._log.debug("Type only overrides existing parameters")
                 for p in task.params.keys():
                     param = task.params[p]
                     if p not in field_m.keys():
@@ -203,12 +208,15 @@ class PackageDef(BaseModel):
                         raise Exception("No value specified for param %s: %s" % (
                             p, str(param)))
                     field_m[p] = (field_m[p][0], value)
-                ctor_t.params[p] = value
+                    self._log.debug("Set param=%s to %s" % (p, str(value)))
+                    ctor_t.params[p] = value
+
+        self._log.debug("<-- handleParams %s" % task.name)
 
         return ctor_t
 
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
-        self._log.debug("--> %s::mkTaskCtor %s" % (self.name, task.name))
+        self._log.debug("--> %s::mkTaskCtor %s (srcdir: %s)" % (self.name, task.name, srcdir))
         ctor_t : TaskCtor = None
 
         # Determine the implementation constructor first
@@ -261,6 +269,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir)
 
         ctor_t = self.handleParams(task, ctor_t)
+        ctor_t.depends.extend(task.depends)
 
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
