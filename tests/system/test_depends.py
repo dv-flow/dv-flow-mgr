@@ -12,13 +12,13 @@ package:
 
   tasks:
   - name: files
-    uses: std.FileSet
+    uses: std.Message
     with:
-      type: textFiles
-      include: "*.txt"
+      msg: "Running Files"
 
   - name: print
     uses: std.Message
+    needs: [files]
     with:
       msg: "Running Print"
 """
@@ -44,6 +44,9 @@ package:
 
     output = output.decode()
 
+    print("output: %s" % output)
+
+    assert output.find("Running Files") != -1
     assert output.find("Running Print") != -1
 
 def test_seq_2(tmpdir):

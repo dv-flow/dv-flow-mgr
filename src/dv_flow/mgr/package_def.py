@@ -135,14 +135,15 @@ class PackageDef(BaseModel):
                     decl_params = True
                     break
 
+            field_m = {}
+            # First, add parameters from the base class
+            base_o = ctor_t.mkParams()
+            for fname,info in base_o.model_fields.items():
+                self._log.debug("Field: %s (%s)" % (fname, info.default))
+                field_m[fname] = (info.annotation, info.default)
+
             if decl_params:
                 # We need to combine base parameters with new parameters
-                field_m = {}
-                # First, add parameters from the base class
-                base_o = ctor_t.mkParams()
-                for fname,info in base_o.model_fields.items():
-                    self._log.debug("Field: %s (%s)" % (fname, info.default))
-                    field_m[fname] = (info.annotation, info.default)
                 ptype_m = {
                     "str" : str,
                     "int" : int,
