@@ -31,6 +31,7 @@ class Package(object):
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
+    types : Dict[str,Any] = dc.field(default_factory=dict)
     _log : ClassVar = logging.getLogger("Package")
 
     def getTaskCtor(self, name : str) -> TaskCtor:

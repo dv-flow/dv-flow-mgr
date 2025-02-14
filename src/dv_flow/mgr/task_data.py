@@ -48,26 +48,22 @@ class TaskDataParam(BaseModel):
     kind : TaskDataParamKindE
     ops : List[TaskDataParamOp] = dc.Field(default_factory=list)
 
+class TaskDataItem(BaseModel):
+    type : str
+    src : str
+    id : str
+
 class TaskData(BaseModel):
     src : str = None
-    params : Dict[str,TaskDataParam] = dc.Field(default_factory=dict)
     deps : Dict[str,Set[str]] = dc.Field(default_factory=dict)
-    filesets : List[FileSet] = dc.Field(default_factory=list)
     changed : bool = False
+    data : List[TaskDataItem] = dc.Field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskData")
 
-    def hasParam(self, name: str) -> bool:
-        return name in self.params
-    
-    def getParam(self, name: str) -> Any:
-        return self.params[name]
-    
-    def setParam(self, name: str, value: Any):
-        self.params[name] = value
-
-    def addFileSet(self, fs : FileSet):
-        self.filesets.append(fs)
+    def addData(self, item : TaskDataItem):
+        item.src = self.src
+        self.data.append(item)
 
     def getFileSets(self, type=None, order=True) -> List[FileSet]:
         ret = []
@@ -77,8 +73,10 @@ class TaskData(BaseModel):
         if order:
             # The deps map specifies task dependencies
 
+            filesets = filter(lambda x: x.type == "std.FileSet", self.data)
+
             candidate_fs = []
-            for fs in self.filesets:
+            for fs in filesets:
                 self._log.debug("fs: %s" % str(fs))
                 if type is None or fs.type in type:
                     candidate_fs.append(fs)

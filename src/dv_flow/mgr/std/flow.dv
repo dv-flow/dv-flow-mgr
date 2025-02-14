@@ -27,4 +27,52 @@ package:
 #  - name: Exec
 #    pyclass: dv_flow.mgr.std.exec.Exec
 #    with: {}
-      
+  types:
+  # - name: TaskDataItem
+  #   doc: |
+  #     Base type for a data element produced by a task.
+  #     TaskDataItem is never used directly
+  #   with:
+  #   - name: kind
+  #     type: str
+  #     kind: metadata
+  #     doc: |
+  #       Kind of data item
+  #   - name: src
+  #     type: str
+  #     kind: metadata
+  #     doc: |
+  #       Name of the task that produced this item
+  #   - name: id
+  #     type: str
+  #     kind: metadata
+  #     doc: |
+  #       Unique identiifer 
+
+  - name: Env
+    doc: |
+      Environment variables
+    with:
+    - name: doc
+
+  - name: FileSet
+    uses: TaskDataItem
+    with:
+    - name: kind
+      value: "FileSet"
+    - name: base
+      type: str
+    - name: fileType
+      type: str
+    - name: files
+      type: 
+        list:
+          item:
+            type: str
+
+    # type:
+    #   list: (str,int)
+    #     - complex type
+    # type:
+    #   object:
+    #     

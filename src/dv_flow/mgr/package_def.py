@@ -19,6 +19,7 @@
 #*     Author: 
 #*
 #****************************************************************************
+import io
 import os
 import json
 import yaml
@@ -35,6 +36,7 @@ from .package_import_spec import PackageImportSpec, PackageSpec
 from .task import TaskCtor, TaskCtorProxy, TaskCtorCls, TaskCtorParam, TaskCtorParamCls
 from .task_def import TaskDef, TaskSpec
 from .std.task_null import TaskNull
+from .type_def import TypeDef
 
 
 class PackageDef(BaseModel):
@@ -44,6 +46,7 @@ class PackageDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(default_factory=list)
     imports : List[PackageImportSpec] = dc.Field(default_factory=list)
     fragments: List[str] = dc.Field(default_factory=list)
+    types : List[TypeDef] = dc.Field(default_factory=list)
 
     fragment_l : List['FragmentDef'] = dc.Field(default_factory=list, exclude=True)
 
@@ -312,6 +315,32 @@ class PackageDef(BaseModel):
             PackageDef._loadFragmentSpec(pkg, spec, file_s)
 
         file_s.pop()
+
+        return pkg
+
+    @staticmethod
+    def loads(data, exp_pkg_name=None):
+        return PackageDef._loadPkgDefS(data, exp_pkg_name)
+        pass
+
+    @staticmethod
+    def _loadPkgDefS(data, exp_pkg_name):
+        ret = None
+        doc = yaml.load(io.StringIO(data), Loader=yaml.FullLoader)
+        if "package" not in doc.keys():
+            raise Exception("Missing 'package' key in %s" % root)
+        pkg = PackageDef(**(doc["package"]))
+        pkg.basedir = None
+
+#            for t in pkg.tasks:
+#                t.basedir = os.path.dirname(root)
+
+        if exp_pkg_name is not None:
+            if exp_pkg_name != pkg.name:
+                raise Exception("Package name mismatch: %s != %s" % (exp_pkg_name, pkg.name))
+
+        if len(pkg.fragments) > 0:
+            raise Exception("Cannot load a package-def with fragments from a string")
 
         return pkg
     

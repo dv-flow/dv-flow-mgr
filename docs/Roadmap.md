@@ -124,3 +124,8 @@ are evaluated.
   - Specify dependency file created by task
   - When the timestamp is updated, task is known to have been rebuilt
 - 
+
+- Allow each task to emit a series of markers as part of the result
+  - Enables users to easily click on first N warnings/errors in each step
+    without needing to find and open a logfile
+- Allow files to be attached as part of the result

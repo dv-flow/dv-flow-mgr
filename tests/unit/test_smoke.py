@@ -3,11 +3,65 @@ import io
 import os
 import dataclasses as dc
 import pytest
+import jq
 from typing import List
 import yaml
-from dv_flow.mgr import FileSet, PackageDef, TaskData
+from dv_flow.mgr import FileSet, PackageDef, TaskData, TaskGraphBuilder
 from pydantic import BaseModel
 from shutil import copytree
+
+def test_smoke_1():
+    flowdv = """
+package:
+    name: my_pkg
+
+    tasks:
+    - name: entry
+      with:
+      - name: p1
+        type: int
+      - name: p2
+        type: int
+"""
+
+    pkg_def = PackageDef.loads(flowdv)
+    builder = TaskGraphBuilder(pkg_def, os.getcwd())
+    task = builder.mkTaskGraph("my_pkg.entry")
+
+def test_jq():
+    data = [
+        {
+            "type": "FileSet",
+            "kind": "systemVerilogSource"
+        },
+        {
+            "type": "FileSet",
+            "kind": "vhdlSource"
+        },
+        {
+            "type": "FileSet",
+            "kind": "verilogSource"
+        }
+    ]
+
+    result = jq.compile(""".[] | 
+                        select(
+                            .kind == "systemVerilogSource" 
+                            or .kind == "verilogSource")
+                        """).input(data).all()
+    value = """
+    with:
+    - name: files
+      list-append: |
+      ${{ 
+      in | jq('.[] | select(
+        .kind == "systemVerilogSource" 
+        or .kind == "verilogSource")')
+      }}
+"""
+    print("result: %s" % str(result))
+
+
 
 # def test_smoke():
 #     file = """

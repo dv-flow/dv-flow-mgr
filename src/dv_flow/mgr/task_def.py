@@ -22,7 +22,9 @@
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union, Tuple
+from .param_def import ParamDef
 from .task import Task
+from .task_output import TaskOutput
 
 @dc.dataclass
 class TaskSpec(object):
@@ -37,7 +39,8 @@ class TaskDef(BaseModel):
     desc : str = dc.Field(default="")
     doc : str = dc.Field(default="")
     depends : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
-    params: Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
+    params: List[ParamDef] = dc.Field(default_factory=list, alias="with")
+    out: List[TaskOutput] = dc.Field(default_factory=list)
 
     def copy(self) -> 'TaskDef':
         ret = TaskDef(

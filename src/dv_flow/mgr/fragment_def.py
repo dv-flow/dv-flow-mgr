@@ -26,11 +26,13 @@ from typing import Any, Dict, List, Union
 from .package import Package
 from .package_import_spec import PackageImportSpec
 from .task_def import TaskDef
+from .type_def import TypeDef
 
 class FragmentDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(default_factory=list)
     imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list, alias="imports")
     fragments: List[str] = dc.Field(default_factory=list)
+    types : List[TypeDef] = dc.Field(default_factory=list)
 
     basedir : str = None
 

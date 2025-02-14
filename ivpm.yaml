@@ -25,5 +25,7 @@ package:
       src: pypi
     - name: sphinxcontrib-mermaid
       src: pypi
+    - name: jq
+      src: pypi
 
 
