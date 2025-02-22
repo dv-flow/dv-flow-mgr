@@ -27,5 +27,7 @@ package:
       src: pypi
     - name: jq
       src: pypi
+    - name: ply
+      src: pypi
 
 

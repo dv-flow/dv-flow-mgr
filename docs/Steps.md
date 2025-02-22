@@ -40,6 +40,7 @@ Result Data
   - changed
   - memento
   - list of markers
+  - exit status (?)
 - Saves memento and markers for later inspection (central dir?)
 - Sets 'self' as source of parameter sets
 - Forms output data from
@@ -47,4 +48,21 @@ Result Data
   - list of parameter sets
 
 # Creating Task Parameters
+- 
+
+# Need execution support for tasks
+- Create parameters given the current inputs
+  - Need to follow inheritance
+  - Last (bottom-up) "value" wins
+  - Appends act bottom-up
+
+- Task holds handles to input data from dependencies
+  - 
+  - Make Task as simple as possible: scheduling item and place to store data
+
+- Something needs to prepare inputs (likely runner)
+  - Locate 
+- Something needs to process result
+  - Save memento in central store (map of task-execution records)
+    - Organize with start/finish times, etc
 - 

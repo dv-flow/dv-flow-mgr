@@ -27,6 +27,24 @@ from typing import Any, ClassVar, Dict, Set, List, Tuple
 from .fileset import FileSet
 from toposort import toposort
 
+class TaskDataInput(BaseModel):
+    changed : bool
+    srcdir : str
+    rundir : str
+    params : Any
+    memento : Any
+
+class TaskDataResult(BaseModel):
+    changed : bool
+    output : List[Any]
+    memento : Any
+    markers : List[Any]
+    status : int
+
+class TaskDataOutput(BaseModel):
+    changed : bool
+    output : List[Any]
+
 class TaskDataParamOpE(enum.Enum):
     Set = enum.auto()
     Append = enum.auto()

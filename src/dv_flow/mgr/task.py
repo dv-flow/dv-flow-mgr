@@ -25,7 +25,7 @@ import dataclasses as dc
 import logging
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_data import TaskData
+from .task_data import TaskData, TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_memento import TaskMemento
 
 @dc.dataclass
@@ -180,112 +180,21 @@ class TaskCtorProxy(TaskCtor):
 class Task(object):
     """Executable view of a task"""
     name : str
-    params : TaskParams
-    srcdir : str = None
-    session : 'TaskGraphRunner' = None
-    basedir : str = None
-    memento : TaskMemento = None
-    depends : List['Task'] = dc.field(default_factory=list)
-    output : Any = None
 
-    # Implementation data below
-    basedir : str = dc.field(default=None)
+    # Need TaskDef 
+
+    params : TaskParams # Might need to be set of instructions for building...
+    # This needs to be 'inside out' -- listed bottom to top
+    srcdir : str = dc.field(default=None)
     rundir : str = dc.field(default=None)
-    impl : str = None
-    body: Dict[str,Any] = dc.field(default_factory=dict)
-    impl_t : Any = None
+    depends    : List['Task'] = dc.field(default_factory=list)
+    dependents : List['Task'] = dc.field(default_factory=list)
+    output : TaskDataOutput = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("Task")
 
-    def init(self, runner, basedir):
-        self.session = runner
-        self.basedir = basedir
-
-    def getMemento(self, T) -> TaskMemento:
-        if os.path.isfile(os.path.join(self.rundir, "memento.json")):
-            with open(os.path.join(self.rundir, "memento.json"), "r") as fp:
-                try:
-                    data = json.load(fp)
-                    self.memento = T(**data)
-                except Exception as e:
-                    self._log.critical("Failed to load memento %s: %s" % (
-                        os.path.join(self.rundir, "memento.json"), str(e)))
-                    os.unlink(os.path.join(self.rundir, "memento.json"))
-        return self.memento
-
-    def setMemento(self, memento : TaskMemento):
-        self.memento = memento
-
-    async def isUpToDate(self, memento) -> bool:
-        return False
-
-    async def do_run(self, session) -> TaskData:
-        self._log.info("--> %s (%s) do_run - %d depends" % (
-            self.name, 
-            str(type(self)),
-            len(self.depends)))
-
-        self.session = session
-
-        if len(self.depends) > 0:
-            deps_o = []
-            for d in self.depends:
-                dep_o = d.getOutput()
-                if dep_o is None:
-                    raise Exception("Null output for %s" % d.name)
-                deps_o.append(dep_o)
-
-            input = TaskData.merge(deps_o)
-            input.src = self.name
-            input.deps[self.name] = list(inp.name for inp in self.depends)
-        else:
-            input = TaskData()
-
-
-        # Mark the source of this data as being this task
-        input.src = self.name
-
-        self.init_rundir()
-
-        self.output = await self.run(input)
-
-        if self.output is None:
-            raise Exception("No output produced by %s" % self.name)
-            result = TaskData()
-
-        # Write-back the memento, if specified
-        self.save_memento()
-
-        # Combine data from the deps to produce a result
-        self._log.info("<-- %s (%s) do_run - %d depends" % (
-            self.name, 
-            str(type(self)),
-            len(self.depends)))
-        return self.output
-
-    async def run(self, input : TaskData) -> TaskData:
+    async def run(self, 
+                  input : TaskDataInput,
+                  runner : 'TaskGraphRunner') -> TaskDataResult:
         raise NotImplementedError("TaskImpl.run() not implemented")
-    
-    def init_rundir(self):
-        if not os.path.isdir(self.rundir):
-            os.makedirs(self.rundir)
-
-    def save_memento(self):
-        if self.memento is not None:
-            with open(os.path.join(self.rundir, "memento.json"), "w") as fp:
-                fp.write(self.memento.model_dump_json(indent=2))
-    
-    def getOutput(self) -> TaskData:
-        return self.output
-
-    def getField(self, name : str) -> Any:
-        if name in self.__dict__.keys():
-            return self.__dict__[name]
-        elif name in self.__pydantic_extra__.keys():
-            return self.__pydantic_extra__[name]
-        else:
-            raise Exception("No such field %s" % name)
-        
-
-
 
