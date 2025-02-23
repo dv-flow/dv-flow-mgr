@@ -21,19 +21,18 @@
 #****************************************************************************
 import asyncio
 import os
-import yaml
 import dataclasses as dc
-from typing import Any, Callable, ClassVar, Dict, List
+from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task import Task
 from .task_data import TaskData
+from .task_runner import TaskRunner
 
 @dc.dataclass
-class TaskGraphRunner(object):
+class TaskGraphRunner(TaskRunner):
     """Session manages execution of a task graph"""
 
-    rundir : str
-
     _inst : ClassVar['TaskGraphRunner'] = None
+
 
     # Search path for .dfs files
     create_subprocess : Callable = asyncio.create_subprocess_exec

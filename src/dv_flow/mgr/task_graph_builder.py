@@ -25,7 +25,7 @@ import logging
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
-from .task import Task, TaskCtor, TaskSpec
+from .task import Task
 from typing import Dict, List
 
 @dc.dataclass
@@ -37,7 +37,7 @@ class TaskGraphBuilder(object):
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
-    _task_m : Dict[TaskSpec,Task] = dc.field(default_factory=dict)
+    _task_m : Dict['TaskSpec',Task] = dc.field(default_factory=dict)
     _logger : logging.Logger = None
 
     def __post_init__(self):
@@ -173,7 +173,7 @@ class TaskGraphBuilder(object):
 
         return pkg
         
-    def getTaskCtor(self, spec : TaskSpec, pkg : PackageDef = None) -> 'TaskCtor':
+    def getTaskCtor(self, spec : 'TaskSpec', pkg : PackageDef = None) -> 'TaskCtor':
         self._logger.debug("--> getTaskCtor %s" % spec.name)
         spec_e = spec.name.split(".")
         task_name = spec_e[-1]

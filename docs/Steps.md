@@ -65,4 +65,45 @@ Result Data
 - Something needs to process result
   - Save memento in central store (map of task-execution records)
     - Organize with start/finish times, etc
-- 
+
+# 
+- Create a task type from YAML
+  - Taskdef
+- Create a task and parameter changes
+  - Params are given a value (most-common)
+  - Or, a mutator class instance to append/prepend/etc
+
+files = factory.mkTask("std.FileSet", 
+  srcdir=os.path.join(os.path.abspath(__file__)),
+  params=dict(
+    basedir="foo",
+    fileType="systemVerilog",
+    include="*.sv"
+  ))
+
+simImg = factory.mkTask("hdlsim.SimImg", needs=[files])
+
+runner.run(simImg)
+
+## Task constructor 
+- Creates the parameter-type data structure
+- Creates the parameter-evaluation stack (stack of param-type structs)
+- Creates the task (holding eval stack)
+
+
+
+- Python layer than can be used with or wihout YAML meta-data
+  - Define Task, Define Params
+  - Maybe decorator to wrap Task as a Ctor?
+  - Must be able to work with YAML-defined content
+- YAML layer simply populates Python layer
+
+  @Task.ctor(MyParams)
+  class MyTask(Task):
+    # Creates an inner static method ctor that can be passed as the constructor
+
+factory.addTaskType(MyTask.ctor)
+
+
+
+

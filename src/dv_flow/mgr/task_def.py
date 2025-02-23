@@ -40,7 +40,7 @@ class TaskDef(BaseModel):
     doc : str = dc.Field(default="")
     depends : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: List[ParamDef] = dc.Field(default_factory=list, alias="with")
-    out: List[TaskOutput] = dc.Field(default_factory=list)
+#    out: List[TaskOutput] = dc.Field(default_factory=list)
 
     def copy(self) -> 'TaskDef':
         ret = TaskDef(

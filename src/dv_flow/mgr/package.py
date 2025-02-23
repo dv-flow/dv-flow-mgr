@@ -22,7 +22,7 @@
 import dataclasses as dc
 import logging
 from typing import Any, ClassVar, Dict
-from .task import TaskCtor
+from .task_ctor import TaskCtor
 
 @dc.dataclass
 class Package(object):

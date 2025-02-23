@@ -27,6 +27,16 @@ from typing import Any, ClassVar, Dict, Set, List, Tuple
 from .fileset import FileSet
 from toposort import toposort
 
+class TaskMarkerLoc(BaseModel):
+    path : str
+    line : int = dc.Field(default=-1)
+    pos : int = dc.Field(default=-1)
+
+class TaskMarker(BaseModel):
+    msg : str
+    severity : str
+    loc : TaskMarkerLoc = dc.Field(default=None)
+
 class TaskDataInput(BaseModel):
     changed : bool
     srcdir : str
@@ -35,11 +45,11 @@ class TaskDataInput(BaseModel):
     memento : Any
 
 class TaskDataResult(BaseModel):
-    changed : bool
-    output : List[Any]
-    memento : Any
-    markers : List[Any]
-    status : int
+    changed : bool = dc.Field(default=True)
+    output : List[Any] = dc.Field(default_factory=list)
+    memento : Any = dc.Field(default=None)
+    markers : List[TaskMarker] = dc.Field(default_factory=list)
+    status : int = dc.Field(default=0)
 
 class TaskDataOutput(BaseModel):
     changed : bool

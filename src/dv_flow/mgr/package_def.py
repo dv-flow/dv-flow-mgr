@@ -33,7 +33,8 @@ from typing import Any, Dict, List, Callable, Tuple, ClassVar
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
-from .task import TaskCtor, TaskCtorProxy, TaskCtorCls, TaskCtorParam, TaskCtorParamCls
+#from .task import TaskCtorCls, TaskCtorParam, TaskCtorParamCls
+from .task_ctor import TaskCtor
 from .task_def import TaskDef, TaskSpec
 from .std.task_null import TaskNull
 from .type_def import TypeDef

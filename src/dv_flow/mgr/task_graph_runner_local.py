@@ -30,7 +30,7 @@ from .fragment_def import FragmentDef
 from .package import Package
 from .pkg_rgy import PkgRgy
 from .package_def import PackageDef, PackageSpec
-from .task import Task, TaskSpec, TaskCtor
+from .task import Task
 from .task_data import TaskData
 from .task_graph_runner import TaskGraphRunner
 
