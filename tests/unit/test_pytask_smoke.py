@@ -3,25 +3,26 @@ import pytest
 import dataclasses as dc
 from dv_flow.mgr.task import Task
 from dv_flow.mgr.task_data import TaskDataResult, TaskMarker
-from dv_flow.mgr.task_runner import SingleTaskRunner
+from dv_flow.mgr.task_node import task as t_decorator
+from dv_flow.mgr.task_runner import SingleTaskRunner, TaskSetRunner
 
 
 def test_smoke_1(tmpdir):
 
     @dc.dataclass
     class Params(object):
-        p1 : str
+        p1 : str = None
 
     called = False
-    @Task.ctor(Params)
-    class MyTask(Task):
-        async def run(self, runner, input):
+
+    @t_decorator(Params)
+    async def MyTask(runner, input):
             nonlocal called
             called = True
             print("Hello from run")
-            pass
+            return TaskDataResult()
 
-    task = MyTask("task1", "srcdir", MyTask.mkParams("p1"))
+    task = MyTask("srcdir", p1="p1")
     runner = SingleTaskRunner("rundir")
 
     result = asyncio.run(runner.run(task))
@@ -56,4 +57,40 @@ def test_smoke_2(tmpdir):
     assert result is not None
     assert len(result.markers) == 1
 
+def test_smoke_3(tmpdir):
 
+    @dc.dataclass
+    class Params(object):
+        p1 : str = None
+
+    called = False
+
+    @t_decorator(Params)
+    async def MyTask1(runner, input):
+            nonlocal called
+            called = True
+            print("Hello from run1 (%s)" % input.params.p1)
+            return TaskDataResult()
+
+    @t_decorator(Params)
+    async def MyTask2(runner, input):
+            nonlocal called
+            called = True
+            print("Hello from run2 (%s)" % input.params.p1)
+            return TaskDataResult()
+
+    @t_decorator(Params)
+    async def MyTask3(runner, input):
+            nonlocal called
+            called = True
+            print("Hello from run3 (%s)" % input.params.p1)
+            return TaskDataResult()
+
+    task1 = MyTask1("srcdir", p1="1")
+    task2 = MyTask2("srcdir", p1="2")
+    task3 = MyTask3("srcdir", p1="2", needs=[task1, task2])
+    runner = TaskSetRunner("rundir")
+
+    result = asyncio.run(runner.run(task3))
+
+    assert called
