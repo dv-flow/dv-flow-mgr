@@ -53,7 +53,10 @@ class TaskSetRunner(TaskRunner):
                                 active_task_l.pop(i)
                                 break
                 if t not in done_task_s:
-                    coro = asyncio.Task(self.do_run(t))
+                    coro = asyncio.Task(t.do_run(
+                        self,
+                        self.rundir, # TODO
+                        None)) # TODO: memento
                     active_task_l.append((t, coro))
                
             # Now, wait for tasks to complete
@@ -63,50 +66,6 @@ class TaskSetRunner(TaskRunner):
 
 
         pass
-
-    async def do_run(self, 
-                  task : 'TaskNode',
-                  memento : Any = None) -> 'TaskDataResult':
-        changed = False
-        for dep in task.needs:
-            changed |= dep.changed
-
-        # TODO: create an evaluator for substituting param values
-        eval = None
-
-        for field in dc.fields(task.params):
-            print("Field: %s" % field.name)
-
-        input = TaskDataInput(
-            changed=changed,
-            srcdir=task.srcdir,
-            rundir=self.rundir,
-            params=task.params,
-            memento=memento)
-
-        # TODO: notify of task start
-        ret : TaskDataResult = await task.task(self, input)
-        # TODO: notify of task complete
-
-        # Store the result
-        task.output = TaskDataOutput(
-            changed=ret.changed,
-            output=ret.output.copy())
-
-        # # By definition, none of this have run, since we just ran        
-        # for dep in task.dependents:
-        #     is_sat = True
-        #     for need in dep.needs:
-        #         if need.output is None:
-        #             is_sat = False
-        #             break
-            
-        #     if is_sat:
-        #         # TODO: queue task for evaluation
-        #     pass
-        # TODO: 
-
-        return ret
 
     def _buildDepMap(self, dep_m, task : TaskNode):
         if task not in dep_m.keys():

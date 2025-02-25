@@ -37,6 +37,10 @@ class TaskMarker(BaseModel):
     severity : str
     loc : TaskMarkerLoc = dc.Field(default=None)
 
+class TaskParameterSet(BaseModel):
+    task : str = None # Name of the task that produced this param set
+    seq : int  = -1 # Order in which the param-set must appear
+
 class TaskDataInput(BaseModel):
     changed : bool
     srcdir : str
@@ -46,14 +50,15 @@ class TaskDataInput(BaseModel):
 
 class TaskDataResult(BaseModel):
     changed : bool = dc.Field(default=True)
-    output : List[Any] = dc.Field(default_factory=list)
+    output : List[TaskParameterSet] = dc.Field(default_factory=list)
     memento : Any = dc.Field(default=None)
     markers : List[TaskMarker] = dc.Field(default_factory=list)
     status : int = dc.Field(default=0)
 
 class TaskDataOutput(BaseModel):
-    changed : bool
-    output : List[Any]
+    changed : bool = True
+    output : List[TaskParameterSet] = dc.Field(default_factory=list)
+    dep_m : Dict[str,List[str]] = dc.Field(default_factory=dict)
 
 class TaskDataParamOpE(enum.Enum):
     Set = enum.auto()

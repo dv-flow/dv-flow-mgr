@@ -9,16 +9,26 @@ class ExprEval(ExprVisitor):
     variables : Dict[str, object] = dc.field(default_factory=dict)
     value : Any = None
 
-    def eval(self, e : Expr):
+    def eval(self, e : Expr) -> str:
         self.value = None
         e.accept(self)
-        return self.value
+
+        val = self._toString(self.value)
+
+        return val
+    
+    def _toString(self, val):
+        if isinstance(val, list):
+            val = '[' + ",".join(self._toString(v) for v in val) + ']'
+        elif hasattr(val, "model_dump_json"):
+            val = val.model_dump_json()
+        return val
 
     def visitExprId(self, e : ExprId):
         if e.id in self.variables:
             self.value = self.variables[e.id]
         else:
-            raise Exception("Variable %s not found" % e.id)
+            raise Exception("Variable '%s' not found" % e.id)
 
     def visitExprString(self, e : ExprString):
         self.value = e.value

@@ -104,6 +104,11 @@ runner.run(simImg)
 
 factory.addTaskType(MyTask.ctor)
 
+# Proper values
+- Show that can pass individual values
+- Need to test append/prepend/path-append/path-prepend
+- Need to process and expand expressions
+- 
 
 
 
