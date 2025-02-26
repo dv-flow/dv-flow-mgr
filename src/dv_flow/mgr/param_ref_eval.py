@@ -2,12 +2,16 @@ import dataclasses as dc
 import json
 from .expr_eval import ExprEval
 from .expr_parser import ExprParser
+from .eval_jq import eval_jq
 
 @dc.dataclass
 class ParamRefEval(object):
 
     parser : ExprParser = ExprParser()
     expr_eval : ExprEval = ExprEval()
+
+    def __post_init__(self):
+        self.expr_eval.methods["jq"] = eval_jq
 
     def eval(self, val : str) -> str:
         idx = 0

@@ -45,13 +45,15 @@ class TaskNode(object):
 
         eval.setVar("in", in_params)
 
+#        for attr in dir(self.params):
+#            if not attr.startswith("_"):
+#                print("Attr: %s" % attr)
         for name,field in self.params.model_fields.items():
             value = getattr(self.params, name)
+            print("Field: %s %s" % (name, str(value)))
             if value.find("${{") != -1:
                 new_val = eval.eval(value)
                 setattr(self.params, name, new_val)
-                print("TODO: expand")
-            print("Field: %s %s" % (name, str(value)))
             pass
 
         input = TaskDataInput(

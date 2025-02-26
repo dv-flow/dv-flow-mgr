@@ -130,7 +130,7 @@ def test_smoke_4(tmpdir):
     task1 = MyTask1("srcdir", p1="1")
     task2 = MyTask2("srcdir", p1="2")
     task3 = MyTask3("srcdir", 
-                    p1="${{ in }}", 
+                    p1="${{ in | jq('.[] .val') }}", 
                     needs=[task1, task2])
     runner = TaskSetRunner("rundir")
 
@@ -138,4 +138,4 @@ def test_smoke_4(tmpdir):
 
     assert len(called) == 3
     assert called[-1][0] == "MyTask3"
-    assert called[-1][1] == "3"
+    assert called[-1][1] == "[1, 2]"
