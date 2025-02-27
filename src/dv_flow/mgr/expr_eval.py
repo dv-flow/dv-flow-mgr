@@ -19,8 +19,11 @@ class ExprEval(ExprVisitor):
         return val
     
     def _toString(self, val):
-        obj = self._toObject(val)
-        return json.dumps(obj)
+        rval = val
+        if type(val) != str:
+            obj = self._toObject(val)
+            rval = json.dumps(obj)
+        return rval
 #        if isinstance(val, list):
 #            val = '[' + ",".join(self._toString(v) for v in val) + ']'
 #        elif hasattr(val, "model_dump_json"):

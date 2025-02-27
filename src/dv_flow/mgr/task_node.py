@@ -6,6 +6,7 @@ from typing import Any, Callable, ClassVar, Dict, List
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
+from .param import Param
 
 @dc.dataclass
 class TaskNode(object):
@@ -45,16 +46,19 @@ class TaskNode(object):
 
         eval.setVar("in", in_params)
 
-#        for attr in dir(self.params):
-#            if not attr.startswith("_"):
-#                print("Attr: %s" % attr)
         for name,field in self.params.model_fields.items():
             value = getattr(self.params, name)
-            print("Field: %s %s" % (name, str(value)))
-            if value.find("${{") != -1:
-                new_val = eval.eval(value)
-                setattr(self.params, name, new_val)
-            pass
+            if type(value) == str:
+                if value.find("${{") != -1:
+                    new_val = eval.eval(value)
+                    setattr(self.params, name, new_val)
+            elif isinstance(value, list):
+                for i,elem in enumerate(value):
+                    if elem.find("${{") != -1:
+                        new_val = eval.eval(elem)
+                        value[i] = new_val
+            else:
+                raise Exception("Unhandled param type: %s" % str(value))
 
         input = TaskDataInput(
             changed=changed,
@@ -83,12 +87,6 @@ class TaskNode(object):
     def __hash__(self):
         return id(self)
     
-@staticmethod
-def task(paramT):
-    def wrapper(T):
-        ctor = TaskNodeCtorWrapper(T.__name__, T, paramT)
-        return ctor
-    return wrapper
 
 @dc.dataclass
 class TaskNodeCtor(object):
@@ -98,7 +96,6 @@ class TaskNodeCtor(object):
     - Produces a TaskNode
     """
     name : str
-
 
     def mkTaskNode(self, srcdir, params, name=None) -> TaskNode:
         raise NotImplementedError("mkTaskNode in type %s" % str(type(self)))
@@ -140,5 +137,25 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                     str(type(obj)),
                     key))
             else:
-                setattr(obj, key, value)
+                if isinstance(value, Param):
+                    if value.append is not None:
+                        ex_value = getattr(obj, key, [])
+                        ex_value.extend(value.append)
+                        setattr(obj, key, ex_value)
+                    elif value.prepend is not None:
+                        ex_value = getattr(obj, key, [])
+                        value = value.copy()
+                        value.extend(ex_value)
+                        setattr(obj, key, value)
+                        pass
+                    else:
+                        raise Exception("Unhandled value spec: %s" % str(value))
+                else:
+                    setattr(obj, key, value)
         return obj
+
+def task(paramT):
+    def wrapper(T):
+        ctor = TaskNodeCtorWrapper(T.__name__, T, paramT)
+        return ctor
+    return wrapper

@@ -8,8 +8,9 @@ def eval_jq(input, args):
     filt = jq.compile(args[0])
 
     if type(input) == str:
-        ret = filt.input_text(input).all()
+        ret = filt.input_text(input).text()
     else:
-        ret = filt.input_value(input).all()
+        ret = filt.input_value(input).text()
+
 
     return ret

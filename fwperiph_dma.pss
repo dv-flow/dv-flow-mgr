@@ -1,0 +1,127 @@
+
+struct wb_if { }
+struct clk_rst_if { }
+
+// Need to mark hierarchies as 'verilog'
+// This allows 
+component fwperiph_dma : vlog_blackbox_c {
+    // All contain refs
+    // Upper must connect during init_down
+    export_c<wb_if>     reg_if;
+    port_c<wb_if>       mem_if;
+    port_c<wb_if>       clk_rst_if;
+
+    exec init_down {
+        module_type = "fwperiph_dma #(%s,%s)" % hh;
+
+        // Append port bindings?
+    }
+}
+
+component wb_initiator_bfm_c {
+
+    // Port: consumer - requires something to implement the API
+    // Export: provider - is, or provides, an implementation
+    port_c<
+}
+
+// Effectively want to partition such that PSS model is valid,
+// and we can extract a region to generate as SV
+
+// Want to create a full testbench env from PSS input
+// - Still have to pull the 
+
+// Hierarchy mirrors the design and surrounding environment
+component pss_top {
+    wb_initiator_bfm_c        reg_if;
+    fwperiph_dma_c            dut;
+
+    exec init_down {
+
+    }
+}
+
+// port/export are orthogonal to interface/mirror
+
+// Wire ports have two components
+// Always use 'export', since we are providing 
+
+
+
+For wire ports, outside world must be able to determine internal binding (?)
+- No, not really. Assume netlister will create temp wires with names like container
+- dma_u_adr_i
+- ...
+
+Port must have a reference to an export
+Directionality may be arbitrary...
+
+port: initiator
+export: target
+
+Need to elaborate component tree in order to connect up bound port/export
+
+Goal is to be able to:
+- Instance the dut
+- Isolate stimulus
+- Synthesize stimulus
+
+
+Create reactive tests
+- Must be able to identify reactive portion
+- "constraints" surrounding reactive data must be sufficiently open
+- Must be able to "lower" reactive subset of the description
+
+"Scope of reactivity"
+- Loop:
+  repeat (<variable>) {
+    // body must also be autonomous?
+    // body is fixed or autonomous
+  }
+
+Action traversal cannot cross partition boundaries?
+- Specifically, must convert to reads/writes
+- Maybe automate 
+
+Capture required Emu / DfX content as part of UTP
+- Platform required
+- Target-specific requirements
+- Known dependencies (eg content for related blocks)
+- Stub requirements (which interfaces must be accessed)
+=> Goal: produce reusable content with minimal additional effort
+
+Pitch: multiple teams developing cross-platform test content from a natural-language spec
+- IP team needs to deliver to firmware
+- Emu team often re-engineers init content, builds SL content on top
+- Likewise, DfX team often re-engineers ; may be delayed due to dependency
+-> Want to reduce or eliminate redundant work
+-> Want consistency in what is used -- verifcation 
+-> 
+Pitch: capture initialization in machine-readable format
+-> Derive natural-language description and diagrams
+-> Derive platform-appropriate content
+-> Save time
+
+Formal capture of init sequences
+- Capture in PSS
+- Derive user documentation (AI for summarization + comments)
+
+struct wishbone_s : protocol_s {
+
+}
+
+struct wishbone_rtl_abstraction_s <ADDR_WIDTH=32, DATA_WIDTH=32> : abstraction_s<wishbone_s> {
+  @port(init_dir=Output, targ_dir=Input)
+  bit[DATA_WIDTH]   wr_data;
+
+  @port(init_dir=Output, targ_dir=Input)
+  bit[DATA_WIDTH]   rd_data;
+}
+
+// bus type
+// abstraction 
+// initiator, target, initiator_mirror, 
+
+component wb_initiator_c {
+  
+}
