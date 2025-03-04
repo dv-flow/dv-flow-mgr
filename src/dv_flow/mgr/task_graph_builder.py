@@ -96,20 +96,26 @@ class TaskGraphBuilder(object):
 
         self._logger.debug("ctor_t: %s" % ctor_t.name)
 
-        depends = []
+        needs = []
 
-        for dep in ctor_t.depends:
-            if not dep in self._task_m.keys():
-                task = self._mkTaskGraph(dep, rundir)
-                self._task_m[dep] = task
-                pass
-            depends.append(self._task_m[dep])
+        # for dep in ctor_t.depends:
+        #     if not dep in self._task_m.keys():
+        #         task = self._mkTaskGraph(dep, rundir)
+        #         self._task_m[dep] = task
+        #         pass
+        #     depends.append(self._task_m[dep])
 
         # The returned task should have all param references resolved
-        task = ctor_t.mkTask(
+        params = ctor_t.mkTaskParams()
+
+        if params is None:
+            raise Exception("ctor %s returned None for params" % str(ctor_t))
+
+        task = ctor_t.mkTaskNode(
+            params=params,
             name=task_name,
-            depends=depends,
-            rundir=rundir)
+            needs=needs)
+        task.rundir = rundir
         
         self._task_m[task.name] = task
 

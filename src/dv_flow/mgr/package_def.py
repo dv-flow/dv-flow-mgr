@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Callable, Tuple, ClassVar
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
-#from .task import TaskCtorCls, TaskCtorParam, TaskCtorParamCls
+from .task_node import TaskNodeCtor, TaskNodeCtorProxy, TaskNodeCtorTask
 from .task_ctor import TaskCtor
 from .task_def import TaskDef, TaskSpec
 from .std.task_null import TaskNull
@@ -151,20 +151,7 @@ class PackageDef(BaseModel):
             if decl_params:
                 self._log.debug("Type declares new parameters")
                 # We need to combine base parameters with new parameters
-                ptype_m = {
-                    "str" : str,
-                    "int" : int,
-                    "float" : float,
-                    "bool" : bool,
-                    "list" : List
-                }
-                pdflt_m = {
-                    "str" : "",
-                    "int" : 0,
-                    "float" : 0.0,
-                    "bool" : False,
-                    "list" : []
-                }
+
                 for p in task.params.keys():
                     param = task.params[p]
                     self._log.debug("param: %s" % str(param))
@@ -221,16 +208,24 @@ class PackageDef(BaseModel):
 
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
         self._log.debug("--> %s::mkTaskCtor %s (srcdir: %s)" % (self.name, task.name, srcdir))
+        base_ctor_t : TaskCtor = None
         ctor_t : TaskCtor = None
+        base_params : BaseModel = None
+        callable = None
+        needs = [] if task.needs is None else task.needs.copy()
+
+        if task.uses is not None:
+            base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
+            base_params = base_ctor_t.mkTaskParams()
 
         # Determine the implementation constructor first
-        if task.pyclass is not None:
+        if task.pytask is not None:
             # Built-in impl
             # Now, lookup the class
-            self._log.debug("Use PyClass implementation")
-            last_dot = task.pyclass.rfind('.')
-            clsname = task.pyclass[last_dot+1:]
-            modname = task.pyclass[:last_dot]
+            self._log.debug("Use PyTask implementation")
+            last_dot = task.pytask.rfind('.')
+            clsname = task.pytask[last_dot+1:]
+            modname = task.pytask[:last_dot]
 
             try:
                 if modname not in sys.modules:
@@ -245,26 +240,26 @@ class PackageDef(BaseModel):
                 
             if not hasattr(mod, clsname):
                 raise Exception("Class %s not found in module %s" % (clsname, modname))
-            task_ctor = getattr(mod, clsname)
+            callable = getattr(mod, clsname)
 
-            # Determine if we need to use a new 
-
-            if task.uses is not None:
-                uses = self.getTaskCtor(session, task.uses, tasks_m)
-            else:
-                uses = None
-
-            ctor_t = TaskCtorCls(
+        # Determine if we need to use a new 
+        paramT = self._getParamT(task, base_params)
+        
+        if callable is not None:
+            ctor_t = TaskNodeCtorTask(
                 name=task.name,
-                uses=uses,
-                task_ctor=task_ctor,
-                srcdir=srcdir)
-        elif task.uses is not None:
+                srcdir=srcdir,
+                paramT=paramT, # TODO: need to determine the parameter type
+                needs=needs, # TODO: need to determine the needs
+                task=callable)
+        elif base_ctor_t is not None:
             # Use the existing (base) to create the implementation
-            ctor_t = TaskCtor(
+            ctor_t = TaskNodeCtorProxy(
                 name=task.name,
-                uses=self.getTaskCtor(session, task.uses, tasks_m),
-                srcdir=srcdir)
+                srcdir=srcdir,
+                paramT=paramT, # TODO: need to determine the parameter type
+                needs=needs,
+                uses=base_ctor_t)
         else:
             self._log.debug("Use 'Null' as the class implementation")
             ctor_t = TaskCtorCls(
@@ -272,11 +267,77 @@ class PackageDef(BaseModel):
                 task_ctor=TaskNull,
                 srcdir=srcdir)
 
-        ctor_t = self.handleParams(task, ctor_t)
-        ctor_t.depends.extend(task.depends)
+# TODO:
+#        ctor_t = self.handleParams(task, ctor_t)
+#        ctor_t.depends.extend(task.depends)
 
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
+    
+    def _getParamT(self, task, base_t : BaseModel):
+        # Get the base parameter type (if available)
+        # We will build a new type with updated fields
+
+        ptype_m = {
+            "str" : str,
+            "int" : int,
+            "float" : float,
+            "bool" : bool,
+            "list" : List
+        }
+        pdflt_m = {
+            "str" : "",
+            "int" : 0,
+            "float" : 0.0,
+            "bool" : False,
+            "list" : []
+        }
+
+        fields = []
+        field_m : Dict[str,int] = {}
+
+        # First, pull out existing fields (if there's a base type)
+        if base_t is not None:
+            self._log.debug("Base type: %s" % str(base_t))
+            for name,f in base_t.model_fields.items():
+                ff : dc.Field = f
+                fields.append(f)
+                field_m[name] = (f.annotation, getattr(base_t, name))
+        else:
+            self._log.debug("No base type")
+
+        for p in task.params.keys():
+            param = task.params[p]
+            self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
+            if hasattr(param, "type") and param.type is not None:
+                ptype_s = param.type
+                if ptype_s not in ptype_m.keys():
+                    raise Exception("Unknown type %s" % ptype_s)
+                ptype = ptype_m[ptype_s]
+
+                if p in field_m.keys():
+                    raise Exception("Duplicate field %s" % p)
+                if param.value is not None:
+                    field_m[p] = (ptype, param.value)
+                else:
+                    field_m[p] = (ptype, pdflt_m[ptype_s])
+                self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
+            else:
+                if p not in field_m.keys():
+                    raise Exception("Field %s not found" % p)
+                if type(param) != dict:
+                    value = param
+                elif "value" in param.keys():
+                    value = param["value"]
+                else:
+                    raise Exception("No value specified for param %s: %s" % (
+                        p, str(param)))
+                field_m[p] = (field_m[p][0], value)
+                self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
+
+        params_t = pydantic.create_model("Task%sParams" % task.name, **field_m)
+
+        return params_t
 
     @staticmethod
     def load(path, exp_pkg_name=None):

@@ -7,8 +7,8 @@ from .eval_jq import eval_jq
 @dc.dataclass
 class ParamRefEval(object):
 
-    parser : ExprParser = ExprParser()
-    expr_eval : ExprEval = ExprEval()
+    parser : ExprParser = dc.field(default_factory=ExprParser)
+    expr_eval : ExprEval = dc.field(default_factory=ExprEval)
 
     def __post_init__(self):
         self.expr_eval.methods["jq"] = eval_jq

@@ -3,6 +3,7 @@ import os
 import asyncio
 import pytest
 from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
+from dv_flow.mgr.task_runner import TaskSetRunner
 #from dv_flow_mgr.tasklib.builtin_pkg import TaskPyClass, TaskPyClassParams
 
 # def test_smoke(tmpdir):
@@ -36,20 +37,18 @@ package:
   name: pkg1
   tasks:
   - name: foo
-    pyclass: my_module.foo
+    pytask: my_module.foo
     with:
       param1:
         type: str
         value: "1"
 """
     module = """
-from dv_flow.mgr import Task, TaskData
-
-class foo(Task):
-    async def run(self, input : TaskData) -> TaskData:
-        print("foo::run", flush=True)
-        print("params: %s" % str(self.params), flush=True)
-        return input
+from dv_flow.mgr import TaskDataResult
+async def foo(runner, input):
+    print("foo::run", flush=True)
+    print("params: %s" % str(input.params), flush=True)
+    return TaskDataResult()
 """
 
     with open(os.path.join(tmpdir, "my_module.py"), "w") as f:
@@ -62,7 +61,7 @@ class foo(Task):
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
-    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
     task = builder.mkTaskGraph("pkg1.foo")
     output = asyncio.run(runner.run(task))
@@ -75,7 +74,7 @@ package:
   name: pkg1
   tasks:
   - name: foo
-    pyclass: my_module.foo
+    pytask: my_module.foo
     with:
       param1:
         type: str
@@ -84,13 +83,12 @@ package:
     uses: foo
 """
     module = """
-from dv_flow.mgr import Task, TaskData
+from dv_flow.mgr import TaskDataResult
 
-class foo(Task):
-    async def run(self, input : TaskData) -> TaskData:
-        print("foo::run", flush=True)
-        print("params: %s" % str(self.params), flush=True)
-        return input
+async def foo(runner, input) -> TaskDataResult:
+    print("foo::run", flush=True)
+    print("params: %s" % str(input.params), flush=True)
+    return TaskDataResult()
 """
 
     with open(os.path.join(tmpdir, "my_module.py"), "w") as f:
@@ -102,7 +100,7 @@ class foo(Task):
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
-    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     task = builder.mkTaskGraph("pkg1.foo2")
     output = asyncio.run(runner.run(task))
@@ -114,7 +112,7 @@ package:
   name: pkg1
   tasks:
   - name: foo
-    pyclass: my_module.foo
+    pytask: my_module.foo
     with:
       param1:
         type: str
@@ -126,13 +124,12 @@ package:
 
 """
     module = """
-from dv_flow.mgr import Task, TaskData
+from dv_flow.mgr import TaskDataResult
 
-class foo(Task):
-    async def run(self, input : TaskData) -> TaskData:
+async def foo(runner, input) -> TaskDataResult:
         print("foo::run", flush=True)
-        print("params: %s" % str(self.params), flush=True)
-        return input
+        print("params: %s" % str(input.params), flush=True)
+        return TaskDataResult()
 """
 
     with open(os.path.join(tmpdir, "my_module.py"), "w") as f:
@@ -144,9 +141,9 @@ class foo(Task):
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
-    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo")
+    task = builder.mkTaskGraph("pkg1.foo2")
     output = asyncio.run(runner.run(task))
 
 def test_class_use_with_new_param(tmpdir):

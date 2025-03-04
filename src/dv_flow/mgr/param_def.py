@@ -14,7 +14,6 @@ class ComplexType(BaseModel):
     map : Union[MapType, None] = None
 
 class ParamDef(BaseModel):
-    name : str
     doc : str = None
     type : Union[str, 'ComplexType'] = None
     value : Union[Any, None] = None

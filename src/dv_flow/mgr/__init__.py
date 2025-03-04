@@ -7,4 +7,5 @@ from .task_data import *
 from .task_graph_runner import TaskGraphRunner
 from .task_graph_runner_local import TaskGraphRunnerLocal
 from .task_graph_builder import TaskGraphBuilder
+from .task_node import task
 

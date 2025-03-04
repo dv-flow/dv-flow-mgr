@@ -115,4 +115,31 @@ with:
   # List-of 
   - append-list: 
 
+# Why PSS?
+- Key usecases
+
+# Open Source and PSS
+
+# YAML basics
+- Load packages and create TaskNodeCtor objects from a YAML file
+- Define types in YAML
+- Implement a 'task factory'
+  - Support package overrides (config setting?)
+  - 
+
+# TaskNode, TaskNodeCtor
+- TaskNodeCtor exists for each node type
+  - Every node declaration in a YAML file
+  - Node types accessed via the Python API
+- A new node -- likely with different parameter values -- can be created via the API
+- A node created via the YAML spec has a dedicated node ctor
+
+When created via the 
+
+# Early Differentiators
+- Library of tools with aggressive work avoidance (faster turnaround)
+- Cross-tool support (strategy for category support)
+- Extract and display markers (easier identification of failures)
+
+
 

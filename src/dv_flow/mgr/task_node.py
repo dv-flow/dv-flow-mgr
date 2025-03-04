@@ -1,4 +1,5 @@
-
+import os
+import sys
 import dataclasses as dc
 import pydantic.dataclasses as pdc
 import logging
@@ -26,6 +27,10 @@ class TaskNode(object):
     output : TaskDataOutput = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")
+
+    def __post_init__(self):
+        if self.needs is None:
+            self.needs = []
 
     async def do_run(self, 
                   runner,
@@ -96,38 +101,110 @@ class TaskNodeCtor(object):
     - Produces a TaskNode
     """
     name : str
+    srcdir : str
+    paramT : Any
 
-    def mkTaskNode(self, srcdir, params, name=None) -> TaskNode:
+    def getNeeds(self) -> List[str]:
+        return []
+
+    def mkTaskNode(self,
+                   params,
+                   srcdir=None,
+                   name=None,
+                   needs=None) -> TaskNode:
         raise NotImplementedError("mkTaskNode in type %s" % str(type(self)))
 
-    def mkTaskParams(self, params : Dict) -> Any:
-        raise NotImplementedError("mkTaskParams in type %s" % str(type(self)))
+    def mkTaskParams(self, params : Dict = None) -> Any:
+        obj = self.paramT()
+
+        # Apply user-specified params
+        if params is not None:
+            for key,value in params.items():
+                if not hasattr(obj, key):
+                    raise Exception("Parameters class %s does not contain field %s" % (
+                        str(type(obj)),
+                        key))
+                else:
+                    if isinstance(value, Param):
+                        if value.append is not None:
+                            ex_value = getattr(obj, key, [])
+                            ex_value.extend(value.append)
+                            setattr(obj, key, ex_value)
+                        elif value.prepend is not None:
+                            ex_value = getattr(obj, key, [])
+                            value = value.copy()
+                            value.extend(ex_value)
+                            setattr(obj, key, value)
+                            pass
+                        else:
+                            raise Exception("Unhandled value spec: %s" % str(value))
+                    else:
+                        setattr(obj, key, value)
+        return obj
+
+@dc.dataclass
+class TaskNodeCtorDefBase(TaskNodeCtor):
+    """Task defines its own needs, that will need to be filled in"""
+    needs : List['str']
+
+    def __post_init__(self):
+        if self.needs is None:
+            self.needs = []
+
+    def getNeeds(self) -> List[str]:
+        return self.needs
+
+@dc.dataclass
+class TaskNodeCtorProxy(TaskNodeCtorDefBase):
+    """Task has a 'uses' clause, so we delegate creation of the node"""
+    uses : TaskNodeCtor
+
+    def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
+        if srcdir is None:
+            srcdir = self.srcdir
+        node = self.uses.mkTaskNode(params=params, srcdir=srcdir, name=name, needs=needs)
+        return node
+    
+@dc.dataclass
+class TaskNodeCtorTask(TaskNodeCtorDefBase):
+    task : Callable[['TaskRunner','TaskDataInput'],'TaskDataResult']
+
+    def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
+        if srcdir is None:
+            srcdir = self.srcdir
+
+        node = TaskNode(name, srcdir, params, self.task, needs=needs)
+        node.task = self.task
+
+        return node
 
 @dc.dataclass
 class TaskNodeCtorWrapper(TaskNodeCtor):
     T : Any
-    paramT : Any
 
     def __call__(self, 
-                 srcdir, 
-                 name=None, 
-                 params=None, 
+                 name=None,
+                 srcdir=None,
+                 params=None,
                  needs=None,
                  **kwargs):
         """Convenience method for direct creation of tasks"""
         if params is None:
             params = self.mkTaskParams(kwargs)
         
-        node = self.mkTaskNode(srcdir, params, name)
-        if needs is not None:
-            node.needs.extend(needs)
+        node = self.mkTaskNode(
+            srcdir=srcdir, 
+            params=params, 
+            name=name, 
+            needs=needs)
+
         return node
 
-    def mkTaskNode(self, srcdir, params, name=None) -> TaskNode:
-        node = TaskNode(name, srcdir, params, self.T)
+    def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
+        node = TaskNode(name, srcdir, params, self.T, needs=needs)
         return node
 
-    def mkTaskParams(self, params : Dict) -> Any:
+    def mkTaskParams(self, params : Dict = None) -> Any:
         obj = self.paramT()
 
         # Apply user-specified params
@@ -155,7 +232,16 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
         return obj
 
 def task(paramT):
+    """Decorator to wrap a task method as a TaskNodeCtor"""
     def wrapper(T):
-        ctor = TaskNodeCtorWrapper(T.__name__, T, paramT)
+        task_mname = T.__module__
+        task_module = sys.modules[task_mname]
+        ctor = TaskNodeCtorWrapper(
+            T.__name__, 
+            os.path.dirname(os.path.abspath(task_module.__file__)), 
+            paramT,
+            T)
         return ctor
     return wrapper
+
+
