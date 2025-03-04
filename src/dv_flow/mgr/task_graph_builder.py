@@ -26,6 +26,7 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
 from .task import Task
+from .task_node import TaskNodeCtor
 from typing import Dict, List
 
 @dc.dataclass
@@ -92,18 +93,17 @@ class TaskGraphBuilder(object):
         
         self._pkg_s.append(pkg)
 
-        ctor_t : TaskCtor = pkg.getTaskCtor(task_name)
+        ctor_t : TaskNodeCtor = pkg.getTaskCtor(task_name)
 
         self._logger.debug("ctor_t: %s" % ctor_t.name)
 
         needs = []
 
-        # for dep in ctor_t.depends:
-        #     if not dep in self._task_m.keys():
-        #         task = self._mkTaskGraph(dep, rundir)
-        #         self._task_m[dep] = task
-        #         pass
-        #     depends.append(self._task_m[dep])
+        for need_def in ctor_t.getNeeds():
+            if not need_def in self._task_m.keys():
+                task = self._mkTaskGraph(need_def, rundir)
+                self._task_m[need_def] = task
+            needs.append(self._task_m[need_def])
 
         # The returned task should have all param references resolved
         params = ctor_t.mkTaskParams()

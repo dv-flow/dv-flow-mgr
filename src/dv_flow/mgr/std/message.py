@@ -1,7 +1,6 @@
 
-from dv_flow.mgr import Task, TaskData
+from dv_flow.mgr import Task, TaskDataResult
 
-class Message(Task):
-    async def run(self, input : TaskData) -> TaskData:
-        print("%s: %s" % (self.name, self.params.msg))
-        return input
+async def Message(runner, input) -> TaskDataResult:
+        print("%s: %s" % (input.name, input.params.msg))
+        return TaskDataResult()

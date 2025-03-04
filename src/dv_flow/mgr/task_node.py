@@ -22,9 +22,11 @@ class TaskNode(object):
 
     # Runtime fields -- these get populated during execution
     changed : bool = False
+    passthrough : bool = False
     needs : List['TaskNode'] = dc.field(default_factory=list)
     rundir : str = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
+    result : TaskDataResult = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 
@@ -46,7 +48,7 @@ class TaskNode(object):
         for need in self.needs:
             in_params.extend(need.output.output)
 
-        # TODO: create an evaluator for substituting param values
+        # Create an evaluator for substituting param values
         eval = ParamRefEval()
 
         eval.setVar("in", in_params)
@@ -66,6 +68,7 @@ class TaskNode(object):
                 raise Exception("Unhandled param type: %s" % str(value))
 
         input = TaskDataInput(
+            name=self.name,
             changed=changed,
             srcdir=self.srcdir,
             rundir=rundir,
@@ -73,7 +76,7 @@ class TaskNode(object):
             memento=memento)
 
         # TODO: notify of task start
-        ret : TaskDataResult = await self.task(self, input)
+        self.result : TaskDataResult = await self.task(self, input)
         # TODO: notify of task complete
 
         # TODO: form a dep map from the outgoing param sets
@@ -81,13 +84,13 @@ class TaskNode(object):
 
         # Store the result
         self.output = TaskDataOutput(
-            changed=ret.changed,
+            changed=self.result.changed,
             dep_m=dep_m,
-            output=ret.output.copy())
+            output=self.result.output.copy())
 
         # TODO: 
 
-        return ret
+        return self.result
 
     def __hash__(self):
         return id(self)
@@ -103,6 +106,7 @@ class TaskNodeCtor(object):
     name : str
     srcdir : str
     paramT : Any
+    passthrough : bool
 
     def getNeeds(self) -> List[str]:
         return []
@@ -163,6 +167,7 @@ class TaskNodeCtorProxy(TaskNodeCtorDefBase):
         if srcdir is None:
             srcdir = self.srcdir
         node = self.uses.mkTaskNode(params=params, srcdir=srcdir, name=name, needs=needs)
+        node.passthrough = self.passthrough
         return node
     
 @dc.dataclass
@@ -174,6 +179,7 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
             srcdir = self.srcdir
 
         node = TaskNode(name, srcdir, params, self.task, needs=needs)
+        node.passthrough = self.passthrough
         node.task = self.task
 
         return node
@@ -187,6 +193,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                  srcdir=None,
                  params=None,
                  needs=None,
+                 passthrough=None,
                  **kwargs):
         """Convenience method for direct creation of tasks"""
         if params is None:
@@ -197,11 +204,16 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
             params=params, 
             name=name, 
             needs=needs)
+        if passthrough is not None:
+            node.passthrough = passthrough
+        else:
+            node.passthrough = self.passthrough
 
         return node
 
     def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
         node = TaskNode(name, srcdir, params, self.T, needs=needs)
+        node.passthrough = self.passthrough
         return node
 
     def mkTaskParams(self, params : Dict = None) -> Any:
@@ -231,16 +243,17 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                     setattr(obj, key, value)
         return obj
 
-def task(paramT):
+def task(paramT,passthrough=False):
     """Decorator to wrap a task method as a TaskNodeCtor"""
     def wrapper(T):
         task_mname = T.__module__
         task_module = sys.modules[task_mname]
         ctor = TaskNodeCtorWrapper(
-            T.__name__, 
-            os.path.dirname(os.path.abspath(task_module.__file__)), 
-            paramT,
-            T)
+            name=T.__name__, 
+            srcdir=os.path.dirname(os.path.abspath(task_module.__file__)), 
+            paramT=paramT,
+            passthrough=passthrough,
+            T=T)
         return ctor
     return wrapper
 

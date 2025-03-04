@@ -1,11 +1,9 @@
-from ..task import Task
-from ..task_data import TaskData
+from pydantic import BaseModel
+from ..task_data import TaskDataResult
 
-class TaskNull(Task):
-    """The Null task simply propagates its input to its output"""
+class TaskNullParams(BaseModel):
+    pass
 
-    async def run(self, input : TaskData) -> TaskData:
-        # No memento ; data pass-through
-        self._log.debug("%s: TaskNull.run" % self.name)
-        return input
+async def TaskNull(runner, input) -> TaskDataResult:
+    return TaskDataResult()
 

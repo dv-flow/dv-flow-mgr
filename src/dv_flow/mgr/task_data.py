@@ -42,6 +42,7 @@ class TaskParameterSet(BaseModel):
     seq : int  = -1 # Order in which the param-set must appear
 
 class TaskDataInput(BaseModel):
+    name : str
     changed : bool
     srcdir : str
     rundir : str

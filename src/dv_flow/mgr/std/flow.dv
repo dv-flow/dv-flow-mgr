@@ -1,16 +1,19 @@
 
+# yaml-language-server: $schema=https://dv-flow.github.io/dv-flow.schema.json
+
 package:
   name: std
 
   tasks:
   - name: Message
-    pyclass: dv_flow.mgr.std.message.Message
+    pytask: dv_flow.mgr.std.message.Message
     with:
       msg:
         type: str
         value: ""
   - name: FileSet
-    pyclass: dv_flow.mgr.std.fileset.FileSet
+    pytask: dv_flow.mgr.std.fileset.FileSet
+    passthrough: true
     with:
       base:
         type: str
@@ -24,9 +27,12 @@ package:
       exclude:
         type: str
         value: ""
-#  - name: Exec
-#    pyclass: dv_flow.mgr.std.exec.Exec
-#    with: {}
+  - name: Exec
+    pytask: dv_flow.mgr.std.exec.Exec
+    with: 
+      command:
+        type: str
+        value: ""
   types:
   # - name: TaskDataItem
   #   doc: |
