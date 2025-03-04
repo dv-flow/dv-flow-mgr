@@ -24,7 +24,8 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Tuple
 
 class FileSet(BaseModel):
-    type : str
+    type: str = "std.FileSet"
+    filetype : str
     basedir : str
     name : str = ""
     src : str = None

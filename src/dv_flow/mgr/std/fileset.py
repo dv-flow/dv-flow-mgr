@@ -23,7 +23,12 @@ async def FileSet(runner, input) -> TaskDataResult:
 
 
     changed = False
-    ex_memento = input.memento
+    # 
+    try:
+        ex_memento = TaskFileSetMemento(**input.memento) if input.memento is not None else None
+    except Exception as e:
+        _log.error("Failed to load memento: %s" % str(e))
+        ex_memento = None 
     memento = TaskFileSetMemento()
 
     _log.debug("ex_memento: %s" % str(ex_memento))
@@ -39,8 +44,8 @@ async def FileSet(runner, input) -> TaskDataResult:
         _log.debug("glob_root: %s" % glob_root)
 
         fs = _FileSet(
+                filetype=input.params.type,
                 src=input.name, 
-                type=input.params.type,
                 basedir=glob_root)
 
         if not isinstance(input.params.include, list):

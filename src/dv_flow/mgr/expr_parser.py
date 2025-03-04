@@ -143,7 +143,6 @@ class ExprParser(object):
     t_RPAREN  = r'\)'
     t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*'
     t_PIPE    = r'\|'
-    t_STRING2 = r'\'.*\''
     
     def t_NUMBER(self, t):
         r'\d+'
@@ -155,8 +154,15 @@ class ExprParser(object):
         return t
     
     def t_STRING1(self, t):
-        r'(\'|\")([^\\\n]|(\\.))*?(\'|\")'
-        t.value = t.value[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\n', '\n').replace('\\t', '\t').replace('\\\\', '\\')
+        r'"([^"\\]*(\\.[^"\\]*)*)"'
+        t.value = t.value[1:-1].replace(r'\"', '"').replace(r'\\', '\\')
+
+    def t_STRING2(self, t):
+        r'\'([^\'\\]*(\\.[^\'\\]*)*)\''
+        t.value = t.value[1:-1].replace(r'\'', '"').replace(r'\\', '\\')
+
+#        r'(\'|\")([^\\\n]|(\\.))*?(\'|\")'
+#        t.value = t.value[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\n', '\n').replace('\\t', '\t').replace('\\\\', '\\')
         return t
     
     # Ignored characters

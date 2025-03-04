@@ -140,6 +140,13 @@ class TaskSetRunner(TaskRunner):
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
 
+        if isinstance(task, list):
+            return list(t.output for t in task)
+        else:
+            return task.output
+
+
+
         pass
 
     def _buildDepMap(self, dep_m, task : TaskNode):
