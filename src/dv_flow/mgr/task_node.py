@@ -108,6 +108,29 @@ class TaskNodeCtor(object):
     paramT : Any
     passthrough : bool
 
+    def __call__(self, 
+                 name=None,
+                 srcdir=None,
+                 params=None,
+                 needs=None,
+                 passthrough=None,
+                 **kwargs):
+        """Convenience method for direct creation of tasks"""
+        if params is None:
+            params = self.mkTaskParams(kwargs)
+        
+        node = self.mkTaskNode(
+            srcdir=srcdir, 
+            params=params, 
+            name=name, 
+            needs=needs)
+        if passthrough is not None:
+            node.passthrough = passthrough
+        else:
+            node.passthrough = self.passthrough
+
+        return node
+
     def getNeeds(self) -> List[str]:
         return []
 
@@ -188,28 +211,7 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
 class TaskNodeCtorWrapper(TaskNodeCtor):
     T : Any
 
-    def __call__(self, 
-                 name=None,
-                 srcdir=None,
-                 params=None,
-                 needs=None,
-                 passthrough=None,
-                 **kwargs):
-        """Convenience method for direct creation of tasks"""
-        if params is None:
-            params = self.mkTaskParams(kwargs)
-        
-        node = self.mkTaskNode(
-            srcdir=srcdir, 
-            params=params, 
-            name=name, 
-            needs=needs)
-        if passthrough is not None:
-            node.passthrough = passthrough
-        else:
-            node.passthrough = self.passthrough
 
-        return node
 
     def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
         node = TaskNode(name, srcdir, params, self.T, needs=needs)

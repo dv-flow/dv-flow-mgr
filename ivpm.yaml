@@ -29,5 +29,7 @@ package:
       src: pypi
     - name: ply
       src: pypi
+    - name: rich
+      src: pypi
 
 

@@ -27,7 +27,7 @@ from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
 from .task import Task
 from .task_node import TaskNodeCtor
-from typing import Dict, List
+from typing import Dict, List, Union
 
 @dc.dataclass
 class TaskGraphBuilder(object):
@@ -178,8 +178,21 @@ class TaskGraphBuilder(object):
         self._logger.debug("<-- getPackage: %s" % str(pkg))
 
         return pkg
+    
+    def mkTaskNode(self, typename, name=None, srcdir=None, needs=None, **kwargs):
+        ctor = self.getTaskCtor(typename)
+        params = ctor.mkTaskParams(**kwargs)
+        return ctor.mkTaskNode(
+            params=params,
+            name=name, 
+            srcdir=srcdir, 
+            needs=needs)
         
-    def getTaskCtor(self, spec : 'TaskSpec', pkg : PackageDef = None) -> 'TaskCtor':
+    def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskCtor':
+        from .task_def import TaskSpec
+        if type(spec) == str:
+            spec = TaskSpec(spec)
+
         self._logger.debug("--> getTaskCtor %s" % spec.name)
         spec_e = spec.name.split(".")
         task_name = spec_e[-1]
