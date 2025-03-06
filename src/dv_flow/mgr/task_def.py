@@ -39,7 +39,7 @@ class TaskDef(BaseModel):
     desc : str = dc.Field(default="")
     doc : str = dc.Field(default="")
     needs : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
-    params: Dict[str,Union[str,ParamDef]] = dc.Field(default_factory=dict, alias="with")
+    params: Dict[str,Union[str,list,ParamDef]] = dc.Field(default_factory=dict, alias="with")
     passthrough: bool = dc.Field(default=False)
 #    out: List[TaskOutput] = dc.Field(default_factory=list)
 
