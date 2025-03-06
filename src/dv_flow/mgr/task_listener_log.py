@@ -5,7 +5,7 @@ from rich.console import Console
 class TaskListenerLog(object):
     console : Console = dc.field(default_factory=Console)
     level : int = 0
-    quiet : bool = True
+    quiet : bool = False
 
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
