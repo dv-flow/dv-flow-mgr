@@ -3,6 +3,7 @@ import sys
 import dataclasses as dc
 import pydantic.dataclasses as pdc
 import logging
+import toposort
 from typing import Any, Callable, ClassVar, Dict, List
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_params_ctor import TaskParamsCtor
@@ -38,19 +39,46 @@ class TaskNode(object):
                   runner,
                   rundir,
                   memento : Any = None) -> 'TaskDataResult':
+        self._log.debug("--> do_run: %s" % self.name)
         changed = False
         for dep in self.needs:
             changed |= dep.changed
 
         # TODO: Form dep-map from inputs
-        # TODO: Order param sets according to dep-map
-        in_params = []
+
+        dep_m = {}
         for need in self.needs:
-            in_params.extend(need.output.output)
+            self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
+            for subdep in need.output.dep_m.keys():
+                if subdep not in dep_m.keys():
+                    dep_m[subdep] = []
+                dep_m[subdep].extend(need.output.dep_m[subdep])
+
+        self._log.debug("input dep_m: %s" % str(dep_m))
+        sorted = toposort.toposort(dep_m)
+
+        in_params_m = {}
+        for need in self.needs:
+            for p in need.output.output:
+                if p.src not in in_params_m.keys():
+                    in_params_m[p.src] = []
+                in_params_m[p.src].append(p)
+
+        # in_params holds parameter sets ordered by dependency
+        in_params = []
+        for sorted_s in sorted:
+            self._log.debug("sorted_s: %s" % str(sorted_s))
+            for dep in sorted_s:
+                if dep in in_params_m.keys():
+                    self._log.debug("(%s) Extend with: %s" % (dep, str(in_params_m[dep])))
+                    in_params.extend(in_params_m[dep])
+
+        self._log.debug("in_params[1]: %s" % ",".join(p.src for p in in_params))
 
         # Create an evaluator for substituting param values
         eval = ParamRefEval()
 
+        self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
         eval.setVar("in", in_params)
 
         for name,field in self.params.model_fields.items():
@@ -58,6 +86,7 @@ class TaskNode(object):
             if type(value) == str:
                 if value.find("${{") != -1:
                     new_val = eval.eval(value)
+                    self._log.debug("Param %s: Evaluate expression \"%s\" => \"%s\"" % (name, value, new_val))
                     setattr(self.params, name, new_val)
             elif isinstance(value, list):
                 for i,elem in enumerate(value):
@@ -75,20 +104,40 @@ class TaskNode(object):
             params=self.params,
             memento=memento)
 
-        # TODO: notify of task start
+        self._log.debug("--> Call task method %s" % str(self.task))
         self.result : TaskDataResult = await self.task(self, input)
-        # TODO: notify of task complete
+        self._log.debug("<-- Call task method %s" % str(self.task))
 
-        # TODO: form a dep map from the outgoing param sets
-        dep_m = {}
+        output=self.result.output.copy()
+        for out in output:
+            out.src = self.name
+
+        self._log.debug("output[1]: %s" % str(output))
+
+        if self.passthrough:
+            self._log.debug("passthrough: %s" % self.name)
+            # Add an entry for ourselves
+            dep_m[self.name] = list(need.name for need in self.needs)
+
+            for need in self.needs:
+                output.extend(need.output.output)
+        else:
+            # empty dependency map
+            dep_m = {
+                self.name : []
+            }
+
+        self._log.debug("output dep_m: %s" % str(dep_m))
+        self._log.debug("output[2]: %s" % str(output))
 
         # Store the result
         self.output = TaskDataOutput(
             changed=self.result.changed,
             dep_m=dep_m,
-            output=self.result.output.copy())
+            output=output)
 
         # TODO: 
+        self._log.debug("<-- do_run: %s" % self.name)
 
         return self.result
 

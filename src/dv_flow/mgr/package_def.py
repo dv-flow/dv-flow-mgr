@@ -134,13 +134,18 @@ class PackageDef(BaseModel):
         ctor_t : TaskCtor = None
         base_params : BaseModel = None
         callable = None
-        passthrough = False
+        passthrough = task.passthrough
         needs = [] if task.needs is None else task.needs.copy()
 
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses)
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
+
+            if base_ctor_t is None:
+                self._log.error("Failed to load task ctor %s" % task.uses)
+        else:
+            self._log.debug("No 'uses' specified")
 
         # Determine the implementation constructor first
         if task.pytask is not None:
@@ -376,7 +381,7 @@ class PackageDef(BaseModel):
 
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=yaml.FullLoader)
-            PackageDef._log.debug("doc: %s" % str(doc), flush=True)
+            PackageDef._log.debug("doc: %s" % str(doc))
             if "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))

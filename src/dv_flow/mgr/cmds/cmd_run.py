@@ -6,6 +6,8 @@ from ..task_graph_runner import TaskGraphRunner
 from ..util import loadProjPkgDef
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_graph_runner_local import TaskGraphRunnerLocal
+from ..task_runner import TaskSetRunner
+from ..task_listener_log import TaskListenerLog
 from ..pkg_rgy import PkgRgy
 
 
@@ -57,7 +59,9 @@ class CmdRun(object):
         rundir = os.path.join(pkg.basedir, "rundir")
 
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
-        runner = TaskGraphRunnerLocal(rundir)
+        runner = TaskSetRunner(rundir)
+
+        runner.add_listener(TaskListenerLog().event)
 
         tasks = []
 
@@ -69,27 +73,4 @@ class CmdRun(object):
 
         asyncio.run(runner.run(tasks))
 
-#        rgy = PkgRgy.inst()
-#        rgy.registerPackage(pkg)
-
-
-        # srcdir = os.getcwd()
-
-        # session = Session(srcdir, rundir)
-
-        # package = session.load(srcdir)
-
-        # graphs = []
-        # for task in args.tasks:
-        #     if task.find(".") == -1:
-        #         task = package.name + "." + task
-        #     subgraph = session.mkTaskGraph(task)
-        #     graphs.append(subgraph)
-
-        # awaitables = [subgraph.do_run() for subgraph in graphs]
-        # print("%d awaitables" % len(awaitables))
-
-        # out = asyncio.get_event_loop().run_until_complete(asyncio.gather(*awaitables))
-
-        # print("out: %s" % str(out))
 

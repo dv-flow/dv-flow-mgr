@@ -179,14 +179,18 @@ class TaskGraphBuilder(object):
 
         return pkg
     
-    def mkTaskNode(self, typename, name=None, srcdir=None, needs=None, **kwargs):
-        ctor = self.getTaskCtor(typename)
-        params = ctor.mkTaskParams(**kwargs)
-        return ctor.mkTaskNode(
+    def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
+        self._logger.debug("--> mkTaskNode: %s" % task_t)
+        ctor = self.getTaskCtor(task_t)
+        self._logger.debug("ctor: %s" % ctor.name)
+        params = ctor.mkTaskParams(kwargs)
+        ret = ctor.mkTaskNode(
             params=params,
             name=name, 
             srcdir=srcdir, 
             needs=needs)
+        self._logger.debug("<-- mkTaskNode: %s" % task_t)
+        return ret
         
     def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskCtor':
         from .task_def import TaskSpec
