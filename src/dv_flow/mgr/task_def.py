@@ -42,6 +42,8 @@ class TaskDef(BaseModel):
     needs : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Union[str,ParamDef]] = dc.Field(default_factory=dict, alias="with")
     passthrough: bool = dc.Field(default=False)
+    consumes : List[Any] = dc.Field(default_factory=list)
+
 #    out: List[TaskOutput] = dc.Field(default_factory=list)
 
     def copy(self) -> 'TaskDef':

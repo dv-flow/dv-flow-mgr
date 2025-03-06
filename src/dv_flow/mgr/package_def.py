@@ -135,6 +135,7 @@ class PackageDef(BaseModel):
         base_params : BaseModel = None
         callable = None
         passthrough = task.passthrough
+        consumes = task.consumes
         needs = [] if task.needs is None else task.needs.copy()
 
         if task.uses is not None:
@@ -180,6 +181,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs, # TODO: need to determine the needs
                 task=callable)
         elif base_ctor_t is not None:
@@ -189,6 +191,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs,
                 uses=base_ctor_t)
         else:
@@ -198,6 +201,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir,
                 paramT=paramT,
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs,
                 task=TaskNull)
 

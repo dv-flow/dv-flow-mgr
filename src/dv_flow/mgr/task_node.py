@@ -24,6 +24,7 @@ class TaskNode(object):
     # Runtime fields -- these get populated during execution
     changed : bool = False
     passthrough : bool = False
+    consumes : List[Any] = dc.field(default_factory=list)
     needs : List['TaskNode'] = dc.field(default_factory=list)
     rundir : str = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
@@ -119,8 +120,31 @@ class TaskNode(object):
             # Add an entry for ourselves
             dep_m[self.name] = list(need.name for need in self.needs)
 
-            for need in self.needs:
-                output.extend(need.output.output)
+            if self.consumes is None and len(self.consumes):
+                self._log.debug("Propagating all input parameters to output")
+                for need in self.needs:
+                    output.extend(need.output.output)
+            else:
+                # Filter out parameter sets that were consumed
+                self._log.debug("Propagating non-consumed input parameters to output")
+                for need in self.needs:
+                    for out in need.output.output:
+                        consumed = False
+                        for c in self.consumes:
+                            match = False
+                            for k,v in c.items():
+                                if hasattr(out, k) and getattr(out, k) == v:
+                                    match = True
+                                    break
+                            if match:
+                                consumed = True
+                                break
+                        
+                        if not consumed:
+                            self._log.debug("Propagating type %s from %s" % (
+                                getattr(out, "type", "<unknown>"),
+                                getattr(out, "src", "<unknown>")))
+                            output.append(out)
         else:
             # empty dependency map
             dep_m = {
@@ -156,6 +180,7 @@ class TaskNodeCtor(object):
     srcdir : str
     paramT : Any
     passthrough : bool
+    consumes : List[Any]
 
     def __call__(self, 
                  name=None,
@@ -163,6 +188,7 @@ class TaskNodeCtor(object):
                  params=None,
                  needs=None,
                  passthrough=None,
+                 consumes=None,
                  **kwargs):
         """Convenience method for direct creation of tasks"""
         if params is None:
@@ -177,6 +203,16 @@ class TaskNodeCtor(object):
             node.passthrough = passthrough
         else:
             node.passthrough = self.passthrough
+        if consumes is not None:
+            if node.consumes is None:
+                node.consumes = consumes
+            else:
+                node.consumes.extend(consumes)
+        else:
+            if node.consumes is None:
+                node.consumes = self.consumes
+            else:
+                node.consumes.extend(consumes)
 
         return node
 
@@ -240,6 +276,7 @@ class TaskNodeCtorProxy(TaskNodeCtorDefBase):
             srcdir = self.srcdir
         node = self.uses.mkTaskNode(params=params, srcdir=srcdir, name=name, needs=needs)
         node.passthrough = self.passthrough
+        node.consumes = self.consumes
         return node
     
 @dc.dataclass
@@ -252,6 +289,7 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
 
         node = TaskNode(name, srcdir, params, self.task, needs=needs)
         node.passthrough = self.passthrough
+        node.consumes = self.consumes
         node.task = self.task
 
         return node
@@ -265,6 +303,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
     def mkTaskNode(self, params, srcdir=None, name=None, needs=None) -> TaskNode:
         node = TaskNode(name, srcdir, params, self.T, needs=needs)
         node.passthrough = self.passthrough
+        node.consumes = self.consumes
         return node
 
     def mkTaskParams(self, params : Dict = None) -> Any:
@@ -294,7 +333,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                     setattr(obj, key, value)
         return obj
 
-def task(paramT,passthrough=False):
+def task(paramT,passthrough=False,consumes=None):
     """Decorator to wrap a task method as a TaskNodeCtor"""
     def wrapper(T):
         task_mname = T.__module__
@@ -304,6 +343,7 @@ def task(paramT,passthrough=False):
             srcdir=os.path.dirname(os.path.abspath(task_module.__file__)), 
             paramT=paramT,
             passthrough=passthrough,
+            consumes=consumes,
             T=T)
         return ctor
     return wrapper
