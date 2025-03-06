@@ -30,4 +30,5 @@ class FileSet(BaseModel):
     name : str = ""
     src : str = None
     files : List[str] = dc.Field(default_factory=list)
+    incdirs: List[str] = dc.Field(default_factory=list)
     params : Dict[str,str] = dc.Field(default_factory=dict)
