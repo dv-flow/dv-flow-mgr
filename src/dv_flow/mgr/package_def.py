@@ -56,6 +56,10 @@ class PackageDef(BaseModel):
     basedir : str = None
     _log : ClassVar = logging.getLogger("PackageDef")
 
+    def __post_init__(self):
+        for t in self.tasks:
+            t.fullname = self.name + "." + t.name
+
     def getTask(self, name : str) -> 'TaskDef':
         for t in self.tasks:
             if t.name == name:
@@ -83,11 +87,13 @@ class PackageDef(BaseModel):
         # Now we have a unified map of the tasks declared in this package
         for name in list(tasks_m.keys()):
             task_i = tasks_m[name]
+            fullname = self.name + "." + name
             if len(task_i) < 3:
                 # Need to create the task ctor
                 ctor_t = self.mkTaskCtor(session, task_i[0], task_i[1], tasks_m)
                 tasks_m[name] = (task_i[0], task_i[1], ctor_t)
             ret.tasks[name] = tasks_m[name][2]
+            ret.tasks[fullname] = tasks_m[name][2]
 
         session.pop_package(ret)
 
@@ -95,7 +101,7 @@ class PackageDef(BaseModel):
         return ret
     
     def getTaskCtor(self, session, task_name, tasks_m):
-        self._log.debug("--> getTaskCtor")
+        self._log.debug("--> getTaskCtor %s" % task_name)
         # Find package (not package_def) that implements this task
         # Insert an indirect reference to that tasks's constructor
         last_dot = task_name.rfind('.')
@@ -128,12 +134,19 @@ class PackageDef(BaseModel):
         ctor_t : TaskCtor = None
         base_params : BaseModel = None
         callable = None
-        passthrough = False
+        passthrough = task.passthrough
+        consumes = task.consumes
         needs = [] if task.needs is None else task.needs.copy()
 
         if task.uses is not None:
+            self._log.debug("Uses: %s" % task.uses)
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
+
+            if base_ctor_t is None:
+                self._log.error("Failed to load task ctor %s" % task.uses)
+        else:
+            self._log.debug("No 'uses' specified")
 
         # Determine the implementation constructor first
         if task.pytask is not None:
@@ -160,7 +173,7 @@ class PackageDef(BaseModel):
             callable = getattr(mod, clsname)
 
         # Determine if we need to use a new 
-        paramT = self._getParamT(task, base_params)
+        paramT = self._getParamT(session, task, base_params)
         
         if callable is not None:
             ctor_t = TaskNodeCtorTask(
@@ -168,6 +181,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs, # TODO: need to determine the needs
                 task=callable)
         elif base_ctor_t is not None:
@@ -177,6 +191,7 @@ class PackageDef(BaseModel):
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs,
                 uses=base_ctor_t)
         else:
@@ -184,15 +199,17 @@ class PackageDef(BaseModel):
             ctor_t = TaskNodeCtorTask(
                 name=task.name,
                 srcdir=srcdir,
-                paramT=TaskNullParams,
+                paramT=paramT,
                 passthrough=passthrough,
+                consumes=consumes,
                 needs=needs,
                 task=TaskNull)
 
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
     
-    def _getParamT(self, task, base_t : BaseModel):
+    def _getParamT(self, session, task, base_t : BaseModel):
+        self._log.debug("--> _getParamT %s" % task.fullname)
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
 
@@ -213,6 +230,8 @@ class PackageDef(BaseModel):
 
         fields = []
         field_m : Dict[str,int] = {}
+
+        pkg = session.package()
 
         # First, pull out existing fields (if there's a base type)
         if base_t is not None:
@@ -255,6 +274,11 @@ class PackageDef(BaseModel):
 
         params_t = pydantic.create_model("Task%sParams" % task.name, **field_m)
 
+        self._log.debug("== Params")
+        for name,info in params_t.model_fields.items():
+            self._log.debug("  %s: %s" % (name, str(info)))
+
+        self._log.debug("<-- _getParamT %s" % task.name)
         return params_t
 
     @staticmethod
@@ -273,7 +297,15 @@ class PackageDef(BaseModel):
             doc = yaml.load(fp, Loader=yaml.FullLoader)
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
-            pkg = PackageDef(**(doc["package"]))
+            try:
+                pkg = PackageDef(**(doc["package"]))
+
+                for t in pkg.tasks:
+                    t.fullname = pkg.name + "." + t.name
+
+            except Exception as e:
+                PackageDef._log.error("Failed to load package from %s" % root)
+                raise e
             pkg.basedir = os.path.dirname(root)
 
 #            for t in pkg.tasks:
@@ -353,7 +385,7 @@ class PackageDef(BaseModel):
 
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=yaml.FullLoader)
-            PackageDef._log.debug("doc: %s" % str(doc), flush=True)
+            PackageDef._log.debug("doc: %s" % str(doc))
             if "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))

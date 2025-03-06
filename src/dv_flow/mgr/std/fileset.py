@@ -62,6 +62,13 @@ async def FileSet(runner, input) -> TaskDataResult:
                 memento.files.append((file, os.path.getmtime(os.path.join(glob_root, file))))
                 fs.files.append(file[len(glob_root)+1:])
 
+        if input.params.incdirs is not None:
+            if isinstance(input.params.incdirs, list):
+                fs.incdirs.extend(input.params.incdirs)
+            else:
+                incdirs = input.params.incdirs.split()
+                fs.incdirs.extend(incdirs)
+
     # Check to see if the filelist or fileset have changed
     # Only bother doing this if the upstream task data has not changed
     if ex_memento is not None and not input.changed:

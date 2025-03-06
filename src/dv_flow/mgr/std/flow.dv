@@ -21,6 +21,8 @@ package:
       type:
         type: str
         value: ""
+      incdirs:
+        type: list
       include:
         type: str
         value: ""

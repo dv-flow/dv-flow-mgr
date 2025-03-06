@@ -33,6 +33,7 @@ class TaskSpec(object):
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str
+    fullname : str = dc.Field(default=None)
 #    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
     uses : str = dc.Field(default=None)
     pytask : str = dc.Field(default=None)
@@ -41,6 +42,8 @@ class TaskDef(BaseModel):
     needs : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Union[str,list,ParamDef]] = dc.Field(default_factory=dict, alias="with")
     passthrough: bool = dc.Field(default=False)
+    consumes : List[Any] = dc.Field(default_factory=list)
+
 #    out: List[TaskOutput] = dc.Field(default_factory=list)
 
     def copy(self) -> 'TaskDef':
