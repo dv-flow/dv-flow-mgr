@@ -101,6 +101,7 @@ package:
     with:
       type: systemVerilogSource
       include: "*.sv"
+      incdirs: ["srcdir"]
 """
 
     rundir = os.path.join(tmpdir)
@@ -115,14 +116,14 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
-    runner = TaskGraphRunnerLocal(rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     task = builder.mkTaskGraph("p1.glob")
     output = asyncio.run(runner.run(task))
 
     print("output: %s" % str(output))
 
-    assert len(output.filesets) == 1
-    fs = output.filesets[0]
+    assert len(output.output) == 1
+    fs = output.output[0]
     assert len(fs.files) == 1
     assert fs.files[0] == "top.sv"
