@@ -29,7 +29,7 @@ import sys
 import pydantic
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, Dict, List, Callable, Tuple, ClassVar
+from typing import Any, Dict, List, Callable, Tuple, ClassVar, Union
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
@@ -45,11 +45,12 @@ class PackageDef(BaseModel):
     params : Dict[str,Any] = dc.Field(default_factory=dict)
     type : List[PackageSpec] = dc.Field(default_factory=list)
     tasks : List[TaskDef] = dc.Field(default_factory=list)
-    imports : List[PackageImportSpec] = dc.Field(default_factory=list)
+    imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list)
     fragments: List[str] = dc.Field(default_factory=list)
     types : List[TypeDef] = dc.Field(default_factory=list)
 
     fragment_l : List['FragmentDef'] = dc.Field(default_factory=list, exclude=True)
+    subpkg_m : Dict[str,'PackageDef'] = dc.Field(default_factory=dict, exclude=True)
 
 #    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
 
@@ -281,13 +282,13 @@ class PackageDef(BaseModel):
         self._log.debug("<-- _getParamT %s" % task.name)
         return params_t
 
-    @staticmethod
-    def load(path, exp_pkg_name=None):
+    @classmethod
+    def load(cls, path, exp_pkg_name=None):
         return PackageDef._loadPkgDef(path, exp_pkg_name, [])
         pass
 
-    @staticmethod
-    def _loadPkgDef(root, exp_pkg_name, file_s):
+    @classmethod
+    def _loadPkgDef(cls, root, exp_pkg_name, file_s):
         if root in file_s:
             raise Exception("Recursive file processing @ %s: %s" % (root, ",".join(file_s)))
         file_s.append(root)
@@ -325,6 +326,30 @@ class PackageDef(BaseModel):
 
         for spec in pkg.fragments:
             PackageDef._loadFragmentSpec(pkg, spec, file_s)
+
+        if len(pkg.imports) > 0:
+            cls._log.info("Loading imported packages (basedir=%s)" % pkg.basedir)
+        for imp in pkg.imports:
+            if type(imp) == str:
+                imp_path = imp
+            elif imp.path is not None:
+                imp_path = imp.path
+            else:
+                raise Exception("imp.path is none: %s" % str(imp))
+            
+            cls._log.info("Loading imported package %s" % imp_path)
+
+            if not os.path.isabs(imp_path):
+                cls._log.debug("basedir: %s ; imp_path: %s" % (pkg.basedir, imp_path))
+                imp_path = os.path.join(pkg.basedir, imp_path)
+            if not os.path.isfile(imp_path):
+                raise Exception("Import file %s not found" % imp_path)
+
+            cls._log.info("Loading file %s" % imp_path)
+                
+            sub_pkg = PackageDef.load(imp_path)
+            cls._log.info("Loaded imported package %s" % sub_pkg.name)
+            pkg.subpkg_m[sub_pkg.name] = sub_pkg
 
         file_s.pop()
 

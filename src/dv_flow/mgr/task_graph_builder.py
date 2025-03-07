@@ -46,12 +46,22 @@ class TaskGraphBuilder(object):
             self.pkg_rgy = PkgRgy.inst()
 
         self._logger = logging.getLogger(type(self).__name__)
+        self._logger.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
 
         if self.root_pkg is not None:
+
+            # Register package definitions found during loading
+            for subpkg in self.root_pkg.subpkg_m.values():
+                self._logger.debug("Registering package %s" % subpkg.name)
+                self.pkg_rgy.registerPackage(subpkg)
+
             self._pkg_spec_s.append(self.root_pkg)
             pkg = self.root_pkg.mkPackage(self)
             self._pkg_spec_s.pop()
+
+            # Allows us to find ourselves
             self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
+
 
     def push_package(self, pkg : Package, add=False):
         self._pkg_s.append(pkg)
@@ -150,12 +160,13 @@ class TaskGraphBuilder(object):
             self._logger.debug("Search package %s for import alias %s" % (
                 pkg_def.name, pkg_spec.name))
             for imp in pkg_def.imports:
-                self._logger.debug("imp: %s" % str(imp))
-                if imp.alias is not None and imp.alias == spec.name:
-                    # Found the alias name. Just need to get an instance of this package
-                    self._logger.debug("Found alias %s -> %s" % (imp.alias, imp.name))
-                    pkg_name = imp.name
-                    break
+                if type(imp) != str:
+                    self._logger.debug("imp: %s" % str(imp))
+                    if imp.alias is not None and imp.alias == spec.name:
+                        # Found the alias name. Just need to get an instance of this package
+                        self._logger.debug("Found alias %s -> %s" % (imp.alias, imp.name))
+                        pkg_name = imp.name
+                        break
 
         # Note: _pkg_m needs to be context specific, such that imports from
         # one package don't end up visible in another

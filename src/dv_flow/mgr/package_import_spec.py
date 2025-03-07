@@ -46,6 +46,6 @@ class PackageSpec(object):
         return isinstance(value, PackageSpec) and value.get_fullname() == self.get_fullname()
 
 @dc.dataclass
-class PackageImportSpec(PackageSpec):
+class PackageImportSpec(object):
     path : str = dc.Field(default=None, alias="from")
     alias : str = dc.Field(default=None, alias="as")

@@ -42,6 +42,7 @@ class PkgRgy(object):
             return False
     
     def getPackage(self, name):
+        self._log.debug("--> getPackage(%s)" % name)
         if name in self._pkg_m.keys():
             if self._pkg_m[name][1] is None:
                 pkg_def = PackageDef.load(self._pkg_m[name][0])
@@ -50,9 +51,11 @@ class PkgRgy(object):
                     self._pkg_m[name][0],
                     pkg_def
                 )
-            return self._pkg_m[name][1]
+            ret = self._pkg_m[name][1]
         else:
-            return self._findOnPath(name)
+            ret = self._findOnPath(name)
+        self._log.debug("<-- getPackage(%s)" % name)
+        return ret
         
     def _findOnPath(self, name):
         name_s = name.split('.')
@@ -79,9 +82,11 @@ class PkgRgy(object):
         return pkg
 
     def registerPackage(self, pkg_def):
+        self._log.debug("--> registerPackage %s" % pkg_def.name)
         if pkg_def.name in self._pkg_m.keys():
             raise Exception("Duplicate package %s" % pkg_def.name)
-        self._pkg_m[pkg_def.name] = pkg_def
+        self._pkg_m[pkg_def.name] = (pkg_def.basedir, pkg_def)
+        self._log.debug("<-- registerPackage %s" % pkg_def.name)
 
     def _discover_plugins(self):
         # Register built-in package
