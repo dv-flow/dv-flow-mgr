@@ -146,6 +146,7 @@ class TaskNode(object):
                                 getattr(out, "src", "<unknown>")))
                             output.append(out)
         else:
+            self._log.debug("non-passthrough: %s (only local outputs propagated)" % self.name)
             # empty dependency map
             dep_m = {
                 self.name : []
