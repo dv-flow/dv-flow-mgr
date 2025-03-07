@@ -145,6 +145,9 @@ class PackageDef(BaseModel):
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
 
+            # Once we have passthrough, we can't turn it off
+            passthrough |= base_ctor_t.passthrough
+
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
         else:
