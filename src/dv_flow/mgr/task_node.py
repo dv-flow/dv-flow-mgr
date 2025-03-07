@@ -135,10 +135,12 @@ class TaskNode(object):
                             match = False
                             for k,v in c.items():
                                 self._log.debug("k,v: %s,%s" % (k,v))
-                                if hasattr(out, k) and getattr(out, k) == v:
-                                    self._log.debug("match")
-                                    match = True
-                                    break
+                                if hasattr(out, k):
+                                    self._log.debug("has attribute: %s" % str(getattr(out ,k)))
+                                    if getattr(out, k) == v:
+                                        self._log.debug("match")
+                                        match = True
+                                        break
                             if match:
                                 consumed = True
                                 break
