@@ -134,7 +134,9 @@ class TaskNode(object):
                         for c in self.consumes:
                             match = False
                             for k,v in c.items():
+                                self._log.debug("k,v: %s,%s" % (k,v))
                                 if hasattr(out, k) and getattr(out, k) == v:
+                                    self._log.debug("match")
                                     match = True
                                     break
                             if match:
