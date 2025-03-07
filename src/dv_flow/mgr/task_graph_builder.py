@@ -111,8 +111,8 @@ class TaskGraphBuilder(object):
 
         for need_def in ctor_t.getNeeds():
             if not need_def in self._task_m.keys():
-                task = self._mkTaskGraph(need_def, rundir)
-                self._task_m[need_def] = task
+                need_t = self._mkTaskGraph(need_def, rundir)
+                self._task_m[need_def] = need_t
             needs.append(self._task_m[need_def])
 
         # The returned task should have all param references resolved
