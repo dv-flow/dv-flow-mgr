@@ -138,6 +138,7 @@ class PackageDef(BaseModel):
         passthrough = task.passthrough
         consumes = task.consumes
         needs = [] if task.needs is None else task.needs.copy()
+        fullname = self.name + "." + task.name
 
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses)
@@ -178,7 +179,7 @@ class PackageDef(BaseModel):
         
         if callable is not None:
             ctor_t = TaskNodeCtorTask(
-                name=task.name,
+                name=fullname,
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
@@ -188,7 +189,7 @@ class PackageDef(BaseModel):
         elif base_ctor_t is not None:
             # Use the existing (base) to create the implementation
             ctor_t = TaskNodeCtorProxy(
-                name=task.name,
+                name=fullname,
                 srcdir=srcdir,
                 paramT=paramT, # TODO: need to determine the parameter type
                 passthrough=passthrough,
@@ -198,7 +199,7 @@ class PackageDef(BaseModel):
         else:
             self._log.debug("Use 'Null' as the class implementation")
             ctor_t = TaskNodeCtorTask(
-                name=task.name,
+                name=fullname,
                 srcdir=srcdir,
                 paramT=paramT,
                 passthrough=passthrough,
