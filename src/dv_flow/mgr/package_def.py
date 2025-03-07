@@ -136,7 +136,7 @@ class PackageDef(BaseModel):
         base_params : BaseModel = None
         callable = None
         passthrough = task.passthrough
-        consumes = task.consumes
+        consumes = [] if task.consumes is None else task.consumes.copy()
         needs = [] if task.needs is None else task.needs.copy()
         fullname = self.name + "." + task.name
 
@@ -147,6 +147,7 @@ class PackageDef(BaseModel):
 
             # Once we have passthrough, we can't turn it off
             passthrough |= base_ctor_t.passthrough
+            consumes.extend(base_ctor_t.consumes)
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
