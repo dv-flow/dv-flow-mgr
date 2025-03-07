@@ -123,7 +123,7 @@ class TaskGraphBuilder(object):
 
         task = ctor_t.mkTaskNode(
             params=params,
-            name=task_name,
+            name=task,
             needs=needs)
         task.rundir = rundir
         
