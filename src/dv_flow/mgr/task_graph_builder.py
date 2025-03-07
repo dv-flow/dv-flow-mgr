@@ -113,10 +113,11 @@ class TaskGraphBuilder(object):
         for need_def in ctor_t.getNeeds():
             # Resolve the full name of the need
             need_fullname = self._resolveNeedRef(need_def)
-            if not need_def in self._task_m.keys():
-                need_t = self._mkTaskGraph(need_def, rundir)
-                self._task_m[need_def] = need_t
-            needs.append(self._task_m[need_def])
+            self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
+            if not need_fullname in self._task_m.keys():
+                need_t = self._mkTaskGraph(need_fullname, rundir)
+                self._task_m[need_fullname] = need_t
+            needs.append(self._task_m[need_fullname])
 
         # The returned task should have all param references resolved
         params = ctor_t.mkTaskParams()
