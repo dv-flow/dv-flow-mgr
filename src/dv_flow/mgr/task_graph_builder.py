@@ -43,7 +43,7 @@ class TaskGraphBuilder(object):
 
     def __post_init__(self):
         if self.pkg_rgy is None:
-            self.pkg_rgy = PkgRgy.inst()
+            self.pkg_rgy = PkgRgy.inst().copy()
 
         self._logger = logging.getLogger(type(self).__name__)
         self._logger.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
@@ -51,9 +51,8 @@ class TaskGraphBuilder(object):
         if self.root_pkg is not None:
 
             # Register package definitions found during loading
-            for subpkg in self.root_pkg.subpkg_m.values():
-                self._logger.debug("Registering package %s" % subpkg.name)
-                self.pkg_rgy.registerPackage(subpkg)
+            visited = set()
+            self._registerPackages(self.root_pkg, visited)
 
             self._pkg_spec_s.append(self.root_pkg)
             pkg = self.root_pkg.mkPackage(self)
@@ -61,6 +60,15 @@ class TaskGraphBuilder(object):
 
             # Allows us to find ourselves
             self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
+
+    def _registerPackages(self, pkg : PackageDef, visited):
+        self._logger.debug("Packages: %s" % str(pkg))
+        if pkg.name not in visited:
+            visited.add(pkg.name)
+            self._logger.debug("Registering package %s" % pkg.name)
+            self.pkg_rgy.registerPackage(pkg)
+            for subpkg in pkg.subpkg_m.values():
+                self._registerPackages(subpkg, visited)
 
 
     def push_package(self, pkg : Package, add=False):
@@ -110,10 +118,13 @@ class TaskGraphBuilder(object):
         needs = []
 
         for need_def in ctor_t.getNeeds():
-            if not need_def in self._task_m.keys():
-                need_t = self._mkTaskGraph(need_def, rundir)
-                self._task_m[need_def] = need_t
-            needs.append(self._task_m[need_def])
+            # Resolve the full name of the need
+            need_fullname = self._resolveNeedRef(need_def)
+            self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
+            if not need_fullname in self._task_m.keys():
+                need_t = self._mkTaskGraph(need_fullname, rundir)
+                self._task_m[need_fullname] = need_t
+            needs.append(self._task_m[need_fullname])
 
         # The returned task should have all param references resolved
         params = ctor_t.mkTaskParams()
@@ -133,6 +144,13 @@ class TaskGraphBuilder(object):
         self._pkg_spec_s.pop()
 
         return task
+
+    def _resolveNeedRef(self, need_def) -> str:
+        if need_def.find(".") == -1:
+            # Need is a local task. Prefix to avoid ambiguity
+            return self._pkg_s[-1].name + "." + need_def
+        else:
+            return need_def
 
     def getPackage(self, spec : PackageSpec) -> Package:
         # Obtain the active package definition
