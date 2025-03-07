@@ -122,6 +122,12 @@ class PkgRgy(object):
         # for pkg in self._load_pkg_list():
         #     self._pkgs[pkg.name] = pkg
 
+    def copy(self):
+        ret = PkgRgy()
+        ret._pkgpath = self._pkgpath.copy()
+        ret._pkg_m = self._pkg_m.copy()
+        return ret
+
     @classmethod
     def inst(cls):
         if cls._inst is None:

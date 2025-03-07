@@ -43,7 +43,7 @@ class TaskGraphBuilder(object):
 
     def __post_init__(self):
         if self.pkg_rgy is None:
-            self.pkg_rgy = PkgRgy.inst()
+            self.pkg_rgy = PkgRgy.inst().copy()
 
         self._logger = logging.getLogger(type(self).__name__)
         self._logger.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
@@ -51,6 +51,7 @@ class TaskGraphBuilder(object):
         if self.root_pkg is not None:
 
             # Register package definitions found during loading
+            self._logger.debug("Packages: %s" % str(self.root_pkg))
             for subpkg in self.root_pkg.subpkg_m.values():
                 self._logger.debug("Registering package %s" % subpkg.name)
                 self.pkg_rgy.registerPackage(subpkg)
@@ -110,6 +111,8 @@ class TaskGraphBuilder(object):
         needs = []
 
         for need_def in ctor_t.getNeeds():
+            # Resolve the full name of the need
+            need_fullname = self._resolveNeedRef(need_def)
             if not need_def in self._task_m.keys():
                 need_t = self._mkTaskGraph(need_def, rundir)
                 self._task_m[need_def] = need_t
@@ -133,6 +136,13 @@ class TaskGraphBuilder(object):
         self._pkg_spec_s.pop()
 
         return task
+
+    def _resolveNeedRef(self, need_def) -> str:
+        if need_def.find(".") == -1:
+            # Need is a local task. Prefix to avoid ambiguity
+            return self._pkg_s[-1].name + "." + need_def
+        else:
+            return need_def
 
     def getPackage(self, spec : PackageSpec) -> Package:
         # Obtain the active package definition
