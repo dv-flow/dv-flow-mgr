@@ -61,6 +61,9 @@ class CmdRun(object):
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
         runner = TaskSetRunner(rundir)
 
+        if args.j != -1:
+            runner.nproc = int(args.j)
+
         runner.add_listener(TaskListenerLog().event)
 
         tasks = []

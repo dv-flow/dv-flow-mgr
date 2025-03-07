@@ -38,6 +38,9 @@ def get_parser():
 
     run_parser = subparsers.add_parser('run', help='run a flow')
     run_parser.add_argument("tasks", nargs='*', help="tasks to run")
+    run_parser.add_argument("-j",
+                        help="Specifies degree of parallelism. Uses all cores by default",
+                        default=-1)
     run_parser.set_defaults(func=CmdRun())
 
     return parser
