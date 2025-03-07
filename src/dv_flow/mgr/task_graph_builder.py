@@ -51,10 +51,8 @@ class TaskGraphBuilder(object):
         if self.root_pkg is not None:
 
             # Register package definitions found during loading
-            self._logger.debug("Packages: %s" % str(self.root_pkg))
-            for subpkg in self.root_pkg.subpkg_m.values():
-                self._logger.debug("Registering package %s" % subpkg.name)
-                self.pkg_rgy.registerPackage(subpkg)
+            visited = set()
+            self._registerPackages(self.root_pkg, visited)
 
             self._pkg_spec_s.append(self.root_pkg)
             pkg = self.root_pkg.mkPackage(self)
@@ -62,6 +60,15 @@ class TaskGraphBuilder(object):
 
             # Allows us to find ourselves
             self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
+
+    def _registerPackages(self, pkg : PackageDef, visited):
+        self._logger.debug("Packages: %s" % str(pkg))
+        if pkg.name not in visited:
+            visited.add(pkg.name)
+            self._logger.debug("Registering package %s" % pkg.name)
+            self.pkg_rgy.registerPackage(pkg)
+            for subpkg in pkg.subpkg_m.values():
+                self._registerPackages(subpkg, visited)
 
 
     def push_package(self, pkg : Package, add=False):
