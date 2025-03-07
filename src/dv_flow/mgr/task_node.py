@@ -127,6 +127,7 @@ class TaskNode(object):
             else:
                 # Filter out parameter sets that were consumed
                 self._log.debug("Propagating non-consumed input parameters to output")
+                self._log.debug("consumes: %s" % str(self.consumes))
                 for need in self.needs:
                     for out in need.output.output:
                         consumed = False
