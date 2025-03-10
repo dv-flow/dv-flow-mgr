@@ -176,6 +176,7 @@ class SingleTaskRunner(TaskRunner):
 #            print("Field: %s" % field.name)
 
         input = TaskDataInput(
+            name=task.name,
             changed=changed,
             srcdir=task.srcdir,
             rundir=self.rundir,
