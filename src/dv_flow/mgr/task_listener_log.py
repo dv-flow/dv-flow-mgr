@@ -41,7 +41,7 @@ class TaskListenerLog(object):
                     self.console.print("[green]<< [%d][/green] Task %s%s" % (
                         self.level, 
                         task.name,
-                        ("" if task.changed else " (up-to-date)")))
+                        ("" if task.result.changed else " (up-to-date)")))
                 else:
                     self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
             self.level -= 1
