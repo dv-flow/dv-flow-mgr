@@ -43,6 +43,8 @@ async def FileSet(runner, input) -> TaskDataResult:
 
         _log.debug("glob_root: %s" % glob_root)
 
+        # TODO: throw error if 'type' is not set
+
         fs = _FileSet(
                 filetype=input.params.type,
                 src=input.name, 
