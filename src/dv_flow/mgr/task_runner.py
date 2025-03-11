@@ -103,7 +103,7 @@ class TaskSetRunner(TaskRunner):
                                     dst_memento[tt.name] = tt.result.memento.model_dump()
                                 else:
                                     dst_memento[tt.name] = None
-                                status |= tt.result.status 
+                                self.status |= tt.result.status 
                                 self._notify(tt, "leave")
                                 done_task_s.add(tt)
                                 active_task_l.pop(i)
