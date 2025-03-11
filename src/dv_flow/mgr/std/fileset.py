@@ -82,6 +82,8 @@ async def FileSet(runner, input) -> TaskDataResult:
     else:
         changed = True
 
+    _log.debug("<-- FileSet(%s) changed=%s" % (input.name, changed))
+
     return TaskDataResult(
         memento=memento,
         changed=changed,
