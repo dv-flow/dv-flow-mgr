@@ -28,7 +28,7 @@ class TaskListenerLog(object):
                         task.name,
                         m.msg)
 
-                    self.console.print(msg)
+                    self.console.print("%s (%s)" % (msg, task.rundir))
 
                     if m.loc is not None:
                         if m.loc.line != -1 and m.loc.pos != -1:
@@ -36,9 +36,7 @@ class TaskListenerLog(object):
                         elif m.loc.line != -1:
                             self.console.print("    %s:%d" % (m.loc.path, m.loc.line))
                         else:
-                            self.console.print("    %s (%s)" % (m.loc.path, task.rundir))
-
-                        pass
+                            self.console.print("    %s" % m.loc.path)
                 if task.result.status == 0:
                     self.console.print("[green]<[%d][/green] Task %s" % (self.level, task.name))
                 else:
