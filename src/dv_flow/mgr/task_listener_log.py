@@ -4,9 +4,12 @@ from rich.console import Console
 
 @dc.dataclass
 class TaskListenerLog(object):
-    console : Console = dc.field(default_factory=Console)
+    console : Console = dc.field(default=None)
     level : int = 0
     quiet : bool = False
+
+    def __post_init__(self):
+        self.console = Console(highlight=False)
 
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
