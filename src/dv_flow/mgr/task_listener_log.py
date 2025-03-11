@@ -36,7 +36,7 @@ class TaskListenerLog(object):
                         elif m.loc.line != -1:
                             self.console.print("    %s:%d" % (m.loc.path, m.loc.line))
                         else:
-                            self.console.print("    %s" % m.loc.path)
+                            self.console.print("    %s (%s)" % (m.loc.path, task.rundir))
 
                         pass
                 if task.result.status == 0:
