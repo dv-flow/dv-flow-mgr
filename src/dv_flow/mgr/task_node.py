@@ -45,6 +45,8 @@ class TaskNode(object):
         for dep in self.needs:
             changed |= dep.changed
 
+        self.rundir = rundir
+
         # TODO: Form dep-map from inputs
 
         dep_m = {}
