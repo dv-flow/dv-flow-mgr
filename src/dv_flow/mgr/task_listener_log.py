@@ -11,7 +11,7 @@ class TaskListenerLog(object):
         if reason == 'enter':
             self.level += 1
             if not self.quiet:
-                self.console.print("[green]>[%d][/green] Task %s" % (self.level, task.name))
+                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
         elif reason == 'leave':
             if self.quiet:
                 if task.result.changed:
@@ -38,12 +38,12 @@ class TaskListenerLog(object):
                         else:
                             self.console.print("    %s" % m.loc.path)
                 if task.result.status == 0:
-                    self.console.print("[green]<[%d][/green] Task %s%s" % (
+                    self.console.print("[green]<< [%d][/green] Task %s%s" % (
                         self.level, 
                         task.name,
                         ("" if task.changed else "(up-to-date)")))
                 else:
-                    self.console.print("[red]<[%d][/red] Task %s" % (self.level, task.name))
+                    self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
             self.level -= 1
         else:
             self.console.print("[red]-[/red] Task %s" % task.name)
