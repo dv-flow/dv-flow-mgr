@@ -38,7 +38,10 @@ class TaskListenerLog(object):
                         else:
                             self.console.print("    %s" % m.loc.path)
                 if task.result.status == 0:
-                    self.console.print("[green]<[%d][/green] Task %s" % (self.level, task.name))
+                    self.console.print("[green]<[%d][/green] Task %s%s" % (
+                        self.level, 
+                        task.name,
+                        ("" if task.changed else "(up-to-date)")))
                 else:
                     self.console.print("[red]<[%d][/red] Task %s" % (self.level, task.name))
             self.level -= 1
