@@ -1,4 +1,5 @@
 import dataclasses as dc
+from datetime import datetime
 from rich.console import Console
 
 @dc.dataclass
@@ -17,6 +18,14 @@ class TaskListenerLog(object):
                 if task.result.changed:
                     self.console.print("[green]Done:[/green] %s" % (task.name,))
             else:
+                delta_s = None
+                if task.start is not None and task.end is not None:
+                    delta = task.end - task.start
+                    if delta.total_seconds() > 1:
+                        delta_s = " %0.2fs" % delta.total_seconds()
+                    else:
+                        delta_s = " %0.2fmS" % (1000*delta.total_seconds())
+
                 sev_pref_m = {
                     "info": "[blue]I[/blue]",
                     "warn": "[yellow]W[/yellow]",
@@ -38,10 +47,11 @@ class TaskListenerLog(object):
                         else:
                             self.console.print("    %s" % m.loc.path)
                 if task.result.status == 0:
-                    self.console.print("[green]<< [%d][/green] Task %s%s" % (
+                    self.console.print("[green]<< [%d][/green] Task %s%s%s" % (
                         self.level, 
                         task.name,
-                        ("" if task.result.changed else " (up-to-date)")))
+                        ("" if task.result.changed else " (up-to-date)"),
+                        (delta_s if delta_s is not None else "")))
                 else:
                     self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
             self.level -= 1

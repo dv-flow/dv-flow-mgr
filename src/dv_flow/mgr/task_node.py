@@ -29,6 +29,8 @@ class TaskNode(object):
     rundir : str = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
+    start : float = dc.field(default=None)
+    end : float = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 

@@ -4,6 +4,7 @@ import os
 import re
 import dataclasses as dc
 import logging
+from datetime import datetime
 from toposort import toposort
 from typing import Any, Callable, ClassVar, List, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
@@ -99,6 +100,7 @@ class TaskSetRunner(TaskRunner):
                         for i in range(len(active_task_l)):
                             if active_task_l[i][1] == d:
                                 tt = active_task_l[i][0]
+                                tt.end = datetime.now()
                                 if tt.result.memento is not None:
                                     dst_memento[tt.name] = tt.result.memento.model_dump()
                                 else:
@@ -122,6 +124,7 @@ class TaskSetRunner(TaskRunner):
                         os.makedirs(rundir, exist_ok=True)
 
                     self._notify(t, "enter")
+                    t.start = datetime.now()
                     coro = asyncio.Task(t.do_run(
                         self,
                         rundir,
@@ -139,6 +142,7 @@ class TaskSetRunner(TaskRunner):
                 coros = list(at[1] for at in active_task_l)
                 res = await asyncio.gather(*coros)
                 for tt in active_task_l:
+                    tt[0].end = datetime.now()
                     if tt[0].result.memento is not None:
                         dst_memento[tt[0].name] = tt[0].result.memento.model_dump()
                     else:
