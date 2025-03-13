@@ -8,7 +8,7 @@ import pytest
 from typing import Any, List, Union
 import yaml
 from dv_flow.mgr import PackageDef, TaskGraphBuilder, TaskSetRunner, task, TaskDataResult
-from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, PackageDef
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
 from dv_flow.mgr.fileset import FileSet
