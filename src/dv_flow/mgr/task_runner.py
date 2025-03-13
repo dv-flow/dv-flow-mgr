@@ -181,6 +181,7 @@ class SingleTaskRunner(TaskRunner):
             srcdir=task.srcdir,
             rundir=self.rundir,
             params=task.params,
+            inputs=[],
             memento=memento)
 
         # TODO: notify of task start

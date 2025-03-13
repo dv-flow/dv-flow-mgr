@@ -283,11 +283,11 @@ package:
   - name: Sleep10
     uses: std.Exec
     with:
-      command: sleep 10
+      command: sleep 2
   - name: Sleep5
     uses: std.Exec
     with:
-      command: sleep 5
+      command: sleep 1
   - name: Sleep
     needs: [Sleep10, Sleep5]
 

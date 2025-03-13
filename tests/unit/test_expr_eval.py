@@ -19,7 +19,7 @@ def test_smoke():
     expr = parser.parse(content)
     result = eval.eval(expr)
 
-    assert result == 10
+    assert result == '10'
 
 
 

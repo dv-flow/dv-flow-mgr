@@ -76,7 +76,7 @@ def test_fileset_input_1(tmpdir):
         fs = FileSet(**(fs_l[0]))
 
         return TaskDataResult(
-            output=[input.params.files]
+            output=[fs]
         )
     
     pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))

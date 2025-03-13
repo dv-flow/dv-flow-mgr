@@ -48,6 +48,7 @@ class TaskDataInput(BaseModel):
     srcdir : str
     rundir : str
     params : Any
+    inputs : List[Any]
     memento : Any
 
 class TaskDataResult(BaseModel):

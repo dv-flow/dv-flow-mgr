@@ -347,8 +347,27 @@ class PackageDef(BaseModel):
             if not os.path.isabs(imp_path):
                 cls._log.debug("basedir: %s ; imp_path: %s" % (pkg.basedir, imp_path))
                 imp_path = os.path.join(pkg.basedir, imp_path)
-            if os.path.isdir(imp_path) and os.path.isfile(os.path.join(imp_path, "flow.dv")):
-                imp_path = os.path.join(imp_path, "flow.dv")
+            
+            # Search down the tree looking for a flow.dv file
+            if os.path.isdir(imp_path):
+                path = imp_path
+
+                while path is not None and os.path.isdir(path) and not os.path.isfile(os.path.join(path, "flow.dv")):
+                    # Look one directory down
+                    next_dir = None
+                    for dir in os.listdir(path):
+                        if os.path.isdir(os.path.join(path, dir)):
+                            if next_dir is None:
+                                next_dir = dir
+                            else:
+                                path = None
+                                break
+                    if path is not None:
+                        path = next_dir
+
+                if path is not None and os.path.isfile(os.path.join(path, "flow.dv")):
+                    imp_path = os.path.join(path, "flow.dv")
+
             if not os.path.isfile(imp_path):
                 raise Exception("Import file %s not found" % imp_path)
 
