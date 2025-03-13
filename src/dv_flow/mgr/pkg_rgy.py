@@ -89,6 +89,7 @@ class PkgRgy(object):
         self._log.debug("<-- registerPackage %s" % pkg_def.name)
 
     def _discover_plugins(self):
+        self._log.debug("--> discover_plugins")
         # Register built-in package
         self._pkg_m["std"] = (os.path.join(os.path.dirname(__file__), "std/flow.dv"), None)
 
@@ -102,6 +103,7 @@ class PkgRgy(object):
             from importlib.metadata import entry_points
 
         discovered_plugins = entry_points(group='dv_flow.mgr')
+        self._log.debug("discovered_plugins: %s" % str(discovered_plugins))
         for p in discovered_plugins:
             try:
                 mod = p.load()
@@ -110,6 +112,7 @@ class PkgRgy(object):
                     pkg_m = mod.dvfm_packages()
                     
                     for name,path in pkg_m.items():
+                        self._log.debug("Registering package %s: %s" % (name, path))
                         if name in self._pkg_m.keys():
                             raise Exception("Package %s already registered using path %s. Conflicting path: %s" % (
                                 name, self._pkg_m[name][0], path))
@@ -121,6 +124,7 @@ class PkgRgy(object):
         # self._pkgs = {}
         # for pkg in self._load_pkg_list():
         #     self._pkgs[pkg.name] = pkg
+        self._log.debug("<-- discover_plugins")
 
     def copy(self):
         ret = PkgRgy()

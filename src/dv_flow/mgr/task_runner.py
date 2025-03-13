@@ -4,6 +4,7 @@ import os
 import re
 import dataclasses as dc
 import logging
+from datetime import datetime
 from toposort import toposort
 from typing import Any, Callable, ClassVar, List, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
@@ -38,6 +39,7 @@ class TaskRunner(object):
 @dc.dataclass
 class TaskSetRunner(TaskRunner):
     nproc : int = 8
+    status : int = 0
 
     _anon_tid : int = 1
 
@@ -87,6 +89,7 @@ class TaskSetRunner(TaskRunner):
 
         active_task_l = []
         done_task_s = set()
+        self.status = 0
         for active_s in order:
             done = True
             for t in active_s:
@@ -97,15 +100,18 @@ class TaskSetRunner(TaskRunner):
                         for i in range(len(active_task_l)):
                             if active_task_l[i][1] == d:
                                 tt = active_task_l[i][0]
+                                tt.end = datetime.now()
                                 if tt.result.memento is not None:
                                     dst_memento[tt.name] = tt.result.memento.model_dump()
                                 else:
                                     dst_memento[tt.name] = None
+                                self.status |= tt.result.status 
                                 self._notify(tt, "leave")
                                 done_task_s.add(tt)
                                 active_task_l.pop(i)
                                 break
-                if t not in done_task_s:
+
+                if self.status == 0 and t not in done_task_s:
                     memento = src_memento.get(t.name, None)
                     dirname = t.name
                     invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
@@ -118,24 +124,36 @@ class TaskSetRunner(TaskRunner):
                         os.makedirs(rundir, exist_ok=True)
 
                     self._notify(t, "enter")
+                    t.start = datetime.now()
                     coro = asyncio.Task(t.do_run(
                         self,
                         rundir,
                         memento)) 
                     active_task_l.append((t, coro))
+
+                if self.status != 0:
+                    self._log.debug("Exiting due to status: %d", self.status)
+                    break
                
-            # Now, wait for tasks to complete
+            # All pending tasks in the task-group have been launched
+            # Wait for them to all complete
             if len(active_task_l):
                 # TODO: Shouldn't gather here -- reach to each completion
                 coros = list(at[1] for at in active_task_l)
                 res = await asyncio.gather(*coros)
                 for tt in active_task_l:
+                    tt[0].end = datetime.now()
                     if tt[0].result.memento is not None:
                         dst_memento[tt[0].name] = tt[0].result.memento.model_dump()
                     else:
                         dst_memento[tt[0].name] = None
+                    self.status |= tt[0].result.status
                     self._notify(tt[0], "leave")
                 active_task_l.clear()
+            
+            if self.status != 0:
+                self._log.debug("Exiting due to status: %d", self.status)
+                break
 
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
@@ -144,10 +162,6 @@ class TaskSetRunner(TaskRunner):
             return list(t.output for t in task)
         else:
             return task.output
-
-
-
-        pass
 
     def _buildDepMap(self, dep_m, task : TaskNode):
         if task.name is None:

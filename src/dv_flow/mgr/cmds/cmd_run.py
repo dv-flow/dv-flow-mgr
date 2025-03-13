@@ -76,4 +76,6 @@ class CmdRun(object):
 
         asyncio.run(runner.run(tasks))
 
+        return runner.status
+
 

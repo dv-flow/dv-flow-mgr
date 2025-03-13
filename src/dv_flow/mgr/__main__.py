@@ -56,7 +56,7 @@ def main():
         }
         logging.basicConfig(level=opt_m[args.log_level])
 
-    args.func(args)
+    return args.func(args)
 
 if __name__ == "__main__":
     main()
