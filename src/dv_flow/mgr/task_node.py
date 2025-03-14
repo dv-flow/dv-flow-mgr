@@ -58,8 +58,8 @@ class TaskNode(object):
                 if subdep not in dep_m.keys():
                     dep_m[subdep] = []
                 dep_m[subdep].extend(need.output.dep_m[subdep])
+        self._log.debug("input dep_m: %s %s" % (self.name, str(dep_m)))
 
-        self._log.debug("input dep_m: %s" % str(dep_m))
         sorted = toposort.toposort(dep_m)
 
         in_params_m = {}
@@ -127,10 +127,12 @@ class TaskNode(object):
 
         self._log.debug("output[1]: %s" % str(output))
 
+        # Pass-through all dependencies
+        # Add an entry for ourselves
+        dep_m[self.name] = list(need.name for need in self.needs)
+
         if self.passthrough:
             self._log.debug("passthrough: %s" % self.name)
-            # Add an entry for ourselves
-            dep_m[self.name] = list(need.name for need in self.needs)
 
             if self.consumes is None and len(self.consumes):
                 self._log.debug("Propagating all input parameters to output")
@@ -167,11 +169,11 @@ class TaskNode(object):
         else:
             self._log.debug("non-passthrough: %s (only local outputs propagated)" % self.name)
             # empty dependency map
-            dep_m = {
-                self.name : []
-            }
+#            dep_m = {
+#                self.name : []
+#            }
 
-        self._log.debug("output dep_m: %s" % str(dep_m))
+        self._log.debug("output dep_m: %s %s" % (self.name, str(dep_m)))
         self._log.debug("output[2]: %s" % str(output))
 
         # Store the result
