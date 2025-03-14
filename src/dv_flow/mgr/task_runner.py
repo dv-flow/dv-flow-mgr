@@ -38,12 +38,16 @@ class TaskRunner(object):
 
 @dc.dataclass
 class TaskSetRunner(TaskRunner):
-    nproc : int = 8
+    nproc : int = -1
     status : int = 0
 
     _anon_tid : int = 1
 
     _log : ClassVar = logging.getLogger("TaskSetRunner")
+
+    def __post_init__(self):
+        if self.nproc == -1:
+            self.nproc = os.cpu_count()
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
