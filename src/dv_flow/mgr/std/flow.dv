@@ -29,6 +29,22 @@ package:
       exclude:
         type: str
         value: ""
+  - name: CreateFile
+    pytask: dv_flow.mgr.std.create_file.CreateFile
+    passthrough: true
+    doc: |
+      Creates one or more files in the run directory from 
+      literal content in the .dv file. Outputs a fileset 
+      referencing all the created files.
+    with:
+      type:
+        desc: Content-type to use for the fileset
+        type: str
+        value: ""
+      filename:
+        type: str
+      content:
+        type: str
   - name: Exec
     pytask: dv_flow.mgr.std.exec.Exec
     with: 

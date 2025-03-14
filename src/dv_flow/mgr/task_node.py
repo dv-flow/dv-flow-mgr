@@ -187,6 +187,30 @@ class TaskNode(object):
 
     def __hash__(self):
         return id(self)
+
+    def _matches(self, params, consumes):
+        """Determines if a parameter set matches a set of consumed parameters"""
+        self._log.debug("--> _matches: %s params=%s consumes=%s" % (
+            self.name, str(params), str(consumes)))
+        consumed = False
+        for c in consumes:
+            # All matching attribute keys must have same value
+            match = False
+            for k,v in c.items():
+                self._log.debug("k,v: %s,%s - hasattr=%s" % (k,v, hasattr(params, k)))
+                if hasattr(params, k):
+                    self._log.debug("getattr=%s v=%s" % (getattr(params, k), v))
+                    if getattr(params, k) == v:
+                        match = True
+                    else:
+                        match = False
+                        break
+            if match:
+                consumed = True
+                break
+        self._log.debug("<-- _matches: %s %s" % (self.name, consumed))
+        return consumed
+
     
 
 @dc.dataclass
@@ -353,24 +377,6 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                     setattr(obj, key, value)
         return obj
     
-    def _matches(self, params, consumes):
-        """Determines if a parameter set matches a set of consumed parameters"""
-        consumed = False
-        for c in consumes:
-            # All matching attribute keys must have same value
-            match = False
-            for k,v in c.items():
-                if hasattr(params, k):
-                    if getattr(params, k) != v:
-                        match = True
-                    else:
-                        match = False
-                        break
-            if match:
-                consumed = True
-                break
-        return consumed
-
 def task(paramT,passthrough=False,consumes=None):
     """Decorator to wrap a task method as a TaskNodeCtor"""
     def wrapper(T):

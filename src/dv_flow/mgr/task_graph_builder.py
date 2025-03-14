@@ -39,16 +39,20 @@ class TaskGraphBuilder(object):
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _task_m : Dict['TaskSpec',Task] = dc.field(default_factory=dict)
+    _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _logger : logging.Logger = None
 
     def __post_init__(self):
         if self.pkg_rgy is None:
             self.pkg_rgy = PkgRgy.inst().copy()
 
+        # Initialize the overrides from the global registry
+        self._override_m.update(self.pkg_rgy.getOverrides())
+
         self._logger = logging.getLogger(type(self).__name__)
-        self._logger.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
 
         if self.root_pkg is not None:
+            self._logger.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
 
             # Register package definitions found during loading
             visited = set()
@@ -60,6 +64,14 @@ class TaskGraphBuilder(object):
 
             # Allows us to find ourselves
             self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
+
+    def loadPkg(self, pkgfile : str):
+        pkg = PackageDef.load(pkgfile)
+        visited = set()
+        self._registerPackages(pkg, visited)
+
+    def addOverride(self, key : str, val : str):
+        self._override_m[key] = val
 
     def _registerPackages(self, pkg : PackageDef, visited):
         self._logger.debug("Packages: %s" % str(pkg))
@@ -210,6 +222,21 @@ class TaskGraphBuilder(object):
     
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._logger.debug("--> mkTaskNode: %s" % task_t)
+
+        if task_t in self._override_m.keys():
+            self._logger.debug("Overriding task %s with %s" % (task_t, self._override_m[task_t]))
+            task_t = self._override_m[task_t]
+        else:
+            dot_idx = task_t.rfind(".")
+            if dot_idx != -1:
+                pkg = task_t[0:dot_idx]
+                tname = task_t[dot_idx+1:]
+
+                if pkg in self._override_m.keys():
+                    self._logger.debug("Overriding package %s with %s" % (pkg, self._override_m[pkg]))
+                    task_t = self._override_m[pkg] + "." + tname
+
+
         ctor = self.getTaskCtor(task_t)
         self._logger.debug("ctor: %s" % ctor.name)
         params = ctor.mkTaskParams(kwargs)
