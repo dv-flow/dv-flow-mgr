@@ -1,7 +1,7 @@
 import os
 import asyncio
 import pytest
-from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageDef
 from dv_flow.mgr.util import loadProjPkgDef
 
 def test_message(tmpdir, capsys):
@@ -25,7 +25,7 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=rundir)
-    runner = TaskGraphRunnerLocal(rundir=rundir)
+    runner = TaskSetRunner(rundir=rundir)
 
     task = builder.mkTaskGraph("pkg1.foo")
 

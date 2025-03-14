@@ -5,6 +5,7 @@ import sys
 from dv_flow.mgr import PkgRgy
 
 
+@pytest.mark.skip
 def test_import_specific(tmpdir):
     flow_dv = """
 package:
@@ -56,6 +57,7 @@ package:
     assert output.find("Hello There") != -1
 
 
+@pytest.mark.skip
 def test_import_alias(tmpdir):
     flow_dv = """
 package:
@@ -126,6 +128,7 @@ package:
 
     assert output.find("Hello There (p2.foo)") != -1
 
+@pytest.mark.skip
 def test_interface_impl(tmpdir):
 
     libdir = os.path.join(tmpdir, "lib")

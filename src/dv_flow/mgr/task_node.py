@@ -86,6 +86,13 @@ class TaskNode(object):
         self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
         eval.setVar("in", in_params)
 
+        # Default inputs is the list of parameter sets that match 'consumes'
+        inputs = []
+        if self.consumes is not None and len(self.consumes):
+            for in_p in in_params:
+                if self._matches(in_p, self.consumes):
+                    inputs.append(in_p)
+
         for name,field in self.params.model_fields.items():
             value = getattr(self.params, name)
             if type(value) == str:
@@ -107,6 +114,7 @@ class TaskNode(object):
             srcdir=self.srcdir,
             rundir=rundir,
             params=self.params,
+            inputs=inputs,
             memento=memento)
 
         self._log.debug("--> Call task method %s" % str(self.task))
@@ -134,26 +142,28 @@ class TaskNode(object):
                 self._log.debug("consumes: %s" % str(self.consumes))
                 for need in self.needs:
                     for out in need.output.output:
-                        consumed = False
-                        for c in self.consumes:
-                            match = False
-                            for k,v in c.items():
-                                self._log.debug("k,v: %s,%s" % (k,v))
-                                if hasattr(out, k):
-                                    self._log.debug("has attribute: %s" % str(getattr(out ,k)))
-                                    if getattr(out, k) == v:
-                                        self._log.debug("match")
-                                        match = True
-                                        break
-                            if match:
-                                consumed = True
-                                break
-                        
-                        if not consumed:
+                        if not self._matches(out, self.consumes):
                             self._log.debug("Propagating type %s from %s" % (
                                 getattr(out, "type", "<unknown>"),
                                 getattr(out, "src", "<unknown>")))
                             output.append(out)
+
+                        # consumed = False
+                        # for c in self.consumes:
+                        #     match = False
+                        #     for k,v in c.items():
+                        #         self._log.debug("k,v: %s,%s" % (k,v))
+                        #         if hasattr(out, k):
+                        #             self._log.debug("has attribute: %s" % str(getattr(out ,k)))
+                        #             if getattr(out, k) == v:
+                        #                 self._log.debug("match")
+                        #                 match = True
+                        #                 break
+                        #     if match:
+                        #         consumed = True
+                        #         break
+                        
+                        # if not consumed:
         else:
             self._log.debug("non-passthrough: %s (only local outputs propagated)" % self.name)
             # empty dependency map
@@ -342,6 +352,24 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                 else:
                     setattr(obj, key, value)
         return obj
+    
+    def _matches(self, params, consumes):
+        """Determines if a parameter set matches a set of consumed parameters"""
+        consumed = False
+        for c in consumes:
+            # All matching attribute keys must have same value
+            match = False
+            for k,v in c.items():
+                if hasattr(params, k):
+                    if getattr(params, k) != v:
+                        match = True
+                    else:
+                        match = False
+                        break
+            if match:
+                consumed = True
+                break
+        return consumed
 
 def task(paramT,passthrough=False,consumes=None):
     """Decorator to wrap a task method as a TaskNodeCtor"""

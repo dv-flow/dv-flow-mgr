@@ -18,10 +18,10 @@ package:
     tasks:
     - name: entry
       with:
-      - name: p1
-        type: int
-      - name: p2
-        type: int
+        p1:
+          type: int
+        p2:
+          type: int
 """
 
     pkg_def = PackageDef.loads(flowdv)

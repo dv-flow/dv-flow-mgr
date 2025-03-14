@@ -2,7 +2,7 @@
 import os
 import asyncio
 import pytest
-from dv_flow.mgr import TaskGraphBuilder, TaskGraphRunnerLocal, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, PackageDef
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
 #from dv_flow_mgr.tasklib.builtin_pkg import TaskPyClass, TaskPyClassParams
@@ -283,11 +283,11 @@ package:
   - name: Sleep10
     uses: std.Exec
     with:
-      command: sleep 10
+      command: sleep 2
   - name: Sleep5
     uses: std.Exec
     with:
-      command: sleep 5
+      command: sleep 1
   - name: Sleep
     needs: [Sleep10, Sleep5]
 

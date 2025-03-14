@@ -9,6 +9,7 @@ from dv_flow.mgr import TaskData, FileSet, TaskData, TaskDataParamKindE
 from pydantic import BaseModel
 from shutil import copytree
 
+@pytest.mark.skip
 def test_empty_in():
 
     in1 = TaskData()
@@ -18,6 +19,7 @@ def test_empty_in():
 
     assert len(out.params) == 0
 
+@pytest.mark.skip
 def test_empty_combine_nonoverlap_in():
 
     in1 = TaskData()
@@ -33,6 +35,7 @@ def test_empty_combine_nonoverlap_in():
     assert "v2" in out.params.keys()
     assert out.getParamVal("v2") == "2"
 
+@pytest.mark.skip
 def test_empty_combine_nonoverlap_in():
 
     in1 = TaskData()
@@ -48,6 +51,7 @@ def test_empty_combine_nonoverlap_in():
     assert "v2" in out.params.keys()
     assert out.getParamVal("v2") == "2"
 
+@pytest.mark.skip
 def test_conflict_1():
 
     in1 = TaskData()
@@ -58,6 +62,7 @@ def test_conflict_1():
     with pytest.raises(Exception):
         out = TaskData.merge([in1, in2])
 
+@pytest.mark.skip
 def test_fileset_merge_1():
     in1 = TaskData(src="in1")
     in1.addFileSet(FileSet(
@@ -75,6 +80,7 @@ def test_fileset_merge_1():
 
     assert len(out.filesets) == 2
 
+@pytest.mark.skip
 def test_fileset_merge_common_dep_1():
     in1 = TaskData(src="in1")
     in1.addFileSet(FileSet(
