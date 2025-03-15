@@ -1,7 +1,7 @@
 #****************************************************************************
 #* pkg_rgy.py
 #*
-#* Copyright 2023 Matthew Ballance and Contributors
+#* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
 #* Licensed under the Apache License, Version 2.0 (the "License"); you may 
 #* not use this file except in compliance with the License.  
@@ -32,6 +32,13 @@ class PkgRgy(object):
         self._pkgpath = []
         self._pkg_m : Dict[str, Tuple[str,PackageDef]] = {}
         self._log = logging.getLogger(type(self).__name__)
+        self._override_m : Dict[str,str] = {}
+
+    def addOverride(self, key, value):
+        self._override_m[key] = value
+
+    def getOverrides(self):
+        return self._override_m
 
     def hasPackage(self, name, search_path=True):
         if name in self._pkg_m.keys():

@@ -1,3 +1,24 @@
+#****************************************************************************
+#* task_runner.py
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may 
+#* not use this file except in compliance with the License.  
+#* You may obtain a copy of the License at:
+#*  
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*  
+#* Unless required by applicable law or agreed to in writing, software 
+#* distributed under the License is distributed on an "AS IS" BASIS, 
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
+#* See the License for the specific language governing permissions and 
+#* limitations under the License.
+#*
+#* Created on:
+#*     Author: 
+#*
+#****************************************************************************
 import asyncio
 import json
 import os
@@ -38,12 +59,16 @@ class TaskRunner(object):
 
 @dc.dataclass
 class TaskSetRunner(TaskRunner):
-    nproc : int = 8
+    nproc : int = -1
     status : int = 0
 
     _anon_tid : int = 1
 
     _log : ClassVar = logging.getLogger("TaskSetRunner")
+
+    def __post_init__(self):
+        if self.nproc == -1:
+            self.nproc = os.cpu_count()
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
@@ -169,8 +194,8 @@ class TaskSetRunner(TaskRunner):
             self._anon_tid += 1
 
         if task not in dep_m.keys():
-            dep_m[task] = set(task.needs)
-            for need in task.needs:
+            dep_m[task] = set(task[0] for task in task.needs)
+            for need,block in task.needs:
                 self._buildDepMap(dep_m, need)
 
 @dc.dataclass
@@ -180,7 +205,7 @@ class SingleTaskRunner(TaskRunner):
                   task : 'Task',
                   memento : Any = None) -> 'TaskDataResult':
         changed = False
-        for dep in task.needs:
+        for dep,_ in task.needs:
             changed |= dep.changed
 
         # TODO: create an evaluator for substituting param values
