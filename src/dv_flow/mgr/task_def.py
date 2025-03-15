@@ -30,6 +30,11 @@ from .task_output import TaskOutput
 class TaskSpec(object):
     name : str
 
+@dc.dataclass
+class NeedSpec(object):
+    name : str
+    block : bool = False
+
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     name : str
@@ -39,7 +44,7 @@ class TaskDef(BaseModel):
     pytask : str = dc.Field(default=None)
     desc : str = dc.Field(default="")
     doc : str = dc.Field(default="")
-    needs : List[Union[str,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
+    needs : List[Union[str,NeedSpec,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
     params: Dict[str,Union[str,list,ParamDef]] = dc.Field(default_factory=dict, alias="with")
     passthrough: bool = dc.Field(default=False)
     consumes : List[Any] = dc.Field(default_factory=list)

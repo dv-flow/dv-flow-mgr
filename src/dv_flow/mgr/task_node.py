@@ -25,7 +25,7 @@ import dataclasses as dc
 import pydantic.dataclasses as pdc
 import logging
 import toposort
-from typing import Any, Callable, ClassVar, Dict, List
+from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
@@ -46,7 +46,7 @@ class TaskNode(object):
     changed : bool = False
     passthrough : bool = False
     consumes : List[Any] = dc.field(default_factory=list)
-    needs : List['TaskNode'] = dc.field(default_factory=list)
+    needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
     rundir : str = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
@@ -58,6 +58,10 @@ class TaskNode(object):
     def __post_init__(self):
         if self.needs is None:
             self.needs = []
+        else:
+            for i,need in enumerate(self.needs):
+                if not isinstance(need, tuple):
+                    self.needs[i] = (need, False)
 
     async def do_run(self, 
                   runner,
@@ -65,7 +69,7 @@ class TaskNode(object):
                   memento : Any = None) -> 'TaskDataResult':
         self._log.debug("--> do_run: %s" % self.name)
         changed = False
-        for dep in self.needs:
+        for dep,_ in self.needs:
             changed |= dep.changed
 
         self.rundir = rundir
@@ -73,22 +77,30 @@ class TaskNode(object):
         # TODO: Form dep-map from inputs
 
         dep_m = {}
-        for need in self.needs:
+        for need,block in self.needs:
             self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
-            for subdep in need.output.dep_m.keys():
-                if subdep not in dep_m.keys():
-                    dep_m[subdep] = []
-                dep_m[subdep].extend(need.output.dep_m[subdep])
+            if not block:
+                for subdep in need.output.dep_m.keys():
+                    if subdep not in dep_m.keys():
+                        dep_m[subdep] = []
+                    for dep in need.output.dep_m[subdep]:
+                        if dep not in dep_m[subdep]:
+                            dep_m[subdep].append(dep)
         self._log.debug("input dep_m: %s %s" % (self.name, str(dep_m)))
 
         sorted = toposort.toposort(dep_m)
 
         in_params_m = {}
-        for need in self.needs:
-            for p in need.output.output:
-                if p.src not in in_params_m.keys():
-                    in_params_m[p.src] = []
-                in_params_m[p.src].append(p)
+        added_srcs = set()
+        for need,block in self.needs:
+            if not block:
+                for p in need.output.output:
+                    # Avoid adding parameters from a single task more than once
+                    if p.src not in added_srcs:
+                        added_srcs.add(p.src)
+                        if p.src not in in_params_m.keys():
+                            in_params_m[p.src] = []
+                        in_params_m[p.src].append(p)
 
         # in_params holds parameter sets ordered by dependency
         in_params = []
@@ -150,43 +162,28 @@ class TaskNode(object):
 
         # Pass-through all dependencies
         # Add an entry for ourselves
-        dep_m[self.name] = list(need.name for need in self.needs)
+        dep_m[self.name] = list(need.name for need,_ in self.needs)
 
         if self.passthrough:
             self._log.debug("passthrough: %s" % self.name)
 
             if self.consumes is None and len(self.consumes):
                 self._log.debug("Propagating all input parameters to output")
-                for need in self.needs:
-                    output.extend(need.output.output)
+                for need,block in self.needs:
+                    if not block:
+                        output.extend(need.output.output)
             else:
                 # Filter out parameter sets that were consumed
                 self._log.debug("Propagating non-consumed input parameters to output")
                 self._log.debug("consumes: %s" % str(self.consumes))
-                for need in self.needs:
-                    for out in need.output.output:
-                        if not self._matches(out, self.consumes):
-                            self._log.debug("Propagating type %s from %s" % (
-                                getattr(out, "type", "<unknown>"),
-                                getattr(out, "src", "<unknown>")))
-                            output.append(out)
-
-                        # consumed = False
-                        # for c in self.consumes:
-                        #     match = False
-                        #     for k,v in c.items():
-                        #         self._log.debug("k,v: %s,%s" % (k,v))
-                        #         if hasattr(out, k):
-                        #             self._log.debug("has attribute: %s" % str(getattr(out ,k)))
-                        #             if getattr(out, k) == v:
-                        #                 self._log.debug("match")
-                        #                 match = True
-                        #                 break
-                        #     if match:
-                        #         consumed = True
-                        #         break
-                        
-                        # if not consumed:
+                for need,block in self.needs:
+                    if not block:
+                        for out in need.output.output:
+                            if not self._matches(out, self.consumes):
+                                self._log.debug("Propagating type %s from %s" % (
+                                    getattr(out, "type", "<unknown>"),
+                                    getattr(out, "src", "<unknown>")))
+                                output.append(out)
         else:
             self._log.debug("non-passthrough: %s (only local outputs propagated)" % self.name)
             # empty dependency map

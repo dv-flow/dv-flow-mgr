@@ -194,8 +194,8 @@ class TaskSetRunner(TaskRunner):
             self._anon_tid += 1
 
         if task not in dep_m.keys():
-            dep_m[task] = set(task.needs)
-            for need in task.needs:
+            dep_m[task] = set(task[0] for task in task.needs)
+            for need,block in task.needs:
                 self._buildDepMap(dep_m, need)
 
 @dc.dataclass
@@ -205,7 +205,7 @@ class SingleTaskRunner(TaskRunner):
                   task : 'Task',
                   memento : Any = None) -> 'TaskDataResult':
         changed = False
-        for dep in task.needs:
+        for dep,_ in task.needs:
             changed |= dep.changed
 
         # TODO: create an evaluator for substituting param values
