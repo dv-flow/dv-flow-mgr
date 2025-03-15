@@ -31,10 +31,31 @@ package:
         value: ""
   - name: Exec
     pytask: dv_flow.mgr.std.exec.Exec
-    with: 
+    desc: Executes a subprocess
+    with:
+      shell:
+        type: str
+        value: "bash"
+        doc: |
+          Shell to use for executing the command
       command:
         type: str
         value: ""
+        doc: |
+          Command to execute
+      when:
+        type: str
+        value: "always"
+        doc: |
+          Specifies when the command is run.
+          - always  -- Command is always run (default)
+          - changed -- If upstream tasks change
+      timestamp:
+        type: str
+        value: ""
+        doc: |
+          Optional timestamp file to determine if running 
+          the command changed the output
   types:
   # - name: TaskDataItem
   #   doc: |

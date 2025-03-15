@@ -4,6 +4,8 @@ from dv_flow.mgr import TaskDataResult
 
 _log = logging.getLogger("Exec")
 
+class Memento()
+
 async def Exec(runner, input) -> TaskDataResult:
     _log.debug("TaskExec run: %s: cmd=%s" % (input.name, input.params.command))
 
