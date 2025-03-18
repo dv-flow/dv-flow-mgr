@@ -150,8 +150,6 @@ class TaskNode(object):
                     if elem.find("${{") != -1:
                         new_val = eval.eval(elem)
                         value[i] = new_val
-            else:
-                raise Exception("Unhandled param type: %s" % str(value))
 
         input = TaskDataInput(
             name=self.name,
