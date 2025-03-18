@@ -19,6 +19,7 @@
 #*     Author: 
 #*
 #****************************************************************************
+import enum
 import os
 import sys
 import dataclasses as dc
@@ -30,6 +31,10 @@ from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
 from .param import Param
+
+class RundirE(enum.Enum):
+    Unique = enum.auto()
+    Inherit = enum.auto()
 
 @dc.dataclass
 class TaskNode(object):
@@ -48,6 +53,7 @@ class TaskNode(object):
     consumes : List[Any] = dc.field(default_factory=list)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
     rundir : str = dc.field(default=None)
+    rundir_t : RundirE = dc.field(default=RundirE.Unique)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
     start : float = dc.field(default=None)
@@ -118,6 +124,12 @@ class TaskNode(object):
 
         self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
         eval.setVar("in", in_params)
+        eval.setVar("rundir", rundir)
+
+        # Set variables from the inputs
+        for need in self.needs:
+            for name,value in {"rundir" : need.rundir}.items():
+                eval.setVar("%s.%s" % (need.name, name), value)
 
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
