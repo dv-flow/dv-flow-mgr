@@ -120,10 +120,11 @@ class PkgRgy(object):
                     
                     for name,path in pkg_m.items():
                         self._log.debug("Registering package %s: %s" % (name, path))
-                        if name in self._pkg_m.keys():
-                            raise Exception("Package %s already registered using path %s. Conflicting path: %s" % (
+                        if name in self._pkg_m.keys() and self._pkg_m[name][0] != path:
+                            self._log.debug("Package %s already registered using path %s. Conflicting path: %s" % (
                                 name, self._pkg_m[name][0], path))
-                        self._pkg_m[name] = (path, None)
+                        else:
+                            self._pkg_m[name] = (path, None)
             except Exception as e:
                 self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e
