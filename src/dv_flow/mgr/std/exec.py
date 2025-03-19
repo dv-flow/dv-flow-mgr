@@ -97,7 +97,7 @@ async def Exec(runner, input) -> TaskDataResult:
     if input.params.when == "changed":
         changed = input.changed
 
-    if input.params.timestamp is not None and input.params.timestamp_file != "":
+    if input.params.timestamp is not None and input.params.timestamp != "":
         # Check the timestamp file
         try:
             with open(input.params.timestamp_file, "r") as f:
