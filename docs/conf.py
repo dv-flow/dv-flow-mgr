@@ -15,7 +15,8 @@ author = 'Matthew Ballance'
 
 extensions = [
     'sphinx-jsonschema',
-    'sphinxcontrib.mermaid'
+    'sphinxcontrib.mermaid',
+    'sphinxcontrib-dv-flow'
 ]
 
 templates_path = ['_templates']

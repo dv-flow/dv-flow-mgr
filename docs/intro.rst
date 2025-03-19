@@ -3,12 +3,17 @@ Introduction
 ############
 
 
+.. dv-flow.task:: std.Fileset
 
 
 Many software languages have co-evolved with a build system. For example, C/C++ 
 has Make and CMake. Java has ANT, Maven, and Gradle. All of these build systems
 provide features that cater to specific ways that a given language is processed,
 and provide built-in notions to make setting up simple cases as easy as possible.
+
+
+.. dv-flow.task:: std.Fileset
+
 
 One simple example is Make and a single-file C program. Take the code below:
 
@@ -67,6 +72,7 @@ Key Concepts
 ============
 
 DV Flow Manager has three key concepts:
+
 * **Package** - A packages is parameterizd namespace that contain tasks. 
 * **Task** - A task is a processing step in a flow. Tasks represent a data-processing step, which
   might be as simple as building a list of files, or might be a complex as creating a hardened macro

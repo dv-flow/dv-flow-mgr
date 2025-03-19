@@ -36,6 +36,7 @@ class ComplexType(BaseModel):
 class ParamDef(BaseModel):
     doc : str = None
     type : Union[str, 'ComplexType'] = None
+    derived : bool = Field(default=False)
     value : Union[Any, None] = None
     append : Union[Any, None] = None
     prepend : Union[Any, None] = None

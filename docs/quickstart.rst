@@ -113,7 +113,7 @@ This will allow us to easily swap in a different simulator without changing
 anything else within our package definition.
 
 .. code-block:: yaml
-    :highlight: 8,12
+    :emphasize-lines: 8,12
 
     package:
         name: my_design

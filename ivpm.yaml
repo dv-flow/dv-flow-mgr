@@ -22,9 +22,12 @@ package:
     - name: Sphinx
       src: pypi
     - name: sphinx-jsonschema
-      src: pypi
+#      src: pypi
+      url: https://github.com/lnoor/sphinx-jsonschema.git
     - name: sphinxcontrib-mermaid
       src: pypi
+    - name: sphinxcontrib-dv-flow
+      url: https://github.com/dv-flow/sphinxcontrib-dv-flow.git
     - name: jq
       src: pypi
     - name: ply

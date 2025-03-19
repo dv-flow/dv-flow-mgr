@@ -26,7 +26,6 @@ import logging
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskData, TaskDataInput, TaskDataOutput, TaskDataResult
-from .task_memento import TaskMemento
 from .task_ctor import TaskParamsCtor
 from .task_params_ctor import TaskParamsCtor
 from .task_runner import TaskRunner

@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import pydantic.dataclasses as dc
+import enum
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
@@ -35,20 +36,60 @@ class NeedSpec(object):
     name : str
     block : bool = False
 
+class RundirE(enum.Enum):
+    Unique = "unique"
+    Inherit = "inherit"
+
+class StrategyDef(BaseModel):
+    matrix : Dict[str,List[Any]] = dc.Field(
+        default_factory=dict,
+        description="Matrix of parameter values to explore")
+
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
-    name : str
-    fullname : str = dc.Field(default=None)
+    name : str = dc.Field(
+        title="Task Name",
+        description="The name of the task")
+#    fullname : str = dc.Field(default=None)
 #    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
-    uses : str = dc.Field(default=None)
-    pytask : str = dc.Field(default=None)
-    desc : str = dc.Field(default="")
-    doc : str = dc.Field(default="")
-    needs : List[Union[str,NeedSpec,TaskSpec]] = dc.Field(default_factory=list, alias="needs")
-    params: Dict[str,Union[str,list,ParamDef]] = dc.Field(default_factory=dict, alias="with")
-    passthrough: bool = dc.Field(default=False)
-    consumes : List[Any] = dc.Field(default_factory=list)
-    tasks: List['TaskDef'] = dc.Field(default_factory=list)
+    uses : str = dc.Field(
+        default=None,
+        title="Base type",
+        description="Task from which this task is derived")
+    pytask : str = dc.Field(
+        default=None,
+        title="Python method name",
+        description="Python method to execute to implement this task")
+    strategy : StrategyDef = dc.Field(
+        default=None)
+    tasks: List['TaskDef'] = dc.Field(
+        default_factory=list,
+        description="Sub-tasks")
+    desc : str = dc.Field(
+        default="",
+        title="Task description",
+        description="Short description of the task's purpose")
+    doc : str = dc.Field(
+        default="",
+        title="Task documentation",
+        description="Full documentation of the task")
+#    needs : List[Union[str,NeedSpec,TaskSpec]] = dc.Field(
+    needs : List[Union[str]] = dc.Field(
+        default_factory=list, 
+        description="List of tasks that this task depends on")
+    params: Dict[str,Union[str,list,ParamDef]] = dc.Field(
+        default_factory=dict, 
+        alias="with",
+        description="Parameters for the task")
+    rundir : RundirE = dc.Field(
+        default=RundirE.Unique,
+        description="Specifies handling of this tasks's run directory")
+    passthrough: bool = dc.Field(
+        default=False,
+        description="Specifies whether this task should pass its inputs to its output")
+    consumes : List[Any] = dc.Field(
+        default_factory=list,
+        description="Specifies matching patterns for parameter sets that this task consumes")
 
 #    out: List[TaskOutput] = dc.Field(default_factory=list)
 

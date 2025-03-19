@@ -33,6 +33,7 @@ from typing import Any, Dict, List, Callable, Tuple, ClassVar, Union
 from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
+from .param_def import ParamDef
 from .task_node import TaskNodeCtor, TaskNodeCtorProxy, TaskNodeCtorTask
 from .task_ctor import TaskCtor
 from .task_def import TaskDef, TaskSpec
@@ -41,13 +42,26 @@ from .type_def import TypeDef
 
 
 class PackageDef(BaseModel):
-    name : str
+    name : str = dc.Field(
+        description="Name of the package")
     params : Dict[str,Any] = dc.Field(default_factory=dict)
     type : List[PackageSpec] = dc.Field(default_factory=list)
-    tasks : List[TaskDef] = dc.Field(default_factory=list)
-    imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list)
-    fragments: List[str] = dc.Field(default_factory=list)
+    tasks : List[TaskDef] = dc.Field(
+        default_factory=list,
+        description="List of tasks defined in the package")
+    imports : List[Union[str,PackageImportSpec]] = dc.Field(
+        default_factory=list,
+        description="List of packages to import")
+    fragments: List[str] = dc.Field(
+        default_factory=list,
+        description="List of fragments to include")
     types : List[TypeDef] = dc.Field(default_factory=list)
+    uses : str = dc.Field(
+        default=None,
+        description="Name of the package to use as a base")
+    params : List[ParamDef] = dc.Field(
+        default_factory=list, alias="with",
+        description="List of package parameters to set")
 
     fragment_l : List['FragmentDef'] = dc.Field(default_factory=list, exclude=True)
     subpkg_m : Dict[str,'PackageDef'] = dc.Field(default_factory=dict, exclude=True)

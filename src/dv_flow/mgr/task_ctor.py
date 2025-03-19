@@ -38,7 +38,7 @@ class TaskCtor(object):
 
     _log : ClassVar = logging.getLogger("TaskCtor")
 
-    def mkTask(self, name : str, srcdir=None) -> 'Task':
+    def mkTask(self, name : str, srcdir=None) -> 'TaskNode':
         """Creates a task object"""
         if srcdir is None:
             srcdir = self.srcdir

@@ -29,7 +29,7 @@ from datetime import datetime
 from toposort import toposort
 from typing import Any, Callable, ClassVar, List, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
-from .task_node import TaskNode
+from .task_node import TaskNode, RundirE
 
 @dc.dataclass
 class TaskRunner(object):
@@ -140,10 +140,14 @@ class TaskSetRunner(TaskRunner):
                     memento = src_memento.get(t.name, None)
                     dirname = t.name
                     invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
-                    # Replace invalid characters with the replacement string.
-                    dirname = re.sub(invalid_chars_pattern, '_', dirname)
 
-                    rundir = os.path.join(self.rundir, dirname)
+                    if t.rundir_t == RundirE.Unique:
+                        # Replace invalid characters with the replacement string.
+                        dirname = re.sub(invalid_chars_pattern, '_', dirname)
+
+                        rundir = os.path.join(self.rundir, dirname)
+                    else:
+                        rundir = self.rundir
 
                     if not os.path.isdir(rundir):
                         os.makedirs(rundir, exist_ok=True)

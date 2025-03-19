@@ -27,14 +27,25 @@ from typing import Any, ClassVar, Dict, Set, List, Tuple
 from .fileset import FileSet
 from toposort import toposort
 
+class SeverityE(enum.Enum):
+    Info = "info"
+    Warning = "warning"
+    Error = "error"
+
 class TaskMarkerLoc(BaseModel):
+    """
+    Captures the source location of a marker
+    """
     path : str
     line : int = dc.Field(default=-1)
     pos : int = dc.Field(default=-1)
 
 class TaskMarker(BaseModel):
+    """
+    Captures marker data produced by a task.
+    """
     msg : str
-    severity : str
+    severity : SeverityE
     loc : TaskMarkerLoc = dc.Field(default=None)
 
 class TaskParameterSet(BaseModel):
@@ -43,6 +54,15 @@ class TaskParameterSet(BaseModel):
     seq : int  = -1 # Order in which the param-set must appear
 
 class TaskDataInput(BaseModel):
+    """
+    Input data to a task
+    - name - name of the task
+    - changed - indicates whether any of this task's dependencies have changed
+    - rundir - directory in which the task is to be run
+    - params - parameters to the task
+    - inputs - list of parameter sets 'consumed' by this task
+    - memento - memento data previously returned by this task. None if no memento is available
+    """
     name : str
     changed : bool
     srcdir : str
@@ -52,6 +72,14 @@ class TaskDataInput(BaseModel):
     memento : Any
 
 class TaskDataResult(BaseModel):
+    """
+    Result data from a task
+    - changed - indicates whether the task modified its result data
+    - output - list of output parameter sets
+    - memento - memento data to be passed to the next invocation of the task
+    - markers - list of markers produced by the task
+    - status - status code (0=success, non-zero=failure)
+    """
     changed : bool = dc.Field(default=True)
     output : List[Any] = dc.Field(default_factory=list)
     memento : Any = dc.Field(default=None)
