@@ -50,7 +50,7 @@ async def Exec(runner, input) -> TaskDataResult:
 
         result = await proc.wait()
 
-        status = result.returncode
+        status = proc.returncode
 
         if status != 0:
             markers.append(TaskMarker(

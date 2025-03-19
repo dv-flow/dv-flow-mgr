@@ -56,8 +56,15 @@ class TaskListenerLog(object):
                     "error": "[red]E[/red]",
                 }
                 for m in task.result.markers:
+                    severity_s = str(m.severity)
+
+                    if severity_s in sev_pref_m.keys():
+                        sev_pref = sev_pref_m[severity_s]
+                    else:
+                        sev_pref = ""
+
                     msg = "  %s %s: %s" % (
-                        sev_pref_m[m.severity], 
+                        sev_pref,
                         task.name,
                         m.msg)
 

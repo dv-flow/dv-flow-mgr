@@ -128,8 +128,8 @@ class TaskNode(object):
 
         # Set variables from the inputs
         for need in self.needs:
-            for name,value in {"rundir" : need.rundir}.items():
-                eval.setVar("%s.%s" % (need.name, name), value)
+            for name,value in {"rundir" : need[0].rundir}.items():
+                eval.setVar("%s.%s" % (need[0].name, name), value)
 
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
