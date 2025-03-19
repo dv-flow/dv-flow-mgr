@@ -50,7 +50,7 @@ class TaskDef(BaseModel):
     name : str = dc.Field(
         title="Task Name",
         description="The name of the task")
-#    fullname : str = dc.Field(default=None)
+    fullname : str = dc.Field(default=None)
 #    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
     uses : str = dc.Field(
         default=None,
