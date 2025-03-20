@@ -121,6 +121,21 @@ implements tasks for performing HDL simulation with the Verilator simulator.</p>
 <p>Note that we specify an alias (hdl.sim) for the package when importing it.
 This will allow us to easily swap in a different simulator without changing
 anything else within our package definition.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
+<span class="w">        </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
+
+<span class="hll"><span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="hll"><span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;systemVerilogSource&quot;</span>
+</span><span class="w">          </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+</pre></div>
+</div>
 <p>Our first task is to specify the sources we want to process. This is done
 by specifying a <cite>FileSet</cite> task. The parameters of this task specify where
 the task should look for sources and which sources it should include</p>
@@ -162,6 +177,7 @@ the task should look for sources and which sources it should include</p>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a></li>
 </ul>
 

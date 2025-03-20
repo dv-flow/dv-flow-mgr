@@ -29,4 +29,5 @@ enables concurrent execution and efficient avoidance of redundant work.
 
    quickstart
    intro
+   stdlib
    reference
