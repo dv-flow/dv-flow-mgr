@@ -31,3 +31,4 @@ enables concurrent execution and efficient avoidance of redundant work.
    intro
    stdlib
    reference
+   pytask_api
