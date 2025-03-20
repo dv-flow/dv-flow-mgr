@@ -62,7 +62,9 @@ class TaskListenerLog(object):
                 for m in task.result.markers:
                     severity_s = str(m.severity)
 
-                    if severity_s in sev_pref_m.keys():
+                    if m.severity in sev_pref_m.keys():
+                        sev_pref = sev_pref_m[m.severity]
+                    elif severity_s in sev_pref_m.keys():
                         sev_pref = sev_pref_m[severity_s]
                     else:
                         sev_pref = ""
