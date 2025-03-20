@@ -28,7 +28,7 @@ jobs:
     - name: Build Docs
       run: |
         cd docs
-        make html
+        PYTHONPATH=$(pwd)/../src make html
         cp ../src/dv_flow/mgr/share/flow.json _build/html/
         touch _build/html/.nojekyll
 
