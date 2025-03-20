@@ -145,6 +145,18 @@ class PackageDef(BaseModel):
 
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
         self._log.debug("--> %s::mkTaskCtor %s (srcdir: %s)" % (self.name, task.name, srcdir))
+
+
+        if len(task.tasks) > 0:
+            # Compound task
+            pass
+        else:
+            # Leaf task
+            pass
+
+    
+    def _mkLeafTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+        self._log.debug("--> _mkLeafTaskCtor")
         base_ctor_t : TaskCtor = None
         ctor_t : TaskCtor = None
         base_params : BaseModel = None
@@ -191,6 +203,18 @@ class PackageDef(BaseModel):
             if not hasattr(mod, clsname):
                 raise Exception("Method %s not found in module %s" % (clsname, modname))
             callable = getattr(mod, clsname)
+        elif len(task.tasks) > 0:
+            # Compound task
+            self._log.debug("Use Compound implementation")
+            ctor_t = TaskNodeCtor(
+                name=fullname,
+                srcdir=srcdir,
+                passthrough=passthrough,
+                consumes=consumes,
+                needs=needs,
+                tasks=[])
+            for t in task.tasks:
+                ctor_t.tasks.append(self.mkTaskCtor(session, t, srcdir, tasks_m))
 
         # Determine if we need to use a new 
         paramT = self._getParamT(session, task, base_params)

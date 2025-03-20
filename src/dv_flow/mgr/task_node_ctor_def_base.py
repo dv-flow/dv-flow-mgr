@@ -1,5 +1,5 @@
 #****************************************************************************
-#* task_node_compound.py
+#* task_node_ctor_def_base.py
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -19,25 +19,29 @@
 #*     Author: 
 #*
 #****************************************************************************
+import enum
+import os
+import sys
 import dataclasses as dc
-from .task_node import TaskNode
-from .task_data import TaskDataResult, TaskDataInput, TaskDataOutput
-from .task_runner import TaskRunner
-from typing import Any, List
+import pydantic.dataclasses as pdc
+import logging
+import toposort
+from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_params_ctor import TaskParamsCtor
+from .param_ref_eval import ParamRefEval
+from .param import Param
+from .task_node_ctor import TaskNodeCtor
 
 @dc.dataclass
-class TaskNodeCompound(TaskNode):
-    """A Compound task node *is* the 'out' node in the subgraph"""
-    tasks : List[TaskNode] = dc.field(default_factory=list)
-    input : TaskNode = None
+class TaskNodeCtorDefBase(TaskNodeCtor):
+    """Task defines its own needs, that will need to be filled in"""
+    needs : List['str']
 
     def __post_init__(self):
-        self.input = TaskNode(self.name + ".in")
-        return super().__post_init__()
+        if self.needs is None:
+            self.needs = []
 
-    async def do_run(self, 
-                     runner : TaskRunner, 
-                     rundir, 
-                     memento : Any=None) -> TaskDataResult:
-        pass
-    pass
+    def getNeeds(self) -> List[str]:
+        return self.needs
+

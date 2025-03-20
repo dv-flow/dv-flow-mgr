@@ -129,3 +129,5 @@ are evaluated.
   - Enables users to easily click on first N warnings/errors in each step
     without needing to find and open a logfile
 - Allow files to be attached as part of the result
+
+- Allow need relationships to be conditional
