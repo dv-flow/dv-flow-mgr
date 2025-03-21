@@ -53,5 +53,6 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
         node.passthrough = self.passthrough
         node.consumes = self.consumes
         node.task = self.task
+        builder.addTask(name, node)
 
         return node

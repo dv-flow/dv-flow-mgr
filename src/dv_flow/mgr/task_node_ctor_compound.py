@@ -39,10 +39,11 @@ class TaskNodeCtorCompound(TaskNodeCtor):
     task_def : TaskDef
     tasks : List[TaskNodeCtor] = dc.field(default_factory=list)
 
-    _log : ClassVar = logging.getLogger("TaskCtor")
+    _log : ClassVar = logging.getLogger("TaskNodeCtorCompound")
 
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
         """Creates a task object without a base task"""
+        self._log.debug("--> mkTaskNode %s (%d)" % (name, len(self.tasks)))
         if srcdir is None:
             srcdir = self.srcdir
 
@@ -51,13 +52,42 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             srcdir=srcdir,
             params=params)
 
-        self._buildSubGraph(node)
+        builder.enter_compound(node)
+        builder.addTask("in", node.input)
 
-        if self.uses is not None:
-            return self.uses.mkTask(name, srcdir)
-        else:
-            raise NotImplementedError("TaskCtor.mkTask() not implemented for %s" % str(type(self)))
-    
-    def _buildSubGraph(self, node):
-        # Build out this task level, possibly
+        self._buildSubGraph(builder, node)
+
+        builder.leave_compound(node)
+
+        self._log.debug("<-- mkTaskNode %s (%d)" % (name, len(node.needs)))
+        return node
+
+    def _buildSubGraph(self, builder, node):
+        nodes = []
+
+        for t in self.tasks:
+            # Need to get the parent name
+            needs = []
+            for n in t.needs:
+                need_name = "%s.%s" % (builder.package().name, n)
+                task = builder.findTask(need_name)
+                if task is None:
+                    raise Exception("Failed to find task %s" % need_name)
+                needs.append(task)
+            sn = t.mkTaskNode(
+                builder=builder, 
+                params=t.mkTaskParams(),
+                name=t.name,
+                needs=needs)
+            nodes.append(sn)
+            builder.addTask(t.name, sn)
+
+        
+        for n in nodes:
+            # All nodes 'need' the input node
+            n.needs.append([builder.findTask("in"), False])
+            node.needs.append([n, False])
+        
+        self._log.debug("nodes: %d (%d %d)" % (len(nodes), len(self.tasks), len(node.needs)))
+
         pass

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataOutput, TaskDataResult
 from .task_node import TaskNode
+from .task_node_compound import TaskNodeCompound
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_compound import TaskNodeCtorCompound
 
@@ -19,21 +20,35 @@ class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
 
     _log : ClassVar = logging.getLogger("TaskNodeCtorCompoundProxy")
 
-    def mkTask(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
-        """Creates a task object"""
-        if srcdir is None:
-            srcdir = self.srcdir
-        node = self.uses.mkTaskNode(
-            builder=builder, params=params, srcdir=srcdir, name=name, needs=needs)
-        node.passthrough = self.passthrough
-        node.consumes = self.consumes
-        return node
-
+    def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
+        """Creates a task object without a base task"""
         if srcdir is None:
             srcdir = self.srcdir
 
-        if self.uses is not None:
-            return self.uses.mkTask(name, srcdir)
+        node = TaskNodeCompound(
+            name=name, 
+            srcdir=srcdir,
+            params=params)
+
+        is_compound_uses = builder.is_compound_uses()
+
+        if not is_compound_uses:
+            # 'uses' tasks should see the same 'in'
+            builder.enter_compound(node)
+            builder.addTask("in", node.input)
         else:
-            raise NotImplementedError("TaskCtor.mkTask() not implemented for %s" % str(type(self)))
+            builder.enter_compound_uses()
+
+        # Build 'uses' node
+        need_m = {}
+        self._buildSubGraph(builder, node, need_m)
+
+        builder.leave_compound(node)
+
+        if not is_compound_uses:
+            builder.leave_compound(node)
+        else:
+            builder.leave_compound_uses()
+
+        return node
     

@@ -44,4 +44,6 @@ class TaskNodeCompound(TaskNode):
                      rundir, 
                      memento : Any=None) -> TaskDataResult:
         pass
-    pass
+
+    def __hash__(self):
+        return id(self)

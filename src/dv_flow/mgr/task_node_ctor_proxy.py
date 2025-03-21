@@ -43,9 +43,14 @@ class TaskNodeCtorProxy(TaskNodeCtorDefBase):
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> TaskNode:
         if srcdir is None:
             srcdir = self.srcdir
+        builder.enter_uses()
         node = self.uses.mkTaskNode(
             builder=builder, params=params, srcdir=srcdir, name=name, needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
+        builder.leave_uses()
+
+        if not builder.in_uses():
+            builder.addTask(name, node)
         return node
     

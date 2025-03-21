@@ -1,6 +1,7 @@
 import asyncio
 import os
 from dv_flow.mgr import TaskGraphBuilder, TaskRunner, PackageDef
+from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
 
 def test_smoke(tmpdir):
     flow_dv = """
@@ -37,7 +38,11 @@ package:
         rundir=os.path.join(rundir, "rundir"))
     runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
 
-    t1 = builder.mkTaskNode("foo.entry", "t1")
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    TaskGraphDotWriter().write(
+        t1, 
+        os.path.join(rundir, "graph.dot"))
 
     output = asyncio.run(runner.run(t1))
 

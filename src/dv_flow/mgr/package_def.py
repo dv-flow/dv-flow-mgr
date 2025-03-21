@@ -295,7 +295,7 @@ class PackageDef(BaseModel):
             ctor_t.tasks.append(self.mkTaskCtor(session, t, srcdir, tasks_m))
 
         
-        self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
+        self._log.debug("<-- %s::mkTaskCtor %s (%d)" % (self.name, task.name, len(ctor_t.tasks)))
         return ctor_t
 
     def _getParamT(self, session, task, base_t : BaseModel):

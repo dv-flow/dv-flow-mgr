@@ -25,9 +25,20 @@ import logging
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
-from .task import Task
+from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
 from typing import Dict, List, Union
+
+@dc.dataclass
+class TaskNamespaceScope(object):
+    task_m : Dict[str,TaskNode] = dc.field(default_factory=dict)
+
+@dc.dataclass
+class CompoundTaskCtxt(object):
+    parent : 'TaskGraphBuilder'
+    task : 'TaskNode'
+    task_m : Dict[str,TaskNode] = dc.field(default_factory=dict)
+    uses_s : List[Dict[str, TaskNode]] = dc.field(default_factory=list)
 
 @dc.dataclass
 class TaskGraphBuilder(object):
@@ -38,8 +49,12 @@ class TaskGraphBuilder(object):
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
-    _task_m : Dict['TaskSpec',Task] = dc.field(default_factory=dict)
+    _task_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
+    _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
+    _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
+    _uses_count : int = 0
+
     _logger : logging.Logger = None
 
     def __post_init__(self):
@@ -94,13 +109,85 @@ class TaskGraphBuilder(object):
     def package(self):
         return self._pkg_s[-1]
 
-    def mkTaskGraph(self, task : str) -> Task:
+    def enter_uses(self):
+        self._uses_count += 1
+
+    def in_uses(self):
+        return (self._uses_count > 0)
+    
+    def leave_uses(self):
+        self._uses_count -= 1
+    
+    def enter_compound(self, task : TaskNode):
+        self._compound_task_ctxt_s.append(CompoundTaskCtxt(parent=self, task=task))
+
+    def get_name_prefix(self):
+        if len(self._compound_task_ctxt_s) > 0:
+            # Use the compound scope name
+            name = ".".join(c.task.name for c in self._compound_task_ctxt_s)
+        else:
+            name = self._pkg_s[-1].name
+
+        return name
+
+    def enter_compound_uses(self):
+        self._compound_task_ctxt_s[-1].uses_s.append({})
+
+    def leave_compound_uses(self):
+        if len(self._compound_task_ctxt_s[-1].uses_s) > 1:
+            # Propagate the items up the stack, appending 'super' to 
+            # the names
+            for k,v in self._compound_task_ctxt_s[-1].uses_s[-1].items():
+                self._compound_task_ctxt_s[-1].uses[-2]["super.%s" % k] = v
+        else:
+            # Propagate the items to the compound namespace, appending
+            # 'super' to the names
+            for k,v in self._compound_task_ctxt_s[-1].uses_s[-1].items():
+                self._compound_task_ctxt_s[-1].task_m["super.%s" % k] = v
+        self._compound_task_ctxt_s[-1].uses_s.pop()
+
+    def is_compound_uses(self):
+        return len(self._compound_task_ctxt_s[-1].uses_s) != 0
+
+    def addTask(self, name, task : TaskNode):
+        self._logger.debug("--> addTask: %s" % name)
+        if len(self._compound_task_ctxt_s) == 0:
+            self._task_m[name] = task
+        else:
+            if len(self._compound_task_ctxt_s[-1].uses_s) > 0:
+                self._compound_task_ctxt_s[-1].uses_s[-1][name] = task
+            else:
+                self._compound_task_ctxt_s[-1].task_m[name] = task
+        self._logger.debug("<-- addTask: %s" % name)
+
+    def findTask(self, name):
+        task = None
+
+        if len(self._compound_task_ctxt_s) > 0:
+            if len(self._compound_task_ctxt_s[-1].uses_s) > 0:
+                if name in self._compound_task_ctxt_s[-1].uses_s[-1].keys():
+                    task = self._compound_task_ctxt_s[-1].uses_s[-1][name]
+            if task is None and name in self._compound_task_ctxt_s[-1].task_m.keys():
+                task = self._compound_task_ctxt_s[-1].task_m[name]
+        if task is None and name in self._task_m.keys():
+            task = self._task_m[name]
+        
+        # if task is None:
+        #     # TODO: Look for a def that hasn't yet been constructed
+        #     task = self._mkTaskGraph(name, self.rundir)
+
+        return task
+
+    def leave_compound(self, task : TaskNode):
+        self._compound_task_ctxt_s.pop()
+
+    def mkTaskGraph(self, task : str) -> TaskNode:
         self._pkg_s.clear()
         self._task_m.clear()
 
         return self._mkTaskGraph(task, self.rundir)
         
-    def _mkTaskGraph(self, task : str, parent_rundir : str) -> Task:
+    def _mkTaskGraph(self, task : str, parent_rundir : str) -> TaskNode:
 
         elems = task.split(".")
 
@@ -237,6 +324,9 @@ class TaskGraphBuilder(object):
                     self._logger.debug("Overriding package %s with %s" % (pkg, self._override_m[pkg]))
                     task_t = self._override_m[pkg] + "." + tname
 
+        dot_idx = task_t.rfind(".")
+        pkg = task_t[0:dot_idx]
+        self._pkg_s.append(self.getPackage(PackageSpec(pkg)))
 
         ctor = self.getTaskCtor(task_t)
         if ctor is not None:
@@ -250,6 +340,7 @@ class TaskGraphBuilder(object):
                 needs=needs)
         else:
             raise Exception("Failed to find ctor for task %s" % task_t)
+        self._pkg_s.pop()
         self._logger.debug("<-- mkTaskNode: %s" % task_t)
         return ret
         
