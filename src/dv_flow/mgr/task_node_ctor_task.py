@@ -40,7 +40,12 @@ from .task_node_ctor_def_base import TaskNodeCtorDefBase
 class TaskNodeCtorTask(TaskNodeCtorDefBase):
     task : Callable[['TaskRunner','TaskDataInput'],'TaskDataResult']
 
+    _log : ClassVar[logging.Logger] = logging.getLogger("TaskNodeCtorTask")
+
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> TaskNode:
+        self._log.debug("--> mkTaskNode needs=%d" % (
+            (len(needs) if needs is not None else -1),
+        ))
         if srcdir is None:
             srcdir = self.srcdir
 
@@ -55,4 +60,5 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
         node.task = self.task
         builder.addTask(name, node)
 
+        self._log.debug("<-- mkTaskNode")
         return node

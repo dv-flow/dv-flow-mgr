@@ -235,7 +235,7 @@ class TaskGraphBuilder(object):
             builder=self,
             params=params,
             name=task,
-            needs=needs)
+            needs=None)
         task.rundir = rundir
         
         self._task_m[task.name] = task
@@ -330,6 +330,17 @@ class TaskGraphBuilder(object):
 
         ctor = self.getTaskCtor(task_t)
         if ctor is not None:
+            if needs is None:
+                needs = []
+            for need_def in ctor.getNeeds():
+                # Resolve the full name of the need
+                need_fullname = self._resolveNeedRef(need_def)
+                self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
+                if not need_fullname in self._task_m.keys():
+                    need_t = self._mkTaskGraph(need_fullname, self.rundir)
+                    self._task_m[need_fullname] = need_t
+                needs.append(self._task_m[need_fullname])
+
             self._logger.debug("ctor: %s" % ctor.name)
             params = ctor.mkTaskParams(kwargs)
             ret = ctor.mkTaskNode(

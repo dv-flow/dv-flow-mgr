@@ -50,7 +50,9 @@ class TaskNodeCtorCompound(TaskNodeCtor):
         node = TaskNodeCompound(
             name=name, 
             srcdir=srcdir,
-            params=params)
+            params=params,
+            needs=needs)
+
 
         builder.enter_compound(node)
         builder.addTask("in", node.input)
@@ -84,9 +86,26 @@ class TaskNodeCtorCompound(TaskNodeCtor):
 
         
         for n in nodes:
-            # All nodes 'need' the input node
-            n.needs.append([builder.findTask("in"), False])
-            node.needs.append([n, False])
+
+            # If this node references one of the others, then 
+            # it takes input from that node, and not the 'in' node
+            has_ref = False
+            for nt in n.needs:
+                if nt[0] in nodes:
+                    has_ref = True
+                    break
+            if not has_ref:
+                n.needs.append([builder.findTask("in"), False])
+
+            # Only add a dependency on the node if no other node references it
+            is_ref = False
+            for nt in nodes:
+                for nn in nt.needs:
+                    if nn[0] == n:
+                        is_ref = True
+                        break
+            if not is_ref:
+                node.needs.append([n, False])
         
         self._log.debug("nodes: %d (%d %d)" % (len(nodes), len(self.tasks), len(node.needs)))
 
