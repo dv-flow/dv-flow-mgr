@@ -84,7 +84,7 @@ def test_fileset_input_1(tmpdir):
         pkg_def,
         os.path.join(tmpdir, "rundir"))
     files1 = builder.mkTaskGraph("test1.files1")
-    cfiles = consume_files(srcdir="srcdir", needs=[files1])
+    cfiles = consume_files(builder, srcdir="srcdir", needs=[files1])
 
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 

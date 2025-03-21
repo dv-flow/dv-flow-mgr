@@ -37,8 +37,8 @@ package:
         rundir=os.path.join(rundir, "rundir"))
     runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
 
-    task = builder.mkTaskNode("foo.entry")
+    t1 = builder.mkTaskNode("foo.entry", "t1")
 
-    output = asyncio.run(runner.run(task))
+    output = asyncio.run(runner.run(t1))
 
     pass

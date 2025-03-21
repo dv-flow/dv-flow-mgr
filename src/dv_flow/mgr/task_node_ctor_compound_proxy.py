@@ -15,7 +15,7 @@ TaskParamsCtor = Callable[[object], Any]
 @dc.dataclass
 class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
     """Task has a 'uses' clause, so we delegate creation of the node"""
-    uses : TaskNodeCtor
+    uses : TaskNodeCtor = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNodeCtorCompoundProxy")
 

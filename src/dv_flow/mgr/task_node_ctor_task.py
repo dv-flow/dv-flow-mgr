@@ -32,6 +32,7 @@ from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
 from .param import Param
 from .task_node import TaskNode
+from .task_node_leaf import TaskNodeLeaf
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_def_base import TaskNodeCtorDefBase
 
@@ -43,7 +44,12 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
         if srcdir is None:
             srcdir = self.srcdir
 
-        node = TaskNode(name, srcdir, params, self.task, needs=needs)
+        node = TaskNodeLeaf(
+            name=name, 
+            srcdir=srcdir, 
+            params=params, 
+            task=self.task,
+            needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
         node.task = self.task

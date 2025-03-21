@@ -34,7 +34,11 @@ from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .param_def import ParamDef
-from .task_node import TaskNodeCtor, TaskNodeCtorProxy, TaskNodeCtorTask
+from .task_node_ctor import TaskNodeCtor
+from .task_node_ctor_proxy import TaskNodeCtorProxy
+from .task_node_ctor_task import TaskNodeCtorTask
+from .task_node_ctor_compound import TaskNodeCtorCompound
+from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
 from .task_ctor import TaskCtor
 from .task_def import TaskDef, TaskSpec
 from .std.task_null import TaskNull, TaskNullParams
@@ -146,13 +150,14 @@ class PackageDef(BaseModel):
     def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
         self._log.debug("--> %s::mkTaskCtor %s (srcdir: %s)" % (self.name, task.name, srcdir))
 
-
         if len(task.tasks) > 0:
             # Compound task
-            pass
+            ctor = self._mkCompoundTaskCtor(session, task, srcdir, tasks_m)
         else:
             # Leaf task
-            pass
+            ctor = self._mkLeafTaskCtor(session, task, srcdir, tasks_m)
+        
+        return ctor
 
     
     def _mkLeafTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
@@ -203,18 +208,6 @@ class PackageDef(BaseModel):
             if not hasattr(mod, clsname):
                 raise Exception("Method %s not found in module %s" % (clsname, modname))
             callable = getattr(mod, clsname)
-        elif len(task.tasks) > 0:
-            # Compound task
-            self._log.debug("Use Compound implementation")
-            ctor_t = TaskNodeCtor(
-                name=fullname,
-                srcdir=srcdir,
-                passthrough=passthrough,
-                consumes=consumes,
-                needs=needs,
-                tasks=[])
-            for t in task.tasks:
-                ctor_t.tasks.append(self.mkTaskCtor(session, t, srcdir, tasks_m))
 
         # Determine if we need to use a new 
         paramT = self._getParamT(session, task, base_params)
@@ -251,7 +244,60 @@ class PackageDef(BaseModel):
 
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
-    
+
+    def _mkCompoundTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+        self._log.debug("--> _mkCompoundTaskCtor")
+        base_ctor_t : TaskCtor = None
+        ctor_t : TaskCtor = None
+        base_params : BaseModel = None
+        callable = None
+        passthrough = task.passthrough
+        consumes = [] if task.consumes is None else task.consumes.copy()
+        needs = [] if task.needs is None else task.needs.copy()
+        fullname = self.name + "." + task.name
+
+        # Determine if we need to use a new 
+        paramT = self._getParamT(session, task, base_params)
+
+        if task.uses is not None:
+            self._log.debug("Uses: %s" % task.uses)
+            base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
+            base_params = base_ctor_t.mkTaskParams()
+
+            # Once we have passthrough, we can't turn it off
+            passthrough |= base_ctor_t.passthrough
+            consumes.extend(base_ctor_t.consumes)
+
+            if base_ctor_t is None:
+                self._log.error("Failed to load task ctor %s" % task.uses)
+
+            ctor_t = TaskNodeCtorCompoundProxy(
+                name=fullname,
+                srcdir=srcdir,
+                paramT=paramT,
+                passthrough=passthrough,
+                consumes=consumes,
+                needs=needs,
+                task_def=task,
+                uses=base_ctor_t)
+        else:
+            self._log.debug("No 'uses' specified")
+            ctor_t = TaskNodeCtorCompound(
+                name=fullname,
+                srcdir=srcdir,
+                paramT=paramT,
+                passthrough=passthrough,
+                consumes=consumes,
+                needs=needs,
+                task_def=task)
+
+        for t in task.tasks:
+            ctor_t.tasks.append(self.mkTaskCtor(session, t, srcdir, tasks_m))
+
+        
+        self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
+        return ctor_t
+
     def _getParamT(self, session, task, base_t : BaseModel):
         self._log.debug("--> _getParamT %s" % task.fullname)
         # Get the base parameter type (if available)

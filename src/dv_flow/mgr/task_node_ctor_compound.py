@@ -37,17 +37,21 @@ TaskParamsCtor = Callable[[object], Any]
 @dc.dataclass
 class TaskNodeCtorCompound(TaskNodeCtor):
     task_def : TaskDef
+    tasks : List[TaskNodeCtor] = dc.field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskCtor")
 
-    def mkTask(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
+    def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
         """Creates a task object without a base task"""
         if srcdir is None:
             srcdir = self.srcdir
 
-        node = TaskNodeCompound(name=name, srcdir=srcdir)
+        node = TaskNodeCompound(
+            name=name, 
+            srcdir=srcdir,
+            params=params)
 
-        self._buildSubGraph(node, None)
+        self._buildSubGraph(node)
 
         if self.uses is not None:
             return self.uses.mkTask(name, srcdir)

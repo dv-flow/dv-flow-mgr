@@ -32,6 +32,7 @@ from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
 from .param import Param
 from .task_node import TaskNode
+from .task_node_leaf import TaskNodeLeaf
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_def_base import TaskNodeCtorDefBase
 
@@ -39,10 +40,13 @@ from .task_node_ctor_def_base import TaskNodeCtorDefBase
 class TaskNodeCtorWrapper(TaskNodeCtor):
     T : Any
 
-
-
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> TaskNode:
-        node = TaskNode(name, srcdir, params, self.T, needs=needs)
+        node = TaskNodeLeaf(
+            name=name, 
+            srcdir=srcdir, 
+            params=params, 
+            task=self.T, 
+            needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
         return node
@@ -85,6 +89,7 @@ def task(paramT,passthrough=False,consumes=None):
             paramT=paramT,
             passthrough=passthrough,
             consumes=consumes,
+            needs=[],
             T=T)
         return ctor
     return wrapper

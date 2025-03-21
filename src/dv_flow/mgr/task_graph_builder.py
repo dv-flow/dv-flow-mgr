@@ -26,7 +26,7 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
 from .task import Task
-from .task_node import TaskNodeCtor
+from .task_node_ctor import TaskNodeCtor
 from typing import Dict, List, Union
 
 @dc.dataclass
@@ -145,6 +145,7 @@ class TaskGraphBuilder(object):
             raise Exception("ctor %s returned None for params" % str(ctor_t))
 
         task = ctor_t.mkTaskNode(
+            builder=self,
             params=params,
             name=task,
             needs=needs)
@@ -238,13 +239,17 @@ class TaskGraphBuilder(object):
 
 
         ctor = self.getTaskCtor(task_t)
-        self._logger.debug("ctor: %s" % ctor.name)
-        params = ctor.mkTaskParams(kwargs)
-        ret = ctor.mkTaskNode(
-            params=params,
-            name=name, 
-            srcdir=srcdir, 
-            needs=needs)
+        if ctor is not None:
+            self._logger.debug("ctor: %s" % ctor.name)
+            params = ctor.mkTaskParams(kwargs)
+            ret = ctor.mkTaskNode(
+                self,
+                params=params,
+                name=name, 
+                srcdir=srcdir, 
+                needs=needs)
+        else:
+            raise Exception("Failed to find ctor for task %s" % task_t)
         self._logger.debug("<-- mkTaskNode: %s" % task_t)
         return ret
         
@@ -275,3 +280,5 @@ class TaskGraphBuilder(object):
 
         self._logger.debug("--> getTaskCtor %s" % spec.name)
         return ctor
+    
+

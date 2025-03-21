@@ -45,8 +45,10 @@ class TaskNodeCtor(object):
     paramT : Any
     passthrough : bool
     consumes : List[Any]
+    needs : List[str]
 
     def __call__(self, 
+                 builder=None,
                  name=None,
                  srcdir=None,
                  params=None,
@@ -59,6 +61,7 @@ class TaskNodeCtor(object):
             params = self.mkTaskParams(kwargs)
         
         node = self.mkTaskNode(
+            builder=builder,
             srcdir=srcdir, 
             params=params, 
             name=name, 

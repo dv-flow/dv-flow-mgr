@@ -7,8 +7,7 @@ from pydantic import BaseModel
 from dv_flow.mgr.param import Param, ParamT
 from dv_flow.mgr.task import Task
 from dv_flow.mgr.task_data import TaskDataResult, TaskMarker, TaskMarkerLoc
-from dv_flow.mgr.task_node import task as t_decorator
-from dv_flow.mgr.task_node import task
+from dv_flow.mgr import task
 from dv_flow.mgr.task_runner import SingleTaskRunner, TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
 

@@ -21,18 +21,22 @@
 #****************************************************************************
 import dataclasses as dc
 from .task_node import TaskNode
+from .task_node_leaf import TaskNodeLeaf
 from .task_data import TaskDataResult, TaskDataInput, TaskDataOutput
 from .task_runner import TaskRunner
 from typing import Any, List
 
 @dc.dataclass
 class TaskNodeCompound(TaskNode):
-    """A Compound task node *is* the 'out' node in the subgraph"""
+    """A Compound task node is the 'out' node in the subgraph"""
     tasks : List[TaskNode] = dc.field(default_factory=list)
     input : TaskNode = None
 
     def __post_init__(self):
-        self.input = TaskNode(self.name + ".in")
+        self.input = TaskNodeLeaf(
+            self.name + ".in",
+            srcdir=self.srcdir,
+            params=None)
         return super().__post_init__()
 
     async def do_run(self, 
