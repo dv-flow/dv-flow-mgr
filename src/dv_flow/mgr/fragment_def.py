@@ -34,7 +34,7 @@ class FragmentDef(BaseModel):
     fragments: List[str] = dc.Field(default_factory=list)
     types : List[TypeDef] = dc.Field(default_factory=list)
 
-    basedir : str = None
+    _basedir : str = None
 
     def getTask(self, name : str) -> 'TaskDef':
         for t in self.tasks:

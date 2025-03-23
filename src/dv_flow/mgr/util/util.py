@@ -21,7 +21,7 @@
 #****************************************************************************
 import os
 import yaml
-from .package_def import PackageDef
+from ..package_def import PackageDef
 
 def loadProjPkgDef(path):
     """Locates the project's flow spec and returns the PackageDef"""

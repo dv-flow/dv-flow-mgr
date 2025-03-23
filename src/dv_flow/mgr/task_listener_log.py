@@ -22,6 +22,7 @@
 import dataclasses as dc
 from datetime import datetime
 from rich.console import Console
+from .task_data import SeverityE
 
 @dc.dataclass
 class TaskListenerLog(object):
@@ -52,13 +53,18 @@ class TaskListenerLog(object):
 
                 sev_pref_m = {
                     "info": "[blue]I[/blue]",
+                    SeverityE.Info: "[blue]I[/blue]",
                     "warn": "[yellow]W[/yellow]",
+                    SeverityE.Warning: "[yellow]W[/yellow]",
                     "error": "[red]E[/red]",
+                    SeverityE.Error: "[red]E[/red]",
                 }
                 for m in task.result.markers:
                     severity_s = str(m.severity)
 
-                    if severity_s in sev_pref_m.keys():
+                    if m.severity in sev_pref_m.keys():
+                        sev_pref = sev_pref_m[m.severity]
+                    elif severity_s in sev_pref_m.keys():
                         sev_pref = sev_pref_m[severity_s]
                     else:
                         sev_pref = ""

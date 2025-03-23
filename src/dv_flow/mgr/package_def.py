@@ -67,15 +67,33 @@ class PackageDef(BaseModel):
         default_factory=list, alias="with",
         description="List of package parameters to set")
 
-    fragment_l : List['FragmentDef'] = dc.Field(default_factory=list, exclude=True)
-    subpkg_m : Dict[str,'PackageDef'] = dc.Field(default_factory=dict, exclude=True)
+    _fragment_l : List['FragmentDef'] = []
+    _subpkg_m : Dict[str,'PackageDef'] = {}
 
 #    import_m : Dict['PackageSpec','Package'] = dc.Field(default_factory=dict)
 
-    basedir : str = None
+    _basedir : str = None
     _log : ClassVar = logging.getLogger("PackageDef")
 
+    @property
+    def fragment_l(self):
+        return self._fragment_l
+    
+    @property
+    def subpkg_m(self):
+        return self._subpkg_m
+
+    @property
+    def basedir(self):
+        return self._basedir
+    
+    @basedir.setter
+    def basedir(self, v):
+        self._basedir = v
+
     def __post_init__(self):
+        self._fragment_l = []
+        self._subpkg_m = {}
         for t in self.tasks:
             t.fullname = self.name + "." + t.name
 
@@ -95,13 +113,13 @@ class PackageDef(BaseModel):
         for task in self.tasks:
             if task.name in tasks_m.keys():
                 raise Exception("Duplicate task %s" % task.name)
-            tasks_m[task.name] = (task, self.basedir, ) # We'll add a TaskCtor later
+            tasks_m[task.name] = (task, self._basedir, ) # We'll add a TaskCtor later
 
-        for frag in self.fragment_l:
+        for frag in self._fragment_l:
             for task in frag.tasks:
                 if task.name in tasks_m.keys():
                     raise Exception("Duplicate task %s" % task.name)
-                tasks_m[task.name] = (task, frag.basedir, ) # We'll add a TaskCtor later
+                tasks_m[task.name] = (task, frag._basedir, ) # We'll add a TaskCtor later
 
         # Now we have a unified map of the tasks declared in this package
         for name in list(tasks_m.keys()):
@@ -196,14 +214,14 @@ class PackageDef(BaseModel):
 
             try:
                 if modname not in sys.modules:
-                    if self.basedir not in sys.path:
-                        sys.path.append(self.basedir)
+                    if self._basedir not in sys.path:
+                        sys.path.append(self._basedir)
                     mod = importlib.import_module(modname)
                 else:
                     mod = sys.modules[modname]
             except ModuleNotFoundError as e:
-                raise Exception("Failed to import module %s (basedir=%s): %s" % (
-                    modname, self.basedir, str(e)))
+                raise Exception("Failed to import module %s (_basedir=%s): %s" % (
+                    modname, self._basedir, str(e)))
                 
             if not hasattr(mod, clsname):
                 raise Exception("Method %s not found in module %s" % (clsname, modname))
@@ -396,10 +414,10 @@ class PackageDef(BaseModel):
             except Exception as e:
                 PackageDef._log.error("Failed to load package from %s" % root)
                 raise e
-            pkg.basedir = os.path.dirname(root)
+            pkg._basedir = os.path.dirname(root)
 
 #            for t in pkg.tasks:
-#                t.basedir = os.path.dirname(root)
+#                t._basedir = os.path.dirname(root)
 
         if exp_pkg_name is not None:
             if exp_pkg_name != pkg.name:
@@ -417,7 +435,7 @@ class PackageDef(BaseModel):
             PackageDef._loadFragmentSpec(pkg, spec, file_s)
 
         if len(pkg.imports) > 0:
-            cls._log.info("Loading imported packages (basedir=%s)" % pkg.basedir)
+            cls._log.info("Loading imported packages (_basedir=%s)" % pkg._basedir)
         for imp in pkg.imports:
             if type(imp) == str:
                 imp_path = imp
@@ -429,8 +447,8 @@ class PackageDef(BaseModel):
             cls._log.info("Loading imported package %s" % imp_path)
 
             if not os.path.isabs(imp_path):
-                cls._log.debug("basedir: %s ; imp_path: %s" % (pkg.basedir, imp_path))
-                imp_path = os.path.join(pkg.basedir, imp_path)
+                cls._log.debug("_basedir: %s ; imp_path: %s" % (pkg._basedir, imp_path))
+                imp_path = os.path.join(pkg._basedir, imp_path)
             
             # Search down the tree looking for a flow.dv file
             if os.path.isdir(imp_path):
@@ -459,7 +477,7 @@ class PackageDef(BaseModel):
                 
             sub_pkg = PackageDef.load(imp_path)
             cls._log.info("Loaded imported package %s" % sub_pkg.name)
-            pkg.subpkg_m[sub_pkg.name] = sub_pkg
+            pkg._subpkg_m[sub_pkg.name] = sub_pkg
 
         file_s.pop()
 
@@ -477,10 +495,10 @@ class PackageDef(BaseModel):
         if "package" not in doc.keys():
             raise Exception("Missing 'package' key in %s" % root)
         pkg = PackageDef(**(doc["package"]))
-        pkg.basedir = None
+        pkg._basedir = None
 
 #            for t in pkg.tasks:
-#                t.basedir = os.path.dirname(root)
+#                t._basedir = os.path.dirname(root)
 
         if exp_pkg_name is not None:
             if exp_pkg_name != pkg.name:
@@ -497,10 +515,10 @@ class PackageDef(BaseModel):
         # - File path
         # - Directory path
 
-        if os.path.isfile(os.path.join(pkg.basedir, spec)):
+        if os.path.isfile(os.path.join(pkg._basedir, spec)):
             PackageDef._loadFragmentFile(pkg, spec, file_s)
-        elif os.path.isdir(os.path.join(pkg.basedir, spec)):
-            PackageDef._loadFragmentDir(pkg, os.path.join(pkg.basedir, spec), file_s)
+        elif os.path.isdir(os.path.join(pkg._basedir, spec)):
+            PackageDef._loadFragmentDir(pkg, os.path.join(pkg._basedir, spec), file_s)
         else:
             raise Exception("Fragment spec %s not found" % spec)
 
@@ -524,7 +542,7 @@ class PackageDef(BaseModel):
             if "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))
-                frag.basedir = os.path.dirname(file)
-                pkg.fragment_l.append(frag)
+                frag._basedir = os.path.dirname(file)
+                pkg._fragment_l.append(frag)
             else:
                 print("Warning: file %s is not a fragment" % file)

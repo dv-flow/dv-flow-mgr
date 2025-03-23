@@ -23,15 +23,20 @@ from typing import Any, List, Union
 from pydantic import BaseModel, Field
 
 class ListType(BaseModel):
-    item : Union[str, 'ComplexType']
+#    item : Union[str, 'ComplexType']
+    item : Union[str, Any]
 
 class MapType(BaseModel):
-    key : Union[str, 'ComplexType']
-    item : Union[str, 'ComplexType']
+#    key : Union[str, 'ComplexType']
+#    item : Union[str, 'ComplexType']
+    key : Union[str, Any]
+    item : Union[str, Any]
 
 class ComplexType(BaseModel):
     list : Union[ListType, None] = None
     map : Union[MapType, None] = None
+#    list : Union[Any, None] = None
+#    map : Union[Any, None] = None
 
 class ParamDef(BaseModel):
     doc : str = None
