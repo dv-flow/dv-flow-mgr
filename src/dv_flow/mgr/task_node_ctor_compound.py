@@ -72,9 +72,12 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             needs = []
             for n in t.needs:
                 need_name = "%s.%s" % (builder.package().name, n)
-                task = builder.findTask(need_name)
+                task = builder.findTask(n)
                 if task is None:
-                    raise Exception("Failed to find task %s" % need_name)
+                    task = builder.findTask(need_name)
+
+                if task is None:
+                    raise Exception("Failed to find task %s (%s)" % (n, need_name))
                 needs.append(task)
             sn = t.mkTaskNode(
                 builder=builder, 

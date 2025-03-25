@@ -147,7 +147,7 @@ class TaskGraphBuilder(object):
         self._compound_task_ctxt_s[-1].uses_s.pop()
 
     def is_compound_uses(self):
-        return len(self._compound_task_ctxt_s[-1].uses_s) != 0
+        return len(self._compound_task_ctxt_s) > 0 and len(self._compound_task_ctxt_s[-1].uses_s) != 0
 
     def addTask(self, name, task : TaskNode):
         self._logger.debug("--> addTask: %s" % name)
@@ -235,7 +235,7 @@ class TaskGraphBuilder(object):
             builder=self,
             params=params,
             name=task,
-            needs=None)
+            needs=needs)
         task.rundir = rundir
         
         self._task_m[task.name] = task

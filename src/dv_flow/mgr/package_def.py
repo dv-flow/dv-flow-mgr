@@ -274,8 +274,6 @@ class PackageDef(BaseModel):
         needs = [] if task.needs is None else task.needs.copy()
         fullname = self.name + "." + task.name
 
-        # Determine if we need to use a new 
-        paramT = self._getParamT(session, task, base_params)
 
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses)
@@ -289,6 +287,10 @@ class PackageDef(BaseModel):
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
 
+        # Determine if we need to use a new 
+        paramT = self._getParamT(session, task, base_params)
+
+        if base_ctor_t is not None:
             ctor_t = TaskNodeCtorCompoundProxy(
                 name=fullname,
                 srcdir=srcdir,

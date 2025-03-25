@@ -151,3 +151,44 @@ package:
         os.path.join(rundir, "graph.dot"))
 
     output = asyncio.run(runner.run(t1))
+
+def test_uses_leaf(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: entry
+      uses: std.CreateFile
+      rundir: inherit
+      with:
+        filename: hello.txt
+        content: |
+          Hello World
+      tasks:
+        - name: GetFiles
+          uses: std.FileSet
+          needs: [super]
+          with:
+            type: textFile
+            base: ${{ rundir }}
+            include: "*.txt"
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    TaskGraphDotWriter().write(
+        t1, 
+        os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))

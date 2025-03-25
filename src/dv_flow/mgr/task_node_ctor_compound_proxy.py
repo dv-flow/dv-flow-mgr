@@ -25,30 +25,40 @@ class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
         if srcdir is None:
             srcdir = self.srcdir
 
-        node = TaskNodeCompound(
-            name=name, 
-            srcdir=srcdir,
-            params=params)
 
         is_compound_uses = builder.is_compound_uses()
 
         if not is_compound_uses:
-            # 'uses' tasks should see the same 'in'
+            # We're at the leaf level
+            node = TaskNodeCompound(
+                name=name, 
+                srcdir=srcdir,
+                params=params)
+
             builder.enter_compound(node)
             builder.addTask("in", node.input)
         else:
-            builder.enter_compound_uses()
+            node = None
+
+        builder.enter_compound_uses()
+
+        # Construct the base-task node
+        base_node = self.uses.mkTaskNode(
+            builder=builder, 
+            params=params, 
+            srcdir=srcdir, 
+            name=name, 
+            needs=needs)
+        builder.addTask("super", base_node)
 
         # Build 'uses' node
-        need_m = {}
-        self._buildSubGraph(builder, node, need_m)
+        self._buildSubGraph(builder, node)
 
-        builder.leave_compound(node)
+        builder.leave_compound_uses()
 
         if not is_compound_uses:
             builder.leave_compound(node)
-        else:
-            builder.leave_compound_uses()
+
 
         return node
     

@@ -21,6 +21,7 @@
 #****************************************************************************
 import argparse
 import logging
+from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 
 def get_parser():
@@ -35,6 +36,16 @@ def get_parser():
     #                     help="Enable verbose output",
     #                     action="store_true")
     subparsers = parser.add_subparsers(required=True)
+
+    graph_parser = subparsers.add_parser('graph', 
+                                         help='Generates the graph of a task')
+    graph_parser.add_argument("task", nargs="?", help="task to graph")
+    graph_parser.add_argument("-f", "--format", help="Specifies the output format",
+                              default="dot")
+    graph_parser.add_argument("-o", "--output", 
+                              help="Specifies the output file",
+                              default="-")
+    graph_parser.set_defaults(func=CmdGraph())
 
     run_parser = subparsers.add_parser('run', help='run a flow')
     run_parser.add_argument("tasks", nargs='*', help="tasks to run")
