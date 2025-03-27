@@ -89,7 +89,7 @@ class TaskDef(BaseModel):
     rundir : RundirE = dc.Field(
         default=RundirE.Unique,
         description="Specifies handling of this tasks's run directory")
-    passthrough: PassthroughE = dc.Field(
+    passthrough: Union[bool, PassthroughE] = dc.Field(
         default=PassthroughE.No,
         description="Specifies whether this task should pass its inputs to its output")
     consumes : List[Any] = dc.Field(
