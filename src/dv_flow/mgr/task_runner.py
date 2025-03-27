@@ -27,7 +27,7 @@ import dataclasses as dc
 import logging
 from datetime import datetime
 from toposort import toposort
-from typing import Any, Callable, ClassVar, List, Tuple, Union
+from typing import Any, Callable, ClassVar, Dict, List, Set, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node import TaskNode, RundirE
 
@@ -92,11 +92,7 @@ class TaskSetRunner(TaskRunner):
 
 
         # First, build a depedency map
-        tasks = task if isinstance(task, list) else [task]
-        dep_m = {}
-        self._anon_tid = 1
-        for t in tasks:
-            self._buildDepMap(dep_m, t)
+        dep_m = self.buildDepMap(task)
 
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug("Deps:")
@@ -191,6 +187,15 @@ class TaskSetRunner(TaskRunner):
             return list(t.output for t in task)
         else:
             return task.output
+        
+    def buildDepMap(self, task : Union[TaskNode, List[TaskNode]]) -> Dict[TaskNode, Set[TaskNode]]:
+        tasks = task if isinstance(task, list) else [task]
+        dep_m = {}
+        self._anon_tid = 1
+        for t in tasks:
+            self._buildDepMap(dep_m, t)
+
+        return dep_m
 
     def _buildDepMap(self, dep_m, task : TaskNode):
         if task.name is None:

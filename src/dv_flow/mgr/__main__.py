@@ -23,6 +23,7 @@ import argparse
 import logging
 from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
+from .cmds.cmd_show import CmdShow
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -55,6 +56,17 @@ def get_parser():
                         help="Specifies degree of parallelism. Uses all cores by default",
                         type=int, default=-1)
     run_parser.set_defaults(func=CmdRun())
+
+    show_parser = subparsers.add_parser('show', 
+                                        help='Display information about a task or tasks')
+    show_parser.add_argument("task", nargs='?', help="task to show")
+    show_parser.add_argument("-a", "--all",
+                        action="store_true",
+                        help="Shows all tasks required for the subject to run")
+    show_parser.add_argument("-v", "--verbose",
+                        action="store_true",
+                        help="Shows additional information about tasks")
+    show_parser.set_defaults(func=CmdShow())
 
     return parser
 
