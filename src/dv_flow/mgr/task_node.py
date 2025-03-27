@@ -79,6 +79,7 @@ class TaskNode(object):
         self._log.debug("--> _matches: %s params=%s consumes=%s" % (
             self.name, str(params), str(consumes)))
         consumed = False
+        self._log.debug("params: %s" % str(params))
         for c in consumes:
             # All matching attribute keys must have same value
             match = False
@@ -91,6 +92,7 @@ class TaskNode(object):
                     else:
                         match = False
                         break
+            self._log.debug("match: %s" % match)
             if match:
                 consumed = True
                 break

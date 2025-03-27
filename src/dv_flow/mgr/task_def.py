@@ -39,6 +39,12 @@ class RundirE(enum.Enum):
     Unique = "unique"
     Inherit = "inherit"
 
+class PassthroughE(enum.Enum):
+    No = "no"
+    All = "all"
+    Unused = "unused"
+
+
 class StrategyDef(BaseModel):
     matrix : Dict[str,List[Any]] = dc.Field(
         default_factory=dict,
@@ -83,8 +89,8 @@ class TaskDef(BaseModel):
     rundir : RundirE = dc.Field(
         default=RundirE.Unique,
         description="Specifies handling of this tasks's run directory")
-    passthrough: bool = dc.Field(
-        default=False,
+    passthrough: PassthroughE = dc.Field(
+        default=PassthroughE.No,
         description="Specifies whether this task should pass its inputs to its output")
     consumes : List[Any] = dc.Field(
         default_factory=list,
