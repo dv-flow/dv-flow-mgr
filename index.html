@@ -12,14 +12,6 @@
     <script src="_static/documentation_options.js?v=5929fcd5"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs"></script>
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.4/dist/mermaid-layout-elk.esm.min.mjs"></script>
-    <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs";import elkLayouts from "https://cdn.jsdelivr.net/npm/@mermaid-js/layout-elk@0.1.4/dist/mermaid-layout-elk.esm.min.mjs";mermaid.registerLayoutLoaders(elkLayouts);mermaid.initialize({startOnLoad:false});</script>
-    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-    <script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.2.0/dist/mermaid.esm.min.mjs";
-window.addEventListener("load", () => mermaid.run());
-</script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Quickstart" href="quickstart.html" />
@@ -42,19 +34,12 @@ window.addEventListener("load", () => mermaid.run());
             
   <section id="dv-flow-manager">
 <h1>DV Flow Manager<a class="headerlink" href="#dv-flow-manager" title="Link to this heading">¶</a></h1>
-<p>DV Flow Manager provides a “make for silicon engineering”: a specification
-for capturing design and verification (DV) tasks and dataflow in a way that
-enables concurrent execution and efficient avoidance of redundant work.</p>
-<pre  class="mermaid">
-        flowchart TD
-  A[IP Fileset] --&gt; B[Testbench]
-  C[VIP Fileset] --&gt; D[Precompile]
-  D --&gt; B
-  B --&gt; E[SimImage]
-  E --&gt; F[Test1]
-  E --&gt; G[Test2]
-  E --&gt; H[Test3]
-    </pre><div class="toctree-wrapper compound">
+<p>DV Flow Manager is an execution engine for the DV Flow build
+specification. This YAML-based format captures design and verification
+(DV) tasks and dataflow in a way that enables concurrent execution and
+efficient avoidance of redundant work.
+You can learn more about the input specification &lt;here&gt;.</p>
+<div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
@@ -62,22 +47,18 @@ enables concurrent execution and efficient avoidance of redundant work.</p>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#your-first-flow">Your First Flow</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#mysection">DEF</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#abc">DEF</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#meanwhile-in-silicon-engineering-land">Meanwhile, in Silicon Engineering Land…</a></li>
-<li class="toctree-l2"><a class="reference internal" href="intro.html#key-concepts">Key Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cmdref.html#dv_flow.mgr.__main__-get_parser-named-arguments">Named Arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cmdref.html#Sub-commands">Sub-commands</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="stdlib.html">Standard Library</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="stdlib.html#mysection">DEF</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pytask_api.html#taskdatainput">TaskDataInput</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pytask_api.html#taskdataitem">TaskDataItem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pytask_api.html#taskdataresult">TaskDataResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pytask_api.html#taskmarker">TaskMarker</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="reference.html#file-root-elements">File Root Elements</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 </ul>
 </div>
 </section>
@@ -111,9 +92,7 @@ enables concurrent execution and efficient avoidance of redundant work.</p>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 </ul>
 

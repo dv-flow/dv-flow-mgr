@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Flow-Spec Reference" href="reference.html" />
+    <link rel="prev" title="Command reference" href="cmdref.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -42,6 +42,80 @@ This method is passed two parameters:</p>
 </ul>
 <p>The method must return a <cite>TaskDataResult</cite> object with the execution
 status of the task, result data, markers, and memento data.</p>
+<section id="taskdatainput">
+<h2>TaskDataInput<a class="headerlink" href="#taskdatainput" title="Link to this heading">¶</a></h2>
+<p>An object of type <cite>TaskDataInput</cite> is passed as the <cite>input</cite> parameter
+of the runner method.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskDataInput">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskDataInput</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">changed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">srcdir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rundir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memento</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskDataInput" title="Link to this definition">¶</a></dt>
+<dd><p>Input data to a task:</p>
+<ul class="simple">
+<li><p>name - name of the task</p></li>
+<li><p>changed - indicates whether any of this task’s dependencies have changed</p></li>
+<li><p>rundir - directory in which the task is to be run</p></li>
+<li><p>params - parameters to the task</p></li>
+<li><p>inputs - list of <cite>TaskDataItem</cite> that are consumed’ by this task</p></li>
+<li><p>memento - memento data previously returned by this task. None if no memento is available</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="taskdataitem">
+<h2>TaskDataItem<a class="headerlink" href="#taskdataitem" title="Link to this heading">¶</a></h2>
+<p>Data is passed between tasks via <cite>TaskDataItem</cite>-derived objects.
+Each task may produce 0 or more <cite>TaskDataItem</cite> objects as output.
+A task receives all the <cite>TaskDataItem</cite> objects produced by its
+dependencies.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskDataItem">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskDataItem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seq</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskDataItem" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for task data items</p>
+<ul class="simple">
+<li><p>type - Name of the data item type</p></li>
+<li><p>src - Name of the task that produced this item</p></li>
+<li><p>seq - Sequence number of the item within the task</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="taskdataresult">
+<h2>TaskDataResult<a class="headerlink" href="#taskdataresult" title="Link to this heading">¶</a></h2>
+<p>Task implementation methods must return an object of type
+<cite>TaskDataResult</cite>. This object contains key data about
+task execution.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskDataResult">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskDataResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">changed:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output:</span> <span class="pre">~typing.List[~typing.Any]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">memento:</span> <span class="pre">~typing.Any</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">markers:</span> <span class="pre">~typing.List[~dv_flow.mgr.task_data.TaskMarker]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskDataResult" title="Link to this definition">¶</a></dt>
+<dd><p>Result data from a task:</p>
+<ul class="simple">
+<li><p>changed - indicates whether the task modified its result data</p></li>
+<li><p>output - list of output parameter sets</p></li>
+<li><p>memento - memento data to be passed to the next invocation of the task</p></li>
+<li><p>markers - list of markers produced by the task</p></li>
+<li><p>status - status code (0=success, non-zero=failure)</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="taskmarker">
+<h2>TaskMarker<a class="headerlink" href="#taskmarker" title="Link to this heading">¶</a></h2>
+<p>Tasks may produce markers to highlight key information to the
+user. A marker is typically a pointer to a file location with
+an associated severity level (error, warning, info).</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskMarker">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskMarker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SeverityE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskMarkerLoc" title="dv_flow.mgr.task_data.TaskMarkerLoc"><span class="pre">TaskMarkerLoc</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskMarker" title="Link to this definition">¶</a></dt>
+<dd><p>Captures marker data produced by a task.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskMarkerLoc">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskMarkerLoc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">line</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskMarkerLoc" title="Link to this definition">¶</a></dt>
+<dd><p>Captures the source location of a marker</p>
+</dd></dl>
+
+</section>
 </section>
 
 
@@ -73,17 +147,21 @@ status of the task, result data, markers, and memento data.</p>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="reference.html">Flow-Spec Reference</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#taskdatainput">TaskDataInput</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#taskdataitem">TaskDataItem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#taskdataresult">TaskDataResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#taskmarker">TaskMarker</a></li>
+</ul>
+</li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="reference.html" title="previous chapter">Flow-Spec Reference</a></li>
+      <li>Previous: <a href="cmdref.html" title="previous chapter">Command reference</a></li>
   </ul></li>
 </ul>
 </div>
