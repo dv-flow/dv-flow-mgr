@@ -25,7 +25,9 @@ from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='dv_flow_mgr')
+    parser = argparse.ArgumentParser(
+        description='dv_flow_mgr',
+        prog='dfm')
     # parser.add_argument("-d", "--debug", 
     #                     help="Enable debug",
     #                     action="store_true")

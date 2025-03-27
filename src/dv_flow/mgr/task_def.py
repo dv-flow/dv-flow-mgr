@@ -24,7 +24,6 @@ import enum
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
-from .task import Task
 from .task_output import TaskOutput
 
 @dc.dataclass

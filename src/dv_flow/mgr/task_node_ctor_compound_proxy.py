@@ -22,9 +22,9 @@ class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
 
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> 'TaskNode':
         """Creates a task object without a base task"""
+        self._log.debug("--> mkTaskNode: %s", name)
         if srcdir is None:
             srcdir = self.srcdir
-
 
         is_compound_uses = builder.is_compound_uses()
 
@@ -47,8 +47,8 @@ class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
             builder=builder, 
             params=params, 
             srcdir=srcdir, 
-            name=name, 
-            needs=needs)
+            name=name + ".super", 
+            needs=[node.input])
         builder.addTask("super", base_node)
 
         # Build 'uses' node
@@ -60,5 +60,6 @@ class TaskNodeCtorCompoundProxy(TaskNodeCtorCompound):
             builder.leave_compound(node)
 
 
+        self._log.debug("<-- mkTaskNode: %s", name)
         return node
     

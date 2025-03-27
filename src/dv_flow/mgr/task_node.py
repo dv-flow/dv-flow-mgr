@@ -27,9 +27,7 @@ import pydantic.dataclasses as pdc
 import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
-from .task_params_ctor import TaskParamsCtor
-from .param_ref_eval import ParamRefEval
+from .task_data import TaskDataOutput, TaskDataResult
 from .param import Param
 
 class RundirE(enum.Enum):
@@ -43,7 +41,7 @@ class TaskNode(object):
     name : str
     srcdir : str
     # This can be the resolved parameters
-    params : TaskParamsCtor 
+    params : Any
 
     # Runtime fields -- these get populated during execution
     changed : bool = False

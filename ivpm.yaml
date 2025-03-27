@@ -21,6 +21,8 @@ package:
       src: pypi
     - name: Sphinx
       src: pypi
+    - name: sphinx-argparse
+      src: pypi
     - name: sphinx-jsonschema
 #      src: pypi
       url: https://github.com/lnoor/sphinx-jsonschema.git

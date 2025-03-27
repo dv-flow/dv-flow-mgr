@@ -5,8 +5,7 @@ import dataclasses as dc
 import pydantic.dataclasses as pdc
 from pydantic import BaseModel
 from dv_flow.mgr.param import Param, ParamT
-from dv_flow.mgr.task import Task
-from dv_flow.mgr.task_data import TaskDataResult, TaskMarker, TaskParameterSet, TaskDataItem
+from dv_flow.mgr.task_data import TaskDataResult, TaskMarker, TaskDataItem
 from dv_flow.mgr import task
 from dv_flow.mgr.task_runner import SingleTaskRunner, TaskSetRunner
 

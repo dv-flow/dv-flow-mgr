@@ -46,11 +46,14 @@ class TaskNodeLeaf(TaskNode):
         in_params_m = {}
         added_srcs = set()
         for need,block in self.needs:
+            self._log.debug("Process need=%s block=%s" % (need.name, block))
             if not block:
                 for p in need.output.output:
+
                     # Avoid adding parameters from a single task more than once
-                    if p.src not in added_srcs:
-                        added_srcs.add(p.src)
+                    key = (p.src, p.seq)
+                    if key not in added_srcs:
+                        added_srcs.add(key)
                         if p.src not in in_params_m.keys():
                             in_params_m[p.src] = []
                         in_params_m[p.src].append(p)
@@ -112,8 +115,9 @@ class TaskNodeLeaf(TaskNode):
         self._log.debug("<-- Call task method %s" % str(self.task))
 
         output=self.result.output.copy()
-        for out in output:
+        for i,out in enumerate(output):
             out.src = self.name
+            out.seq = i
 
         self._log.debug("output[1]: %s" % str(output))
 
@@ -124,7 +128,7 @@ class TaskNodeLeaf(TaskNode):
         if self.passthrough:
             self._log.debug("passthrough: %s" % self.name)
 
-            if self.consumes is None and len(self.consumes):
+            if self.consumes is None or len(self.consumes) == 0:
                 self._log.debug("Propagating all input parameters to output")
                 for need,block in self.needs:
                     if not block:

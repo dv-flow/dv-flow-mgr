@@ -31,9 +31,6 @@ from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
 from .task_node_compound import TaskNodeCompound
 
-# TaskParamsCtor accepts an evaluation context and returns a task parameter object
-TaskParamsCtor = Callable[[object], Any]
-
 @dc.dataclass
 class TaskNodeCtorCompound(TaskNodeCtor):
     task_def : TaskDef
@@ -78,6 +75,9 @@ class TaskNodeCtorCompound(TaskNodeCtor):
 
                 if task is None:
                     raise Exception("Failed to find task %s (%s)" % (n, need_name))
+                self._log.debug("Add %s as dependency of %s" % (
+                    task.name, t.name
+                ))
                 needs.append(task)
             sn = t.mkTaskNode(
                 builder=builder, 
@@ -86,6 +86,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                 needs=needs)
             nodes.append(sn)
             builder.addTask(t.name, sn)
+        in_t = builder.findTask("in")
 
         
         for n in nodes:
@@ -94,7 +95,8 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             # it takes input from that node, and not the 'in' node
             has_ref = False
             for nt in n.needs:
-                if nt[0] in nodes:
+                self._log.debug("nt: %s %s" % (nt[0].name, str(n.needs)))
+                if nt[0] in nodes or nt[0] is in_t:
                     has_ref = True
                     break
             if not has_ref:

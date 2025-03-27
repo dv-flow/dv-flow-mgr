@@ -14,6 +14,7 @@ author = 'Matthew Ballance'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'sphinxarg.ext',
     'sphinx-jsonschema',
     'sphinxcontrib.mermaid',
     'sphinxcontrib-dv-flow'

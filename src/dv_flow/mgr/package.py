@@ -22,7 +22,7 @@
 import dataclasses as dc
 import logging
 from typing import Any, ClassVar, Dict
-from .task_ctor import TaskCtor
+from .task_node_ctor import TaskNodeCtor
 
 @dc.dataclass
 class Package(object):
@@ -30,11 +30,11 @@ class Package(object):
     params : Dict[str,Any] = dc.field(default_factory=dict)
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
-    tasks : Dict[str,TaskCtor] = dc.field(default_factory=dict)
+    tasks : Dict[str,TaskNodeCtor] = dc.field(default_factory=dict)
     types : Dict[str,Any] = dc.field(default_factory=dict)
     _log : ClassVar = logging.getLogger("Package")
 
-    def getTaskCtor(self, name : str) -> TaskCtor:
+    def getTaskCtor(self, name : str) -> TaskNodeCtor:
         self._log.debug("-- %s::getTaskCtor: %s" % (self.name, name))
         if name not in self.tasks.keys():
             raise Exception("Task %s not present in package %s" % (name, self.name))

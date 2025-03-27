@@ -48,20 +48,16 @@ class TaskMarker(BaseModel):
     severity : SeverityE
     loc : TaskMarkerLoc = dc.Field(default=None)
 
-class TaskParameterSet(BaseModel):
-    type : str = None
-    task : str = None # Name of the task that produced this param set
-    seq : int  = -1 # Order in which the param-set must appear
-
 class TaskDataInput(BaseModel):
     """
-    Input data to a task
-    - name - name of the task
-    - changed - indicates whether any of this task's dependencies have changed
-    - rundir - directory in which the task is to be run
-    - params - parameters to the task
-    - inputs - list of parameter sets 'consumed' by this task
-    - memento - memento data previously returned by this task. None if no memento is available
+    Input data to a task:
+
+    * name - name of the task
+    * changed - indicates whether any of this task's dependencies have changed
+    * rundir - directory in which the task is to be run
+    * params - parameters to the task
+    * inputs - list of `TaskDataItem` that are consumed' by this task
+    * memento - memento data previously returned by this task. None if no memento is available
     """
     name : str
     changed : bool
@@ -73,12 +69,13 @@ class TaskDataInput(BaseModel):
 
 class TaskDataResult(BaseModel):
     """
-    Result data from a task
-    - changed - indicates whether the task modified its result data
-    - output - list of output parameter sets
-    - memento - memento data to be passed to the next invocation of the task
-    - markers - list of markers produced by the task
-    - status - status code (0=success, non-zero=failure)
+    Result data from a task:
+
+    * changed - indicates whether the task modified its result data
+    * output - list of output parameter sets
+    * memento - memento data to be passed to the next invocation of the task
+    * markers - list of markers produced by the task
+    * status - status code (0=success, non-zero=failure)
     """
     changed : bool = dc.Field(default=True)
     output : List[Any] = dc.Field(default_factory=list)
@@ -113,9 +110,16 @@ class TaskDataParam(BaseModel):
     ops : List[TaskDataParamOp] = dc.Field(default_factory=list)
 
 class TaskDataItem(BaseModel):
+    """
+    Base class for task data items
+
+    * type - Name of the data item type
+    * src - Name of the task that produced this item
+    * seq - Sequence number of the item within the task
+    """
     type : str
-    src : str
-    id : str
+    src : str = None
+    seq : int = -1
 
 class TaskData(BaseModel):
     src : str = None

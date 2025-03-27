@@ -21,7 +21,6 @@
 #****************************************************************************
 import io
 import os
-import json
 import yaml
 import importlib
 import logging
@@ -34,14 +33,13 @@ from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .param_def import ParamDef
+from .task_def import TaskDef
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
 from .task_node_ctor_compound import TaskNodeCtorCompound
 from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
-from .task_ctor import TaskCtor
-from .task_def import TaskDef, TaskSpec
-from .std.task_null import TaskNull, TaskNullParams
+from .std.task_null import TaskNull
 from .type_def import TypeDef
 
 
@@ -108,18 +106,18 @@ class PackageDef(BaseModel):
 
         session.push_package(ret, add=True)
 
-        tasks_m : Dict[str,str,TaskCtor]= {}
+        tasks_m : Dict[str,str,TaskNodeCtor]= {}
 
         for task in self.tasks:
             if task.name in tasks_m.keys():
                 raise Exception("Duplicate task %s" % task.name)
-            tasks_m[task.name] = (task, self._basedir, ) # We'll add a TaskCtor later
+            tasks_m[task.name] = (task, self._basedir, ) # We'll add a TaskNodeCtor later
 
         for frag in self._fragment_l:
             for task in frag.tasks:
                 if task.name in tasks_m.keys():
                     raise Exception("Duplicate task %s" % task.name)
-                tasks_m[task.name] = (task, frag._basedir, ) # We'll add a TaskCtor later
+                tasks_m[task.name] = (task, frag._basedir, ) # We'll add a TaskNodeCtor later
 
         # Now we have a unified map of the tasks declared in this package
         for name in list(tasks_m.keys()):
@@ -165,7 +163,7 @@ class PackageDef(BaseModel):
             ctor_t = tasks_m[task_name][2]
         return ctor_t
 
-    def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+    def mkTaskCtor(self, session, task, srcdir, tasks_m) -> TaskNodeCtor:
         self._log.debug("--> %s::mkTaskCtor %s (srcdir: %s)" % (self.name, task.name, srcdir))
 
         if len(task.tasks) > 0:
@@ -178,10 +176,10 @@ class PackageDef(BaseModel):
         return ctor
 
     
-    def _mkLeafTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+    def _mkLeafTaskCtor(self, session, task, srcdir, tasks_m) -> TaskNodeCtor:
         self._log.debug("--> _mkLeafTaskCtor")
-        base_ctor_t : TaskCtor = None
-        ctor_t : TaskCtor = None
+        base_ctor_t : TaskNodeCtor = None
+        ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
         passthrough = task.passthrough
@@ -263,10 +261,10 @@ class PackageDef(BaseModel):
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
         return ctor_t
 
-    def _mkCompoundTaskCtor(self, session, task, srcdir, tasks_m) -> TaskCtor:
+    def _mkCompoundTaskCtor(self, session, task, srcdir, tasks_m) -> TaskNodeCtor:
         self._log.debug("--> _mkCompoundTaskCtor")
-        base_ctor_t : TaskCtor = None
-        ctor_t : TaskCtor = None
+        base_ctor_t : TaskNodeCtor = None
+        ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
         passthrough = task.passthrough

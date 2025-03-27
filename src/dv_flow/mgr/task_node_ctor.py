@@ -27,10 +27,7 @@ import pydantic.dataclasses as pdc
 import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node import TaskNode
-from .task_params_ctor import TaskParamsCtor
-from .param_ref_eval import ParamRefEval
 from .param import Param
 
 @dc.dataclass
@@ -78,8 +75,6 @@ class TaskNodeCtor(object):
         else:
             if node.consumes is None:
                 node.consumes = self.consumes
-            else:
-                node.consumes.extend(consumes)
 
         return node
 
