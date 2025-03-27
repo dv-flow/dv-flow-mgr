@@ -33,7 +33,7 @@ from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .param_def import ParamDef
-from .task_def import TaskDef
+from .task_def import TaskDef, PassthroughE, ConsumesE
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
@@ -183,7 +183,7 @@ class PackageDef(BaseModel):
         base_params : BaseModel = None
         callable = None
         passthrough = task.passthrough
-        consumes = [] if task.consumes is None else task.consumes.copy()
+        consumes = task.consumes.copy() if isinstance(task.consumes, list) else task.consumes
         needs = [] if task.needs is None else task.needs.copy()
         fullname = self.name + "." + task.name
 
@@ -192,14 +192,20 @@ class PackageDef(BaseModel):
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
 
-            # Once we have passthrough, we can't turn it off
-            passthrough |= base_ctor_t.passthrough
-            consumes.extend(base_ctor_t.consumes)
+            if passthrough is None:
+                passthrough = base_ctor_t.passthrough
+            if consumes is None:
+                consumes = base_ctor_t.consumes
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
         else:
             self._log.debug("No 'uses' specified")
+
+        if passthrough is None:
+            passthrough = PassthroughE.No
+        if consumes is None:
+            consumes = ConsumesE.All
 
         # Determine the implementation constructor first
         if task.pytask is not None:

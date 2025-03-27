@@ -7,6 +7,7 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_params_ctor import TaskParamsCtor
 from .param_ref_eval import ParamRefEval
@@ -83,10 +84,12 @@ class TaskNodeLeaf(TaskNode):
 
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
-        if self.consumes is not None and len(self.consumes):
+        if isinstance(self.consumes, list) and len(self.consumes):
             for in_p in in_params:
                 if self._matches(in_p, self.consumes):
                     inputs.append(in_p)
+        elif self.consumes == ConsumesE.All:
+            inputs = in_params.copy()
 
         for name,field in self.params.model_fields.items():
             value = getattr(self.params, name)
@@ -125,10 +128,17 @@ class TaskNodeLeaf(TaskNode):
         # Add an entry for ourselves
         dep_m[self.name] = list(need.name for need,_ in self.needs)
 
-        if self.passthrough:
+        if isinstance(self.passthrough, list):
+            self._log.warning("List-based passthrough not yet supported")
+        elif self.passthrough == PassthroughE.All:
+            self._log.debug("Propagating all input parameters to output")
+            for need,block in self.needs:
+                if not block:
+                    output.extend(need.output.output)
+        elif self.passthrough == PassthroughE.Unused:
             self._log.debug("passthrough: %s" % self.name)
 
-            if self.consumes is None or len(self.consumes) == 0:
+            if self.consumes == ConsumesE.No or (isinstance(self.consumes, list) and len(self.consumes) == 0):
                 self._log.debug("Propagating all input parameters to output")
                 for need,block in self.needs:
                     if not block:
@@ -164,6 +174,11 @@ class TaskNodeLeaf(TaskNode):
         # TODO: 
         self._log.debug("<-- do_run: %s" % self.name)
 
+        if self.result is None:
+            raise Exception("Task %s did not produce a result" % self.name)
+
+        if self.output is None:
+            raise Exception("Task %s did not produce a result" % self.name)
         return self.result
 
     def __hash__(self):

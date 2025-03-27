@@ -86,7 +86,7 @@ class TaskNode(object):
             for k,v in c.items():
                 self._log.debug("k,v: %s,%s - hasattr=%s" % (k,v, hasattr(params, k)))
                 if hasattr(params, k):
-                    self._log.debug("getattr=%s v=%s" % (getattr(params, k), v))
+                    self._log.debug("getattr=\"%s\" v=\"%s\"" % (getattr(params, k), v))
                     if getattr(params, k) == v:
                         match = True
                     else:

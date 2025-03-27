@@ -183,10 +183,18 @@ class TaskSetRunner(TaskRunner):
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
 
-        if isinstance(task, list):
-            return list(t.output for t in task)
+        if self.status == 0:
+            if isinstance(task, list):
+                for t in task:
+                    if t.output is None:
+                        raise Exception("Task %s did not produce output" % t.name)
+                return list(t.output for t in task)
+            else:
+                if task.output is None:
+                    raise Exception("Task %s did not produce output" % task.name)
+                return task.output
         else:
-            return task.output
+            return None
         
     def buildDepMap(self, task : Union[TaskNode, List[TaskNode]]) -> Dict[TaskNode, Set[TaskNode]]:
         tasks = task if isinstance(task, list) else [task]

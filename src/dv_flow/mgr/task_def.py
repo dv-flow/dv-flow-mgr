@@ -39,8 +39,12 @@ class RundirE(enum.Enum):
     Unique = "unique"
     Inherit = "inherit"
 
+class ConsumesE(enum.Enum):
+    No = "none"
+    All = "all"
+
 class PassthroughE(enum.Enum):
-    No = "no"
+    No = "none"
     All = "all"
     Unused = "unused"
 
@@ -89,11 +93,11 @@ class TaskDef(BaseModel):
     rundir : RundirE = dc.Field(
         default=RundirE.Unique,
         description="Specifies handling of this tasks's run directory")
-    passthrough: Union[bool, PassthroughE] = dc.Field(
-        default=PassthroughE.No,
+    passthrough: Union[PassthroughE, List[Any], None] = dc.Field(
+        default=None,
         description="Specifies whether this task should pass its inputs to its output")
-    consumes : List[Any] = dc.Field(
-        default_factory=list,
+    consumes : Union[ConsumesE, List[Any], None] = dc.Field(
+        default=None,
         description="Specifies matching patterns for parameter sets that this task consumes")
 
 #    out: List[TaskOutput] = dc.Field(default_factory=list)
