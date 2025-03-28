@@ -117,20 +117,7 @@ class TaskSetRunner(TaskRunner):
                 while len(active_task_l) >= self.nproc and t not in done_task_s:
                     # Wait for at least one job to complete
                     done, pending = await asyncio.wait(at[1] for at in active_task_l)
-                    for d in done:
-                        for i in range(len(active_task_l)):
-                            if active_task_l[i][1] == d:
-                                tt = active_task_l[i][0]
-                                tt.end = datetime.now()
-                                if tt.result.memento is not None:
-                                    dst_memento[tt.name] = tt.result.memento.model_dump()
-                                else:
-                                    dst_memento[tt.name] = None
-                                self.status |= tt.result.status 
-                                self._notify(tt, "leave")
-                                done_task_s.add(tt)
-                                active_task_l.pop(i)
-                                break
+                    self._completeTasks(active_task_l, done_task_s, done, dst_memento)
 
                 if self.status == 0 and t not in done_task_s:
                     memento = src_memento.get(t.name, None)
@@ -162,19 +149,10 @@ class TaskSetRunner(TaskRunner):
                
             # All pending tasks in the task-group have been launched
             # Wait for them to all complete
-            if len(active_task_l):
+            while len(active_task_l):
                 # TODO: Shouldn't gather here -- reach to each completion
-                coros = list(at[1] for at in active_task_l)
-                res = await asyncio.gather(*coros)
-                for tt in active_task_l:
-                    tt[0].end = datetime.now()
-                    if tt[0].result.memento is not None:
-                        dst_memento[tt[0].name] = tt[0].result.memento.model_dump()
-                    else:
-                        dst_memento[tt[0].name] = None
-                    self.status |= tt[0].result.status
-                    self._notify(tt[0], "leave")
-                active_task_l.clear()
+                done, pending = await asyncio.wait(at[1] for at in active_task_l)
+                self._completeTasks(active_task_l, done_task_s, done, dst_memento)
             
             if self.status != 0:
                 self._log.debug("Exiting due to status: %d", self.status)
@@ -195,6 +173,23 @@ class TaskSetRunner(TaskRunner):
                 return task.output
         else:
             return None
+        
+    def _completeTasks(self, active_task_l, done_task_s, done_l, dst_memento):
+        for d in done_l:
+            for i in range(len(active_task_l)):
+                if active_task_l[i][1] == d:
+                    tt = active_task_l[i][0]
+                    tt.end = datetime.now()
+                    if tt.result.memento is not None:
+                        dst_memento[tt.name] = tt.result.memento.model_dump()
+                    else:
+                        dst_memento[tt.name] = None
+                    self.status |= tt.result.status 
+                    self._notify(tt, "leave")
+                    done_task_s.add(tt)
+                    active_task_l.pop(i)
+                    break
+        pass
         
     def buildDepMap(self, task : Union[TaskNode, List[TaskNode]]) -> Dict[TaskNode, Set[TaskNode]]:
         tasks = task if isinstance(task, list) else [task]
