@@ -182,9 +182,6 @@ class PackageDef(BaseModel):
         ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
-        passthrough = task.passthrough
-        consumes = task.consumes.copy() if isinstance(task.consumes, list) else task.consumes
-        needs = [] if task.needs is None else task.needs.copy()
         fullname = self.name + "." + task.name
 
         if task.uses is not None:
@@ -192,20 +189,13 @@ class PackageDef(BaseModel):
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
 
-            if passthrough is None:
-                passthrough = base_ctor_t.passthrough
-            if consumes is None:
-                consumes = base_ctor_t.consumes
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
         else:
             self._log.debug("No 'uses' specified")
 
-        if passthrough is None:
-            passthrough = PassthroughE.No
-        if consumes is None:
-            consumes = ConsumesE.All
+        passthrough, consumes, needs = self._getPTConsumesNeeds(task, base_ctor_t)
 
         # Determine the implementation constructor first
         if task.pytask is not None:
@@ -273,9 +263,7 @@ class PackageDef(BaseModel):
         ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
-        passthrough = task.passthrough
-        consumes = [] if task.consumes is None else task.consumes.copy()
-        needs = [] if task.needs is None else task.needs.copy()
+
         fullname = self.name + "." + task.name
 
 
@@ -284,12 +272,10 @@ class PackageDef(BaseModel):
             base_ctor_t = self.getTaskCtor(session, task.uses, tasks_m)
             base_params = base_ctor_t.mkTaskParams()
 
-            # Once we have passthrough, we can't turn it off
-            passthrough |= base_ctor_t.passthrough
-            consumes.extend(base_ctor_t.consumes)
-
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
+
+        passthrough, consumes, needs = self._getPTConsumesNeeds(task, base_ctor_t)
 
         # Determine if we need to use a new 
         paramT = self._getParamT(session, task, base_params)
@@ -321,6 +307,25 @@ class PackageDef(BaseModel):
         
         self._log.debug("<-- %s::mkTaskCtor %s (%d)" % (self.name, task.name, len(ctor_t.tasks)))
         return ctor_t
+    
+    def _getPTConsumesNeeds(self, task, base_ctor_t):
+        passthrough = task.passthrough
+        consumes = task.consumes.copy() if isinstance(task.consumes, list) else task.consumes
+        needs = [] if task.needs is None else task.needs.copy()
+
+        if self.uses is not None:
+            if passthrough is None:
+                passthrough = base_ctor_t.passthrough
+            if consumes is None:
+                consumes = base_ctor_t.consumes
+
+        if passthrough is None:
+            passthrough = PassthroughE.No
+        if consumes is None:
+            consumes = ConsumesE.All
+
+
+        return (passthrough, consumes, needs)
 
     def _getParamT(self, session, task, base_t : BaseModel):
         self._log.debug("--> _getParamT %s" % task.fullname)

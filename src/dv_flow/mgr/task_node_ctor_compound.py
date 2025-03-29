@@ -44,6 +44,9 @@ class TaskNodeCtorCompound(TaskNodeCtor):
         if srcdir is None:
             srcdir = self.srcdir
 
+        if params is None:
+            raise Exception("params is None")
+
         node = TaskNodeCompound(
             name=name, 
             srcdir=srcdir,

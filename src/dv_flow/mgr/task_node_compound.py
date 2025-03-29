@@ -20,11 +20,15 @@
 #*
 #****************************************************************************
 import dataclasses as dc
+from pydantic import BaseModel
 from .task_node import TaskNode
 from .task_node_leaf import TaskNodeLeaf
 from .task_data import TaskDataResult, TaskDataInput, TaskDataOutput
 from .task_runner import TaskRunner
 from typing import Any, List
+
+class NullParams(BaseModel):
+    pass
 
 @dc.dataclass
 class TaskNodeCompound(TaskNode):
@@ -33,17 +37,21 @@ class TaskNodeCompound(TaskNode):
     input : TaskNode = None
 
     def __post_init__(self):
+        async def null_run(runner, input):
+            return TaskDataResult()
+
         self.input = TaskNodeLeaf(
             self.name + ".in",
             srcdir=self.srcdir,
-            params=None)
+            params=NullParams())
+        self.input.task = null_run
         return super().__post_init__()
 
     async def do_run(self, 
                      runner : TaskRunner, 
                      rundir, 
                      memento : Any=None) -> TaskDataResult:
-        pass
+        return TaskDataResult()
 
     def __hash__(self):
         return id(self)

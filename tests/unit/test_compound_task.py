@@ -1,6 +1,6 @@
 import asyncio
 import os
-from dv_flow.mgr import TaskGraphBuilder, TaskRunner, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageDef
 from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
 
 def test_smoke(tmpdir):
@@ -36,7 +36,7 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
-    runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 
     t1 = builder.mkTaskNode("foo.entry", name="t1")
 
@@ -89,7 +89,7 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
-    runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 
     t1 = builder.mkTaskNode("foo.entry", name="t1")
 
@@ -142,7 +142,7 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
-    runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 
     t1 = builder.mkTaskNode("foo.entry", name="t1")
 
@@ -183,7 +183,7 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
-    runner = TaskRunner(rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 
     t1 = builder.mkTaskNode("foo.entry", name="t1")
 
@@ -192,3 +192,6 @@ package:
         os.path.join(rundir, "graph.dot"))
 
     output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    assert output is not None
