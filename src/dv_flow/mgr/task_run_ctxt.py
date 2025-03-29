@@ -23,6 +23,19 @@ class TaskRunCtxt(object):
                    logfilter=None,
                    cwd=None,
                    env=None):
+        """
+        Executes a command as part of the task's implementation.
+        Output from the command will be saved to the specified logfile,
+        or to a default logfile if not specified. If the command
+        fails, an error marker will be added.
+
+        Example:
+        
+        .. code-block:: python
+
+            status |= await runner.exec(['ls', '-l'], logfile='ls.log')
+
+        """
         if logfile is None:
             logfile = "cmd_%d.log" % (self._exec_info.__len__() + 1)
 
@@ -45,6 +58,7 @@ class TaskRunCtxt(object):
         return status
 
     def create(self, path, content):
+        """Create a file in the task's rundir"""
         if not os.path.isabs(path):
             path = os.path.join(self.rundir, path)
         
@@ -56,10 +70,12 @@ class TaskRunCtxt(object):
 
 
     def marker(self, msg : str, severity : SeverityE, loc : TaskMarkerLoc=None):
+        """Add a marker related to the task's execution"""
         if loc is not None:
             self._markers.append(TaskMarker(msg=msg, severity=severity, loc=loc))
         else:
             self._markers.append(TaskMarker(msg=msg, severity=severity))
 
     def error(self, msg : str, loc : TaskMarkerLoc=None):
+        """Add an error marker related to the task's execution"""
         self.marker(msg=msg, severity=SeverityE.Error, loc=loc)
