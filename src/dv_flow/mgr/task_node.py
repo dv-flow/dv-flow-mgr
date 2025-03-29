@@ -111,7 +111,7 @@ class TaskNode(object):
             "rundir": rundir,
             "input": input.model_dump(warnings=False),
             "needs": [need[0].name for need in self.needs],
-            "commands": [cmd.dump_model() for cmd in ctxt._exec_info],
+            "commands": [cmd.model_dump() for cmd in ctxt._exec_info],
             "result": {
                 "status": self.result.status,
                 "changed": self.result.changed,

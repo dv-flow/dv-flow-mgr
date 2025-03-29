@@ -116,10 +116,10 @@ class TaskNodeLeaf(TaskNode):
             inputs=inputs,
             memento=memento)
         
-        ctxt = TaskRunCtxt(runner=self, rundir=input.rundir)
+        ctxt = TaskRunCtxt(runner=runner, rundir=input.rundir)
 
         self._log.debug("--> Call task method %s" % str(self.task))
-        self.result : TaskDataResult = await self.task(self, input)
+        self.result : TaskDataResult = await self.task(ctxt, input)
         self._log.debug("<-- Call task method %s" % str(self.task))
 
         self.result.markers.extend(ctxt._markers)

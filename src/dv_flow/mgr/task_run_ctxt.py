@@ -40,7 +40,20 @@ class TaskRunCtxt(object):
         self._exec_info.append(ExecInfo(cmd=cmd, status=status))
 
         if status != 0:
-            self.error_marker("Command failed: %s" % " ".join(cmd))
+            self.error("Command failed: %s" % " ".join(cmd))
+
+        return status
+
+    def create(self, path, content):
+        if not os.path.isabs(path):
+            path = os.path.join(self.rundir, path)
+        
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        with open(path, "w") as fp:
+            fp.write(content)
+
 
     def marker(self, msg : str, severity : SeverityE, loc : TaskMarkerLoc=None):
         if loc is not None:
