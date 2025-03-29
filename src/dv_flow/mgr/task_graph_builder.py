@@ -192,10 +192,6 @@ class TaskGraphBuilder(object):
         if task is None and name in self._task_m.keys():
             task = self._task_m[name]
         
-        # if task is None:
-        #     # TODO: Look for a def that hasn't yet been constructed
-        #     task = self._mkTaskGraph(name, self.rundir)
-
         return task
 
     def leave_compound(self, task : TaskNode):
@@ -249,7 +245,11 @@ class TaskGraphBuilder(object):
             need_fullname = self._resolveNeedRef(need_def)
             self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
             if not need_fullname in self._task_m.keys():
+                # Go back to the root from a rundir perspective
+                rundir_s = self._rundir_s
+                self._rundir_s = [need_fullname]
                 need_t = self._mkTaskGraph(need_fullname)
+                self._rundir_s = rundir_s
                 self._task_m[need_fullname] = need_t
             needs.append(self._task_m[need_fullname])
 
@@ -365,7 +365,10 @@ class TaskGraphBuilder(object):
                 need_fullname = self._resolveNeedRef(need_def)
                 self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
                 if not need_fullname in self._task_m.keys():
+                    rundir_s = self._rundir_s
+                    self._rundir_s = [need_fullname]
                     need_t = self._mkTaskGraph(need_fullname)
+                    self._rundir_s = rundir_s
                     self._task_m[need_fullname] = need_t
                 needs.append(self._task_m[need_fullname])
 
