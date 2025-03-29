@@ -317,7 +317,8 @@ class PackageDef(BaseModel):
         consumes = task.consumes.copy() if isinstance(task.consumes, list) else task.consumes
         needs = [] if task.needs is None else task.needs.copy()
 
-        if self.uses is not None:
+        if base_ctor_t is not None:
+            print("-- uses")
             if passthrough is None:
                 passthrough = base_ctor_t.passthrough
             if consumes is None:
@@ -327,7 +328,6 @@ class PackageDef(BaseModel):
             passthrough = PassthroughE.No
         if consumes is None:
             consumes = ConsumesE.All
-
 
         return (passthrough, consumes, needs)
 

@@ -207,9 +207,9 @@ class TaskGraphBuilder(object):
         self._pkg_s.clear()
         self._task_m.clear()
 
-        return self._mkTaskGraph(task, self.rundir)
+        return self._mkTaskGraph(task)
         
-    def _mkTaskGraph(self, task : str, parent_rundir : str) -> TaskNode:
+    def _mkTaskGraph(self, task : str) -> TaskNode:
 
         elems = task.split(".")
 
@@ -223,8 +223,6 @@ class TaskGraphBuilder(object):
             pkg_name = pkg_spec.name
         else:
             pkg_spec = PackageSpec(pkg_name)
-
-        rundir = os.path.join(parent_rundir, pkg_name, task_name)
 
         self._logger.debug("pkg_spec: %s" % str(pkg_spec))
         self._pkg_spec_s.append(pkg_spec)
@@ -243,7 +241,7 @@ class TaskGraphBuilder(object):
             need_fullname = self._resolveNeedRef(need_def)
             self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
             if not need_fullname in self._task_m.keys():
-                need_t = self._mkTaskGraph(need_fullname, rundir)
+                need_t = self._mkTaskGraph(need_fullname)
                 self._task_m[need_fullname] = need_t
             needs.append(self._task_m[need_fullname])
 
@@ -258,7 +256,7 @@ class TaskGraphBuilder(object):
             params=params,
             name=task,
             needs=needs)
-        task.rundir = rundir
+#        task.rundir = rundir
         
         self._task_m[task.name] = task
 
@@ -359,7 +357,7 @@ class TaskGraphBuilder(object):
                 need_fullname = self._resolveNeedRef(need_def)
                 self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
                 if not need_fullname in self._task_m.keys():
-                    need_t = self._mkTaskGraph(need_fullname, self.rundir)
+                    need_t = self._mkTaskGraph(need_fullname)
                     self._task_m[need_fullname] = need_t
                 needs.append(self._task_m[need_fullname])
 
@@ -371,13 +369,14 @@ class TaskGraphBuilder(object):
                 name=name, 
                 srcdir=srcdir, 
                 needs=needs)
+            ret.rundir = self.get_rundir(name)
         else:
             raise Exception("Failed to find ctor for task %s" % task_t)
         self._pkg_s.pop()
         self._logger.debug("<-- mkTaskNode: %s" % task_t)
         return ret
         
-    def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskCtor':
+    def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskNodeCtor':
         from .task_def import TaskSpec
         if type(spec) == str:
             spec = TaskSpec(spec)

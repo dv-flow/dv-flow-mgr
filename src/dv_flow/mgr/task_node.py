@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import enum
+import json
 import os
 import sys
 import dataclasses as dc
@@ -27,7 +28,7 @@ import pydantic.dataclasses as pdc
 import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_data import TaskDataOutput, TaskDataResult
+from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .param import Param
 
 class RundirE(enum.Enum):
@@ -49,11 +50,11 @@ class TaskNode(object):
     consumes : List[Any] = dc.field(default_factory=list)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
     rundir : List[str] = dc.field(default=None)
-#    rundir_t : RundirE = dc.field(default=RundirE.Unique)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
     start : float = dc.field(default=None)
     end : float = dc.field(default=None)
+    save_exec_data : bool = dc.field(default=True)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 
@@ -100,6 +101,36 @@ class TaskNode(object):
                 break
         self._log.debug("<-- _matches: %s %s" % (self.name, consumed))
         return consumed
+    
+    def _save_exec_data(self, rundir, input : TaskDataInput):
+        """Saves execution data to the rundir"""
+        data = {
+            "name": self.name,
+            "srcdir": self.srcdir,
+            "rundir": rundir,
+            "input": input.model_dump(warnings=False),
+            "needs": [need[0].name for need in self.needs],
+            "result": {
+                "status": self.result.status,
+                "changed": self.result.changed,
+                "memento": self.result.memento.model_dump() if self.result.memento else None,
+            },
+            "output": self.output.model_dump(),
+        }
+
+        if isinstance(self.consumes, list):
+            data["consumes"] = self.consumes
+        else:
+            data["consumes"] = str(self.consumes)
+
+        if isinstance(self.passthrough, list):
+            data["passthrough"] = self.passthrough
+        else:
+            data["passthrough"] = str(self.passthrough)
+
+        with open(os.path.join(rundir, "%s.exec_data.json" % self.name), "w") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
     
 
 

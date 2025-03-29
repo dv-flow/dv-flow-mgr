@@ -66,6 +66,10 @@ async def CreateFile(runner, input) -> TaskDataResult:
 
         with open(filename, "w") as fp:
             fp.write(input.params.content)
+        memento.name = input.params.filename
+        memento.hash = hashlib.md5(input.params.content.encode()).hexdigest()
+    else:
+        memento = ex_memento
 
     fs = _FileSet(
                 filetype=input.params.type,

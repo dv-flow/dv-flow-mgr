@@ -107,5 +107,7 @@ class TaskDef(BaseModel):
             name=self.name,
             type=self.type,
             depends=self.depends.copy())
-        return ret  
+        return ret 
+
+TaskDef.model_rebuild()
 

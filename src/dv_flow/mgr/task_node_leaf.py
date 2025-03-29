@@ -172,6 +172,9 @@ class TaskNodeLeaf(TaskNode):
             changed=self.result.changed,
             dep_m=dep_m,
             output=output)
+        
+        if self.save_exec_data:
+            self._save_exec_data(rundir, input)
 
         # TODO: 
         self._log.debug("<-- do_run: %s" % self.name)

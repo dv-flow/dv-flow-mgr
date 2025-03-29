@@ -53,9 +53,10 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             params=params,
             needs=needs)
         # Use the compound task's rundir
-        node.input.rundir = builder.get_rundir()
 
         builder.enter_compound(node, self.task_def.rundir)
+        node.input.rundir = builder.get_rundir()
+        print("input rundir: %s" % str(node.input.rundir))
         builder.addTask("in", node.input)
 
         self._buildSubGraph(builder, node)

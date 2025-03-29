@@ -22,6 +22,7 @@ package:
         rundir: inherit
         uses: std.FileSet
         needs: [create_file]
+        passthrough: none
         with:
           base: ${{ rundir }}
           include: "*.txt"
@@ -69,6 +70,7 @@ package:
       - name: glob_txt
         rundir: inherit
         uses: std.FileSet
+        passthrough: none
         needs: [create_file]
         with:
           base: ${{ rundir }}
@@ -81,13 +83,15 @@ package:
       uses: TaskType1
 
     - name: entry
+      passthrough: all
+      consumes: none
       needs: [Task1, Task2]
 """
 
     rundir = os.path.join(tmpdir)
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
-
+    
     pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
