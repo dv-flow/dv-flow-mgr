@@ -318,7 +318,6 @@ class PackageDef(BaseModel):
         needs = [] if task.needs is None else task.needs.copy()
 
         if base_ctor_t is not None:
-            print("-- uses")
             if passthrough is None:
                 passthrough = base_ctor_t.passthrough
             if consumes is None:

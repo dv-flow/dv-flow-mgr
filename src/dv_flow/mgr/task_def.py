@@ -50,8 +50,9 @@ class PassthroughE(enum.Enum):
 
 
 class StrategyDef(BaseModel):
-    matrix : Dict[str,List[Any]] = dc.Field(
-        default_factory=dict,
+    chain: Union[bool, None] = dc.Field(default=None)
+    matrix : Union[Dict[str,List[Any]],None] = dc.Field(
+        default=None,
         description="Matrix of parameter values to explore")
 
 class TaskDef(BaseModel):

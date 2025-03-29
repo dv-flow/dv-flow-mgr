@@ -203,11 +203,19 @@ class TaskGraphBuilder(object):
         if ctxt.rundir is None or ctxt.rundir == RundirE.Unique:
             self._rundir_s.pop()
 
-    def mkTaskGraph(self, task : str) -> TaskNode:
+    def mkTaskGraph(self, task : str, rundir=None) -> TaskNode:
         self._pkg_s.clear()
         self._task_m.clear()
 
-        return self._mkTaskGraph(task)
+        if rundir is not None:
+            self._rundir_s.append(rundir)
+
+        ret = self._mkTaskGraph(task)
+
+        if rundir is not None:
+            self._rundir_s.pop()
+
+        return ret
         
     def _mkTaskGraph(self, task : str) -> TaskNode:
 

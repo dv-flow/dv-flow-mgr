@@ -90,7 +90,7 @@ class CmdRun(object):
         for spec in args.tasks:
             if spec.find('.') == -1:
                 spec = pkg.name + "." + spec
-            task = builder.mkTaskGraph(spec)
+            task = builder.mkTaskGraph(spec, rundir=spec)
             tasks.append(task)
 
         asyncio.run(runner.run(tasks))

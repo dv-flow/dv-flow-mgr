@@ -6,7 +6,7 @@ import pytest
 import jq
 from typing import List
 import yaml
-from dv_flow.mgr import FileSet, PackageDef, TaskData, TaskGraphBuilder
+from dv_flow.mgr import TaskSetRunner, PackageDef, TaskData, TaskGraphBuilder
 from pydantic import BaseModel
 from shutil import copytree
 
@@ -26,7 +26,9 @@ package:
 
     pkg_def = PackageDef.loads(flowdv)
     builder = TaskGraphBuilder(pkg_def, os.getcwd())
-    task = builder.mkTaskGraph("my_pkg.entry")
+    task = builder.mkTaskGraph("my_pkg.entry", rundir="mk_pkg.entry")
+
+    assert len(task.rundir) == 1
 
 def test_jq():
     data = [
