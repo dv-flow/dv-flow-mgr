@@ -79,6 +79,47 @@ dependencies.</p>
 </dd></dl>
 
 </section>
+<section id="taskrunctxt">
+<h2>TaskRunCtxt<a class="headerlink" href="#taskrunctxt" title="Link to this heading">¶</a></h2>
+<p>The task implementaion is passed a task-run context object that
+provides utilities for the task.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskRunCtxt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">runner:</span> <span class="pre">'TaskRunner'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rundir:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_markers:</span> <span class="pre">List[dv_flow.mgr.task_data.TaskMarker]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_exec_info:</span> <span class="pre">List[dv_flow.mgr.task_run_ctxt.ExecInfo]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt" title="Link to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.create">
+<span class="sig-name descname"><span class="pre">create</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.create" title="Link to this definition">¶</a></dt>
+<dd><p>Create a file in the task’s rundir</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.error">
+<span class="sig-name descname"><span class="pre">error</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskMarkerLoc" title="dv_flow.mgr.task_data.TaskMarkerLoc"><span class="pre">TaskMarkerLoc</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.error" title="Link to this definition">¶</a></dt>
+<dd><p>Add an error marker related to the task’s execution</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.exec">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">exec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logfile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logfilter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cwd</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.exec" title="Link to this definition">¶</a></dt>
+<dd><p>Executes a command as part of the task’s implementation.
+Output from the command will be saved to the specified logfile,
+or to a default logfile if not specified. If the command
+fails, an error marker will be added.</p>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">status</span> <span class="o">|=</span> <span class="k">await</span> <span class="n">runner</span><span class="o">.</span><span class="n">exec</span><span class="p">([</span><span class="s1">&#39;ls&#39;</span><span class="p">,</span> <span class="s1">&#39;-l&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;ls.log&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.marker">
+<span class="sig-name descname"><span class="pre">marker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">severity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SeverityE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskMarkerLoc" title="dv_flow.mgr.task_data.TaskMarkerLoc"><span class="pre">TaskMarkerLoc</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.marker" title="Link to this definition">¶</a></dt>
+<dd><p>Add a marker related to the task’s execution</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
 <section id="taskdataresult">
 <h2>TaskDataResult<a class="headerlink" href="#taskdataresult" title="Link to this heading">¶</a></h2>
 <p>Task implementation methods must return an object of type
@@ -151,6 +192,7 @@ an associated severity level (error, warning, info).</p>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#taskdatainput">TaskDataInput</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#taskdataitem">TaskDataItem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#taskrunctxt">TaskRunCtxt</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#taskdataresult">TaskDataResult</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#taskmarker">TaskMarker</a></li>
 </ul>

@@ -33,6 +33,16 @@ dependencies.
    :members:
    :exclude-members: model_config
 
+TaskRunCtxt
+===========
+
+The task implementaion is passed a task-run context object that
+provides utilities for the task.
+
+.. autoclass:: dv_flow.mgr.TaskRunCtxt
+   :members:
+   :exclude-members: model_config
+
 
 TaskDataResult
 ==============
