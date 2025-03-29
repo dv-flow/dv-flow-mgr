@@ -48,8 +48,8 @@ class TaskNode(object):
     passthrough : bool = False
     consumes : List[Any] = dc.field(default_factory=list)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
-    rundir : str = dc.field(default=None)
-    rundir_t : RundirE = dc.field(default=RundirE.Unique)
+    rundir : List[str] = dc.field(default=None)
+#    rundir_t : RundirE = dc.field(default=RundirE.Unique)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
     start : float = dc.field(default=None)
@@ -58,6 +58,8 @@ class TaskNode(object):
     _log : ClassVar = logging.getLogger("TaskNode")
 
     def __post_init__(self):
+        # Give this a default run directory based on the task name
+        self.rundir = [self.name]
         if self.needs is None:
             self.needs = []
         else:
@@ -69,7 +71,7 @@ class TaskNode(object):
                   runner,
                   rundir,
                   memento : Any = None) -> 'TaskDataResult':
-        pass
+        raise NotImplementedError("do_run not implemented for %s" % self.__class__.__name__)
 
     def __hash__(self):
         return id(self)

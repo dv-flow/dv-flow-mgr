@@ -21,6 +21,7 @@
 #****************************************************************************
 import dataclasses as dc
 from pydantic import BaseModel
+from .task_def import ConsumesE
 from .task_node import TaskNode
 from .task_node_leaf import TaskNodeLeaf
 from .task_data import TaskDataResult, TaskDataInput, TaskDataOutput
@@ -39,9 +40,9 @@ class TaskNodeCompound(TaskNode):
     def __post_init__(self):
         async def null_run(runner, input):
             return TaskDataResult()
-
+        
         self.input = TaskNodeLeaf(
-            self.name + ".in",
+            name=self.name + ".in",
             srcdir=self.srcdir,
             params=NullParams())
         self.input.task = null_run
@@ -51,7 +52,41 @@ class TaskNodeCompound(TaskNode):
                      runner : TaskRunner, 
                      rundir, 
                      memento : Any=None) -> TaskDataResult:
-        return TaskDataResult()
+        self._log.debug("Compound task %s (%d)" % (self.name, len(self.needs)))
+
+        add_s = set()
+        output = []
+        status = 0
+        changed = False
+
+        for n in self.needs:
+            status |= n[0].result.status
+            changed |= n[0].output.changed
+            for o in n[0].output.output:
+                o_id = (o.src, o.seq)
+                if not o_id in add_s:
+                    if self.consumes is not None or self.consumes == ConsumesE.All:
+                        add_s.add(o_id)
+                        output.append(o)
+                    elif isinstance(self.consumes, list) and self._matches(o, self.consumes):
+                        add_s.add(o_id)
+                        output.append(o)
+
+        self.result = TaskDataResult(
+            status=status,
+            changed=changed,
+            output=output
+        )
+
+        # TODO: Handle passthrough and deps
+
+        self.output = TaskDataOutput(
+            changed=changed,
+            output=output,
+            dep_m={})
+
+        return 0
 
     def __hash__(self):
         return id(self)
+    

@@ -36,10 +36,12 @@ from .task_node_ctor import TaskNodeCtor
 @dc.dataclass
 class TaskNodeCtorWrapper(TaskNodeCtor):
     T : Any
+    _count : int = 0
 
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> TaskNode:
         if params is None:
             raise Exception("params is None")
+
         node = TaskNodeLeaf(
             name=name, 
             srcdir=srcdir, 
@@ -48,6 +50,14 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
             needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
+        if name is None:
+            name = "%s_%d" % (self.name, self._count)
+            self._count += 1
+
+        if builder is not None:
+            node.rundir = builder.get_rundir(name)
+        else:
+            node.rundir = [name]
         return node
 
     def mkTaskParams(self, params : Dict = None) -> Any:

@@ -30,7 +30,7 @@ def test_smoke_1(tmpdir):
                  ]
             )
 
-    task1 = MyTask("task1", srcdir="srcdir", p1="p1")
+    task1 = MyTask(name="task1", srcdir="srcdir", p1="p1")
     runner = TaskSetRunner("rundir")
     runner.add_listener(TaskListenerLog().event)
 

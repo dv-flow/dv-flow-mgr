@@ -28,12 +28,14 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_def import RundirE
 from .task_node_ctor import TaskNodeCtor
 
 @dc.dataclass
 class TaskNodeCtorDefBase(TaskNodeCtor):
     """Task defines its own needs, that will need to be filled in"""
     needs : List['str']
+    rundir : RundirE 
 
     def __post_init__(self):
         if self.needs is None:

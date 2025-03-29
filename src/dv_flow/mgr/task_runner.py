@@ -106,7 +106,7 @@ class TaskSetRunner(TaskRunner):
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug("Order:")
             for active_s in order:
-                self._log.debug("- {%s}", ",".join(t.name for t in active_s))
+                self._log.debug("- {%s}", ",".join(str(t.name) for t in active_s))
 
         active_task_l = []
         done_task_s = set()
@@ -121,16 +121,24 @@ class TaskSetRunner(TaskRunner):
 
                 if self.status == 0 and t not in done_task_s:
                     memento = src_memento.get(t.name, None)
-                    dirname = t.name
+#                    dirname = t.name
                     invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
 
-                    if t.rundir_t == RundirE.Unique:
-                        # Replace invalid characters with the replacement string.
-                        dirname = re.sub(invalid_chars_pattern, '_', dirname)
+                    # TaskNode rundir is a list of path elements relative
+                    # to the root rundir
+                    rundir = self.rundir
 
-                        rundir = os.path.join(self.rundir, dirname)
-                    else:
-                        rundir = self.rundir
+                    for rundir_e in t.rundir:
+                        rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
+                        rundir = os.path.join(rundir, rundir_e)
+
+                    # if t.rundir_t == RundirE.Unique:
+                    #     # Replace invalid characters with the replacement string.
+                    #     dirname = re.sub(invalid_chars_pattern, '_', dirname)
+
+                    #     rundir = os.path.join(self.rundir, dirname)
+                    # else:
+                    #     rundir = self.rundir
 
                     if not os.path.isdir(rundir):
                         os.makedirs(rundir, exist_ok=True)
@@ -180,6 +188,8 @@ class TaskSetRunner(TaskRunner):
                 if active_task_l[i][1] == d:
                     tt = active_task_l[i][0]
                     tt.end = datetime.now()
+                    if tt.result is None:
+                        raise Exception("Task %s did not produce a result" % tt.name)
                     if tt.result.memento is not None:
                         dst_memento[tt.name] = tt.result.memento.model_dump()
                     else:
@@ -189,7 +199,7 @@ class TaskSetRunner(TaskRunner):
                     done_task_s.add(tt)
                     active_task_l.pop(i)
                     break
-        pass
+    pass
         
     def buildDepMap(self, task : Union[TaskNode, List[TaskNode]]) -> Dict[TaskNode, Set[TaskNode]]:
         tasks = task if isinstance(task, list) else [task]

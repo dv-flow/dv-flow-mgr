@@ -28,6 +28,7 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_def import RundirE
 from .task_node import TaskNode
 from .task_node_leaf import TaskNodeLeaf
 from .task_node_ctor_def_base import TaskNodeCtorDefBase
@@ -57,6 +58,7 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
         node.passthrough = self.passthrough
         node.consumes = self.consumes
         node.task = self.task
+        node.rundir = builder.get_rundir()
         builder.addTask(name, node)
 
         self._log.debug("<-- mkTaskNode")

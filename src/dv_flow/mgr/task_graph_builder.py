@@ -25,6 +25,7 @@ import logging
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
+from .task_def import RundirE
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
 from typing import Dict, List, Union
@@ -37,6 +38,7 @@ class TaskNamespaceScope(object):
 class CompoundTaskCtxt(object):
     parent : 'TaskGraphBuilder'
     task : 'TaskNode'
+    rundir : RundirE
     task_m : Dict[str,TaskNode] = dc.field(default_factory=dict)
     uses_s : List[Dict[str, TaskNode]] = dc.field(default_factory=list)
 
@@ -53,6 +55,7 @@ class TaskGraphBuilder(object):
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
+    _rundir_s : List[str] = dc.field(default_factory=list)
     _uses_count : int = 0
 
     _logger : logging.Logger = None
@@ -97,7 +100,7 @@ class TaskGraphBuilder(object):
             for subpkg in pkg.subpkg_m.values():
                 self._registerPackages(subpkg, visited)
 
-
+    
     def push_package(self, pkg : Package, add=False):
         self._pkg_s.append(pkg)
         if add:
@@ -109,6 +112,18 @@ class TaskGraphBuilder(object):
     def package(self):
         return self._pkg_s[-1]
 
+    def enter_rundir(self, rundir : str):
+        self._rundir_s.append(rundir)
+
+    def get_rundir(self, rundir=None):
+        ret = self._rundir_s.copy()
+        if rundir is not None:
+            ret.append(rundir)
+        return ret
+    
+    def leave_rundir(self):
+        self._rundir_s.pop()
+
     def enter_uses(self):
         self._uses_count += 1
 
@@ -117,9 +132,13 @@ class TaskGraphBuilder(object):
     
     def leave_uses(self):
         self._uses_count -= 1
-    
-    def enter_compound(self, task : TaskNode):
-        self._compound_task_ctxt_s.append(CompoundTaskCtxt(parent=self, task=task))
+
+    def enter_compound(self, task : TaskNode, rundir=None):
+        self._compound_task_ctxt_s.append(CompoundTaskCtxt(
+            parent=self, task=task, rundir=rundir))
+
+        if rundir is None or rundir == RundirE.Unique:
+            self._rundir_s.append(task.name)
 
     def get_name_prefix(self):
         if len(self._compound_task_ctxt_s) > 0:
@@ -151,6 +170,7 @@ class TaskGraphBuilder(object):
 
     def addTask(self, name, task : TaskNode):
         self._logger.debug("--> addTask: %s" % name)
+
         if len(self._compound_task_ctxt_s) == 0:
             self._task_m[name] = task
         else:
@@ -179,7 +199,9 @@ class TaskGraphBuilder(object):
         return task
 
     def leave_compound(self, task : TaskNode):
-        self._compound_task_ctxt_s.pop()
+        ctxt = self._compound_task_ctxt_s.pop()
+        if ctxt.rundir is None or ctxt.rundir == RundirE.Unique:
+            self._rundir_s.pop()
 
     def mkTaskGraph(self, task : str) -> TaskNode:
         self._pkg_s.clear()

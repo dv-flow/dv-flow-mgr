@@ -25,7 +25,7 @@ import dataclasses as dc
 import logging
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_def import TaskDef
+from .task_def import TaskDef, RundirE
 from .task_data import TaskDataOutput, TaskDataResult
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
@@ -52,9 +52,10 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             srcdir=srcdir,
             params=params,
             needs=needs)
+        # Use the compound task's rundir
+        node.input.rundir = builder.get_rundir()
 
-
-        builder.enter_compound(node)
+        builder.enter_compound(node, self.task_def.rundir)
         builder.addTask("in", node.input)
 
         self._buildSubGraph(builder, node)

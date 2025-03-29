@@ -46,7 +46,10 @@ package:
 
     output = asyncio.run(runner.run(t1))
 
-    pass
+    assert runner.status == 0
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
 
 def test_smoke_2(tmpdir):
     flow_dv = """

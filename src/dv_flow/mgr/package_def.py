@@ -33,7 +33,7 @@ from .fragment_def import FragmentDef
 from .package import Package
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .param_def import ParamDef
-from .task_def import TaskDef, PassthroughE, ConsumesE
+from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
@@ -183,6 +183,7 @@ class PackageDef(BaseModel):
         base_params : BaseModel = None
         callable = None
         fullname = self.name + "." + task.name
+        rundir = task.rundir
 
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses)
@@ -232,7 +233,8 @@ class PackageDef(BaseModel):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs, # TODO: need to determine the needs
-                task=callable)
+                task=callable,
+                rundir=rundir)
         elif base_ctor_t is not None:
             # Use the existing (base) to create the implementation
             ctor_t = TaskNodeCtorProxy(
@@ -242,6 +244,7 @@ class PackageDef(BaseModel):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs,
+                rundir=rundir,
                 uses=base_ctor_t)
         else:
             self._log.debug("Use 'Null' as the class implementation")
@@ -252,6 +255,7 @@ class PackageDef(BaseModel):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs,
+                rundir=rundir,
                 task=TaskNull)
 
         self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
