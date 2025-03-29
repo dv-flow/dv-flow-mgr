@@ -9,6 +9,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
+from .task_run_ctxt import TaskRunCtxt
 from .param_ref_eval import ParamRefEval
 from .param import Param
 
@@ -114,10 +115,14 @@ class TaskNodeLeaf(TaskNode):
             params=self.params,
             inputs=inputs,
             memento=memento)
+        
+        ctxt = TaskRunCtxt(runner=self, rundir=input.rundir)
 
         self._log.debug("--> Call task method %s" % str(self.task))
         self.result : TaskDataResult = await self.task(self, input)
         self._log.debug("<-- Call task method %s" % str(self.task))
+
+        self.result.markers.extend(ctxt._markers)
 
         output=self.result.output.copy()
         for i,out in enumerate(output):
@@ -174,7 +179,7 @@ class TaskNodeLeaf(TaskNode):
             output=output)
         
         if self.save_exec_data:
-            self._save_exec_data(rundir, input)
+            self._save_exec_data(rundir, ctxt, input)
 
         # TODO: 
         self._log.debug("<-- do_run: %s" % self.name)

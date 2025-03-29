@@ -29,6 +29,7 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_run_ctxt import TaskRunCtxt
 from .param import Param
 
 class RundirE(enum.Enum):
@@ -102,7 +103,7 @@ class TaskNode(object):
         self._log.debug("<-- _matches: %s %s" % (self.name, consumed))
         return consumed
     
-    def _save_exec_data(self, rundir, input : TaskDataInput):
+    def _save_exec_data(self, rundir, ctxt : TaskRunCtxt, input : TaskDataInput):
         """Saves execution data to the rundir"""
         data = {
             "name": self.name,
@@ -110,6 +111,7 @@ class TaskNode(object):
             "rundir": rundir,
             "input": input.model_dump(warnings=False),
             "needs": [need[0].name for need in self.needs],
+            "commands": [cmd.dump_model() for cmd in ctxt._exec_info],
             "result": {
                 "status": self.result.status,
                 "changed": self.result.changed,
