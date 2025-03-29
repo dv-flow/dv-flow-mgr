@@ -28,6 +28,9 @@ class TaskNodeLeaf(TaskNode):
 
         self.rundir = rundir
 
+        if self.params is None:
+            raise Exception("params is None (%s)" % str(self))
+
         # TODO: Form dep-map from inputs
 
         dep_m = {}

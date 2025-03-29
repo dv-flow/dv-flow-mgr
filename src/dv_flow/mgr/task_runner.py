@@ -168,6 +168,8 @@ class TaskSetRunner(TaskRunner):
                 res = await asyncio.gather(*coros)
                 for tt in active_task_l:
                     tt[0].end = datetime.now()
+                    if tt[0].result is None:
+                        raise Exception("Task %s did not produce a result" % tt[0].name)
                     if tt[0].result.memento is not None:
                         dst_memento[tt[0].name] = tt[0].result.memento.model_dump()
                     else:

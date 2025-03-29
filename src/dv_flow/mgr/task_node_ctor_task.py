@@ -49,6 +49,9 @@ class TaskNodeCtorTask(TaskNodeCtorDefBase):
         if srcdir is None:
             srcdir = self.srcdir
 
+        if params is None:
+            raise Exception("params is None")
+
         node = TaskNodeLeaf(
             name=name, 
             srcdir=srcdir, 

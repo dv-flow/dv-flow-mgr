@@ -41,6 +41,8 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
     T : Any
 
     def mkTaskNode(self, builder, params, srcdir=None, name=None, needs=None) -> TaskNode:
+        if params is None:
+            raise Exception("params is None")
         node = TaskNodeLeaf(
             name=name, 
             srcdir=srcdir, 
