@@ -82,7 +82,7 @@
 <section id="run">
 <h3>run<a class="headerlink" href="#run" title="Link to this heading">¶</a></h3>
 <p>run a flow</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments_repeat1">
@@ -99,6 +99,10 @@
 <dt><kbd>-j</kbd></dt>
 <dd><p>Specifies degree of parallelism. Uses all cores by default</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">-1</span></code></p>
+</dd>
+<dt><kbd>-c, --clean</kbd></dt>
+<dd><p>Cleans the rundir before running</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
 </dd>
 </dl>
 </section>
