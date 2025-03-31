@@ -77,6 +77,12 @@ class CmdRun(object):
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
         rundir = os.path.join(pkg._basedir, "rundir")
 
+        if args.clean:
+            print("Note: Cleaning rundir %s" % rundir)
+            if os.path.exists(rundir):
+                os.rmdir(rundir)
+            os.makedirs(rundir)
+
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
         runner = TaskSetRunner(rundir)
 

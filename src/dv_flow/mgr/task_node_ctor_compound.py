@@ -73,13 +73,23 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             # Need to get the parent name
             needs = []
             for n in t.needs:
-                need_name = "%s.%s" % (builder.package().name, n)
-                task = builder.findTask(n)
-                if task is None:
+                # 'n' is the dependency as specified by the user
+                # Need to perform a search
+                # - Look locally inside the compound task (pkg.compound.name)
+                # - Look for the fully-qualified task name
+                # - Look for the task name in the package
+
+                names = []
+                for pref in (builder.get_name_prefix((), "", builder.package().name):
+                    need_name = n if pref == "" else ("%s.%s" % (pref, n))
+                    names.append(need_name)
                     task = builder.findTask(need_name)
 
+                    if task is not None:
+                        break
+
                 if task is None:
-                    raise Exception("Failed to find task %s (%s)" % (n, need_name))
+                    raise Exception("Failed to find task %s (searched %s)" % (n, str(names)))
                 self._log.debug("Add %s as dependency of %s" % (
                     task.name, t.name
                 ))

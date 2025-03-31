@@ -49,12 +49,30 @@ class PassthroughE(enum.Enum):
     All = "all"
     Unused = "unused"
 
-
 class StrategyDef(BaseModel):
     chain: Union[bool, None] = dc.Field(default=None)
     matrix : Union[Dict[str,List[Any]],None] = dc.Field(
         default=None,
         description="Matrix of parameter values to explore")
+
+class TaskExecDef(BaseModel):
+    pytask : Union[str, None] = dc.Field(
+        default=None,
+        description="Python method to execute to implement this task")
+    pydep  : Union[str, None] = dc.Field(
+        default=None,
+        description="Python method to check up-to-date status for this task")
+
+class TasksBuilder(BaseModel):
+    # TODO: control how much data this task is provided?
+    pydef : Union[str, None] = dc.Field(
+        default=None,
+        description="Python method to build the subgraph")
+
+class Tasks(BaseModel):
+    tasks: Union[List['TaskDef'], TasksBuilder] = dc.Field(
+        default_factory=list,
+        description="Sub-tasks")
 
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
@@ -73,7 +91,7 @@ class TaskDef(BaseModel):
         description="Python method to execute to implement this task")
     strategy : StrategyDef = dc.Field(
         default=None)
-    tasks: List['TaskDef'] = dc.Field(
+    tasks: Union[List['TaskDef'], TasksBuilder] = dc.Field(
         default_factory=list,
         description="Sub-tasks")
     desc : str = dc.Field(

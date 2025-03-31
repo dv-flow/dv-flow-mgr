@@ -55,6 +55,9 @@ def get_parser():
     run_parser.add_argument("-j",
                         help="Specifies degree of parallelism. Uses all cores by default",
                         type=int, default=-1)
+    run_parser.add_argument("-c", "--clean",
+                            action="store_true",
+                            help="Cleans the rundir before running")
     run_parser.set_defaults(func=CmdRun())
 
     show_parser = subparsers.add_parser('show', 
