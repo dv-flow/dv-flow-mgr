@@ -64,6 +64,7 @@ class PackageDef(BaseModel):
     params : List[ParamDef] = dc.Field(
         default_factory=list, alias="with",
         description="List of package parameters to set")
+    srcinfo : Any = dc.Field(default=None)
 
     _fragment_l : List['FragmentDef'] = []
     _subpkg_m : Dict[str,'PackageDef'] = {}
@@ -410,13 +411,23 @@ class PackageDef(BaseModel):
 
     @classmethod
     def _loadPkgDef(cls, root, exp_pkg_name, file_s):
+        from yaml.loader import SafeLoader
+
+        class SafeLineLoader(SafeLoader):
+            def construct_mapping(self, node, deep=False):
+#                print("construct")
+                mapping = super(SafeLineLoader, self).construct_mapping(node, deep=deep)
+                # Add 1 so line numbering starts at 1
+#                mapping['_srcinfo'] = node.start_mark.line + 1
+                return mapping
+
         if root in file_s:
             raise Exception("Recursive file processing @ %s: %s" % (root, ",".join(file_s)))
         file_s.append(root)
         ret = None
         with open(root, "r") as fp:
             PackageDef._log.debug("open %s" % root)
-            doc = yaml.load(fp, Loader=yaml.FullLoader)
+            doc = yaml.load(fp, Loader=SafeLineLoader)
             if "package" not in doc.keys():
                 raise Exception("Missing 'package' key in %s" % root)
             try:

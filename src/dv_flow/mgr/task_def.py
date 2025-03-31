@@ -19,6 +19,7 @@
 #*     Author: 
 #*
 #****************************************************************************
+import pydantic
 import pydantic.dataclasses as dc
 import enum
 from pydantic import BaseModel
@@ -100,9 +101,12 @@ class TaskDef(BaseModel):
     consumes : Union[ConsumesE, List[Any], None] = dc.Field(
         default=None,
         description="Specifies matching patterns for parameter sets that this task consumes")
-
-#    out: List[TaskOutput] = dc.Field(default_factory=list)
-
+    
+    def __init__(self, **data):
+#        print("--> task_def %s" % str(data))
+        super().__init__(**data)
+#        print("<-- task_def %s" % str(data))
+    
     def copy(self) -> 'TaskDef':
         ret = TaskDef(
             name=self.name,

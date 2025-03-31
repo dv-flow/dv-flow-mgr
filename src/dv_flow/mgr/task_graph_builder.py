@@ -22,6 +22,7 @@
 import os
 import dataclasses as dc
 import logging
+from typing import Callable
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .pkg_rgy import PkgRgy
@@ -48,6 +49,7 @@ class TaskGraphBuilder(object):
     root_pkg : PackageDef
     rundir : str
     pkg_rgy : PkgRgy = None
+    marker_l : Callable = lambda *args, **kwargs: None
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -330,6 +332,7 @@ class TaskGraphBuilder(object):
             self._pkg_spec_s.pop()
             self._pkg_m[spec] = pkg
         else:
+            self.error("Failed to find package %s" % spec.name)
             raise Exception("Failed to find definition of package %s" % spec.name)
 
         self._logger.debug("<-- getPackage: %s" % str(pkg))
