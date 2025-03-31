@@ -80,7 +80,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                 # - Look for the task name in the package
 
                 names = []
-                for pref in (builder.get_name_prefix((), "", builder.package().name):
+                for pref in (builder.get_name_prefix((), "", builder.package().name)):
                     need_name = n if pref == "" else ("%s.%s" % (pref, n))
                     names.append(need_name)
                     task = builder.findTask(need_name)
