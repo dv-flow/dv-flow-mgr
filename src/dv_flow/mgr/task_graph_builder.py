@@ -193,6 +193,13 @@ class TaskGraphBuilder(object):
                 task = self._compound_task_ctxt_s[-1].task_m[name]
         if task is None and name in self._task_m.keys():
             task = self._task_m[name]
+
+        if task is None:
+            # Go search type definitions
+
+            # Check the current package
+            if len(self._pkg_s) > 0 and name in self._pkg_s[-1].task_m.keys():
+                task = self._pkg_s[-1].task_m[name]
         
         return task
 
@@ -274,6 +281,9 @@ class TaskGraphBuilder(object):
         self._pkg_spec_s.pop()
 
         return task
+    
+    def findTaskDef(self, name):
+        pass
 
     def _resolveNeedRef(self, need_def) -> str:
         if need_def.find(".") == -1:
@@ -417,5 +427,8 @@ class TaskGraphBuilder(object):
 
         self._logger.debug("--> getTaskCtor %s" % spec.name)
         return ctor
+    
+    def error(self, msg):
+        pass
     
 

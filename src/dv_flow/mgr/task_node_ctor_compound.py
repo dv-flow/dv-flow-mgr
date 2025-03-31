@@ -69,10 +69,23 @@ class TaskNodeCtorCompound(TaskNodeCtor):
     def _buildSubGraph(self, builder, node):
         nodes = []
 
+        # First, build out all tasks so they're available
+        tasks_defs = []
         for t in self.tasks:
+            # Initially, 
+            sn = t.mkTaskNode(
+                builder=builder, 
+                params=t.mkTaskParams(),
+                name=t.name,
+                needs=[])
+            nodes.append(sn)
+            builder.addTask(t.name, sn)
+            tasks_defs.append(sn, t)
+
+        for t,td in tasks_defs:
             # Need to get the parent name
             needs = []
-            for n in t.needs:
+            for n in td.needs:
                 # 'n' is the dependency as specified by the user
                 # Need to perform a search
                 # - Look locally inside the compound task (pkg.compound.name)
@@ -94,13 +107,8 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                     task.name, t.name
                 ))
                 needs.append(task)
-            sn = t.mkTaskNode(
-                builder=builder, 
-                params=t.mkTaskParams(),
-                name=t.name,
-                needs=needs)
-            nodes.append(sn)
-            builder.addTask(t.name, sn)
+            t.needs.extends(needs)
+
         in_t = builder.findTask("in")
 
         

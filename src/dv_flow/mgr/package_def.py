@@ -541,7 +541,10 @@ class PackageDef(BaseModel):
         # - Directory path
 
         if os.path.isfile(os.path.join(pkg._basedir, spec)):
-            PackageDef._loadFragmentFile(pkg, spec, file_s)
+            PackageDef._loadFragmentFile(
+                pkg, 
+                os.path.join(pkg._basedir, spec), 
+                file_s)
         elif os.path.isdir(os.path.join(pkg._basedir, spec)):
             PackageDef._loadFragmentDir(pkg, os.path.join(pkg._basedir, spec), file_s)
         else:
@@ -564,7 +567,7 @@ class PackageDef(BaseModel):
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=yaml.FullLoader)
             PackageDef._log.debug("doc: %s" % str(doc))
-            if "fragment" in doc.keys():
+            if doc is not None and "fragment" in doc.keys():
                 # Merge the package definition
                 frag = FragmentDef(**(doc["fragment"]))
                 frag._basedir = os.path.dirname(file)
