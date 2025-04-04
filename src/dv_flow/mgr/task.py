@@ -4,6 +4,11 @@ from .task_def import TaskDef
 from .task_node_ctor import TaskNodeCtor
 
 @dc.dataclass
+class Need(object):
+    task : 'Task'
+    cond : str = None
+
+@dc.dataclass
 class Task(object):
     """
     Type information about a task, linking it into the package
@@ -14,10 +19,15 @@ class Task(object):
     """
     name : str
     ctor : TaskNodeCtor = None
+    paramT : Any = None
     uses : 'Task' = None
-    needs : List['Task'] = dc.field(default_factory=list)
+    needs : List[str] = dc.field(default_factory=list)
     subtasks : List['Task'] = dc.field(default_factory=list)
     srcinfo : Any = None
+
+    @property
+    def leafname(self):
+        return self.name[self.name.rfind(".")+1:]
 
     def __post_init__(self):
         if self.name is None:

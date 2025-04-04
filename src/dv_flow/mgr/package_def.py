@@ -31,6 +31,7 @@ import pydantic
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
 from typing import Any, Dict, List, Callable, Tuple, ClassVar, Union
+from .config_def import ConfigDef
 from .fragment_def import FragmentDef
 from .package_import_spec import PackageImportSpec, PackageSpec
 from .param_def import ParamDef
@@ -60,14 +61,17 @@ class PackageDef(BaseModel):
     params : List[ParamDef] = dc.Field(
         default_factory=list, alias="with",
         description="List of package parameters to set")
+    configs : List[ConfigDef] = dc.Field(
+        default_factory=list,
+        description="List of package configurations")
     srcinfo : SrcInfo = dc.Field(default=None)
 
-    @pydantic.model_validator(mode='before')
-    def filter_srcinfo(self, values):
-        print("pkg_def values: %s" % values)
-#        if values.get("srcinfo") is not None:
-#            values["srcinfo"] = values["srcinfo"].replace("\\", "/")
-        return self
+#     @pydantic.model_validator(mode='before')
+#     def filter_srcinfo(self, values):
+#         print("pkg_def values: %s" % values)
+# #        if values.get("srcinfo") is not None:
+# #            values["srcinfo"] = values["srcinfo"].replace("\\", "/")
+#         return self
 
     _fragment_l : List['FragmentDef'] = []
     _subpkg_m : Dict[str,'PackageDef'] = {}

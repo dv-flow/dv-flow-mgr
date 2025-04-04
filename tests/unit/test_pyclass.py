@@ -2,7 +2,7 @@
 import os
 import asyncio
 import pytest
-from dv_flow.mgr import TaskGraphBuilder, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, PackageLoader
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
 #from dv_flow_mgr.tasklib.builtin_pkg import TaskPyClass, TaskPyClassParams
@@ -58,14 +58,18 @@ async def foo(runner, input):
         f.write(flow)
 
     rundir = os.path.join(tmpdir, "rundir")
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
-        root_pkg=pkg_def,
+        root_pkg=pkg,
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
     task = builder.mkTaskGraph("pkg1.foo")
     output = asyncio.run(runner.run(task))
+
+    assert runner.status == 0
+    assert os.path.isdir(os.path.join(rundir, "pkg1.foo"))
+
 
 
 def test_class_use(tmpdir):
@@ -97,7 +101,7 @@ async def foo(runner, input) -> TaskDataResult:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
@@ -138,7 +142,7 @@ async def foo(runner, input) -> TaskDataResult:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
@@ -182,7 +186,7 @@ async def foo(runner, input) -> TaskDataResult:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
@@ -237,7 +241,7 @@ async def foo(runner, input) -> TaskDataResult:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
@@ -265,7 +269,7 @@ package:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
@@ -296,7 +300,7 @@ package:
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
         f.write(flow)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))

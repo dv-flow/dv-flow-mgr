@@ -10,10 +10,9 @@ from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
-from .package_root import PackageRoot
 from .pkg_rgy import PkgRgy
 from .task import Task
-from .task_def import TaskDef, PassthroughE, ConsumesE
+from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_compound import TaskNodeCtorCompound
 from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
@@ -25,31 +24,11 @@ from .yaml_srcinfo_loader import YamlSrcInfoLoader
 
 @dc.dataclass
 class SymbolScope(object):
-    def add(self, task):
-        pass
-
-    def find(self, name) -> Task:
-        pass
-
-    def findType(self, name) -> Task:
-        pass
-
-@dc.dataclass
-class PackageScope(SymbolScope):
-    pkg : Package
-
-    def find(self, name) -> Task:
-        if name in self.pkg.task_m.keys():
-            return self.pkg.task_m[name]
-        else:
-            return None
-
-@dc.dataclass
-class TaskScope(SymbolScope):
+    name : str
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
 
-    def add(self, task):
-        self.task_m[task.name] = task
+    def add(self, task, name):
+        self.task_m[name] = task
 
     def find(self, name) -> Task:
         if name in self.task_m.keys():
@@ -57,11 +36,19 @@ class TaskScope(SymbolScope):
         else:
             return None
 
+    def findType(self, name) -> Task:
+        pass
+
+
+@dc.dataclass
+class TaskScope(SymbolScope):
+    pass
+
 @dc.dataclass
 class LoaderScope(SymbolScope):
-    loader : 'PackageLoader'
+    loader : 'PackageLoader' = None
 
-    def add(self, task):
+    def add(self, task, name):
         raise NotImplementedError("LoaderScope.add() not implemented")
     
     def find(self, name) -> Task:
@@ -80,11 +67,84 @@ class LoaderScope(SymbolScope):
                 if path is not None:
                     pkg = self.loader._loadPackage(path)
                     self.loader._pkg_m[pkg_name] = pkg
-            if pkg is not None:
-                return pkg.findTask(task_name)
+            if pkg is not None and name in pkg.task_m.keys():
+                return pkg.task_m[name]
             else:
                 return None
 
+@dc.dataclass
+class PackageScope(SymbolScope):
+    pkg : Package = None
+    loader : LoaderScope = None
+    _scope_s : List[SymbolScope] = dc.field(default_factory=list)
+
+    def add(self, task, name):
+        if len(self._scope_s):
+            self._scope_s[-1].add(task, name)
+        else:
+            super().add(task, name)
+        
+    def push_scope(self, scope):
+        self._scope_s.append(scope)
+
+    def pop_scope(self):
+        self._scope_s.pop()
+
+    def find(self, name) -> Task:
+        ret = None
+        for i in range(len(self._scope_s)-1, -1, -1):
+            scope = self._scope_s[i]
+            ret = scope.find(name)
+            if ret is not None:
+                break
+
+        if ret is None:
+            ret = super().find(name)
+
+        if ret is None and name in self.pkg.task_m.keys():
+            ret = self.pkg.task_m[name]
+
+        if ret is None:
+            raise Exception("Failed to find Task %s" % name)
+
+        return ret
+
+    def findType(self, name) -> Task:
+        ret = None
+
+        if name in self.task_m.keys():
+            ret = self.task_m[name]
+
+        if ret is None:
+            for i in range(len(self._scope_s)-1, -1, -1):
+                scope = self._scope_s[i]
+                ret = scope.findType(name)
+                if ret is not None:
+                    break
+        
+        if ret is None:
+            ret = super().findType(name)
+
+        if ret is None and name in self.pkg.task_m.keys():
+            ret = self.pkg.task_m[name]
+
+        if ret is None:
+            ret = self.loader.findType(name)
+        
+        if ret is None:
+            raise Exception("Failed to find TaskType %s" % name)
+        return ret
+
+    def getScopeFullname(self, leaf=None) -> str:
+        path = self.name
+        if len(self._scope_s):
+            path +=  "."
+            path += ".".join([s.name for s in self._scope_s])
+
+        if leaf is not None:
+            path += "." + leaf
+        return path
+    
 
 @dc.dataclass
 class PackageLoader(object):
@@ -94,16 +154,15 @@ class PackageLoader(object):
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
-    _task_l : List[Tuple[Task,TaskDef]] = dc.field(default_factory=list)
-    _scope_s : List[SymbolScope] = dc.field(default_factory=list)
-    _task_s : List[Task] = dc.field(default_factory=list)
+    _loader_scope : LoaderScope = None
 
     def __post_init__(self):
         if self.pkg_rgy is None:
             self.pkg_rgy = PkgRgy.inst()
-        self._scope_s.append(LoaderScope(self))
 
-    def load(self, root) -> PackageRoot:
+        self._loader_scope = LoaderScope(name=None, loader=self)
+
+    def load(self, root) -> Package:
         self._log.debug("--> load %s" % root)
         ret = self._loadPackage(root, None)
         self._log.debug("<-- load %s" % root)
@@ -152,25 +211,17 @@ class PackageLoader(object):
         return pkg
 
     def _mkPackage(self, pkg_def : PackageDef, root : str) -> Package:
+        self._log.debug("--> _mkPackage %s" % pkg_def.name)
         pkg = Package(pkg_def, os.path.dirname(root))
 
         self._pkg_m[pkg.name] = pkg
-        self._pkg_s.append(PackageScope(pkg))
-        self._scope_s.append(PackageScope(pkg))
+        self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
         self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
         self._loadFragments(pkg, pkg_def.fragments, pkg.basedir)
         self._loadTasks(pkg, pkg_def.tasks, pkg.basedir)
-
-        if len(self._pkg_s) == 1:
-            # Back to the root package
-            for name,pkg in self._pkg_m.items():
-                # TODO: resolve names within the package
-                pass
-#                self.pkg_rgy.registerPackage(name, pkg)
-
         self._pkg_s.pop()
-        self._scope_s.pop()
 
+        self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
     
     def _loadPackageImports(self, pkg, imports, basedir):
@@ -283,11 +334,11 @@ class PackageLoader(object):
             needs = []
 
             task = Task(
-                name=taskdef.name,
-                ctor=None,
+                name=self._getScopeFullname(taskdef.name),
                 srcinfo=taskdef.srcinfo)
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
+            self._pkg_s[-1].add(task, taskdef.name)
 
         # Now, build out tasks
         for taskdef, task in tasks:
@@ -304,22 +355,29 @@ class PackageLoader(object):
                     raise Exception("Unknown need type %s" % str(type(need)))
 
             if taskdef.body is not None and taskdef.body.tasks is not None:
-                self._scope_s.append(TaskScope())
+                self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))
+
+                # Need to add subtasks from 'uses' scope?
+                if task.uses is not None:
+                    for st in task.uses.subtasks:
+                        self._pkg_s[-1].add(st, st.leafname)
 
                 # Build out first
                 subtasks = []
                 for td in taskdef.body.tasks:
                     st = Task(
-                        name=td.name,
+                        name=self._getScopeFullname(td.name),
                         ctor=None,
-                        srcdir=td.srcinfo)
+                        srcinfo=td.srcinfo)
                     subtasks.append((td, st))
-                    self._scope_s.add(st)
+                    task.subtasks.append(st)
+                    self._pkg_s[-1].add(st, td.name)
 
                 # Now, resolve
                 for td, st in subtasks:
                     if td.uses is not None:
-                        st.uses = self._findTaskType(td.uses)
+                        if st.uses is None:
+                            st.uses = self._findTaskType(td.uses)
                     for need in td.needs:
                         if isinstance(need, str):
                             st.needs.append(self._findTask(need))
@@ -328,27 +386,22 @@ class PackageLoader(object):
                         else:
                             raise Exception("Unknown need type %s" % str(type(need)))
                 task.body = taskdef.body
-            pass
+                self._pkg_s[-1].pop_scope()
+
+            if task.ctor is None:
+                self._mkTaskCtor(taskdef, task)
 
         # TODO: 
 
     def _findTaskType(self, name):
-        ret = None
-        for i in range(len(self._scope_s)-1, -1, -1):
-            scope = self._scope_s[i]
-            ret = scope.findType(name)
-            if ret is not None:
-                break
-        return ret
+        return self._pkg_s[-1].findType(name)
 
     def _findTask(self, name):
-        ret = None
-        for i in range(len(self._scope_s)-1, -1, -1):
-            scope = self._scope_s[i]
-            ret = scope.find(name)
-            if ret is not None:
-                break
-        return ret
+        return self._pkg_s[-1].find(name)
+
+    
+    def _getScopeFullname(self, leaf=None):
+        return self._pkg_s[-1].getScopeFullname(leaf)
 
     def _resolveTaskRefs(self, pkg, task):
         # Determine 
@@ -390,55 +443,64 @@ class PackageLoader(object):
     #     self._log.debug("<-- mkPackage %s" % pkg.name)
     #     return ret
     
-    def _mkTaskCtor(self, task, srcdir) -> TaskNodeCtor:
+    def _mkTaskCtor(self, taskdef, task):
+        srcdir = os.path.dirname(task.srcinfo.file)
         self._log.debug("--> mkTaskCtor %s (srcdir: %s)" % (task.name, srcdir))
 
-        if task.tasks is not None:
-            if isinstance(task.tasks, list) and len(task.tasks) > 0:
+        if task.ctor is not None:
+            return
+
+        if taskdef.body is not None:
+            if taskdef.body.tasks is not None:
                 # Compound task
-                ctor = self._mkCompoundTaskCtor(task, srcdir)
+                ctor = self._mkCompoundTaskCtor(task, taskdef)
             else:
-                raise Exception("not supported")
+                ctor = self._mkLeafTaskCtor(task, taskdef)
         else:
-            # Leaf task
-            ctor = self._mkLeafTaskCtor(task, srcdir)
+            # Null task
+            ctor = self._mkLeafTaskCtor(task, taskdef)
         
-        return ctor
+        task.ctor = ctor
     
 
-    def _mkLeafTaskCtor(self, task, srcdir) -> TaskNodeCtor:
+    def _mkLeafTaskCtor(self, task, taskdef) -> TaskNodeCtor:
         self._log.debug("--> _mkLeafTaskCtor")
+        srcdir = os.path.dirname(taskdef.srcinfo.file)
         base_ctor_t : TaskNodeCtor = None
         ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
 #        fullname = self.name + "." + task.name
-        rundir = task.rundir
+#        rundir = task.rundir
 
         # TODO: should we have the ctor look this up itself?
         # Want to confirm that the value can be found.
         # Defer final resolution until actual graph building (post-config)
-        if task.uses is not None:
-            self._log.debug("Uses: %s" % task.uses)
-            base_ctor_t = self.getTaskCtor(task.uses)
-            base_params = base_ctor_t.mkTaskParams()
+        if taskdef.uses is not None:
+            self._log.debug("Uses: %s" % taskdef.uses)
+            # Find the target task
+            base_task = self._findTaskType(taskdef.uses)
+            if base_task.ctor is None:
+                self._log.error("base-task ctor is None")
 
+            base_ctor_t = base_task.ctor
+            base_params = base_ctor_t.mkTaskParams()
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
         else:
             self._log.debug("No 'uses' specified")
 
-        passthrough, consumes, needs = self._getPTConsumesNeeds(task, base_ctor_t)
+        passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, base_ctor_t)
 
         # Determine the implementation constructor first
-        if task.pytask is not None:
+        if taskdef.body is not None and taskdef.body.pytask is not None:
             # Built-in impl
             # Now, lookup the class
             self._log.debug("Use PyTask implementation")
-            last_dot = task.pytask.rfind('.')
-            clsname = task.pytask[last_dot+1:]
-            modname = task.pytask[:last_dot]
+            last_dot = taskdef.body.pytask.rfind('.')
+            clsname = taskdef.body.pytask[last_dot+1:]
+            modname = taskdef.body.pytask[:last_dot]
 
             try:
                 if modname not in sys.modules:
@@ -456,7 +518,10 @@ class PackageLoader(object):
             callable = getattr(mod, clsname)
 
         # Determine if we need to use a new 
-        paramT = self._getParamT(task, base_params)
+        paramT = self._getParamT(taskdef, base_params)
+
+        # TODO:
+        rundir : RundirE = RundirE.Unique
         
         if callable is not None:
             ctor_t = TaskNodeCtorTask(
@@ -466,8 +531,8 @@ class PackageLoader(object):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs, # TODO: need to determine the needs
-                task=callable,
-                rundir=rundir)
+                rundir=rundir,
+                task=callable)
         elif base_ctor_t is not None:
             # Use the existing (base) to create the implementation
             ctor_t = TaskNodeCtorProxy(
@@ -491,31 +556,31 @@ class PackageLoader(object):
                 rundir=rundir,
                 task=TaskNull)
 
-        self._log.debug("<-- %s::mkTaskCtor %s" % (self.name, task.name))
+        self._log.debug("<-- mkTaskCtor %s" % task.name)
         return ctor_t
 
-    def _mkCompoundTaskCtor(self, task, srcdir) -> TaskNodeCtor:
+    def _mkCompoundTaskCtor(self, task, taskdef) -> TaskNodeCtor:
         self._log.debug("--> _mkCompoundTaskCtor")
+        srcdir = os.path.dirname(taskdef.srcinfo.file)
         base_ctor_t : TaskNodeCtor = None
         ctor_t : TaskNodeCtor = None
         base_params : BaseModel = None
         callable = None
 
-        fullname = self.name + "." + task.name
-
+        fullname = self._getScopeFullname()
 
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses)
-            base_ctor_t = self.getTaskCtor(task.uses)
+            base_ctor_t = task.uses.ctor
             base_params = base_ctor_t.mkTaskParams()
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
 
-        passthrough, consumes, needs = self._getPTConsumesNeeds(task, base_ctor_t)
+        passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, base_ctor_t)
 
         # Determine if we need to use a new 
-        paramT = self._getParamT(task, base_params)
+        paramT = self._getParamT(taskdef, base_params)
 
         if base_ctor_t is not None:
             ctor_t = TaskNodeCtorCompoundProxy(
@@ -538,14 +603,14 @@ class PackageLoader(object):
                 needs=needs,
                 task_def=task)
 
-        for t in task.tasks:
-            ctor_t.tasks.append(self.mkTaskCtor(t, srcdir))
+#        for t in task.subtasks:
+#            ctor_t.tasks.append(self._mkTaskCtor(t, srcdir))
 
         
-        self._log.debug("<-- %s::mkTaskCtor %s (%d)" % (self.name, task.name, len(ctor_t.tasks)))
+        self._log.debug("<-- mkTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
         return ctor_t
     
-    def _getPTConsumesNeeds(self, task, base_ctor_t):
+    def _getPTConsumesNeeds(self, task : TaskDef, base_ctor_t):
         passthrough = task.passthrough
         consumes = task.consumes.copy() if isinstance(task.consumes, list) else task.consumes
         needs = [] if task.needs is None else task.needs.copy()
@@ -563,8 +628,8 @@ class PackageLoader(object):
 
         return (passthrough, consumes, needs)
 
-    def _getParamT(self, session, task, base_t : BaseModel):
-        self._log.debug("--> _getParamT %s" % task.fullname)
+    def _getParamT(self, task, base_t : BaseModel):
+        self._log.debug("--> _getParamT %s" % task.name)
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
 
@@ -586,7 +651,7 @@ class PackageLoader(object):
         fields = []
         field_m : Dict[str,int] = {}
 
-        pkg = session.package()
+#        pkg = self.package()
 
         # First, pull out existing fields (if there's a base type)
         if base_t is not None:

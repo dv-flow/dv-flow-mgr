@@ -118,7 +118,6 @@ class TaskDef(BaseModel):
         default="",
         title="Task documentation",
         description="Full documentation of the task")
-#    needs : List[Union[str,NeedSpec,TaskSpec]] = dc.Field(
     needs : List[Union[str]] = dc.Field(
         default_factory=list, 
         description="List of tasks that this task depends on")
@@ -137,17 +136,6 @@ class TaskDef(BaseModel):
         description="Specifies matching patterns for parameter sets that this task consumes")
     srcinfo : SrcInfo = dc.Field(default=None)
     
-    def __init__(self, **data):
-#        print("--> task_def %s" % str(data))
-        super().__init__(**data)
-#        print("<-- task_def %s" % str(data))
-    
-    def copy(self) -> 'TaskDef':
-        ret = TaskDef(
-            name=self.name,
-            type=self.type,
-            depends=self.depends.copy())
-        return ret 
 
 TaskDef.model_rebuild()
 

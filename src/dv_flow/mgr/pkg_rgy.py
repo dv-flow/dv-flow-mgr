@@ -84,7 +84,7 @@ class PkgRgy(object):
     def _discover_plugins(self):
         self._log.debug("--> discover_plugins")
         # Register built-in package
-        self._pkg_m["std"] = (os.path.join(os.path.dirname(__file__), "std/flow.dv"), None)
+        self._pkg_m["std"] = os.path.join(os.path.dirname(__file__), "std/flow.dv")
 
         if "DV_FLOW_PATH" in os.environ.keys() and os.environ["DV_FLOW_PATH"] != "":
             paths = os.environ["DV_FLOW_PATH"].split(':')

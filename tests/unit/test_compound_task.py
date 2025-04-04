@@ -1,6 +1,6 @@
 import asyncio
 import os
-from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoader
 from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
 
 def test_smoke(tmpdir):
@@ -33,7 +33,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -92,7 +92,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
     
-    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -145,7 +145,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -186,7 +186,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -239,7 +239,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
