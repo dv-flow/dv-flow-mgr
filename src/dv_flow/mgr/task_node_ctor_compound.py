@@ -80,7 +80,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                 needs=[])
             nodes.append(sn)
             builder.addTask(t.name, sn)
-            tasks_defs.append(sn, t)
+            tasks_defs.append((sn, t))
 
         for t,td in tasks_defs:
             # Need to get the parent name
@@ -106,8 +106,8 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                 self._log.debug("Add %s as dependency of %s" % (
                     task.name, t.name
                 ))
-                needs.append(task)
-            t.needs.extends(needs)
+                needs.append((task, False))
+            t.needs.extend(needs)
 
         in_t = builder.findTask("in")
 
@@ -123,7 +123,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                     has_ref = True
                     break
             if not has_ref:
-                n.needs.append([builder.findTask("in"), False])
+                n.needs.append((builder.findTask("in"), False))
 
             # Only add a dependency on the node if no other node references it
             is_ref = False
@@ -133,7 +133,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
                         is_ref = True
                         break
             if not is_ref:
-                node.needs.append([n, False])
+                node.needs.append((n, False))
         
         self._log.debug("nodes: %d (%d %d)" % (len(nodes), len(self.tasks), len(node.needs)))
 

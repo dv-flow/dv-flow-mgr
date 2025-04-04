@@ -23,8 +23,8 @@ import pydantic.dataclasses as dc
 import json
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union
-from .package import Package
 from .package_import_spec import PackageImportSpec
+from .srcinfo import SrcInfo
 from .task_def import TaskDef
 from .type_def import TypeDef
 
@@ -33,6 +33,7 @@ class FragmentDef(BaseModel):
     imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list, alias="imports")
     fragments: List[str] = dc.Field(default_factory=list)
     types : List[TypeDef] = dc.Field(default_factory=list)
+    srcinfo : SrcInfo = dc.Field(default=None)
 
     _basedir : str = None
 
@@ -41,6 +42,6 @@ class FragmentDef(BaseModel):
             if t.name == name:
                 return t
             
-    def apply(self, session, pkg : Package):
-        pass
+#    def apply(self, session, pkg : Package):
+#        pass
             

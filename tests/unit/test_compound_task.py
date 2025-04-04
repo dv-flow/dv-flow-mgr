@@ -202,3 +202,58 @@ package:
 
     assert runner.status == 0
     assert output is not None
+
+def test_name_resolution_pkg(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: TopLevelTask
+      uses: std.CreateFile
+      with:
+        filename: TopLevelTask.txt
+        content: "TopLevelTask.txt"
+
+    - name: entry
+      tasks:
+      - name: create_file
+        rundir: inherit
+        uses: std.CreateFile
+        with:
+          filename: hello.txt
+          content: |
+            Hello World
+      - name: glob_txt
+        rundir: inherit
+        uses: std.FileSet
+        needs: [create_file, TopLevelTask]
+        passthrough: none
+        with:
+          base: ${{ rundir }}
+          include: "*.txt"
+          type: textFile
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    pkg_def = PackageDef.load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    TaskGraphDotWriter().write(
+        t1, 
+        os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1

@@ -5,24 +5,24 @@ semantic definition of how task graphs defined using the flow specification
 are evaluated.
 
 ## 1.0.0
-- Package definition
-- Package import
-- Task definition
-  - "with" variable usage
-  - Operations on input and output data
-  - Operations on task parameters
-- Package fragments
-- Define task status. Tasks can have at least two types of failures
-  - Pass/Fail: Fail halts successors
+* Package definition
+* Package import
+* Task definition
+  * "with" variable usage
+  * Operations on input and output data
+  * Operations on task parameters
+* Package fragments
+* Define task status. Tasks can have at least two types of failures
+  * Pass/Fail: Fail halts successors
     - Fail must come with a message and extra info
-  - Status markers/counters
+  * Status markers/counters
     - errors / warnings / notes 
   - Want known fileset to capture logfiles and related info
   - Central params and datasets?
     - Datasets preserve dependency relationships
     - Datasets are the best way to aggregate settings
-  - Typed parameter sets
-  - Dependencies provide order in which to evaluate
+  * Typed parameter sets
+  * Dependencies provide order in which to evaluate
   - Operations on variables
 
 ## 2.0.0
@@ -38,11 +38,11 @@ are evaluated.
     determine up-to-date status on a whole collection of source
 
 ## 3.0.0
-- JQ-based data extraction
+* JQ-based data extraction
 - YAML task templates / expansions
 - Support for annotating job requirements 
 - Support capturing schema for structured task data
-- Mark tasks as producing and accepting certain data
+~ Mark tasks as producing and accepting certain data
   - FileSet task `produces` fileset of `type`
   - SimImage task `accepts` systemVerilogSource, verilogSource, verilogPreCompLib, etc
   => Mostly useful for checking and suggestion
@@ -131,3 +131,17 @@ are evaluated.
 - Allow files to be attached as part of the result
 
 - Allow need relationships to be conditional
+
+
+# Apr-May
+- Configuration
+  - Conditional needs
+  - package-level parameters
+  - 
+- Subgraph builders
+  - Python
+  - Matrix strategy
+
+- Identify export tasks
+
+- Interop w/external formats

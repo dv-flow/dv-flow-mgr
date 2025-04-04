@@ -25,6 +25,7 @@ import enum
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
+from .srcinfo import SrcInfo
 from .task_output import TaskOutput
 
 @dc.dataclass
@@ -55,16 +56,23 @@ class StrategyDef(BaseModel):
         default=None,
         description="Matrix of parameter values to explore")
 
-class TaskExecDef(BaseModel):
+class TaskBodyDef(BaseModel):
     pytask : Union[str, None] = dc.Field(
         default=None,
         description="Python method to execute to implement this task")
-    pydep  : Union[str, None] = dc.Field(
+    tasks: Union[List['TaskDef'],None] = dc.Field(
+        default_factory=list,
+        description="Sub-tasks")
+    run: str = dc.Field(
         default=None,
-        description="Python method to check up-to-date status for this task")
+        description="Shell command to execute for this task")
+#    pydep  : Union[str, None] = dc.Field(
+#        default=None,
+#        description="Python method to check up-to-date status for this task")
 
 class TasksBuilder(BaseModel):
     # TODO: control how much data this task is provided?
+    srcinfo : SrcInfo = dc.Field(default=None)
     pydef : Union[str, None] = dc.Field(
         default=None,
         description="Python method to build the subgraph")
@@ -76,23 +84,31 @@ class Tasks(BaseModel):
 
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
-    name : str = dc.Field(
+    name : Union[str, None] = dc.Field(
         title="Task Name",
-        description="The name of the task")
-    fullname : str = dc.Field(default=None)
+        description="The name of the task",
+        default=None)
+    override : Union[str, None] = dc.Field(
+        title="Overide Name",
+        description="The name of the task to override",
+        default=None)
+#    fullname : str = dc.Field(default=None)
 #    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
     uses : str = dc.Field(
         default=None,
         title="Base type",
         description="Task from which this task is derived")
-    pytask : str = dc.Field(
+    body : TaskBodyDef = dc.Field(
         default=None,
-        title="Python method name",
-        description="Python method to execute to implement this task")
+        description="Task body (implementation) information")
+#    pytask : str = dc.Field(
+#        default=None,
+#        title="Python method name",
+#        description="Python method to execute to implement this task")
     strategy : StrategyDef = dc.Field(
         default=None)
-    tasks: Union[List['TaskDef'], TasksBuilder] = dc.Field(
-        default_factory=list,
+    tasks: Union[List['TaskDef'], TasksBuilder, None] = dc.Field(
+        default=None,
         description="Sub-tasks")
     desc : str = dc.Field(
         default="",
@@ -119,6 +135,7 @@ class TaskDef(BaseModel):
     consumes : Union[ConsumesE, List[Any], None] = dc.Field(
         default=None,
         description="Specifies matching patterns for parameter sets that this task consumes")
+    srcinfo : SrcInfo = dc.Field(default=None)
     
     def __init__(self, **data):
 #        print("--> task_def %s" % str(data))

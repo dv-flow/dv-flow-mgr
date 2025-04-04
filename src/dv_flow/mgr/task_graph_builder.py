@@ -25,11 +25,12 @@ import logging
 from typing import Callable
 from .package import Package
 from .package_def import PackageDef, PackageSpec
+from .package_root import PackageRoot
 from .pkg_rgy import PkgRgy
 from .task_def import RundirE
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -46,7 +47,7 @@ class CompoundTaskCtxt(object):
 @dc.dataclass
 class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
-    root_pkg : PackageDef
+    root_pkg : PackageRoot
     rundir : str
     pkg_rgy : PkgRgy = None
     marker_l : Callable = lambda *args, **kwargs: None
@@ -98,7 +99,7 @@ class TaskGraphBuilder(object):
         if pkg.name not in visited:
             visited.add(pkg.name)
             self._logger.debug("Registering package %s" % pkg.name)
-            self.pkg_rgy.registerPackage(pkg)
+#            self.pkg_rgy.registerPackage(pkg)
             for subpkg in pkg.subpkg_m.values():
                 self._registerPackages(subpkg, visited)
 
@@ -182,7 +183,7 @@ class TaskGraphBuilder(object):
                 self._compound_task_ctxt_s[-1].task_m[name] = task
         self._logger.debug("<-- addTask: %s" % name)
 
-    def findTask(self, name):
+    def findTask(self, name, create=True):
         task = None
 
         if len(self._compound_task_ctxt_s) > 0:
@@ -194,12 +195,13 @@ class TaskGraphBuilder(object):
         if task is None and name in self._task_m.keys():
             task = self._task_m[name]
 
-        if task is None:
+        if task is None and create:
             # Go search type definitions
+            pass
 
             # Check the current package
-            if len(self._pkg_s) > 0 and name in self._pkg_s[-1].task_m.keys():
-                task = self._pkg_s[-1].task_m[name]
+#            if len(self._pkg_s) > 0 and name in self._pkg_s[-1].task_m.keys():
+#                task = self._pkg_s[-1].task_m[name]
         
         return task
 
@@ -249,18 +251,18 @@ class TaskGraphBuilder(object):
 
         needs = []
 
-        for need_def in ctor_t.getNeeds():
-            # Resolve the full name of the need
-            need_fullname = self._resolveNeedRef(need_def)
-            self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
-            if not need_fullname in self._task_m.keys():
-                # Go back to the root from a rundir perspective
-                rundir_s = self._rundir_s
-                self._rundir_s = [need_fullname]
-                need_t = self._mkTaskGraph(need_fullname)
-                self._rundir_s = rundir_s
-                self._task_m[need_fullname] = need_t
-            needs.append(self._task_m[need_fullname])
+        # for need_def in ctor_t.getNeeds():
+        #     # Resolve the full name of the need
+        #     need_fullname = self._resolveNeedRef(need_def)
+        #     self._logger.debug("Searching for qualifed-name task %s" % need_fullname)
+        #     if not need_fullname in self._task_m.keys():
+        #         # Go back to the root from a rundir perspective
+        #         rundir_s = self._rundir_s
+        #         self._rundir_s = [need_fullname]
+        #         need_t = self._mkTaskGraph(need_fullname)
+        #         self._rundir_s = rundir_s
+        #         self._task_m[need_fullname] = need_t
+        #     needs.append(self._task_m[need_fullname])
 
         # The returned task should have all param references resolved
         params = ctor_t.mkTaskParams()

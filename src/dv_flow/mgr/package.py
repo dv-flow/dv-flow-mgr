@@ -21,20 +21,29 @@
 #****************************************************************************
 import dataclasses as dc
 import logging
-from typing import Any, ClassVar, Dict
-from .task_node_ctor import TaskNodeCtor
+from typing import Any, ClassVar, Dict, List
+from .fragment_def import FragmentDef
+from .package_def import PackageDef
+from .task import Task
 
 @dc.dataclass
 class Package(object):
-    name : str
+    pkg_def : PackageDef
+    basedir : str = None
     params : Dict[str,Any] = dc.field(default_factory=dict)
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
-    tasks : Dict[str,TaskNodeCtor] = dc.field(default_factory=dict)
+    task_m : Dict[str,Task] = dc.field(default_factory=dict)
     types : Dict[str,Any] = dc.field(default_factory=dict)
+    fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
+    pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
     _log : ClassVar = logging.getLogger("Package")
 
-    def getTaskCtor(self, name : str) -> TaskNodeCtor:
+    @property
+    def name(self):
+        return self.pkg_def.name
+
+    def getTaskCtor(self, name : str) -> Task:
         self._log.debug("-- %s::getTaskCtor: %s" % (self.name, name))
         if name not in self.tasks.keys():
             raise Exception("Task %s not present in package %s" % (name, self.name))

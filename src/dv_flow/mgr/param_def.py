@@ -20,7 +20,7 @@
 #*
 #****************************************************************************
 from typing import Any, List, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 class ListType(BaseModel):
 #    item : Union[str, 'ComplexType']
@@ -47,4 +47,5 @@ class ParamDef(BaseModel):
     prepend : Union[Any, None] = None
     path_append : Union[Any, None] = Field(alias="path-append", default=None)
     path_prepend : Union[Any, None] = Field(alias="path-prepend", default=None)
+    srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
 

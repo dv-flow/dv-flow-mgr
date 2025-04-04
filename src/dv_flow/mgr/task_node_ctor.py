@@ -33,9 +33,13 @@ from .param import Param
 @dc.dataclass
 class TaskNodeCtor(object):
     """
-    Factory for a specific task type
-    - Produces a task parameters object, applying value-setting instructions
-    - Produces a TaskNode
+    Factory for a specific task type. A TaskNodeCtor has two clients. 
+    - The graph builder may call it. In this case, 'needs', passthrough,
+      and consumes are known. Also, the default parameters block is built
+    - It may be called to programmatically create a task from a Python
+      workflow (eg pytest-dv-flow). In this case, the API call may supply
+      additional needs, specify passthrough and consumes requirements,
+      and customize parameter values
     """
     name : str
     srcdir : str

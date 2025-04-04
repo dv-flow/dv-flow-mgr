@@ -23,14 +23,13 @@ import os
 import logging
 import sys
 from typing import Dict, Tuple
-from .package_def import PackageDef
 
 class PkgRgy(object):
     _inst = None
 
     def __init__(self):
         self._pkgpath = []
-        self._pkg_m : Dict[str, Tuple[str,PackageDef]] = {}
+        self._pkg_m : Dict[str, str] = {}
         self._log = logging.getLogger(type(self).__name__)
         self._override_m : Dict[str,str] = {}
 
@@ -47,21 +46,15 @@ class PkgRgy(object):
             return True
         else:
             return False
-    
-    def getPackage(self, name):
-        self._log.debug("--> getPackage(%s)" % name)
+        
+    def findPackagePath(self, name) -> str:
+        ret = None
+        self._log.debug("--> findPackagePath(%s)" % name)
         if name in self._pkg_m.keys():
-            if self._pkg_m[name][1] is None:
-                pkg_def = PackageDef.load(self._pkg_m[name][0])
-                # Load the package
-                self._pkg_m[name] = (
-                    self._pkg_m[name][0],
-                    pkg_def
-                )
-            ret = self._pkg_m[name][1]
+            ret = self._pkg_m[name]
         else:
             ret = self._findOnPath(name)
-        self._log.debug("<-- getPackage(%s)" % name)
+        self._log.debug("<-- findPackagePath(%s)" % name)
         return ret
         
     def _findOnPath(self, name):
@@ -72,28 +65,21 @@ class PkgRgy(object):
         else:
             name_pref = None
 
-        pkg = None
+        ret = None
 
         for path in self._pkgpath:
             if os.path.isfile(os.path.join(path, name_dir, "flow.dv")):
-                pkg = PackageDef.load(os.path.join(path, name_dir, "flow.dv"))
+                ret = os.path.join(path, name_dir, "flow.dv")
             elif name_pref is not None and os.path.isfile(os.path.join(path, name_pref, name_s[-1] + ".dv")):
-                pkg = PackageDef.load(os.path.join(path, name_pref, name_s[-1] + ".dv"))
+                ret = os.path.join(path, name_pref, name_s[-1] + ".dv")
             elif os.path.isfile(os.path.join(path, name + ".dv")):
-                pkg = PackageDef.load(os.path.join(path, name + ".dv"))
+                ret = os.path.join(path, name + ".dv")
 
-            if pkg is not None:
-                self._pkg_m[name] = (pkg.name, pkg)
+            if ret is not None:
+                self._pkg_m[name] = ret
                 break
 
-        return pkg
-
-    def registerPackage(self, pkg_def):
-        self._log.debug("--> registerPackage %s" % pkg_def.name)
-        if pkg_def.name in self._pkg_m.keys():
-            raise Exception("Duplicate package %s" % pkg_def.name)
-        self._pkg_m[pkg_def.name] = (pkg_def.basedir, pkg_def)
-        self._log.debug("<-- registerPackage %s" % pkg_def.name)
+        return ret
 
     def _discover_plugins(self):
         self._log.debug("--> discover_plugins")
@@ -124,7 +110,7 @@ class PkgRgy(object):
                             self._log.debug("Package %s already registered using path %s. Conflicting path: %s" % (
                                 name, self._pkg_m[name][0], path))
                         else:
-                            self._pkg_m[name] = (path, None)
+                            self._pkg_m[name] = path
             except Exception as e:
                 self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e
