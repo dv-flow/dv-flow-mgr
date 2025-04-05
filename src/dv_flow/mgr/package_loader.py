@@ -7,6 +7,7 @@ import sys
 import yaml
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from .exec_callable import ExecCallable
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
@@ -228,7 +229,7 @@ class PackageLoader(object):
         if len(imports) > 0:
             self._log.info("Loading imported packages (basedir=%s)" % basedir)
         for imp in imports:
-            self._loadPackageImport(pkg, imp)
+            self._loadPackageImport(pkg, imp, basedir)
     
     def _loadPackageImport(self, pkg, imp, basedir):
         self._log.debug("--> _loadPackageImport %s" % str(imp))
@@ -385,6 +386,8 @@ class PackageLoader(object):
                             st.needs.append(self._findTask(need.name))
                         else:
                             raise Exception("Unknown need type %s" % str(type(need)))
+                    if st.ctor is None:
+                        self._mkTaskCtor(td, st)
                 task.body = taskdef.body
                 self._pkg_s[-1].pop_scope()
 
@@ -451,16 +454,22 @@ class PackageLoader(object):
             return
 
         if taskdef.body is not None:
-            if taskdef.body.tasks is not None:
+            self._log.debug("Task has a body")
+            if taskdef.body.tasks is not None and len(taskdef.body.tasks):
                 # Compound task
+                self._log.debug("Task specifies sub-task implementation")
                 ctor = self._mkCompoundTaskCtor(task, taskdef)
             else:
                 ctor = self._mkLeafTaskCtor(task, taskdef)
         else:
             # Null task
+            self._log.debug("Task doesn't specify a body -- null")
             ctor = self._mkLeafTaskCtor(task, taskdef)
-        
+
         task.ctor = ctor
+
+        if task.ctor is None:
+            raise Exception()
     
 
     def _mkLeafTaskCtor(self, task, taskdef) -> TaskNodeCtor:
@@ -489,33 +498,38 @@ class PackageLoader(object):
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
         else:
-            self._log.debug("No 'uses' specified")
+            self._log.debug("No 'uses' specified %s" % taskdef.name)
 
         passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, base_ctor_t)
 
-        # Determine the implementation constructor first
-        if taskdef.body is not None and taskdef.body.pytask is not None:
-            # Built-in impl
-            # Now, lookup the class
-            self._log.debug("Use PyTask implementation")
-            last_dot = taskdef.body.pytask.rfind('.')
-            clsname = taskdef.body.pytask[last_dot+1:]
-            modname = taskdef.body.pytask[:last_dot]
+        self._log.debug("%d needs" % len(needs))
 
-            try:
-                if modname not in sys.modules:
-                    if self._basedir not in sys.path:
-                        sys.path.append(self._basedir)
-                    mod = importlib.import_module(modname)
-                else:
-                    mod = sys.modules[modname]
-            except ModuleNotFoundError as e:
-                raise Exception("Failed to import module %s (_basedir=%s): %s" % (
-                    modname, self._basedir, str(e)))
+        # Determine the implementation constructor first
+        if taskdef.body is not None:
+            if taskdef.body.pytask is not None:
+                # Built-in impl
+                # Now, lookup the class
+                self._log.debug("Use PyTask implementation")
+                last_dot = taskdef.body.pytask.rfind('.')
+                clsname = taskdef.body.pytask[last_dot+1:]
+                modname = taskdef.body.pytask[:last_dot]
+
+                try:
+                    if modname not in sys.modules:
+                        if srcdir not in sys.path:
+                            sys.path.append(srcdir)
+                        mod = importlib.import_module(modname)
+                    else:
+                        mod = sys.modules[modname]
+                except ModuleNotFoundError as e:
+                    raise Exception("Failed to import module %s (_basedir=%s): %s" % (
+                        modname, self._basedir, str(e)))
                 
-            if not hasattr(mod, clsname):
-                raise Exception("Method %s not found in module %s" % (clsname, modname))
-            callable = getattr(mod, clsname)
+                if not hasattr(mod, clsname):
+                    raise Exception("Method %s not found in module %s" % (clsname, modname))
+                callable = getattr(mod, clsname)
+            elif taskdef.body.run is not None:
+                callable = self._getRunCallable(taskdef)
 
         # Determine if we need to use a new 
         paramT = self._getParamT(taskdef, base_params)
@@ -558,9 +572,37 @@ class PackageLoader(object):
 
         self._log.debug("<-- mkTaskCtor %s" % task.name)
         return ctor_t
+    
+    def _getRunCallable(self, taskdef):
+        self._log.debug("--> _getRunCallable %s" % taskdef.name)
+        callable = None
+        if taskdef.body.run is not None and taskdef.body.shell == "python":
+            # Evaluate a Python script
+            text = taskdef.body.run.strip()
+            text_lines = text.splitlines()
+            least_whitespace = 2^32
+            have_content = False
+            for line in text_lines:
+                line_no_leading_ws = line.lstrip()
+                if line_no_leading_ws != "":
+                    have_content = True
+                    leading_ws = len(line) - len(line_no_leading_ws)
+                    if leading_ws < least_whitespace:
+                        least_whitespace = leading_ws
+            # Remove leading whitespace
+            if have_content:
+                for i,line in enumerate(text_lines):
+                    if len(line) >= least_whitespace:
+                        text_lines[i] = line[least_whitespace:]
+
+            callable = ExecCallable(text_lines)
+        else:
+            # TODO: run a shell script
+            pass
+        return callable
 
     def _mkCompoundTaskCtor(self, task, taskdef) -> TaskNodeCtor:
-        self._log.debug("--> _mkCompoundTaskCtor")
+        self._log.debug("--> _mkCompoundTaskCtor %s" % task.name)
         srcdir = os.path.dirname(taskdef.srcinfo.file)
         base_ctor_t : TaskNodeCtor = None
         ctor_t : TaskNodeCtor = None
@@ -590,7 +632,7 @@ class PackageLoader(object):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs,
-                task_def=task,
+                task=task,
                 uses=base_ctor_t)
         else:
             self._log.debug("No 'uses' specified")
@@ -601,13 +643,18 @@ class PackageLoader(object):
                 passthrough=passthrough,
                 consumes=consumes,
                 needs=needs,
-                task_def=task)
+                task=task)
+            
+        for st in task.subtasks:
+            if st.ctor is None:
+                raise Exception("ctor for %s is None" % st.name)
+            ctor_t.tasks.append(st)
 
 #        for t in task.subtasks:
 #            ctor_t.tasks.append(self._mkTaskCtor(t, srcdir))
 
         
-        self._log.debug("<-- mkTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
+        self._log.debug("<-- mkCompoundTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
         return ctor_t
     
     def _getPTConsumesNeeds(self, task : TaskDef, base_ctor_t):

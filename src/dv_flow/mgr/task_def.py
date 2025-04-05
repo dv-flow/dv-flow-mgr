@@ -22,7 +22,7 @@
 import pydantic
 import pydantic.dataclasses as dc
 import enum
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
@@ -57,12 +57,16 @@ class StrategyDef(BaseModel):
         description="Matrix of parameter values to explore")
 
 class TaskBodyDef(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     pytask : Union[str, None] = dc.Field(
         default=None,
         description="Python method to execute to implement this task")
     tasks: Union[List['TaskDef'],None] = dc.Field(
         default_factory=list,
         description="Sub-tasks")
+    shell: Union[str, None] = dc.Field(
+        default=None,
+        description="Specifies the shell to run")
     run: str = dc.Field(
         default=None,
         description="Shell command to execute for this task")

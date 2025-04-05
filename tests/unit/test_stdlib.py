@@ -1,7 +1,7 @@
 import os
 import asyncio
 import pytest
-from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageDef
+from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoader
 from dv_flow.mgr.util import loadProjPkgDef
 
 def test_message(tmpdir, capsys):

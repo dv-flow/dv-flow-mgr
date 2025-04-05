@@ -7,8 +7,8 @@ import dataclasses as dc
 import pytest
 from typing import Any, List, Union
 import yaml
-from dv_flow.mgr import PackageDef, TaskGraphBuilder, TaskSetRunner, task, TaskDataResult
-from dv_flow.mgr import TaskGraphBuilder, PackageDef
+from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner, task, TaskDataResult
+from dv_flow.mgr import TaskGraphBuilder
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
 from dv_flow.mgr.fileset import FileSet
@@ -48,7 +48,7 @@ package:
     with open(os.path.join(tmpdir, "subdir/flow.dv"), "w") as f:
         f.write(subpkg_flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     print("pkg_def: %s" % str(pkg_def), flush=True)
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
@@ -101,7 +101,7 @@ package:
     with open(os.path.join(tmpdir, "subdir/flow.dv"), "w") as f:
         f.write(subpkg_flow_dv)
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     print("pkg_def: %s" % str(pkg_def), flush=True)
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,

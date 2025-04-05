@@ -6,7 +6,7 @@ import dataclasses as dc
 import pytest
 from typing import Any, List, Union
 import yaml
-from dv_flow.mgr import PackageDef, TaskGraphBuilder, TaskSetRunner, task, TaskDataResult
+from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner, task, TaskDataResult
 from dv_flow.mgr.fileset import FileSet
 from pydantic import BaseModel
 from shutil import copytree
@@ -19,7 +19,7 @@ def test_fileset_1(tmpdir):
         os.path.join(datadir, "test1"), 
         os.path.join(tmpdir, "test1"))
     
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "test1", "flow.dv"))
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
@@ -31,7 +31,7 @@ def test_fileset_1(tmpdir):
 
     # Now, re-run using the same run directory.
     # Since the files haven't changed, the output must indicate that
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "test1", "flow.dv"))
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
@@ -45,7 +45,7 @@ def test_fileset_1(tmpdir):
     with open(os.path.join(tmpdir, "test1", "files1", "file1_3.sv"), "w") as f:
         f.write("// file1_3.sv\n")
 
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "test1", "flow.dv"))
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
@@ -79,7 +79,7 @@ def test_fileset_input_1(tmpdir):
             output=[fs]
         )
     
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "test1", "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "test1", "flow.dv"))
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
@@ -112,7 +112,7 @@ package:
     with open(os.path.join(rundir, "top.sv"), "w") as fp:
         fp.write("\n")
     
-    pkg_def = PackageDef.load(os.path.join(tmpdir, "flow.dv"))
+    pkg_def = PackageLoader().load(os.path.join(tmpdir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))

@@ -10,23 +10,24 @@ package:
 
     tasks:
     - name: entry
-      tasks:
-      - name: create_file
-        rundir: inherit
-        uses: std.CreateFile
-        with:
-          filename: hello.txt
-          content: |
-            Hello World
-      - name: glob_txt
-        rundir: inherit
-        uses: std.FileSet
-        needs: [create_file]
-        passthrough: none
-        with:
-          base: ${{ rundir }}
-          include: "*.txt"
-          type: textFile
+      body:
+        tasks:
+        - name: create_file
+          rundir: inherit
+          uses: std.CreateFile
+          with:
+            filename: hello.txt
+            content: |
+              Hello World
+        - name: glob_txt
+          rundir: inherit
+          uses: std.FileSet
+          needs: [create_file]
+          passthrough: none
+          with:
+            base: ${{ rundir }}
+            include: "*.txt"
+            type: textFile
 """
 
     rundir = os.path.join(tmpdir)
@@ -216,23 +217,24 @@ package:
         content: "TopLevelTask.txt"
 
     - name: entry
-      tasks:
-      - name: create_file
-        rundir: inherit
-        uses: std.CreateFile
-        with:
-          filename: hello.txt
-          content: |
-            Hello World
-      - name: glob_txt
-        rundir: inherit
-        uses: std.FileSet
-        needs: [create_file, TopLevelTask]
-        passthrough: none
-        with:
-          base: ${{ rundir }}
-          include: "*.txt"
-          type: textFile
+      body:
+        tasks:
+        - name: create_file
+          rundir: inherit
+          uses: std.CreateFile
+          with:
+            filename: hello.txt
+            content: |
+              Hello World
+        - name: glob_txt
+          rundir: inherit
+          uses: std.FileSet
+          needs: [create_file, TopLevelTask]
+          passthrough: none
+          with:
+            base: ${{ rundir }}
+            include: "*.txt"
+            type: textFile
 """
 
     rundir = os.path.join(tmpdir)

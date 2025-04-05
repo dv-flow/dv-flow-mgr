@@ -6,7 +6,7 @@ import pydantic.dataclasses as pdc
 import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
-from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskMarker, SeverityE
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
@@ -119,7 +119,22 @@ class TaskNodeLeaf(TaskNode):
         ctxt = TaskRunCtxt(runner=runner, rundir=input.rundir)
 
         self._log.debug("--> Call task method %s" % str(self.task))
-        self.result : TaskDataResult = await self.task(ctxt, input)
+        try:
+            self.result : TaskDataResult = await self.task(ctxt, input)
+        except Exception as e:
+            self._log.error("Task %s failed: %s" % (self.name, str(e)))
+            self._log.exception(e)
+            self.result = TaskDataResult(
+                status=1,
+                changed=False,
+                output=[],
+                markers=[
+                    TaskMarker(
+                        msg="Task implementation raised an exception: %s" % str(e),
+                        severity=SeverityE.Error
+                    )
+                ],
+                memento=None)
         self._log.debug("<-- Call task method %s" % str(self.task))
 
         self.result.markers.extend(ctxt._markers)

@@ -143,6 +143,7 @@ class TaskSetRunner(TaskRunner):
                     if not os.path.isdir(rundir):
                         os.makedirs(rundir, exist_ok=True)
 
+                    self._log.debug("start task %s" % t.name)
                     self._notify(t, "enter")
                     t.start = datetime.now()
                     coro = asyncio.Task(t.do_run(
@@ -188,6 +189,7 @@ class TaskSetRunner(TaskRunner):
                 if active_task_l[i][1] == d:
                     tt = active_task_l[i][0]
                     tt.end = datetime.now()
+                    self._log.debug("complete task %s" % tt.name)
                     if tt.result is None:
                         raise Exception("Task %s did not produce a result" % tt.name)
                     if tt.result.memento is not None:

@@ -1,6 +1,6 @@
 import dataclasses as dc
 from typing import Any, List, Tuple
-from .task_def import TaskDef
+from .task_def import TaskDef, RundirE
 from .task_node_ctor import TaskNodeCtor
 
 @dc.dataclass
@@ -22,6 +22,7 @@ class Task(object):
     paramT : Any = None
     uses : 'Task' = None
     needs : List[str] = dc.field(default_factory=list)
+    rundir : RundirE = None
     subtasks : List['Task'] = dc.field(default_factory=list)
     srcinfo : Any = None
 
@@ -32,4 +33,7 @@ class Task(object):
     def __post_init__(self):
         if self.name is None:
             self.name = self.task_def.name
+
+    def __hash__(self):
+        return id(self)
 

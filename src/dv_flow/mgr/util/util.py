@@ -21,7 +21,7 @@
 #****************************************************************************
 import os
 import yaml
-from ..package_def import PackageDef
+from ..package_loader import PackageLoader
 
 def loadProjPkgDef(path):
     """Locates the project's flow spec and returns the PackageDef"""
@@ -33,7 +33,7 @@ def loadProjPkgDef(path):
             with open(os.path.join(dir, "flow.dv")) as f:
                 data = yaml.load(f, Loader=yaml.FullLoader)
                 if "package" in data.keys():
-                    ret = PackageDef.load(os.path.join(dir, "flow.dv"))
+                    ret = PackageLoader().load(os.path.join(dir, "flow.dv"))
                     break
         dir = os.path.dirname(dir)
     return ret

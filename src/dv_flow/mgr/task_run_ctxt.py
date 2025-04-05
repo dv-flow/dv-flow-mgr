@@ -79,3 +79,7 @@ class TaskRunCtxt(object):
     def error(self, msg : str, loc : TaskMarkerLoc=None):
         """Add an error marker related to the task's execution"""
         self.marker(msg=msg, severity=SeverityE.Error, loc=loc)
+
+    def info(self, msg : str, loc : TaskMarkerLoc=None):
+        """Add an error marker related to the task's execution"""
+        self.marker(msg=msg, severity=SeverityE.Info, loc=loc)

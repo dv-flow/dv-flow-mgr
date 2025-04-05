@@ -25,6 +25,7 @@ import dataclasses as dc
 import logging
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from .task import Task
 from .task_def import TaskDef, RundirE
 from .task_data import TaskDataOutput, TaskDataResult
 from .task_node import TaskNode
@@ -33,8 +34,8 @@ from .task_node_compound import TaskNodeCompound
 
 @dc.dataclass
 class TaskNodeCtorCompound(TaskNodeCtor):
-    task_def : TaskDef
-    tasks : List[TaskNodeCtor] = dc.field(default_factory=list)
+    task : Task
+    tasks : List[Task] = dc.field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskNodeCtorCompound")
 
@@ -54,9 +55,9 @@ class TaskNodeCtorCompound(TaskNodeCtor):
             needs=needs)
         # Use the compound task's rundir
 
-        builder.enter_compound(node, self.task_def.rundir)
+        # TODO:
+        builder.enter_compound(node, RundirE.Unique)
         node.input.rundir = builder.get_rundir()
-        print("input rundir: %s" % str(node.input.rundir))
         builder.addTask("in", node.input)
 
         self._buildSubGraph(builder, node)
@@ -73,50 +74,36 @@ class TaskNodeCtorCompound(TaskNodeCtor):
         tasks_defs = []
         for t in self.tasks:
             # Initially, 
-            sn = t.mkTaskNode(
+            sn = t.ctor.mkTaskNode(
                 builder=builder, 
-                params=t.mkTaskParams(),
+                params=t.ctor.mkTaskParams(),
                 name=t.name,
                 needs=[])
             nodes.append(sn)
             builder.addTask(t.name, sn)
-            tasks_defs.append((sn, t))
+            tasks_defs.append((t, sn))
 
-        for t,td in tasks_defs:
+        # Build out the needs for each task
+        for t,tn in tasks_defs:
             # Need to get the parent name
             needs = []
-            for n in td.needs:
-                # 'n' is the dependency as specified by the user
-                # Need to perform a search
-                # - Look locally inside the compound task (pkg.compound.name)
-                # - Look for the fully-qualified task name
-                # - Look for the task name in the package
+            for n in t.needs:
+                sn = builder.findTask(n.name)
 
-                names = []
-                for pref in (builder.get_name_prefix(), "", builder.package().name):
-                    need_name = n if pref == "" else ("%s.%s" % (pref, n))
-                    names.append(need_name)
-                    task = builder.findTask(need_name)
-
-                    if task is not None:
-                        break
-
-                if task is None:
-                    raise Exception("Failed to find task %s (searched %s)" % (n, str(names)))
-                self._log.debug("Add %s as dependency of %s" % (
-                    task.name, t.name
-                ))
-                needs.append((task, False))
-            t.needs.extend(needs)
+                if sn is None:
+                    raise Exception("Failed to find task %s" % n.name)
+                self._log.debug("Add %s as dependency of %s" % (sn.name, t.name))
+                needs.append((sn, False))
+            tn.needs.extend(needs)
 
         in_t = builder.findTask("in")
 
         
         for n in nodes:
-
             # If this node references one of the others, then 
             # it takes input from that node, and not the 'in' node
             has_ref = False
+            self._log.debug("Node: %s (task=%s)" % (n.name, str(n)))
             for nt in n.needs:
                 self._log.debug("nt: %s %s" % (nt[0].name, str(n.needs)))
                 if nt[0] in nodes or nt[0] is in_t:

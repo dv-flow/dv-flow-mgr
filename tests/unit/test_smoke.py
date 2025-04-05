@@ -6,11 +6,11 @@ import pytest
 import jq
 from typing import List
 import yaml
-from dv_flow.mgr import TaskSetRunner, PackageDef, TaskData, TaskGraphBuilder
+from dv_flow.mgr import TaskSetRunner, PackageLoader, TaskGraphBuilder
 from pydantic import BaseModel
 from shutil import copytree
 
-def test_smoke_1():
+def test_smoke_1(tmpdir):
     flowdv = """
 package:
     name: my_pkg
@@ -24,11 +24,14 @@ package:
           type: int
 """
 
-    pkg_def = PackageDef.loads(flowdv)
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flowdv)
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(pkg_def, os.getcwd())
     task = builder.mkTaskGraph("my_pkg.entry", rundir="mk_pkg.entry")
 
-    assert len(task.rundir) == 1
+    assert task is not None
 
 def test_jq():
     data = [

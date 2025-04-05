@@ -28,7 +28,8 @@ package:
 
   tasks:
   - name: Message
-    pytask: dv_flow.mgr.std.message.Message
+    body:
+      pytask: dv_flow.mgr.std.message.Message
     with:
       msg:
         type: str
@@ -36,7 +37,8 @@ package:
   - name: FileSet
     doc: |
       Creates a fileset from a list of files or glob patterns
-    pytask: dv_flow.mgr.std.fileset.FileSet
+    body:
+      pytask: dv_flow.mgr.std.fileset.FileSet
     passthrough: all
     consumes: none
     with:
@@ -61,7 +63,8 @@ package:
         type: str
         value: ""
   - name: CreateFile
-    pytask: dv_flow.mgr.std.create_file.CreateFile
+    body:
+      pytask: dv_flow.mgr.std.create_file.CreateFile
     passthrough: all
     consumes: none
     doc: |
@@ -78,7 +81,8 @@ package:
       content:
         type: str
   - name: Exec
-    pytask: dv_flow.mgr.std.exec.Exec
+    body:
+      pytask: dv_flow.mgr.std.exec.Exec
     desc: Executes a subprocess
     with:
       shell:

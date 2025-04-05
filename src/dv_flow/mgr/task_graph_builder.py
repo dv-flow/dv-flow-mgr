@@ -190,6 +190,12 @@ class TaskGraphBuilder(object):
             task = self._task_m[name]
 
         if task is None and create:
+            if name in self.root_pkg.task_m.keys():
+                task = self.mkTaskGraph(name)
+                self._log.debug("Found task %s in root package" % name)
+            else:
+                raise Exception("Failed to find task %s" % name)
+                pass
             # Go search type definitions
             pass
 
@@ -233,6 +239,13 @@ class TaskGraphBuilder(object):
         params = ctor.mkTaskParams()
 
         needs = []
+
+        for need in task_t.needs:
+            need_n = self.findTask(need.name)
+            if need_n is None:
+                raise Exception("Failed to find need %s" % need.name)
+            needs.append(need_n)
+
         task = ctor.mkTaskNode(
             builder=self,
             params=params,
@@ -318,10 +331,14 @@ class TaskGraphBuilder(object):
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
 
+        pkg = None
         if task_t in self.root_pkg.task_m.keys():
             ctor = self.root_pkg.task_m[task_t].ctor
+            pkg = self.root_pkg
         else:
+            raise Exception("task_t (%s) not present" % str(task_t))
             pass
+        self.push_package(pkg)
 
         # if task_t in self._override_m.keys():
         #     self._log.debug("Overriding task %s with %s" % (task_t, self._override_m[task_t]))
@@ -368,6 +385,7 @@ class TaskGraphBuilder(object):
         else:
             raise Exception("Failed to find ctor for task %s" % task_t)
 #        self._pkg_s.pop()
+        self.pop_package(pkg)
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
         
