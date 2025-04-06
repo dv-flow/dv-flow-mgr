@@ -240,7 +240,6 @@ package:
           chain:
           matrix: 
         tasks:
-        pytask:
         shell:
         run: |
 """

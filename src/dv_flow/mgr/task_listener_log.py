@@ -33,6 +33,10 @@ class TaskListenerLog(object):
     def __post_init__(self):
         self.console = Console(highlight=False)
 
+    def marker(self, marker):
+        """Receives markers during loading"""
+        pass
+
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
             self.level += 1

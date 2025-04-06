@@ -1,5 +1,5 @@
 #****************************************************************************
-#* pkg_rgy.py
+#* ext_rgy.py
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -19,17 +19,23 @@
 #*     Author: 
 #*
 #****************************************************************************
+import dataclasses as dc
 import os
 import logging
 import sys
-from typing import Dict, Tuple
+from typing import Callable, ClassVar, Dict, Tuple
+from .exec_callable import ExecCallable
+from .pytask_callable import PytaskCallable
+from .shell_callable import ShellCallable
 
-class PkgRgy(object):
-    _inst = None
+@dc.dataclass
+class ExtRgy(object):
+    _inst : ClassVar = None
 
     def __init__(self):
         self._pkgpath = []
         self._pkg_m : Dict[str, str] = {}
+        self._shell_m : Dict[str, Callable] = {}
         self._log = logging.getLogger(type(self).__name__)
         self._override_m : Dict[str,str] = {}
 
@@ -46,6 +52,10 @@ class PkgRgy(object):
             return True
         else:
             return False
+        
+    def findShell(self, name) -> Callable:
+        if name in self._shell_m.keys():
+            return self._shell_m[name]
         
     def findPackagePath(self, name) -> str:
         ret = None
@@ -86,6 +96,11 @@ class PkgRgy(object):
         # Register built-in package
         self._pkg_m["std"] = os.path.join(os.path.dirname(__file__), "std/flow.dv")
 
+        # Register built-in shells
+        self._shell_m["shell"] = ShellCallable
+        self._shell_m["pytask"] = ExecCallable
+
+
         if "DV_FLOW_PATH" in os.environ.keys() and os.environ["DV_FLOW_PATH"] != "":
             paths = os.environ["DV_FLOW_PATH"].split(':')
             self._pkgpath.extend(paths)
@@ -111,6 +126,14 @@ class PkgRgy(object):
                                 name, self._pkg_m[name][0], path))
                         else:
                             self._pkg_m[name] = path
+                if hasattr(mod, "dvfm_shells"):
+                    shell_m = mod.dvfm_shells()
+                    for name, shell in shell_m.items():
+                        self._log.debug("Registering shell %s" % name)
+                        if name in self._shell_m.keys():
+                            self._log.debug("Shell %s already registered" % name)
+                        else:
+                            self._shell_m[name] = shell
             except Exception as e:
                 self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e

@@ -27,7 +27,7 @@ from ..util import loadProjPkgDef
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
-from ..pkg_rgy import PkgRgy
+from ..ext_rgy import PkgRgy
 
 
 class CmdRun(object):
@@ -36,7 +36,8 @@ class CmdRun(object):
     def __call__(self, args):
 
         # First, find the project we're working with
-        pkg = loadProjPkgDef(os.getcwd())
+        listener = TaskListenerLog()
+        pkg = loadProjPkgDef(os.getcwd(), listener=listener)
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
@@ -77,6 +78,7 @@ class CmdRun(object):
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
         rundir = os.path.join(pkg._basedir, "rundir")
 
+
         if args.clean:
             print("Note: Cleaning rundir %s" % rundir)
             if os.path.exists(rundir):
@@ -89,7 +91,7 @@ class CmdRun(object):
         if args.j != -1:
             runner.nproc = int(args.j)
 
-        runner.add_listener(TaskListenerLog().event)
+        runner.add_listener(listener.event)
 
         tasks = []
 

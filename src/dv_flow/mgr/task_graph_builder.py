@@ -22,14 +22,24 @@
 import os
 import dataclasses as dc
 import logging
-from typing import Callable
+from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
-from .pkg_rgy import PkgRgy
+from .ext_rgy import ExtRgy
+from .task import Task
 from .task_def import RundirE
+from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
-from typing import Any, Dict, List, Union
+from .task_node_ctor import TaskNodeCtor
+from .task_node_ctor_compound import TaskNodeCtorCompound
+from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
+from .task_node_ctor_proxy import TaskNodeCtorProxy
+from .task_node_ctor_task import TaskNodeCtorTask
+from .task_node_ctor_wrapper import TaskNodeCtorWrapper
+from .std.task_null import TaskNull
+from .shell_callable import ShellCallable
+from .exec_callable import ExecCallable
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -52,7 +62,9 @@ class TaskGraphBuilder(object):
     _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
+    _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
     _task_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
+    _task_ctor_m : Dict[Task,TaskNodeCtor] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
@@ -63,41 +75,12 @@ class TaskGraphBuilder(object):
 
     def __post_init__(self):
         # Initialize the overrides from the global registry
-
         self._log = logging.getLogger(type(self).__name__)
-
-        # if self.root_pkg is not None:
-        #     self._log.debug("TaskGraphBuilder: root_pkg: %s" % str(self.root_pkg))
-
-        #     # Register package definitions found during loading
-        #     visited = set()
-        #     self._registerPackages(self.root_pkg, visited)
-
-        #     self._pkg_spec_s.append(self.root_pkg)
-        #     pkg = self.root_pkg.mkPackage(self)
-        #     self._pkg_spec_s.pop()
-
-        #     # Allows us to find ourselves
-        #     self._pkg_m[PackageSpec(self.root_pkg.name)] = pkg
-
-    # def loadPkg(self, pkgfile : str):
-    #     pkg = PackageDef.load(pkgfile)
-    #     visited = set()
-    #     self._registerPackages(pkg, visited)
+        self._shell_m.update(ExtRgy._inst.shell_m)
 
     def addOverride(self, key : str, val : str):
         self._override_m[key] = val
 
-#     def _registerPackages(self, pkg : PackageDef, visited):
-#         self._log.debug("Packages: %s" % str(pkg))
-#         if pkg.name not in visited:
-#             visited.add(pkg.name)
-#             self._log.debug("Registering package %s" % pkg.name)
-# #            self.pkg_rgy.registerPackage(pkg)
-#             for subpkg in pkg.subpkg_m.values():
-#                 self._registerPackages(subpkg, visited)
-
-    
     def push_package(self, pkg : Package, add=False):
         self._pkg_s.append(pkg)
         if add:
@@ -233,8 +216,8 @@ class TaskGraphBuilder(object):
 
         if task_t is None:
             raise Exception("Failed to find task %s" % task)
-        
-        ctor = task_t.ctor
+
+        ctor = self._getTaskCtor(task_t)
 
         params = ctor.mkTaskParams()
 
@@ -333,31 +316,13 @@ class TaskGraphBuilder(object):
 
         pkg = None
         if task_t in self.root_pkg.task_m.keys():
-            ctor = self.root_pkg.task_m[task_t].ctor
+            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
             pkg = self.root_pkg
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
             pass
         self.push_package(pkg)
 
-        # if task_t in self._override_m.keys():
-        #     self._log.debug("Overriding task %s with %s" % (task_t, self._override_m[task_t]))
-        #     task_t = self._override_m[task_t]
-        # else:
-        #     dot_idx = task_t.rfind(".")
-        #     if dot_idx != -1:
-        #         pkg = task_t[0:dot_idx]
-        #         tname = task_t[dot_idx+1:]
-
-        #         if pkg in self._override_m.keys():
-        #             self._log.debug("Overriding package %s with %s" % (pkg, self._override_m[pkg]))
-        #             task_t = self._override_m[pkg] + "." + tname
-
-        # dot_idx = task_t.rfind(".")
-        # pkg = task_t[0:dot_idx]
-        # self._pkg_s.append(self.getPackage(PackageSpec(pkg)))
-
-        # ctor = self.getTaskCtor(task_t)
         if ctor is not None:
             if needs is None:
                 needs = []
@@ -414,10 +379,238 @@ class TaskGraphBuilder(object):
 
         ctor = pkg.getTaskCtor(task_name)
 
-        self._log.debug("--> getTaskCtor %s" % spec.name)
+        self._log.debug("<-- getTaskCtor %s" % spec.name)
         return ctor
     
-    def error(self, msg):
-        pass
+    def error(self, msg, loc=None):
+        if loc is not None:
+            marker = TaskMarker(msg=msg, severity=SeverityE.Error, loc=loc)
+        else:
+            marker = TaskMarker(msg=msg, severity=SeverityE.Error)
+        self.marker(marker)
+
+    def marker(self, marker):
+        self.marker_l(marker)
+
+    def _getTaskCtor(self, task : Task) -> TaskNodeCtor:
+        if task in self._task_ctor_m.keys():
+            ctor = self._task_ctor_m[task]
+        else:
+            ctor = self._mkTaskCtor(task)
+            self._task_ctor_m[task] = ctor
+        return ctor
+
+    def _mkTaskCtor(self, task):
+        srcdir = os.path.dirname(task.srcinfo.file)
+        self._log.debug("--> mkTaskCtor %s (srcdir: %s)" % (task.name, srcdir))
+
+        if len(task.subtasks) > 0:
+            self._log.debug("Task has a body")
+            # Compound task
+            self._log.debug("Task specifies sub-task implementation")
+            ctor = self._mkCompoundTaskCtor(task)
+        else:
+            self._log.debug("Task doesn't specify a body")
+            # Shell task or 'null'
+            ctor = self._mkLeafTaskCtor(task)
+
+        if task.ctor is None:
+            raise Exception()
+
+        return ctor
+
+    def _mkLeafTaskCtor(self, task) -> TaskNodeCtor:
+        self._log.debug("--> _mkLeafTaskCtor")
+        srcdir = os.path.dirname(task.srcinfo.file)
+        base_ctor_t : TaskNodeCtor = None
+        ctor_t : TaskNodeCtor = None
+        base_params = None
+        callable = None
+#        fullname = self.name + "." + task.name
+#        rundir = task.rundir
+
+        # TODO: should we have the ctor look this up itself?
+        # Want to confirm that the value can be found.
+        # Defer final resolution until actual graph building (post-config)
+        if task.uses is not None:
+            self._log.debug("Uses: %s" % task.uses.name)
+
+            if task.uses.ctor is None:
+                self.uses.ctor = self._getTaskCtor(task.uses)
+            base_ctor_t = task.uses.ctor
+            base_params = base_ctor_t.mkTaskParams()
+
+            if base_ctor_t is None:
+                self._log.error("Failed to load task ctor %s" % task.uses)
+        else:
+            self._log.debug("No 'uses' specified %s" % task.name)
+
+        self._log.debug("%d needs" % len(task.needs))
+
+        # Determine the implementation constructor first
+        if task.run is not None:
+            shell = task.shell if task.shell is not None else "shell"
+
+            if taskdef.body.pytask is not None:
+                # Built-in impl
+                # Now, lookup the class
+                self._log.debug("Use PyTask implementation")
+                last_dot = taskdef.body.pytask.rfind('.')
+                clsname = taskdef.body.pytask[last_dot+1:]
+                modname = taskdef.body.pytask[:last_dot]
+
+                try:
+                    if modname not in sys.modules:
+                        if srcdir not in sys.path:
+                            sys.path.append(srcdir)
+                        mod = importlib.import_module(modname)
+                    else:
+                        mod = sys.modules[modname]
+                except ModuleNotFoundError as e:
+                    raise Exception("Failed to import module %s (_basedir=%s): %s" % (
+                        modname, self._basedir, str(e)))
+                
+                if not hasattr(mod, clsname):
+                    raise Exception("Method %s not found in module %s" % (clsname, modname))
+                callable = getattr(mod, clsname)
+            elif taskdef.body.run is not None:
+                callable = self._getRunCallable(taskdef)
+
+        # Determine if we need to use a new 
+        paramT = task.paramT
+        needs = []
+
+        # TODO:
+        rundir : RundirE = task.rundir
+        
+        if callable is not None:
+            ctor_t = TaskNodeCtorTask(
+                name=task.name,
+                srcdir=srcdir,
+                paramT=task.paramT, # TODO: need to determine the parameter type
+                passthrough=task.passthrough,
+                consumes=task.consumes,
+                needs=needs, # TODO: need to determine the needs
+                rundir=rundir,
+                task=callable)
+        elif base_ctor_t is not None:
+            # Use the existing (base) to create the implementation
+            ctor_t = TaskNodeCtorProxy(
+                name=task.name,
+                srcdir=srcdir,
+                paramT=task.paramT, # TODO: need to determine the parameter type
+                passthrough=task.passthrough,
+                consumes=task.consumes,
+                needs=needs,
+                rundir=rundir,
+                uses=base_ctor_t)
+        else:
+            self._log.debug("Use 'Null' as the class implementation")
+            ctor_t = TaskNodeCtorTask(
+                name=task.name,
+                srcdir=srcdir,
+                paramT=paramT,
+                passthrough=task.passthrough,
+                consumes=task.consumes,
+                needs=needs,
+                rundir=rundir,
+                task=TaskNull)
+
+        self._log.debug("<-- mkTaskCtor %s" % task.name)
+        return ctor_t
     
+    def _getRunCallable(self, task):
+        self._log.debug("--> _getRunCallable %s" % taskdef.name)
+        callable = None
+        if task.run is not None and task.body.shell == "python":
+            # Evaluate a Python script
+            text = taskdef.body.run.strip()
+            text_lines = text.splitlines()
+            least_whitespace = 2^32
+            have_content = False
+            for line in text_lines:
+                line_no_leading_ws = line.lstrip()
+                if line_no_leading_ws != "":
+                    have_content = True
+                    leading_ws = len(line) - len(line_no_leading_ws)
+                    if leading_ws < least_whitespace:
+                        least_whitespace = leading_ws
+            # Remove leading whitespace
+            if have_content:
+                for i,line in enumerate(text_lines):
+                    if len(line) >= least_whitespace:
+                        text_lines[i] = line[least_whitespace:]
+
+            callable = ExecCallable(text_lines)
+        else:
+            # run a shell script
+            shell = None
+            body = task.run.strip()
+
+            callable = ShellCallable(body=body, shell=shell)
+            pass
+        return callable
+
+    def _mkCompoundTaskCtor(self, task) -> TaskNodeCtor:
+        self._log.debug("--> _mkCompoundTaskCtor %s" % task.name)
+        srcdir = os.path.dirname(task.srcinfo.file)
+        base_ctor_t : TaskNodeCtor = None
+        ctor_t : TaskNodeCtor = None
+        base_params = None
+        callable = None
+
+#        fullname = self._getScopeFullname()
+        fullname = task.name
+
+        if task.uses is not None:
+            self._log.debug("Uses: %s" % task.uses)
+            base_ctor_t = task.uses.ctor
+            base_params = base_ctor_t.mkTaskParams()
+
+            if base_ctor_t is None:
+                self._log.error("Failed to load task ctor %s" % task.uses)
+
+        # TODO: should build during loading
+#        passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, base_ctor_t)
+        passthrough = []
+        consumes = []
+        needs = []
+
+        # Determine if we need to use a new 
+#        paramT = self._getParamT(taskdef, base_params)
+        paramT = None
+
+        if base_ctor_t is not None:
+            ctor_t = TaskNodeCtorCompoundProxy(
+                name=fullname,
+                srcdir=srcdir,
+                paramT=paramT,
+                passthrough=passthrough,
+                consumes=consumes,
+                needs=needs,
+                task=task,
+                uses=base_ctor_t)
+        else:
+            self._log.debug("No 'uses' specified")
+            ctor_t = TaskNodeCtorCompound(
+                name=fullname,
+                srcdir=srcdir,
+                paramT=paramT,
+                passthrough=passthrough,
+                consumes=consumes,
+                needs=needs,
+                task=task)
+            
+        for st in task.subtasks:
+            ctor = self._getTaskCtor(st)
+            if ctor is None:
+                raise Exception("ctor for %s is None" % st.name)
+            ctor_t.tasks.append(st)
+
+#        for t in task.subtasks:
+#            ctor_t.tasks.append(self._mkTaskCtor(t, srcdir))
+
+        
+        self._log.debug("<-- mkCompoundTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
+        return ctor_t    
 

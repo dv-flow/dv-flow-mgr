@@ -28,8 +28,8 @@ package:
 
   tasks:
   - name: Message
-    body:
-      pytask: dv_flow.mgr.std.message.Message
+    shell: pytask
+    run: dv_flow.mgr.std.message.Message
     with:
       msg:
         type: str
@@ -37,8 +37,8 @@ package:
   - name: FileSet
     doc: |
       Creates a fileset from a list of files or glob patterns
-    body:
-      pytask: dv_flow.mgr.std.fileset.FileSet
+    shell: pytask
+    run: dv_flow.mgr.std.fileset.FileSet
     passthrough: all
     consumes: none
     with:
@@ -63,8 +63,8 @@ package:
         type: str
         value: ""
   - name: CreateFile
-    body:
-      pytask: dv_flow.mgr.std.create_file.CreateFile
+    shell: pytask
+    run: dv_flow.mgr.std.create_file.CreateFile
     passthrough: all
     consumes: none
     doc: |
@@ -81,8 +81,8 @@ package:
       content:
         type: str
   - name: Exec
-    body:
-      pytask: dv_flow.mgr.std.exec.Exec
+    shell: pytask
+    run: dv_flow.mgr.std.exec.Exec
     desc: Executes a subprocess
     with:
       shell:
@@ -109,6 +109,23 @@ package:
           Optional timestamp file to determine if running 
           the command changed the output
   types:
+  - name: DataItem
+    with:
+    - name: type
+      type: str
+  - name: FileSet
+    uses: std.DataItem
+    with:
+    - name: filetype
+      type: str
+      value: "FileSet"
+    - name: basedir
+      type: str
+    - name: files
+      type: list
+      item:
+        type: str
+
   # - name: TaskDataItem
   #   doc: |
   #     Base type for a data element produced by a task.

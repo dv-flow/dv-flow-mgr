@@ -1,7 +1,9 @@
 import asyncio
+import json
 import os
 from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoader
 from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
+from .marker_collector import MarkerCollector
 
 def test_smoke(tmpdir):
     flow_dv = """
@@ -11,32 +13,37 @@ package:
     tasks:
     - name: entry
       body:
-        tasks:
-        - name: create_file
-          rundir: inherit
-          uses: std.CreateFile
-          with:
-            filename: hello.txt
-            content: |
-              Hello World
-        - name: glob_txt
-          rundir: inherit
-          uses: std.FileSet
-          needs: [create_file]
-          passthrough: none
-          with:
-            base: ${{ rundir }}
-            include: "*.txt"
-            type: textFile
+      - name: create_file
+        rundir: inherit
+        uses: std.CreateFile
+        with:
+          filename: hello.txt
+          content: |
+            Hello World
+      - name: glob_txt
+        rundir: inherit
+        uses: std.FileSet
+        needs: [create_file]
+        passthrough: none
+        with:
+          base: ${{ rundir }}
+          include: "*.txt"
+          type: textFile
 """
 
     rundir = os.path.join(tmpdir)
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    assert len(collector.markers) == 0
     builder = TaskGraphBuilder(
-        root_pkg=pkg_def,
+        root_pkg=pkg,
         rundir=os.path.join(rundir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 

@@ -28,7 +28,7 @@ from ..util import loadProjPkgDef
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
-from ..pkg_rgy import PkgRgy
+from ..ext_rgy import PkgRgy
 from ..task_graph_dot_writer import TaskGraphDotWriter
 
 

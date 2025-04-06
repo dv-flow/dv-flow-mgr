@@ -48,6 +48,21 @@ class Package(object):
         if name not in self.tasks.keys():
             raise Exception("Task %s not present in package %s" % (name, self.name))
         return self.tasks[name]
+    
+    def dump(self):
+        tasks = {}
+        for k, v in self.task_m.items():
+            tasks[k] = v.dump()
+
+        pkg = {
+            "name": self.name,
+            "basedir": self.basedir,
+            "params": self.params,
+            "tasks": tasks,
+            "fragments": [f.dump() for f in self.fragment_def_l]
+        }
+
+        return pkg
             
     def __hash__(self):
         return hash(self.fullname())

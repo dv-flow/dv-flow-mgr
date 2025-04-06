@@ -319,7 +319,8 @@ package:
         root_pkg=pkg_def,
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
-    runner.add_listener()
+    listener = TaskListenerTest()
+    runner.add_listener(listener.event)
 
     task = builder.mkTaskGraph("pkg1.SendMsg")
     output = asyncio.run(runner.run(task))

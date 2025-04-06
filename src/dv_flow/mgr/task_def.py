@@ -96,19 +96,19 @@ class TaskDef(BaseModel):
         title="Overide Name",
         description="The name of the task to override",
         default=None)
-#    fullname : str = dc.Field(default=None)
-#    type : Union[str,TaskSpec] = dc.Field(default_factory=list)
     uses : str = dc.Field(
         default=None,
         title="Base type",
         description="Task from which this task is derived")
-    body : TaskBodyDef = dc.Field(
+    body: List['TaskDef'] = dc.Field(
+        default_factory=list,
+        description="Sub-tasks")
+    run : str = dc.Field(
         default=None,
-        description="Task body (implementation) information")
-#    pytask : str = dc.Field(
-#        default=None,
-#        title="Python method name",
-#        description="Python method to execute to implement this task")
+        description="Shell-based implementation")
+    shell: str = dc.Field(
+        default="bash",
+        description="Shell to use for shell-based implementation")
     strategy : StrategyDef = dc.Field(
         default=None)
     tasks: Union[List['TaskDef'], TasksBuilder, None] = dc.Field(
