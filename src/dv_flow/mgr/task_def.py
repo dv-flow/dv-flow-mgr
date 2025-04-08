@@ -103,6 +103,9 @@ class TaskDef(BaseModel):
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
         description="Sub-tasks")
+    pytask : str = dc.Field(
+        default=None,
+        description="Python-based implementation (deprecated)")
     run : str = dc.Field(
         default=None,
         description="Shell-based implementation")

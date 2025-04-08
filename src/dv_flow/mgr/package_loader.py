@@ -10,7 +10,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
-from .ext_rgy import PkgRgy
+from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
@@ -142,7 +142,7 @@ class PackageScope(SymbolScope):
 
 @dc.dataclass
 class PackageLoader(object):
-    pkg_rgy : PkgRgy = dc.field(default=None)
+    pkg_rgy : ExtRgy = dc.field(default=None)
     marker_listeners : List[Callable] = dc.field(default_factory=list)
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
@@ -152,7 +152,7 @@ class PackageLoader(object):
 
     def __post_init__(self):
         if self.pkg_rgy is None:
-            self.pkg_rgy = PkgRgy.inst()
+            self.pkg_rgy = ExtRgy.inst()
 
         self._loader_scope = LoaderScope(name=None, loader=self)
 
@@ -363,6 +363,9 @@ class PackageLoader(object):
 
             if taskdef.uses is not None:
                 task.uses = self._findTaskType(taskdef.uses)
+
+                if task.uses is None:
+                    raise Exception("Failed to link")
             
 #            passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, task.uses)
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
@@ -383,11 +386,16 @@ class PackageLoader(object):
 
             if taskdef.body is not None and len(taskdef.body) > 0:
                 self._mkTaskBody(task, taskdef)
-
             elif taskdef.run is not None:
-                task.run = taskdef.run.strip()
+                task.run = taskdef.run
                 if taskdef.shell is not None:
                     task.shell = taskdef.shell
+            elif taskdef.pytask is not None:
+                task.run = taskdef.pytask
+                task.shell = "pytask"
+            elif task.uses is not None and task.uses.run is not None:
+                task.run = task.uses.run
+                task.shell = task.uses.shell
         # TODO: 
 
     def _mkTaskBody(self, task, taskdef):
@@ -416,6 +424,8 @@ class PackageLoader(object):
             if td.uses is not None:
                 if st.uses is None:
                     st.uses = self._findTaskType(td.uses)
+                    if st.uses is None:
+                        raise Exception("Failed to find task %s" % td.uses)
             for need in td.needs:
                 if isinstance(need, str):
                     st.needs.append(self._findTask(need))
@@ -423,16 +433,27 @@ class PackageLoader(object):
                     st.needs.append(self._findTask(need.name))
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
+
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, td)
             elif td.run is not None:
-                task.run = td.run.strip()
-                task.shell = getattr(td, "shell", None)
+                st.run = td.run
+                st.shell = getattr(td, "shell", None)
+            elif td.pytask is not None:
+                st.run = td.pytask
+                st.shell = "pytask"
+            elif st.uses is not None and st.uses.run is not None:
+                st.run = st.uses.run
+                st.shell = st.uses.shell
 
-            for td, st in subtasks:
-                # TODO: assess passthrough, consumes, needs, and rundir
-                # with respect to 'uses'
-                pass
+            st.paramT = self._getParamT(
+                td, 
+                st.uses.paramT if st.uses is not None else None)
+
+        for td, st in subtasks:
+            # TODO: assess passthrough, consumes, needs, and rundir
+            # with respect to 'uses'
+            pass
 
         self._pkg_s[-1].pop_scope()
 
@@ -537,11 +558,14 @@ class PackageLoader(object):
 
         # First, pull out existing fields (if there's a base type)
         if base_t is not None:
+            base_o = base_t()
             self._log.debug("Base type: %s" % str(base_t))
             for name,f in base_t.model_fields.items():
                 ff : dc.Field = f
                 fields.append(f)
-                field_m[name] = (f.annotation, getattr(base_t, name))
+                if not hasattr(base_o, name):
+                    raise Exception("Base type %s does not have field %s" % (str(base_t), name))
+                field_m[name] = (f.annotation, getattr(base_o, name))
         else:
             self._log.debug("No base type")
 

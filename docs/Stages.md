@@ -179,3 +179,23 @@ Key: all
   - end-to-end system check
   - avoid recompile when primary sources do not change
 
+# Load/Elab/Build Refactor
+- Separated loading from graph building
+  - Now, package and task information is produced with source info
+- Working on recreating the task-node builder
+  - Consider getting rid of the Ctor infrastructure
+    - Have parameter-type info
+    - Have inheritance info
+    - Have fully-qualified names for all dependencies
+  - In this mode, graph builder would:
+    - Find named 'task' object
+    - Determine how to create a node and parameters from it
+      - Task should save statically-specified parameter values
+      - GraphBuilder can apply programmatically-specified parameters
+    - What is a programmatically-specified task?
+      - Prototype for a task node
+      - Not necessarily registered with the package loader
+      - Should have similar characteristics to a task (?)
+      - Maybe just a direct way to create a task node
+      - Don't think we expect the system to create is programmatically...
+

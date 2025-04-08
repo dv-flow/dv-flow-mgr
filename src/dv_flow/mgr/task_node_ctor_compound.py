@@ -74,6 +74,7 @@ class TaskNodeCtorCompound(TaskNodeCtor):
         tasks_defs = []
         for t in self.tasks:
             # Initially, 
+#            builder.get
             sn = t.ctor.mkTaskNode(
                 builder=builder, 
                 params=t.ctor.mkTaskParams(),

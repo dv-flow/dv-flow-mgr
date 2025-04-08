@@ -34,7 +34,7 @@ def loadProjPkgDef(path, listener=None):
                 data = yaml.load(f, Loader=yaml.FullLoader)
                 if "package" in data.keys():
                     listeners = [listener] if listener is None else []
-                    ret = PackageLoader(listeners=listeners).load(os.path.join(dir, "flow.dv"))
+                    ret = PackageLoader(marker_listeners=listeners).load(os.path.join(dir, "flow.dv"))
                     break
         dir = os.path.dirname(dir)
     return ret

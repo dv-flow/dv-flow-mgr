@@ -48,6 +48,10 @@ class TaskNodeCtor(object):
     consumes : List[Any]
     needs : List[str]
 
+    def __post_init__(self):
+        if self.paramT is None:
+            raise Exception("paramT must be specified for TaskNodeCtor")
+
     def __call__(self, 
                  builder=None,
                  name=None,

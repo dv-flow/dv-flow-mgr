@@ -27,6 +27,7 @@ def test_fileset_1(tmpdir):
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     out = asyncio.run(runner.run(task))
+    assert runner.status == 0
     assert out.changed == True
 
     # Now, re-run using the same run directory.

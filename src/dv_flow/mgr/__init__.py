@@ -21,7 +21,7 @@
 #****************************************************************************
 from .package_def import *
 from .package_loader import PackageLoader
-from .ext_rgy import PkgRgy
+from .ext_rgy import ExtRgy
 from .task_data import *
 from .task_def import *
 from .task_graph_builder import TaskGraphBuilder

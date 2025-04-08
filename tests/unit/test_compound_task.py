@@ -56,6 +56,8 @@ package:
     output = asyncio.run(runner.run(t1))
 
     assert runner.status == 0
+    for out in output.output:
+        print("Out: %s" % str(out))
     assert len(output.output) == 1
     assert output.output[0].type == 'std.FileSet'
     assert len(output.output[0].files) == 1
@@ -225,30 +227,34 @@ package:
 
     - name: entry
       body:
-        tasks:
-        - name: create_file
-          rundir: inherit
-          uses: std.CreateFile
-          with:
-            filename: hello.txt
-            content: |
-              Hello World
-        - name: glob_txt
-          rundir: inherit
-          uses: std.FileSet
-          needs: [create_file, TopLevelTask]
-          passthrough: none
-          with:
-            base: ${{ rundir }}
-            include: "*.txt"
-            type: textFile
+      - name: create_file
+        rundir: inherit
+        uses: std.CreateFile
+        with:
+          filename: hello.txt
+          content: |
+            Hello World
+      - name: glob_txt
+        rundir: inherit
+        uses: std.FileSet
+        needs: [create_file, TopLevelTask]
+        passthrough: none
+        with:
+          base: ${{ rundir }}
+          include: "*.txt"
+          type: textFile
 """
 
     rundir = os.path.join(tmpdir)
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    marker_collector = MarkerCollector()
+    pkg_def = PackageLoader(
+        marker_listeners=[marker_collector]).load(
+            os.path.join(rundir, "flow.dv"))
+    assert len(marker_collector.markers) == 0
+
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))

@@ -144,7 +144,7 @@ class ExtRgy(object):
         self._log.debug("<-- discover_plugins")
 
     def copy(self):
-        ret = PkgRgy()
+        ret = ExtRgy()
         ret._pkgpath = self._pkgpath.copy()
         ret._pkg_m = self._pkg_m.copy()
         return ret

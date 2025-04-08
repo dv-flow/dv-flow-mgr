@@ -37,9 +37,12 @@ from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
 from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
 from .task_node_ctor_wrapper import TaskNodeCtorWrapper
+from .task_node_compound import TaskNodeCompound
+from .task_node_leaf import TaskNodeLeaf
 from .std.task_null import TaskNull
-from .shell_callable import ShellCallable
 from .exec_callable import ExecCallable
+from .null_callable import NullCallable
+from .shell_callable import ShellCallable
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -59,11 +62,11 @@ class TaskGraphBuilder(object):
     root_pkg : Package
     rundir : str
     marker_l : Callable = lambda *args, **kwargs: None
-    _pkg_s : List[Package] = dc.field(default_factory=list)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
-    _task_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
+    _task_m : Dict[str,Task] = dc.field(default_factory=dict)
+    _task_node_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
     _task_ctor_m : Dict[Task,TaskNodeCtor] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
@@ -76,21 +79,22 @@ class TaskGraphBuilder(object):
     def __post_init__(self):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
-        self._shell_m.update(ExtRgy._inst.shell_m)
+        self._shell_m.update(ExtRgy._inst._shell_m)
+
+        if self.root_pkg is not None:
+            # Collect all the tasks
+            for task in self.root_pkg.task_m.values():
+                self._addTask(task)
+
+    def _addTask(self, task):
+        print("Add task: %s" % task.name)
+        if task.name not in self._task_m.keys():
+            self._task_m[task.name] = task
+            for st in task.subtasks:
+                self._addTask(st)
 
     def addOverride(self, key : str, val : str):
         self._override_m[key] = val
-
-    def push_package(self, pkg : Package, add=False):
-        self._pkg_s.append(pkg)
-        if add:
-            self._pkg_m[PackageSpec(pkg.name, pkg.params)] = pkg
-
-    def pop_package(self, pkg : Package):
-        self._pkg_s.pop()
-
-    def package(self):
-        return self._pkg_s[-1]
 
     def enter_rundir(self, rundir : str):
         self._rundir_s.append(rundir)
@@ -120,15 +124,6 @@ class TaskGraphBuilder(object):
         if rundir is None or rundir == RundirE.Unique:
             self._rundir_s.append(task.name)
 
-    def get_name_prefix(self):
-        if len(self._compound_task_ctxt_s) > 0:
-            # Use the compound scope name
-            name = ".".join(c.task.name for c in self._compound_task_ctxt_s)
-        else:
-            name = self._pkg_s[-1].name
-
-        return name
-
     def enter_compound_uses(self):
         self._compound_task_ctxt_s[-1].uses_s.append({})
 
@@ -152,7 +147,7 @@ class TaskGraphBuilder(object):
         self._log.debug("--> addTask: %s" % name)
 
         if len(self._compound_task_ctxt_s) == 0:
-            self._task_m[name] = task
+            self._task_node_m[name] = task
         else:
             if len(self._compound_task_ctxt_s[-1].uses_s) > 0:
                 self._compound_task_ctxt_s[-1].uses_s[-1][name] = task
@@ -169,8 +164,8 @@ class TaskGraphBuilder(object):
                     task = self._compound_task_ctxt_s[-1].uses_s[-1][name]
             if task is None and name in self._compound_task_ctxt_s[-1].task_m.keys():
                 task = self._compound_task_ctxt_s[-1].task_m[name]
-        if task is None and name in self._task_m.keys():
-            task = self._task_m[name]
+        if task is None and name in self._task_node_m.keys():
+            task = self._task_node_m[name]
 
         if task is None and create:
             if name in self.root_pkg.task_m.keys():
@@ -194,21 +189,20 @@ class TaskGraphBuilder(object):
             self._rundir_s.pop()
 
     def mkTaskGraph(self, task : str, rundir=None) -> TaskNode:
-        self._pkg_s.clear()
-        self._task_m.clear()
+        return self.mkTaskNode(task, rundir=rundir)
+        # self._task_node_m.clear()
 
-        if rundir is not None:
-            self._rundir_s.append(rundir)
+        # if rundir is not None:
+        #     self._rundir_s.append(rundir)
 
-        ret = self._mkTaskGraph(task)
+        # ret = self._mkTaskGraph(task)
 
-        if rundir is not None:
-            self._rundir_s.pop()
+        # if rundir is not None:
+        #     self._rundir_s.pop()
 
-        return ret
+        # return ret
         
     def _mkTaskGraph(self, task : str) -> TaskNode:
-
         if task in self.root_pkg.task_m.keys():
             task_t = self.root_pkg.task_m[task]
         else:
@@ -237,122 +231,185 @@ class TaskGraphBuilder(object):
         task.rundir = self.get_rundir(task.name)
 #        task.rundir = rundir
         
-        self._task_m[task.name] = task
-
-#        self._pkg_s.pop()
-#        self._pkg_spec_s.pop()
+        self._task_node_m[task.name] = task
 
         return task
-    
-    def findTaskDef(self, name):
-        pass
-
-    def _resolveNeedRef(self, need_def) -> str:
-        if need_def.find(".") == -1:
-            # Need is a local task. Prefix to avoid ambiguity
-            return self._pkg_s[-1].name + "." + need_def
-        else:
-            return need_def
-
-    def getPackage(self, spec : PackageSpec) -> Package:
-        # Obtain the active package definition
-        self._log.debug("--> getPackage: %s len: %d" % (spec.name, len(self._pkg_spec_s)))
-        if len(self._pkg_spec_s) > 0:
-            pkg_spec = self._pkg_spec_s[-1]
-            if self.root_pkg is not None and self.root_pkg.name == pkg_spec.name:
-                pkg_def = self.root_pkg
-            else:
-                pkg_def = self.pkg_rgy.getPackage(pkg_spec.name)
-        else:
-            pkg_def = None
-
-        # Need a stack to track which package we are currently in
-        # Need a map to get a concrete package from a name with parameterization
-
-        self._log.debug("pkg_s: %d %s" % (
-            len(self._pkg_s), (self._pkg_s[-1].name if len(self._pkg_s) else "<unknown>")))
-
-        # First, check the active pkg_def to see if any aliases
-        # Should be considered
-        pkg_name = spec.name
-        # if pkg_def is not None:
-        #     # Look for an import alias
-        #     self._log.debug("Search package %s for import alias %s" % (
-        #         pkg_def.name, pkg_spec.name))
-        #     for imp in pkg_def.imports:
-        #         if type(imp) != str:
-        #             self._log.debug("imp: %s" % str(imp))
-        #             if imp.alias is not None and imp.alias == spec.name:
-        #                 # Found the alias name. Just need to get an instance of this package
-        #                 self._log.debug("Found alias %s -> %s" % (imp.alias, imp.name))
-        #                 pkg_name = imp.name
-        #                 break
-
-        # Note: _pkg_m needs to be context specific, such that imports from
-        # one package don't end up visible in another
-        spec.name = pkg_name
-
-        if spec in self._pkg_m.keys():
-            self._log.debug("Found cached package instance")
-            pkg = self._pkg_m[spec]
-        elif self.pkg_rgy.hasPackage(spec.name):
-            self._log.debug("Registry has a definition")
-            p_def =  self.pkg_rgy.getPackage(spec.name)
-
-            self._pkg_spec_s.append(p_def)
-            pkg = p_def.mkPackage(self)
-            self._pkg_spec_s.pop()
-            self._pkg_m[spec] = pkg
-        else:
-            self.error("Failed to find package %s" % spec.name)
-            raise Exception("Failed to find definition of package %s" % spec.name)
-
-        self._log.debug("<-- getPackage: %s" % str(pkg))
-
-        return pkg
     
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
 
         pkg = None
-        if task_t in self.root_pkg.task_m.keys():
-            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
+
+        if task_t in self._task_m.keys():
+            task = self._task_m[task_t]
+#            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
             pkg = self.root_pkg
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
             pass
-        self.push_package(pkg)
 
-        if ctor is not None:
-            if needs is None:
-                needs = []
-            for need_def in ctor.getNeeds():
-                # Resolve the full name of the need
-                need_fullname = self._resolveNeedRef(need_def)
-                self._log.debug("Searching for qualifed-name task %s" % need_fullname)
-                if not need_fullname in self._task_m.keys():
-                    rundir_s = self._rundir_s
-                    self._rundir_s = [need_fullname]
-                    need_t = self._mkTaskGraph(need_fullname)
-                    self._rundir_s = rundir_s
-                    self._task_m[need_fullname] = need_t
-                needs.append(self._task_m[need_fullname])
-
-            self._log.debug("ctor: %s" % ctor.name)
-            params = ctor.mkTaskParams(kwargs)
-            ret = ctor.mkTaskNode(
-                self,
-                params=params,
-                name=name, 
-                srcdir=srcdir, 
-                needs=needs)
-            ret.rundir = self.get_rundir(name)
+        # Determine how to build this node
+        if task.subtasks is not None and len(task.subtasks):
+            ret = self._mkTaskCompoundNode(task)
         else:
-            raise Exception("Failed to find ctor for task %s" % task_t)
-#        self._pkg_s.pop()
-        self.pop_package(pkg)
+            ret = self._mkTaskLeafNode(task)
+
+        # if ctor is not None:
+        #     if needs is None:
+        #         needs = []
+        #     for need_def in ctor.getNeeds():
+        #         # Resolve the full name of the need
+        #         need_fullname = self._resolveNeedRef(need_def)
+        #         self._log.debug("Searching for qualifed-name task %s" % need_fullname)
+        #         if not need_fullname in self._task_node_m.keys():
+        #             rundir_s = self._rundir_s
+        #             self._rundir_s = [need_fullname]
+        #             need_t = self._mkTaskGraph(need_fullname)
+        #             self._rundir_s = rundir_s
+        #             self._task_node_m[need_fullname] = need_t
+        #         needs.append(self._task_node_m[need_fullname])
+
+        #     self._log.debug("ctor: %s" % ctor.name)
+        #     params = ctor.mkTaskParams(kwargs)
+        #     ret = ctor.mkTaskNode(
+        #         self,
+        #         params=params,
+        #         name=name, 
+        #         srcdir=srcdir, 
+        #         needs=needs)
+        #     ret.rundir = self.get_rundir(name)
+        # else:
+        #     raise Exception("Failed to find ctor for task %s" % task_t)
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
+    
+    def _mkTaskNode(self, name):
+
+        if name in self.root_pkg.task_m.keys():
+            task = self.root_pkg.task_m[name]
+#            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
+            pkg = self.root_pkg
+        else:
+            raise Exception("task_t (%s) not present" % str(name))
+            pass
+
+        # Determine how to build this node
+        if task.subtasks is not None and len(task.subtasks):
+            ret = self._mkTaskCompoundNode(task)
+        else:
+            ret = self._mkTaskLeafNode(task)
+
+        return ret        
+    
+    def _getTaskNode(self, name):
+        if name in self._task_node_m.keys():
+            return self._task_node_m[name]
+        else:
+            return self.mkTaskNode(name)
+    
+    def _mkTaskLeafNode(self, task : Task, name=None) -> TaskNode:
+        self._log.debug("--> _mkTaskLeafNode %s" % task.name)
+        srcdir = os.path.dirname(task.srcinfo.file)
+
+        if task.rundir == RundirE.Unique:
+            self.enter_rundir(task.name)
+
+        if name is None:
+            name = task.name
+
+        callable = None
+        print("task.run: %s" % str(task.run))
+        if task.run is not None:
+            shell = task.shell if task.shell is not None else "shell"
+            if shell in self._shell_m.keys():
+                self._log.debug("Use shell implementation")
+                callable = self._shell_m[shell]
+            else:
+                raise Exception("Shell %s not found" % shell)
+        else:
+            callable = NullCallable
+
+        node = TaskNodeLeaf(
+            name=name,
+            srcdir=srcdir,
+            params=task.paramT(),
+            task=callable(task.run))
+        self._task_node_m[name] = node
+        node.rundir = self.get_rundir()
+
+        # Now, link up the needs
+        for n in task.needs:
+            nn = self._getTaskNode(n.name)
+            node.needs.append((nn, False))
+
+        if task.rundir == RundirE.Unique:
+            self.leave_rundir()
+
+        self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
+        return node
+    
+    def _mkTaskCompoundNode(self, task : Task, name=None) -> TaskNode:
+        self._log.debug("--> _mkTaskLeafNode %s" % task.name)
+        srcdir = os.path.dirname(task.srcinfo.file)
+
+        if name is None:
+            name = task.name
+
+        if task.rundir == RundirE.Unique:
+            self.enter_rundir(task.name)
+
+        # Node represents the terminal node of the sub-DAG
+        node = TaskNodeCompound(
+            name=name,
+            srcdir=srcdir,
+            params=task.paramT()
+        )
+        self._task_node_m[name] = node
+        node.rundir = self.get_rundir()
+
+        node_needs = []
+        for need in task.needs:
+            nn = self._getTaskNode(need.name)
+            node_needs.append(nn)
+
+        # TODO: handle strategy
+
+        # Need a local map of name -> task 
+        # For now, build out local tasks and link up the needs
+        tasks = []
+        for t in task.subtasks:
+            tasks.append((t, self._getTaskNode(t.name)))
+
+        # Fill in 'needs'
+        for t, tn in tasks:
+            need_n = []
+
+            referenced = False
+            for tt in task.subtasks:
+                if tt in t.needs:
+                    referenced = True
+                    break
+
+            if len(t.needs):
+                for need in t.needs:
+                    nn = self._getTaskNode(need.name)
+                    need_n.append((nn, False))
+                tn.needs = need_n
+            else:
+                # Any node without dependencies is tied 
+                # to the root node
+                tn.needs = node_needs
+
+            if not referenced:
+                # Add this task as a dependency of the output
+                # node (the root one)
+                node.needs.append((tn, False))
+
+        if task.rundir == RundirE.Unique:
+            self.leave_rundir()
+
+        return node
+
         
     def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskNodeCtor':
         from .task_def import TaskSpec
@@ -363,19 +420,19 @@ class TaskGraphBuilder(object):
         spec_e = spec.name.split(".")
         task_name = spec_e[-1]
 
-        if len(spec_e) == 1:
-            # Just have a task name. Use the current package
-            if len(self._pkg_s) == 0:
-                raise Exception("No package context for task %s" % spec.name)
-            pkg = self._pkg_s[-1]
-        else:
-            pkg_name = ".".join(spec_e[0:-1])
+        # if len(spec_e) == 1:
+        #     # Just have a task name. Use the current package
+        #     if len(self._pkg_s) == 0:
+        #         raise Exception("No package context for task %s" % spec.name)
+        #     pkg = self._pkg_s[-1]
+        # else:
+        #     pkg_name = ".".join(spec_e[0:-1])
 
-            try:
-                pkg = self.getPackage(PackageSpec(pkg_name))
-            except Exception as e:
-                self._log.critical("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
-                raise e
+        #     try:
+        #         pkg = self.getPackage(PackageSpec(pkg_name))
+        #     except Exception as e:
+        #         self._log.critical("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
+        #         raise e
 
         ctor = pkg.getTaskCtor(task_name)
 
@@ -414,7 +471,7 @@ class TaskGraphBuilder(object):
             # Shell task or 'null'
             ctor = self._mkLeafTaskCtor(task)
 
-        if task.ctor is None:
+        if ctor is None:
             raise Exception()
 
         return ctor
@@ -435,13 +492,11 @@ class TaskGraphBuilder(object):
         if task.uses is not None:
             self._log.debug("Uses: %s" % task.uses.name)
 
-            if task.uses.ctor is None:
-                self.uses.ctor = self._getTaskCtor(task.uses)
-            base_ctor_t = task.uses.ctor
-            base_params = base_ctor_t.mkTaskParams()
+            base_ctor_t = self._getTaskCtor(task.uses)
 
             if base_ctor_t is None:
                 self._log.error("Failed to load task ctor %s" % task.uses)
+#            base_params = base_ctor_t.mkTaskParams()
         else:
             self._log.debug("No 'uses' specified %s" % task.name)
 
@@ -451,32 +506,44 @@ class TaskGraphBuilder(object):
         if task.run is not None:
             shell = task.shell if task.shell is not None else "shell"
 
-            if taskdef.body.pytask is not None:
-                # Built-in impl
-                # Now, lookup the class
-                self._log.debug("Use PyTask implementation")
-                last_dot = taskdef.body.pytask.rfind('.')
-                clsname = taskdef.body.pytask[last_dot+1:]
-                modname = taskdef.body.pytask[:last_dot]
+            if shell in self._shell_m.keys():
+                self._log.debug("Use shell implementation")
+                callable = self._shell_m[shell]
+            else:
+                self._log.debug("Shell %s not found" % shell)
+                raise Exception("Shell %s not found" % shell)
 
-                try:
-                    if modname not in sys.modules:
-                        if srcdir not in sys.path:
-                            sys.path.append(srcdir)
-                        mod = importlib.import_module(modname)
-                    else:
-                        mod = sys.modules[modname]
-                except ModuleNotFoundError as e:
-                    raise Exception("Failed to import module %s (_basedir=%s): %s" % (
-                        modname, self._basedir, str(e)))
+            # if taskdef.body.pytask is not None:
+            #     # Built-in impl
+            #     # Now, lookup the class
+            #     self._log.debug("Use PyTask implementation")
+            #     last_dot = taskdef.body.pytask.rfind('.')
+            #     clsname = taskdef.body.pytask[last_dot+1:]
+            #     modname = taskdef.body.pytask[:last_dot]
+
+            #     try:
+            #         if modname not in sys.modules:
+            #             if srcdir not in sys.path:
+            #                 sys.path.append(srcdir)
+            #             mod = importlib.import_module(modname)
+            #         else:
+            #             mod = sys.modules[modname]
+            #     except ModuleNotFoundError as e:
+            #         raise Exception("Failed to import module %s (_basedir=%s): %s" % (
+            #             modname, self._basedir, str(e)))
                 
-                if not hasattr(mod, clsname):
-                    raise Exception("Method %s not found in module %s" % (clsname, modname))
-                callable = getattr(mod, clsname)
-            elif taskdef.body.run is not None:
-                callable = self._getRunCallable(taskdef)
+            #     if not hasattr(mod, clsname):
+            #         raise Exception("Method %s not found in module %s" % (clsname, modname))
+            #     callable = getattr(mod, clsname)
+            # elif taskdef.body.run is not None:
+            #     callable = self._getRunCallable(taskdef)
+        else:
+            # TODO: use null task
+            pass
 
         # Determine if we need to use a new 
+        if task.paramT is None:
+            raise Exception()
         paramT = task.paramT
         needs = []
 
@@ -524,24 +591,7 @@ class TaskGraphBuilder(object):
         callable = None
         if task.run is not None and task.body.shell == "python":
             # Evaluate a Python script
-            text = taskdef.body.run.strip()
-            text_lines = text.splitlines()
-            least_whitespace = 2^32
-            have_content = False
-            for line in text_lines:
-                line_no_leading_ws = line.lstrip()
-                if line_no_leading_ws != "":
-                    have_content = True
-                    leading_ws = len(line) - len(line_no_leading_ws)
-                    if leading_ws < least_whitespace:
-                        least_whitespace = leading_ws
-            # Remove leading whitespace
-            if have_content:
-                for i,line in enumerate(text_lines):
-                    if len(line) >= least_whitespace:
-                        text_lines[i] = line[least_whitespace:]
-
-            callable = ExecCallable(text_lines)
+            pass
         else:
             # run a shell script
             shell = None
@@ -578,7 +628,7 @@ class TaskGraphBuilder(object):
 
         # Determine if we need to use a new 
 #        paramT = self._getParamT(taskdef, base_params)
-        paramT = None
+        paramT = task.paramT
 
         if base_ctor_t is not None:
             ctor_t = TaskNodeCtorCompoundProxy(
