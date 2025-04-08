@@ -439,7 +439,6 @@ class PackageLoader(object):
                 raise Exception("null srcinfo")
             st = Task(
                 name=self._getScopeFullname(td.name),
-                ctor=None,
                 srcinfo=td.srcinfo)
             subtasks.append((td, st))
             task.subtasks.append(st)
