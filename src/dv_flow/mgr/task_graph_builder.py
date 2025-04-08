@@ -83,8 +83,16 @@ class TaskGraphBuilder(object):
 
         if self.root_pkg is not None:
             # Collect all the tasks
-            for task in self.root_pkg.task_m.values():
+            pkg_s = set()
+            self._addPackageTasks(self.root_pkg, pkg_s)
+
+    def _addPackageTasks(self, pkg, pkg_s):
+        if pkg not in pkg_s:
+            pkg_s.add(pkg)
+            for task in pkg.task_m.values():
                 self._addTask(task)
+            for subpkg in pkg.pkg_m.values():
+                self._addPackageTasks(subpkg, pkg_s)
 
     def _addTask(self, task):
         print("Add task: %s" % task.name)
@@ -242,11 +250,8 @@ class TaskGraphBuilder(object):
 
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
-#            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
-            pkg = self.root_pkg
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
-            pass
 
         # Determine how to build this node
         if task.subtasks is not None and len(task.subtasks):
@@ -282,6 +287,17 @@ class TaskGraphBuilder(object):
         #     raise Exception("Failed to find ctor for task %s" % task_t)
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
+    
+    def _findTask(self, pkg, name):
+        task = None
+        if name in pkg.task_m.keys():
+            task = pkg.task_m[name]
+        else:
+            for subpkg in pkg.pkg_m.values():
+                task = self._findTask(subpkg, name)
+                if task is not None:
+                    break
+        return task
     
     def _mkTaskNode(self, name):
 

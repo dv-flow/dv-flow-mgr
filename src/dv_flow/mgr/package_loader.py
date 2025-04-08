@@ -71,6 +71,7 @@ class PackageScope(SymbolScope):
     pkg : Package = None
     loader : LoaderScope = None
     _scope_s : List[SymbolScope] = dc.field(default_factory=list)
+    _log : ClassVar = logging.getLogger("PackageScope")
 
     def add(self, task, name):
         if len(self._scope_s):
@@ -97,6 +98,13 @@ class PackageScope(SymbolScope):
 
         if ret is None and name in self.pkg.task_m.keys():
             ret = self.pkg.task_m[name]
+
+        if ret is None:
+            for pkg in self.pkg.pkg_m.values():
+                self._log.debug("Searching pkg %s for %s" % (pkg.name, name))
+                if name in pkg.task_m.keys():
+                    ret = pkg.task_m[name]
+                    break
 
         if ret is None:
             raise Exception("Failed to find Task %s" % name)
@@ -168,6 +176,15 @@ class PackageLoader(object):
     def _getLoc(self, elem):
         pass
 
+    def package_scope(self):
+        ret = None
+        for i in range(len(self._pkg_s)-1, -1, -1):
+            scope = self._pkg_s[i]
+            if isinstance(scope, PackageScope):
+                ret = scope
+                break
+        return ret
+
     def _loadPackage(self, root, exp_pkg_name=None) -> Package:
         if root in self._file_s:
             raise Exception("recursive reference")
@@ -230,6 +247,14 @@ class PackageLoader(object):
         self._log.debug("--> _mkPackage %s" % pkg_def.name)
         pkg = Package(pkg_def, os.path.dirname(root))
 
+        pkg_scope = self.package_scope()
+        if pkg_scope is not None:
+            self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
+            pkg_scope.pkg.pkg_m[pkg.name] = pkg
+
+        if pkg.name in self._pkg_m.keys():
+            raise Exception("Duplicate package %s" % pkg.name)
+
         self._pkg_m[pkg.name] = pkg
         self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
         self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
@@ -289,8 +314,6 @@ class PackageLoader(object):
             
         sub_pkg = self._loadPackage(imp_path)
         self._log.info("Loaded imported package %s" % sub_pkg.name)
-        if sub_pkg.name in self._pkg_m.keys():
-            raise Exception("Duplicate package %s" % sub_pkg.name)
         pkg.pkg_m[sub_pkg.name] = sub_pkg
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
         pass
@@ -340,6 +363,7 @@ class PackageLoader(object):
                 print("Warning: file %s is not a fragment" % file)
 
     def _loadTasks(self, pkg, taskdefs : List[TaskDef], basedir : str):
+        self._log.debug("--> _loadTasks %s" % pkg.name)
         # Declare first
         tasks = []
         for taskdef in taskdefs:
@@ -351,6 +375,7 @@ class PackageLoader(object):
 
             if taskdef.srcinfo is None:
                 raise Exception("null srcinfo")
+            self._log.debug("Create task %s in pkg %s" % (self._getScopeFullname(taskdef.name), pkg.name))
             task = Task(
                 name=self._getScopeFullname(taskdef.name),
                 srcinfo=taskdef.srcinfo)
@@ -390,13 +415,14 @@ class PackageLoader(object):
                 task.run = taskdef.run
                 if taskdef.shell is not None:
                     task.shell = taskdef.shell
-            elif taskdef.pytask is not None:
+            elif taskdef.pytask is not None: # Deprecated case
                 task.run = taskdef.pytask
                 task.shell = "pytask"
             elif task.uses is not None and task.uses.run is not None:
                 task.run = task.uses.run
                 task.shell = task.uses.shell
-        # TODO: 
+
+        self._log.debug("<-- _loadTasks %s" % pkg.name)
 
     def _mkTaskBody(self, task, taskdef):
         self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))

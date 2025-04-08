@@ -122,6 +122,7 @@ class TaskNodeLeaf(TaskNode):
         try:
             self.result : TaskDataResult = await self.task(ctxt, input)
         except Exception as e:
+            print("== Task threw exception ==")
             self._log.error("Task %s failed: %s" % (self.name, str(e)))
             self._log.exception(e)
             self.result = TaskDataResult(

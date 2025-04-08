@@ -65,5 +65,5 @@ class Package(object):
         return pkg
             
     def __hash__(self):
-        return hash(self.fullname())
+        return id(self)
 

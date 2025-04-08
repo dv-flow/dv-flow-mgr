@@ -255,6 +255,8 @@ package:
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
 
+    print("Package:\n%s\n" % json.dumps(pkg_def.dump(), indent=2))
+
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
