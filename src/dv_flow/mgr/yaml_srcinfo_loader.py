@@ -10,6 +10,7 @@ class YamlSrcInfoLoader(SafeLoader):
     }
 
     def __init__(self, filename):
+        super().__init__()
         self.filename = filename
 
     def __call__(self, stream):
