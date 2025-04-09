@@ -153,6 +153,7 @@ class PackageLoader(object):
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
+    _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _loader_scope : LoaderScope = None
 
     def __post_init__(self):
@@ -253,6 +254,8 @@ class PackageLoader(object):
 
         self._file_s.pop()
 
+        self._pkg_path_m[root] = pkg
+
         return pkg
 
     def _mkPackage(self, pkg_def : PackageDef, root : str) -> Package:
@@ -322,10 +325,13 @@ class PackageLoader(object):
         if not os.path.isfile(imp_path):
             raise Exception("Import file %s not found" % imp_path)
 
-        self._log.info("Loading file %s" % imp_path)
-            
-        sub_pkg = self._loadPackage(imp_path)
-        self._log.info("Loaded imported package %s" % sub_pkg.name)
+        if imp_path in self._pkg_path_m.keys():
+            sub_pkg = self._pkg_path_m[imp_path]
+        else:
+            self._log.info("Loading file %s" % imp_path)
+            sub_pkg = self._loadPackage(imp_path)
+            self._log.info("Loaded imported package %s" % sub_pkg.name)
+
         pkg.pkg_m[sub_pkg.name] = sub_pkg
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
         pass
