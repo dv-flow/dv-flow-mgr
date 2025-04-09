@@ -86,6 +86,7 @@ class PackageScope(SymbolScope):
         self._scope_s.pop()
 
     def find(self, name) -> Task:
+        self._log.debug("--> %s::find %s" % (self.pkg.name, name))
         ret = None
         for i in range(len(self._scope_s)-1, -1, -1):
             scope = self._scope_s[i]
@@ -106,6 +107,11 @@ class PackageScope(SymbolScope):
                     ret = pkg.task_m[name]
                     break
 
+        if ret is None:
+            self._log.debug("Searching loader for %s" % name)
+            ret = self.loader.findType(name)
+
+        self._log.debug("<-- %s::find %s (%s)" % (self.pkg.name, name, str(ret)))
         return ret
 
     def findType(self, name) -> Task:
@@ -514,7 +520,7 @@ class PackageLoader(object):
         self._pkg_s[-1].pop_scope()
 
     def _findTaskType(self, name):
-        return self._pkg_s[-1].findType(name)
+        return self._pkg_s[-1].find(name)
 
     def _findTask(self, name):
         return self._pkg_s[-1].find(name)
