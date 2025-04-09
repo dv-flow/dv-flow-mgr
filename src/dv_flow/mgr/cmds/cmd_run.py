@@ -48,11 +48,8 @@ class CmdRun(object):
         else:
             # Print out available tasks
             tasks = []
-            for task in pkg.tasks:
+            for task in pkg.task_m.values():
                 tasks.append(task)
-            for frag in pkg._fragment_l:
-                for task in frag.tasks:
-                    tasks.append(task)
             tasks.sort(key=lambda x: x.name)
 
             max_name_len = 0
@@ -75,7 +72,7 @@ class CmdRun(object):
         # Maybe separate into a task-graph builder and a task-graph runner
 
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
-        rundir = os.path.join(pkg._basedir, "rundir")
+        rundir = os.path.join(pkg.basedir, "rundir")
 
 
         if args.clean:

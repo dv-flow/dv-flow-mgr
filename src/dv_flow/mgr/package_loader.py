@@ -106,9 +106,6 @@ class PackageScope(SymbolScope):
                     ret = pkg.task_m[name]
                     break
 
-        if ret is None:
-            raise Exception("Failed to find Task %s" % name)
-
         return ret
 
     def findType(self, name) -> Task:
@@ -391,8 +388,12 @@ class PackageLoader(object):
             if taskdef.srcinfo is None:
                 raise Exception("null srcinfo")
             self._log.debug("Create task %s in pkg %s" % (self._getScopeFullname(taskdef.name), pkg.name))
+            desc = taskdef.desc if taskdef.desc is not None else ""
+            doc = taskdef.doc if taskdef.doc is not None else ""
             task = Task(
                 name=self._getScopeFullname(taskdef.name),
+                desc=desc,
+                doc=doc,
                 srcinfo=taskdef.srcinfo)
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
@@ -453,8 +454,13 @@ class PackageLoader(object):
         for td in taskdef.body:
             if td.srcinfo is None:
                 raise Exception("null srcinfo")
+            
+            doc = td.doc if td.doc is not None else ""
+            desc = td.desc if td.desc is not None else ""
             st = Task(
                 name=self._getScopeFullname(td.name),
+                desc=desc,
+                doc=doc,
                 srcinfo=td.srcinfo)
             subtasks.append((td, st))
             task.subtasks.append(st)

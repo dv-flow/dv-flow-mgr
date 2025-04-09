@@ -19,6 +19,8 @@ class Task(object):
     are applied when constructing a TaskNode DAG from tasks
     """
     name : str
+    desc: str = ""
+    doc : str = ""
     paramT : Any = None
     uses : 'Task' = None
     needs : List[str] = dc.field(default_factory=list)
