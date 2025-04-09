@@ -423,12 +423,17 @@ class PackageLoader(object):
                 task.uses.paramT if task.uses is not None else None)
 
             for need in taskdef.needs:
+                nt = None
                 if isinstance(need, str):
-                    task.needs.append(self._findTask(need))
+                    nt = self._findTask(need)
                 elif isinstance(need, TaskDef):
-                    task.needs.append(self._findTask(need.name))
+                    nt = self._findTask(need.name)
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
+                
+                if nt is None:
+                    raise Exception("Failed to find task %s" % need)
+                task.needs.append(nt)
 
             if taskdef.body is not None and len(taskdef.body) > 0:
                 self._mkTaskBody(task, taskdef)
