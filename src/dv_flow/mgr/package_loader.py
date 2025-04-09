@@ -410,7 +410,7 @@ class PackageLoader(object):
                 task.uses = self._findTaskType(taskdef.uses)
 
                 if task.uses is None:
-                    raise Exception("Failed to link")
+                    raise Exception("Failed to link task %s" % taskdef.uses)
             
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
 
