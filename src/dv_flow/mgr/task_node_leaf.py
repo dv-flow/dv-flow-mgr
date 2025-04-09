@@ -88,11 +88,15 @@ class TaskNodeLeaf(TaskNode):
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
         if isinstance(self.consumes, list) and len(self.consumes):
+            self._log.debug("consumes(list): %s" % str(self.consumes))
             for in_p in in_params:
                 if self._matches(in_p, self.consumes):
                     inputs.append(in_p)
         elif self.consumes == ConsumesE.All:
             inputs = in_params.copy()
+            self._log.debug("consumes(all): %s" % str(self.consumes))
+        else:
+            self._log.debug("consumes(unknown): %s" % str(self.consumes))
 
         for name,field in self.params.model_fields.items():
             value = getattr(self.params, name)
@@ -179,7 +183,9 @@ class TaskNodeLeaf(TaskNode):
                                     getattr(out, "src", "<unknown>")))
                                 output.append(out)
         else:
-            self._log.debug("non-passthrough: %s (only local outputs propagated)" % self.name)
+            self._log.debug("non-passthrough: %s (only local outputs propagated) %s" % (
+                self.name,
+                str(self.passthrough)))
             # empty dependency map
 #            dep_m = {
 #                self.name : []

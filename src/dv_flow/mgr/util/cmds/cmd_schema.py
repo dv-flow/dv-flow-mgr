@@ -29,8 +29,6 @@ class CmdSchema(object):
         )
 
         defs = {}
-        print("root_s keys: %s" % " ".join(root_s.keys()))
-        print("root_s defs: %s" % " ".join(root_s["$defs"].keys()))
         defs.update(root_s["$defs"])
 #        defs.update(pkg_s["$defs"])
 #        defs.update(frag_s["$defs"])

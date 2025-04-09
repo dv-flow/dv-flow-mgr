@@ -48,5 +48,4 @@ class TaskParamsCtor(object):
                     val = getattr(self.values[i], field.name)
                     setattr(params, field.name, val)
 
-        print("params: %s" % str(params))
         return params

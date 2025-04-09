@@ -31,7 +31,6 @@ from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
-from .task_node_ctor import TaskNodeCtor
 from .task_node_ctor_compound import TaskNodeCtorCompound
 from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
 from .task_node_ctor_proxy import TaskNodeCtorProxy
@@ -95,7 +94,6 @@ class TaskGraphBuilder(object):
                 self._addPackageTasks(subpkg, pkg_s)
 
     def _addTask(self, task):
-        print("Add task: %s" % task.name)
         if task.name not in self._task_m.keys():
             self._task_m[task.name] = task
             for st in task.subtasks:
@@ -140,7 +138,7 @@ class TaskGraphBuilder(object):
             # Propagate the items up the stack, appending 'super' to 
             # the names
             for k,v in self._compound_task_ctxt_s[-1].uses_s[-1].items():
-                self._compound_task_ctxt_s[-1].uses[-2]["super.%s" % k] = v
+                self._compound_task_ctxt_s[-1].uses_s[-2]["super.%s" % k] = v
         else:
             # Propagate the items to the compound namespace, appending
             # 'super' to the names
@@ -257,7 +255,17 @@ class TaskGraphBuilder(object):
         if task.subtasks is not None and len(task.subtasks):
             ret = self._mkTaskCompoundNode(task)
         else:
-            ret = self._mkTaskLeafNode(task)
+            ret = self._mkTaskLeafNode(task, name)
+
+        if needs is not None:
+            for need in needs:
+                ret.needs.append((need, False))
+
+        for k,v in kwargs.items():
+            if hasattr(ret.params, k):
+                setattr(ret.params, k, v)
+            else:
+                raise Exception("Task parameters do not include %s" % k)
 
         # if ctor is not None:
         #     if needs is None:
@@ -334,7 +342,6 @@ class TaskGraphBuilder(object):
             name = task.name
 
         callable = None
-        print("task.run: %s" % str(task.run))
         if task.run is not None:
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
@@ -349,6 +356,8 @@ class TaskGraphBuilder(object):
             name=name,
             srcdir=srcdir,
             params=task.paramT(),
+            passthrough=task.passthrough,
+            consumes=task.consumes,
             task=callable(task.run))
         self._task_node_m[name] = node
         node.rundir = self.get_rundir()
@@ -365,7 +374,7 @@ class TaskGraphBuilder(object):
         return node
     
     def _mkTaskCompoundNode(self, task : Task, name=None) -> TaskNode:
-        self._log.debug("--> _mkTaskLeafNode %s" % task.name)
+        self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
         srcdir = os.path.dirname(task.srcinfo.file)
 
         if name is None:
@@ -603,9 +612,9 @@ class TaskGraphBuilder(object):
         return ctor_t
     
     def _getRunCallable(self, task):
-        self._log.debug("--> _getRunCallable %s" % taskdef.name)
+        self._log.debug("--> _getRunCallable %s" % task.name)
         callable = None
-        if task.run is not None and task.body.shell == "python":
+        if task.run is not None and task.shell == "python":
             # Evaluate a Python script
             pass
         else:
@@ -678,5 +687,4 @@ class TaskGraphBuilder(object):
 
         
         self._log.debug("<-- mkCompoundTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
-        return ctor_t    
-
+        return ctor_t
