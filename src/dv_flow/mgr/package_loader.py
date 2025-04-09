@@ -367,7 +367,7 @@ class PackageLoader(object):
         self._file_s.append(file)
 
         with open(file, "r") as fp:
-            doc = yaml.load(fp, Loader=YamlSrcInfoLoader)
+            doc = yaml.load(fp, Loader=YamlSrcInfoLoader(file))
             self._log.debug("doc: %s" % str(doc))
             if doc is not None and "fragment" in doc.keys():
                 frag = FragmentDef(**(doc["fragment"]))
