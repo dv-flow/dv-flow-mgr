@@ -65,7 +65,7 @@ class CmdGraph(object):
                     "<no descripion>"
                 print("%s - %s" % (t.name.ljust(max_name_len), desc))
         else:
-            rundir = os.path.join(pkg._basedir, "rundir")
+            rundir = os.path.join(pkg.basedir, "rundir")
 
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
 
