@@ -27,7 +27,6 @@ from ..util import loadProjPkgDef
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
-from ..ext_rgy import PkgRgy
 
 
 class CmdRun(object):
