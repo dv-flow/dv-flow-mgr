@@ -130,8 +130,6 @@ class PackageScope(SymbolScope):
         if ret is None:
             ret = self.loader.findType(name)
         
-        if ret is None:
-            raise Exception("Failed to find TaskType %s" % name)
         return ret
 
     def getScopeFullname(self, leaf=None) -> str:
