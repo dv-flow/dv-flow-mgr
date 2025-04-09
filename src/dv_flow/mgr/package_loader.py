@@ -276,19 +276,28 @@ class PackageLoader(object):
 
         self._pkg_m[pkg.name] = pkg
         self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
+        # Imports are loaded first
         self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
-        self._loadFragments(pkg, pkg_def.fragments, pkg.basedir)
-        self._loadTasks(pkg, pkg_def.tasks, pkg.basedir)
+
+        taskdefs = pkg_def.tasks.copy()
+
+        self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs)
+
+        self._loadTasks(pkg, taskdefs, pkg.basedir)
+
         self._pkg_s.pop()
 
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
     
     def _loadPackageImports(self, pkg, imports, basedir):
+        self._log.debug("--> _loadPackageImports %s" % str(imports))
         if len(imports) > 0:
             self._log.info("Loading imported packages (basedir=%s)" % basedir)
         for imp in imports:
+            self._log.debug("Loading import %s" % imp)
             self._loadPackageImport(pkg, imp, basedir)
+        self._log.debug("<-- _loadPackageImports %s" % str(imports))
     
     def _loadPackageImport(self, pkg, imp, basedir):
         self._log.debug("--> _loadPackageImport %s" % str(imp))
@@ -332,7 +341,7 @@ class PackageLoader(object):
         if imp_path in self._pkg_path_m.keys():
             sub_pkg = self._pkg_path_m[imp_path]
         else:
-            self._log.info("Loading file %s" % imp_path)
+            self._log.info("Loading imported file %s" % imp_path)
             sub_pkg = self._loadPackage(imp_path)
             self._log.info("Loaded imported package %s" % sub_pkg.name)
 
@@ -340,11 +349,11 @@ class PackageLoader(object):
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
         pass
 
-    def _loadFragments(self, pkg, fragments, basedir):
+    def _loadFragments(self, pkg, fragments, basedir, taskdefs):
         for spec in fragments:
-            self._loadFragmentSpec(pkg, spec, basedir)
+            self._loadFragmentSpec(pkg, spec, basedir, taskdefs)
 
-    def _loadFragmentSpec(self, pkg, spec, basedir):
+    def _loadFragmentSpec(self, pkg, spec, basedir, taskdefs):
         # We're either going to have:
         # - File path
         # - Directory path
@@ -352,20 +361,21 @@ class PackageLoader(object):
         if os.path.isfile(os.path.join(basedir, spec)):
             self._loadFragmentFile(
                 pkg, 
-                os.path.join(basedir, spec))
+                os.path.join(basedir, spec),
+                taskdefs)
         elif os.path.isdir(os.path.join(basedir, spec)):
-            self._loadFragmentDir(pkg, os.path.join(basedir, spec))
+            self._loadFragmentDir(pkg, os.path.join(basedir, spec), taskdefs)
         else:
             raise Exception("Fragment spec %s not found" % spec)
 
-    def _loadFragmentDir(self, pkg, dir):
+    def _loadFragmentDir(self, pkg, dir, taskdefs):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
-                self._loadFragmentDir(pkg, os.path.join(dir, file))
+                self._loadFragmentDir(pkg, os.path.join(dir, file), taskdefs)
             elif os.path.isfile(os.path.join(dir, file)) and file == "flow.dv":
-                self._loadFragmentFile(pkg, os.path.join(dir, file))
+                self._loadFragmentFile(pkg, os.path.join(dir, file), taskdefs)
 
-    def _loadFragmentFile(self, pkg, file):
+    def _loadFragmentFile(self, pkg, file, taskdefs):
         if file in self._file_s:
             raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(self._file_s)))
         self._file_s.append(file)
@@ -379,8 +389,8 @@ class PackageLoader(object):
                 pkg.fragment_def_l.append(frag)
 
                 self._loadPackageImports(pkg, frag.imports, basedir)
-                self._loadFragments(pkg, frag.fragments, basedir)
-                self._loadTasks(pkg, frag.tasks, basedir)
+                self._loadFragments(pkg, frag.fragments, basedir, taskdefs)
+                taskdefs.extend(frag.tasks)
             else:
                 print("Warning: file %s is not a fragment" % file)
 

@@ -27,7 +27,7 @@ package:
         rundir=rundir)
     runner = TaskSetRunner(rundir=rundir)
 
-    task = builder.mkTaskGraph("pkg1.foo")
+    task = builder.mkTaskNode("pkg1.foo")
 
     output = asyncio.run(runner.run(task))
 

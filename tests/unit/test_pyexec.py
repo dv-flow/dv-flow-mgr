@@ -31,7 +31,7 @@ package:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("foo.entry")
+    task = builder.mkTaskNode("foo.entry")
     output = asyncio.run(runner.run(task))
 
     assert runner.status == 0

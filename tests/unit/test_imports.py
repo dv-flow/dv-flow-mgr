@@ -55,7 +55,7 @@ package:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("top.top")
+    task = builder.mkTaskNode("top.top")
     output = asyncio.run(runner.run(task))
 
 def test_local_name_collision(tmpdir):
@@ -108,5 +108,5 @@ package:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("top.top")
+    task = builder.mkTaskNode("top.top")
     output = asyncio.run(runner.run(task))

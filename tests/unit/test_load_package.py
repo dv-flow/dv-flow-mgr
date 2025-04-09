@@ -270,3 +270,63 @@ package:
     assert pkg.basedir == rundir
     assert len(pkg.task_m) == 1
     assert "foo.create_file" in pkg.task_m.keys()
+
+def test_need_fragment_1(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: t1
+      body:
+      - name: t2
+      - name: t3
+    - name: t2
+      uses: t1
+      body:
+      - name: t4
+        needs: [t3]
+    - name: t4
+
+    fragments:
+    - frag.dv
+"""
+
+    frag_dv = """
+fragment:
+    tasks:
+    - name: t5
+      uses: t1
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    with open(os.path.join(rundir, "frag.dv"), "w") as fp:
+        fp.write(frag_dv)
+
+    marker_collector = MarkerCollector()
+    pkg = PackageLoader(
+        marker_listeners=[marker_collector]).load(os.path.join(tmpdir, "flow.dv"))
+
+    assert len(marker_collector.markers) == 0
+
+    assert pkg is not None
+    assert pkg.pkg_def is not None
+    assert pkg.name == "foo"
+    assert pkg.basedir == rundir
+    assert len(pkg.task_m) == 4
+    assert "foo.t1" in pkg.task_m.keys()
+    assert "foo.t2" in pkg.task_m.keys()
+    assert "foo.t5" in pkg.task_m.keys()
+
+    t1 = pkg.task_m["foo.t1"]
+    assert t1.name == "foo.t1"
+    assert len(t1.subtasks) == 2
+
+    t2 = pkg.task_m["foo.t2"]
+    assert len(t2.subtasks) == 1
+    assert t2.subtasks[0].name == "foo.t2.t4"
+    assert len(t2.subtasks[0].needs) == 1
+    assert t2.subtasks[0].needs[0] is not None
+    assert t2.subtasks[0].needs[0].name == "foo.t1.t3"

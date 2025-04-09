@@ -29,7 +29,7 @@ package:
         fp.write(flowdv)
     pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(pkg_def, os.getcwd())
-    task = builder.mkTaskGraph("my_pkg.entry", rundir="mk_pkg.entry")
+    task = builder.mkTaskNode("my_pkg.entry")
 
     assert task is not None
 

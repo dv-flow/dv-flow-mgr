@@ -69,7 +69,7 @@ class CmdGraph(object):
 
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
 
-            t = builder.mkTaskGraph(pkg.name + "." + args.task)
+            t = builder.mkTaskNode(pkg.name + "." + args.task)
 
             TaskGraphDotWriter().write(
                 t,

@@ -66,7 +66,7 @@ async def foo(runner, input):
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo")
+    task = builder.mkTaskNode("pkg1.foo")
     output = asyncio.run(runner.run(task))
 
     assert runner.status == 0
@@ -105,7 +105,7 @@ async def foo(runner, input):
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo")
+    task = builder.mkTaskNode("pkg1.foo")
     output = asyncio.run(runner.run(task))
 
     assert runner.status == 1
@@ -148,7 +148,7 @@ async def foo(runner, input) -> TaskDataResult:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo2")
+    task = builder.mkTaskNode("pkg1.foo2")
     output = asyncio.run(runner.run(task))
 
 def test_class_use_with(tmpdir):
@@ -189,7 +189,7 @@ async def foo(runner, input) -> TaskDataResult:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo2")
+    task = builder.mkTaskNode("pkg1.foo2")
     output = asyncio.run(runner.run(task))
 
 def test_class_use_with_new_param(tmpdir):
@@ -233,7 +233,7 @@ async def foo(runner, input) -> TaskDataResult:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("pkg1.foo2")
+    task = builder.mkTaskNode("pkg1.foo2")
     output = asyncio.run(runner.run(task))
 
 def test_broad_parallel(tmpdir):
@@ -297,7 +297,7 @@ async def foo(runner, input) -> TaskDataResult:
     listener = TaskListenerTest()
     runner.add_listener(listener.event)
 
-    task = builder.mkTaskGraph("pkg1.final")
+    task = builder.mkTaskNode("pkg1.final")
     output = asyncio.run(runner.run(task))
 
     assert runner.status == 0
@@ -327,7 +327,7 @@ package:
     listener = TaskListenerTest()
     runner.add_listener(listener.event)
 
-    task = builder.mkTaskGraph("pkg1.SendMsg")
+    task = builder.mkTaskNode("pkg1.SendMsg")
     output = asyncio.run(runner.run(task))
 
     assert runner.status == 0
@@ -363,5 +363,5 @@ package:
     listener = TaskListenerLog()
     runner.add_listener(listener.event)
 
-    task = builder.mkTaskGraph("pkg1.Sleep")
+    task = builder.mkTaskNode("pkg1.Sleep")
     output = asyncio.run(runner.run(task))

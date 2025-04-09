@@ -23,7 +23,7 @@ def test_fileset_1(tmpdir):
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
-    task = builder.mkTaskGraph("test1.files1")
+    task = builder.mkTaskNode("test1.files1")
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     out = asyncio.run(runner.run(task))
@@ -36,7 +36,7 @@ def test_fileset_1(tmpdir):
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
-    task = builder.mkTaskGraph("test1.files1")
+    task = builder.mkTaskNode("test1.files1")
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     out = asyncio.run(runner.run(task))
@@ -50,7 +50,7 @@ def test_fileset_1(tmpdir):
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
-    task = builder.mkTaskGraph("test1.files1")
+    task = builder.mkTaskNode("test1.files1")
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
     out = asyncio.run(runner.run(task))
@@ -84,7 +84,7 @@ def test_fileset_input_1(tmpdir):
     builder = TaskGraphBuilder(
         pkg_def,
         os.path.join(tmpdir, "rundir"))
-    files1 = builder.mkTaskGraph("test1.files1")
+    files1 = builder.mkTaskNode("test1.files1")
     cfiles = consume_files(builder, srcdir="srcdir", needs=[files1])
 
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
@@ -119,7 +119,7 @@ package:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"))
 
-    task = builder.mkTaskGraph("p1.glob")
+    task = builder.mkTaskNode("p1.glob")
     output = asyncio.run(runner.run(task))
 
     print("output: %s" % str(output))

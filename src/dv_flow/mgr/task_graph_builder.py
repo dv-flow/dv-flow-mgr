@@ -265,7 +265,7 @@ class TaskGraphBuilder(object):
             if hasattr(ret.params, k):
                 setattr(ret.params, k, v)
             else:
-                raise Exception("Task parameters do not include %s" % k)
+                raise Exception("Task %s parameters do not include %s" % (task.name, k))
 
         # if ctor is not None:
         #     if needs is None:

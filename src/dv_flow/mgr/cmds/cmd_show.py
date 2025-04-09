@@ -72,7 +72,7 @@ class CmdShow(object):
 
 
             if args.all:
-                t = builder.mkTaskGraph(pkg.name + "." + args.task)
+                t = builder.mkTaskNode(pkg.name + "." + args.task)
                 dep_m = TaskSetRunner(rundir=None).buildDepMap(t)
 
                 order = list(toposort.toposort(dep_m))
