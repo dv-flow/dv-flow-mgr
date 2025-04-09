@@ -169,6 +169,21 @@ class PackageLoader(object):
         ret = self._loadPackage(root, None)
         self._log.debug("<-- load %s" % root)
         return ret
+    
+    def load_rgy(self, name) -> Package:
+        self._log.debug("--> load_rgy %s" % name)
+        pkg = Package(None)
+
+        name = name if isinstance(name, list) else [name]
+
+        for nn in name:
+            pp = self.pkg_rgy.findPackagePath(nn)
+            if pp is None:
+                raise Exception("Package %s not found" % nn)
+            pp_n = self._loadPackage(pp)
+            pkg.pkg_m[pp_n.name] = pp_n
+        self._log.debug("<-- load_rgy %s" % name)
+        return pkg
 
     def _error(self, msg, elem):
         pass
@@ -392,11 +407,12 @@ class PackageLoader(object):
                 if task.uses is None:
                     raise Exception("Failed to link")
             
-#            passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, task.uses)
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
+
             task.passthrough = passthrough
             task.consumes = consumes
             task.rundir = rundir
+
             task.paramT = self._getParamT(
                 taskdef, 
                 task.uses.paramT if task.uses is not None else None)
