@@ -114,9 +114,6 @@ class TaskDef(BaseModel):
         description="Shell to use for shell-based implementation")
     strategy : StrategyDef = dc.Field(
         default=None)
-    tasks: Union[List['TaskDef'], TasksBuilder, None] = dc.Field(
-        default=None,
-        description="Sub-tasks")
     desc : str = dc.Field(
         default="",
         title="Task description",
