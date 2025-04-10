@@ -98,7 +98,7 @@ class TaskNodeLeaf(TaskNode):
         else:
             self._log.debug("consumes(unknown): %s" % str(self.consumes))
 
-        for name,field in self.params.model_fields.items():
+        for name,field in type(self.params).model_fields.items():
             value = getattr(self.params, name)
             if type(value) == str:
                 if value.find("${{") != -1:

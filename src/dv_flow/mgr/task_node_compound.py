@@ -46,8 +46,14 @@ class TaskNodeCompound(TaskNode):
             srcdir=self.srcdir,
             params=NullParams())
         self.input.task = null_run
+        self.tasks.append(self.input)
+
         return super().__post_init__()
 
+    @property
+    def first(self):
+        return self.input
+    
     async def do_run(self, 
                      runner : TaskRunner, 
                      rundir, 

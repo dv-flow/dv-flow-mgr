@@ -56,6 +56,7 @@ class TaskNode(object):
     start : float = dc.field(default=None)
     end : float = dc.field(default=None)
     save_exec_data : bool = dc.field(default=True)
+    parent : 'TaskNode' = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 
@@ -68,6 +69,10 @@ class TaskNode(object):
             for i,need in enumerate(self.needs):
                 if not isinstance(need, tuple):
                     self.needs[i] = (need, False)
+
+    @property
+    def first(self):
+        return self
 
     async def do_run(self, 
                   runner,

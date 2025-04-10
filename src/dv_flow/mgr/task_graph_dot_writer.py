@@ -1,7 +1,7 @@
 import dataclasses as dc
 import logging
 import sys
-from typing import ClassVar, Dict, TextIO
+from typing import ClassVar, Dict, Set, TextIO
 from .task_node import TaskNode
 from .task_node_compound import TaskNodeCompound
 
@@ -10,6 +10,7 @@ class TaskGraphDotWriter(object):
     fp : TextIO = dc.field(default=None)
     _ind : str = ""
     _node_id_m : Dict[TaskNode, str] = dc.field(default_factory=dict)
+    _processed_needs : Set[TaskNode] = dc.field(default_factory=set)
     _node_id : int = 1
     _cluster_id : int = 1
     _log : ClassVar = logging.getLogger("TaskGraphDotWriter")
@@ -22,48 +23,107 @@ class TaskGraphDotWriter(object):
         else:
             self.fp = open(filename, "w")
         self.println("digraph G {")
-        self.process_node(node)
+        # First, build-out all nodes
+        self.build_node(node)
+        self.process_needs(node)
         self.println("}")
 
         self.fp.close()
         self._log.debug("<-- TaskGraphDotWriter::write")
 
-    def process_node(self, node):
-        self._log.debug("--> process_node %s (%d)" % (node.name, len(node.needs),))
-        node_id = self._node_id
-        self._node_id += 1
-        node_name = "n%d" % self._node_id
-        self._node_id_m[node] = node_name
+    def build_node(self, node):
+        self._log.debug("--> build_node %s (%d)" % (node.name, len(node.needs),))
 
         if isinstance(node, TaskNodeCompound):
-            self.println("subgraph cluster_%d {" % self._cluster_id)
-            self._cluster_id += 1
-            self.inc_ind()
-            self.println("label=\"%s\";" % node.name)
-            self.println("color=blue;")
-            self.println("style=dashed;")
-            self.process_node(node.input)
-
-            self.println("%s[label=\"%s.out\"];" % (
-                node_name,
-                node.name))
+            self._log.debug("-- compound node")
+            # Find the root and build out any expanded sub-nodes
+            root = node
+            while root.parent is not None:
+                root = root.parent
+            self.build_compound_node(root)
         else:
-            self.println("%s[label=\"%s\"];" % (
-                node_name,
-                node.name))
+            # Leaf node
+            self._log.debug("-- leaf node")
+            node_id = self._node_id
+            self._node_id += 1
+            node_name = "n%d" % node_id
+            self._node_id_m[node] = node_name
+            self.println("%s[label=\"%s\"];" % (node_name, node.name))
+        self._log.debug("<-- build_node %s (%d)" % (node.name, len(node.needs),))
 
-        for dep in node.needs:
-            if dep[0] not in self._node_id_m.keys():
-                self.process_node(dep[0])
+    def process_needs(self, node):
+        self._log.debug("--> process_needs %s (%d)" % (node.name, len(node.needs),))
+
+        # if isinstance(node, TaskNodeCompound):
+        #     self.println("subgraph cluster_%d {" % self._cluster_id)
+        #     self._cluster_id += 1
+        #     self.inc_ind()
+        #     self.println("label=\"%s\";" % node.name)
+        #     self.println("color=blue;")
+        #     self.println("style=dashed;")
+        #     self.process_node(node.input)
+
+        #     self.println("%s[label=\"%s.out\"];" % (
+        #         node_name,
+        #         node.name))
+        # else:
+        #     self.println("%s[label=\"%s\"];" % (
+        #         node_name,
+        #         node.name))
+
+        for dep,_ in node.needs:
+            if dep not in self._node_id_m.keys():
+                self.build_node(dep)
+            if dep not in self._node_id_m.keys():
+                self._log.error("Dep-node not built: %s" % dep.name)
+            if node not in self._node_id_m.keys():
+                self.build_node(node)
+            if node not in self._node_id_m.keys():
+                self._log.error("Dep-node not built: %s" % node.name)
             self.println("%s -> %s;" % (
-                self._node_id_m[dep[0]],
+                self._node_id_m[dep],
                 self._node_id_m[node]))
+            if dep not in self._processed_needs:
+                self._processed_needs.add(dep)
+                self.process_needs(dep)
             
-        if isinstance(node, TaskNodeCompound):
-            self.dec_ind()
-            self.println("}")
+        self._log.debug("<-- process_needs %s (%d)" % (node.name, len(node.needs),))
 
-        self._log.debug("<-- process_node %s (%d)" % (node.name, len(node.needs),))
+    def build_compound_node(self, node):
+        """Hierarchical build of a compound root node"""
+
+        self._log.debug("--> build_compound_node %s (%d)" % (node.name, len(node.tasks),))
+
+        id = self._cluster_id
+        self._cluster_id += 1
+        self.println("subgraph cluster_%d {" % id)
+        self.inc_ind()
+        self.println("label=\"%s\";" % node.name)
+        self.println("color=blue;")
+        self.println("style=dashed;")
+
+        task_node_id = self._node_id
+        self._node_id += 1
+        task_node_name = "n%d" % task_node_id
+        self.println("%s[label=\"%s\"];" % (task_node_name, node.name))
+        self._node_id_m[node] = task_node_name
+
+        for n in node.tasks:
+            if isinstance(n, TaskNodeCompound):
+                # Recurse
+                self.build_compound_node(n)
+            else:
+                # Leaf node
+                node_id = self._node_id
+                self._node_id += 1
+                node_name = "n%d" % node_id
+                self._node_id_m[n] = node_name
+                leaf_name = n.name[n.name.rfind(".") + 1:]
+                self.println("%s[label=\"%s\"];" % (node_name, leaf_name))
+        self.dec_ind()
+        self.println("}")
+
+        self._log.debug("<-- build_compound_node %s (%d)" % (node.name, len(node.tasks),))
 
     def println(self, l):
         self.fp.write("%s%s\n" % (self._ind, l))

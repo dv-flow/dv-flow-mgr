@@ -376,8 +376,13 @@ class TaskGraphBuilder(object):
         node.input.rundir = self.get_rundir()
         self.leave_rundir()
 
-        self._log.debug("--> processing needs")
-        self._gatherNeeds(task, node.input)
+        self._log.debug("--> processing needs (%s)" % task.name)
+        for need in task.needs:
+            need_n = self._getTaskNode(need.name)
+            self._log.debug("Add need %s" % need_n.name)
+            if need_n is None:
+                raise Exception("Failed to find need %s" % need.name)
+            node.input.needs.append((need_n, False))
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -396,6 +401,7 @@ class TaskGraphBuilder(object):
 
         # Fill in 'needs'
         for t, tn in tasks:
+            self._log.debug("Process node %s" % t.name)
 
             referenced = None
             for tt in task.subtasks:
@@ -404,7 +410,9 @@ class TaskGraphBuilder(object):
                     break
 
             refs_internal = None
-            for nn,_ in tn.needs:
+            # Assess how this task is connected to others in the compound node
+            for nn,_ in tn.first.needs:
+                self._log.debug("Need: %s" % nn.name)
                 for _,tnn in tasks:
                     if nn == tnn:
                         refs_internal = tnn
@@ -418,7 +426,7 @@ class TaskGraphBuilder(object):
                 self._log.debug("Node %s doesn't reference any internal node" % t.name)
                 tn.needs.append((node.input, False))
             else:
-                self._log.debug("Node references internal node %s" % refs_internal.name)
+                self._log.debug("Node %s references internal node %s" % (t.name, refs_internal.name))
 
             if referenced is not None:
                 # Add this task as a dependency of the output

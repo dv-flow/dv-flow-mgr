@@ -2,7 +2,6 @@ import os
 import pytest
 import subprocess
 import sys
-from dv_flow.mgr import PkgRgy
 
 
 @pytest.mark.skip
