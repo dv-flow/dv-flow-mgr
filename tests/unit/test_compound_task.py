@@ -272,5 +272,6 @@ package:
 
     assert runner.status == 0
     assert len(output.output) == 1
+    assert output.output[0].src == 'foo.entry.glob_txt'
     assert output.output[0].type == 'std.FileSet'
     assert len(output.output[0].files) == 1

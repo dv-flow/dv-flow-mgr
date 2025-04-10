@@ -70,7 +70,7 @@ class TaskGraphBuilder(object):
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
-    _rundir_s : List[str] = dc.field(default_factory=list)
+    _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
     _uses_count : int = 0
 
     _log : logging.Logger = None
@@ -79,6 +79,7 @@ class TaskGraphBuilder(object):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
         self._shell_m.update(ExtRgy._inst._shell_m)
+        self._task_rundir_s.append([])
 
         if self.root_pkg is not None:
             # Collect all the tasks
@@ -102,17 +103,23 @@ class TaskGraphBuilder(object):
     def addOverride(self, key : str, val : str):
         self._override_m[key] = val
 
+    def enter_package(self, pkg : PackageDef):
+        pass
+
     def enter_rundir(self, rundir : str):
-        self._rundir_s.append(rundir)
+        self._log.debug("enter_rundir: %s (%d)" % (rundir, len(self._task_rundir_s[-1])))
+        self._task_rundir_s[-1].append(rundir)
 
     def get_rundir(self, rundir=None):
-        ret = self._rundir_s.copy()
+        ret = self._task_rundir_s[-1].copy()
         if rundir is not None:
             ret.append(rundir)
+        self._log.debug("get_rundir: %s" % str(ret))
         return ret
     
     def leave_rundir(self):
-        self._rundir_s.pop()
+        self._log.debug("leave_rundir")
+        self._task_rundir_s[-1].pop()
 
     def enter_uses(self):
         self._uses_count += 1
@@ -244,18 +251,12 @@ class TaskGraphBuilder(object):
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
 
-        pkg = None
-
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
-
-        # Determine how to build this node
-        if task.subtasks is not None and len(task.subtasks):
-            ret = self._mkTaskCompoundNode(task)
-        else:
-            ret = self._mkTaskLeafNode(task, name)
+        
+        ret = self._mkTaskNode(task)
 
         if needs is not None:
             for need in needs:
@@ -267,32 +268,6 @@ class TaskGraphBuilder(object):
             else:
                 raise Exception("Task %s parameters do not include %s" % (task.name, k))
 
-        # if ctor is not None:
-        #     if needs is None:
-        #         needs = []
-        #     for need_def in ctor.getNeeds():
-        #         # Resolve the full name of the need
-        #         need_fullname = self._resolveNeedRef(need_def)
-        #         self._log.debug("Searching for qualifed-name task %s" % need_fullname)
-        #         if not need_fullname in self._task_node_m.keys():
-        #             rundir_s = self._rundir_s
-        #             self._rundir_s = [need_fullname]
-        #             need_t = self._mkTaskGraph(need_fullname)
-        #             self._rundir_s = rundir_s
-        #             self._task_node_m[need_fullname] = need_t
-        #         needs.append(self._task_node_m[need_fullname])
-
-        #     self._log.debug("ctor: %s" % ctor.name)
-        #     params = ctor.mkTaskParams(kwargs)
-        #     ret = ctor.mkTaskNode(
-        #         self,
-        #         params=params,
-        #         name=name, 
-        #         srcdir=srcdir, 
-        #         needs=needs)
-        #     ret.rundir = self.get_rundir(name)
-        # else:
-        #     raise Exception("Failed to find ctor for task %s" % task_t)
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
     
@@ -307,21 +282,19 @@ class TaskGraphBuilder(object):
                     break
         return task
     
-    def _mkTaskNode(self, name):
+    def _mkTaskNode(self, task : Task, hierarchical=False):
 
-        if name in self.root_pkg.task_m.keys():
-            task = self.root_pkg.task_m[name]
-#            ctor = self._getTaskCtor(self.root_pkg.task_m[task_t])
-            pkg = self.root_pkg
-        else:
-            raise Exception("task_t (%s) not present" % str(name))
-            pass
+        if not hierarchical:
+            self._task_rundir_s.append([])
 
         # Determine how to build this node
         if task.subtasks is not None and len(task.subtasks):
             ret = self._mkTaskCompoundNode(task)
         else:
             ret = self._mkTaskLeafNode(task)
+
+        if not hierarchical:
+            self._task_rundir_s.pop()
 
         return ret        
     
@@ -363,9 +336,12 @@ class TaskGraphBuilder(object):
         node.rundir = self.get_rundir()
 
         # Now, link up the needs
+        self._log.debug("--> processing needs")
         for n in task.needs:
+            self._log.debug("-- need %s" % n.name)
             nn = self._getTaskNode(n.name)
             node.needs.append((nn, False))
+        self._log.debug("<-- processing needs")
 
         if task.rundir == RundirE.Unique:
             self.leave_rundir()
@@ -390,12 +366,20 @@ class TaskGraphBuilder(object):
             params=task.paramT()
         )
         self._task_node_m[name] = node
+
         node.rundir = self.get_rundir()
 
-        node_needs = []
+        # Put the input node inside the compound task's rundir
+        self.enter_rundir(task.name + ".in")
+        node.input.rundir = self.get_rundir()
+        self.leave_rundir()
+
+        self._log.debug("--> processing needs")
         for need in task.needs:
+            self._log.debug("-- need: %s" % need.name)
             nn = self._getTaskNode(need.name)
-            node_needs.append(nn)
+            node.input.needs.append((nn, False))
+        self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
 
@@ -403,32 +387,36 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
         for t in task.subtasks:
+            nn = self._mkTaskNode(t, True)
             tasks.append((t, self._getTaskNode(t.name)))
 
         # Fill in 'needs'
         for t, tn in tasks:
-            need_n = []
 
-            referenced = False
+            referenced = None
             for tt in task.subtasks:
                 if tt in t.needs:
-                    referenced = True
+                    referenced = tt
                     break
 
-            if len(t.needs):
-                for need in t.needs:
-                    nn = self._getTaskNode(need.name)
-                    need_n.append((nn, False))
-                tn.needs = need_n
-            else:
-                # Any node without dependencies is tied 
-                # to the root node
-                tn.needs = node_needs
+            refs_internal = False
+            for nn in tn.needs:
+                if nn in task.subtasks:
+                    refs_internal = True
+                    break
+            
+            if not refs_internal:
+                # Any node that doesn't depend on an internal
+                # task is a top-level task
+                tn.needs.append((node.input, False))
 
-            if not referenced:
+            if referenced is not None:
                 # Add this task as a dependency of the output
                 # node (the root one)
+                self._log.debug("Add node %s as a top-level dependency" % tn.name)
                 node.needs.append((tn, False))
+            else:
+                self._log.debug("Node %s has internal needs" % tn.name)
 
         if task.rundir == RundirE.Unique:
             self.leave_rundir()

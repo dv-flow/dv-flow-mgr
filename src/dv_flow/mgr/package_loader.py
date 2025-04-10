@@ -111,7 +111,7 @@ class PackageScope(SymbolScope):
             self._log.debug("Searching loader for %s" % name)
             ret = self.loader.findType(name)
 
-        self._log.debug("<-- %s::find %s (%s)" % (self.pkg.name, name, str(ret)))
+        self._log.debug("<-- %s::find %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
         return ret
 
     def findType(self, name) -> Task:
