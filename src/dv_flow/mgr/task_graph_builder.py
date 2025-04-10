@@ -319,10 +319,7 @@ class TaskGraphBuilder(object):
 
         # Now, link up the needs
         self._log.debug("--> processing needs")
-        for n in task.needs:
-            self._log.debug("-- need %s" % n.name)
-            nn = self._getTaskNode(n.name)
-            node.needs.append((nn, False))
+        self._gatherNeeds(task, node)
         self._log.debug("<-- processing needs")
 
         if task.rundir == RundirE.Unique:
@@ -380,10 +377,7 @@ class TaskGraphBuilder(object):
         self.leave_rundir()
 
         self._log.debug("--> processing needs")
-        for need in task.needs:
-            self._log.debug("-- need: %s" % need.name)
-            nn = self._getTaskNode(need.name)
-            node.input.needs.append((nn, False))
+        self._gatherNeeds(task, node.input)
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -439,6 +433,18 @@ class TaskGraphBuilder(object):
 
         return node
 
+    def _gatherNeeds(self, task_t, node):
+        self._log.debug("--> _gatherNeeds %s" % task_t.name)
+        if task_t.uses is not None:
+            self._gatherNeeds(task_t.uses, node)
+
+        for need in task_t.needs:
+            need_n = self._getTaskNode(need.name)
+            if need_n is None:
+                raise Exception("Failed to find need %s" % need.name)
+            node.needs.append((need_n, False))
+        self._log.debug("<-- _gatherNeeds %s" % task_t.name)
+        
     def error(self, msg, loc=None):
         if loc is not None:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error, loc=loc)
