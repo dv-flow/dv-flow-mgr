@@ -605,7 +605,7 @@ class PackageLoader(object):
                 rundir = base_t.rundir
 
         if passthrough is None:
-            passthrough = PassthroughE.No
+            passthrough = PassthroughE.Unused
         if consumes is None:
             consumes = ConsumesE.All
 

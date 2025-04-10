@@ -98,7 +98,7 @@ class TaskNodeLeaf(TaskNode):
         else:
             self._log.debug("consumes(unknown): %s" % str(self.consumes))
 
-        for name,field in self.params.model_fields.items():
+        for name,field in type(self.params).model_fields.items():
             value = getattr(self.params, name)
             if type(value) == str:
                 if value.find("${{") != -1:
@@ -170,7 +170,9 @@ class TaskNodeLeaf(TaskNode):
                 for need,block in self.needs:
                     if not block:
                         output.extend(need.output.output)
-            else:
+            elif self.consumes == ConsumesE.All:
+                self._log.debug("All inputs are consumed, so not propagating any")
+            elif isinstance(self.consumes, list):
                 # Filter out parameter sets that were consumed
                 self._log.debug("Propagating non-consumed input parameters to output")
                 self._log.debug("consumes: %s" % str(self.consumes))
