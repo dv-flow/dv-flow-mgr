@@ -479,6 +479,7 @@ class PackageLoader(object):
         for td in taskdef.body:
             if td.srcinfo is None:
                 raise Exception("null srcinfo")
+
             
             doc = td.doc if td.doc is not None else ""
             desc = td.desc if td.desc is not None else ""
@@ -498,6 +499,13 @@ class PackageLoader(object):
                     st.uses = self._findTaskType(td.uses)
                     if st.uses is None:
                         raise Exception("Failed to find task %s" % td.uses)
+
+            passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
+
+            st.passthrough = passthrough
+            st.consumes = consumes
+            st.rundir = rundir
+
             for need in td.needs:
                 if isinstance(need, str):
                     st.needs.append(self._findTask(need))
@@ -582,6 +590,7 @@ class PackageLoader(object):
 
     
     def _getPTConsumesRundir(self, taskdef : TaskDef, base_t : Task):
+        self._log.debug("_getPTConsumesRundir %s" % taskdef.name)
         passthrough = taskdef.passthrough
         consumes = taskdef.consumes.copy() if isinstance(taskdef.consumes, list) else taskdef.consumes
         rundir = taskdef.rundir
