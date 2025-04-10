@@ -215,38 +215,6 @@ class TaskGraphBuilder(object):
 
         # return ret
         
-    def _mkTaskGraph(self, task : str) -> TaskNode:
-        if task in self.root_pkg.task_m.keys():
-            task_t = self.root_pkg.task_m[task]
-        else:
-            pass
-
-        if task_t is None:
-            raise Exception("Failed to find task %s" % task)
-
-        ctor = self._getTaskCtor(task_t)
-
-        params = ctor.mkTaskParams()
-
-        needs = []
-
-        for need in task_t.needs:
-            need_n = self.findTask(need.name)
-            if need_n is None:
-                raise Exception("Failed to find need %s" % need.name)
-            needs.append(need_n)
-
-        task = ctor.mkTaskNode(
-            builder=self,
-            params=params,
-            name=task,
-            needs=needs)
-        task.rundir = self.get_rundir(task.name)
-#        task.rundir = rundir
-        
-        self._task_node_m[task.name] = task
-
-        return task
     
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
@@ -337,10 +305,7 @@ class TaskGraphBuilder(object):
 
         # Now, link up the needs
         self._log.debug("--> processing needs")
-        for n in task.needs:
-            self._log.debug("-- need %s" % n.name)
-            nn = self._getTaskNode(n.name)
-            node.needs.append((nn, False))
+        self._gatherNeeds(task, node)
         self._log.debug("<-- processing needs")
 
         if task.rundir == RundirE.Unique:
@@ -375,10 +340,7 @@ class TaskGraphBuilder(object):
         self.leave_rundir()
 
         self._log.debug("--> processing needs")
-        for need in task.needs:
-            self._log.debug("-- need: %s" % need.name)
-            nn = self._getTaskNode(need.name)
-            node.input.needs.append((nn, False))
+        self._gatherNeeds(task, node.input)
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -429,6 +391,17 @@ class TaskGraphBuilder(object):
 
         return node
 
+    def _gatherNeeds(self, task_t, node):
+        self._log.debug("--> _gatherNeeds %s" % task_t.name)
+        if task_t.uses is not None:
+            self._gatherNeeds(task_t.uses, node)
+
+        for need in task_t.needs:
+            need_n = self._getTaskNode(need.name)
+            if need_n is None:
+                raise Exception("Failed to find need %s" % need.name)
+            node.needs.append((need_n, False))
+        self._log.debug("<-- _gatherNeeds %s" % task_t.name)
         
     def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskNodeCtor':
         from .task_def import TaskSpec
