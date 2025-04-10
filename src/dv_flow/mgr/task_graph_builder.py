@@ -399,16 +399,22 @@ class TaskGraphBuilder(object):
                     referenced = tt
                     break
 
-            refs_internal = False
-            for nn in tn.needs:
-                if nn in task.subtasks:
-                    refs_internal = True
+            refs_internal = None
+            for nn,_ in tn.needs:
+                for _,tnn in tasks:
+                    if nn == tnn:
+                        refs_internal = tnn
+                        break
+                if refs_internal is not None:
                     break
             
             if not refs_internal:
                 # Any node that doesn't depend on an internal
                 # task is a top-level task
+                self._log.debug("Node %s doesn't reference any internal node" % t.name)
                 tn.needs.append((node.input, False))
+            else:
+                self._log.debug("Node references internal node %s" % refs_internal.name)
 
             if referenced is not None:
                 # Add this task as a dependency of the output
