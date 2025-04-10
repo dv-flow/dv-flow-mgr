@@ -71,6 +71,7 @@ class TaskGraphBuilder(object):
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
+    _task_node_s : List[TaskNode] = dc.field(default_factory=list)
     _uses_count : int = 0
 
     _log : logging.Logger = None
@@ -203,51 +204,7 @@ class TaskGraphBuilder(object):
 
     def mkTaskGraph(self, task : str, rundir=None) -> TaskNode:
         return self.mkTaskNode(task, rundir=rundir)
-        # self._task_node_m.clear()
-
-        # if rundir is not None:
-        #     self._rundir_s.append(rundir)
-
-        # ret = self._mkTaskGraph(task)
-
-        # if rundir is not None:
-        #     self._rundir_s.pop()
-
-        # return ret
         
-    def _mkTaskGraph(self, task : str) -> TaskNode:
-        if task in self.root_pkg.task_m.keys():
-            task_t = self.root_pkg.task_m[task]
-        else:
-            pass
-
-        if task_t is None:
-            raise Exception("Failed to find task %s" % task)
-
-        ctor = self._getTaskCtor(task_t)
-
-        params = ctor.mkTaskParams()
-
-        needs = []
-
-        for need in task_t.needs:
-            need_n = self.findTask(need.name)
-            if need_n is None:
-                raise Exception("Failed to find need %s" % need.name)
-            needs.append(need_n)
-
-        task = ctor.mkTaskNode(
-            builder=self,
-            params=params,
-            name=task,
-            needs=needs)
-        task.rundir = self.get_rundir(task.name)
-#        task.rundir = rundir
-        
-        self._task_node_m[task.name] = task
-
-        return task
-    
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
 
@@ -282,21 +239,37 @@ class TaskGraphBuilder(object):
                     break
         return task
     
-    def _mkTaskNode(self, task : Task, hierarchical=False):
+    def _mkTaskNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False):
 
         if not hierarchical:
             self._task_rundir_s.append([])
 
         # Determine how to build this node
-        if task.subtasks is not None and len(task.subtasks):
-            ret = self._mkTaskCompoundNode(task)
+        if self._isCompound(task):
+            ret = self._mkTaskCompoundNode(
+                task, 
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                hierarchical=hierarchical)
         else:
-            ret = self._mkTaskLeafNode(task)
+            ret = self._mkTaskLeafNode(
+                task, 
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                hierarchical=hierarchical)
 
         if not hierarchical:
             self._task_rundir_s.pop()
 
         return ret        
+    
+    def _isCompound(self, task):
+        if task.subtasks is not None and len(task.subtasks):
+            return True
+        elif task.uses is not None:
+            return self._isCompound(task.uses)
     
     def _getTaskNode(self, name):
         if name in self._task_node_m.keys():
@@ -304,15 +277,21 @@ class TaskGraphBuilder(object):
         else:
             return self.mkTaskNode(name)
     
-    def _mkTaskLeafNode(self, task : Task, name=None) -> TaskNode:
+    def _mkTaskLeafNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
-        srcdir = os.path.dirname(task.srcinfo.file)
+
+        if name is None:
+            name = task.name
+
+        if srcdir is None:
+            srcdir = os.path.dirname(task.srcinfo.file)
+        
+        if params is None:
+            params = task.paramT()
 
         if task.rundir == RundirE.Unique:
             self.enter_rundir(task.name)
 
-        if name is None:
-            name = task.name
 
         callable = None
         if task.run is not None:
@@ -328,12 +307,15 @@ class TaskGraphBuilder(object):
         node = TaskNodeLeaf(
             name=name,
             srcdir=srcdir,
-            params=task.paramT(),
+            params=params,
             passthrough=task.passthrough,
             consumes=task.consumes,
             task=callable(task.run))
         self._task_node_m[name] = node
         node.rundir = self.get_rundir()
+
+        if len(self._task_node_s):
+            node.parent = self._task_node_s[-1]
 
         # Now, link up the needs
         self._log.debug("--> processing needs")
@@ -349,23 +331,46 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
-    def _mkTaskCompoundNode(self, task : Task, name=None) -> TaskNode:
+    def _mkTaskCompoundNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
-        srcdir = os.path.dirname(task.srcinfo.file)
 
         if name is None:
             name = task.name
 
+        if srcdir is None:
+            srcdir = os.path.dirname(task.srcinfo.file)
+
+        if params is None:
+            params = task.paramT()
+
         if task.rundir == RundirE.Unique:
             self.enter_rundir(task.name)
 
-        # Node represents the terminal node of the sub-DAG
-        node = TaskNodeCompound(
-            name=name,
-            srcdir=srcdir,
-            params=task.paramT()
-        )
+        if task.uses is not None:
+            # This is a compound task that is based on
+            # another. Create the base implementation
+            node = self._mkTaskNode(
+                task.uses,
+                name=name, 
+                srcdir=srcdir,
+                params=params,
+                hierarchical=True)
+            
+            if not isinstance(node, TaskNodeCompound):
+                # TODO: need to enclose the leaf node in a compound wrapper
+                raise Exception("Task %s is not compound" % task.uses)
+        else:
+            # Node represents the terminal node of the sub-DAG
+            node = TaskNodeCompound(
+                name=name,
+                srcdir=srcdir,
+                params=params)
+
+        if len(self._task_node_s):
+            node.parent = self._task_node_s[-1]
+
         self._task_node_m[name] = node
+        self._task_node_s.append(node)
 
         node.rundir = self.get_rundir()
 
@@ -387,8 +392,13 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
         for t in task.subtasks:
-            nn = self._mkTaskNode(t, True)
-            tasks.append((t, self._getTaskNode(t.name)))
+            nn = self._mkTaskNode(t, hierarchical=True)
+            node.tasks.append(nn)
+#            tasks.append((t, self._getTaskNode(t.name)))
+            tasks.append((t, nn))
+
+        # Pop the node stack, since we're done constructing the body
+        self._task_node_s.pop()
 
         # Fill in 'needs'
         for t, tn in tasks:
@@ -429,35 +439,6 @@ class TaskGraphBuilder(object):
 
         return node
 
-        
-    def getTaskCtor(self, spec : Union[str,'TaskSpec'], pkg : PackageDef = None) -> 'TaskNodeCtor':
-        from .task_def import TaskSpec
-        if type(spec) == str:
-            spec = TaskSpec(spec)
-
-        self._log.debug("--> getTaskCtor %s" % spec.name)
-        spec_e = spec.name.split(".")
-        task_name = spec_e[-1]
-
-        # if len(spec_e) == 1:
-        #     # Just have a task name. Use the current package
-        #     if len(self._pkg_s) == 0:
-        #         raise Exception("No package context for task %s" % spec.name)
-        #     pkg = self._pkg_s[-1]
-        # else:
-        #     pkg_name = ".".join(spec_e[0:-1])
-
-        #     try:
-        #         pkg = self.getPackage(PackageSpec(pkg_name))
-        #     except Exception as e:
-        #         self._log.critical("Failed to find package %s while looking for task %s" % (pkg_name, spec.name))
-        #         raise e
-
-        ctor = pkg.getTaskCtor(task_name)
-
-        self._log.debug("<-- getTaskCtor %s" % spec.name)
-        return ctor
-    
     def error(self, msg, loc=None):
         if loc is not None:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error, loc=loc)
@@ -468,217 +449,3 @@ class TaskGraphBuilder(object):
     def marker(self, marker):
         self.marker_l(marker)
 
-    def _getTaskCtor(self, task : Task) -> TaskNodeCtor:
-        if task in self._task_ctor_m.keys():
-            ctor = self._task_ctor_m[task]
-        else:
-            ctor = self._mkTaskCtor(task)
-            self._task_ctor_m[task] = ctor
-        return ctor
-
-    def _mkTaskCtor(self, task):
-        srcdir = os.path.dirname(task.srcinfo.file)
-        self._log.debug("--> mkTaskCtor %s (srcdir: %s)" % (task.name, srcdir))
-
-        if len(task.subtasks) > 0:
-            self._log.debug("Task has a body")
-            # Compound task
-            self._log.debug("Task specifies sub-task implementation")
-            ctor = self._mkCompoundTaskCtor(task)
-        else:
-            self._log.debug("Task doesn't specify a body")
-            # Shell task or 'null'
-            ctor = self._mkLeafTaskCtor(task)
-
-        if ctor is None:
-            raise Exception()
-
-        return ctor
-
-    def _mkLeafTaskCtor(self, task) -> TaskNodeCtor:
-        self._log.debug("--> _mkLeafTaskCtor")
-        srcdir = os.path.dirname(task.srcinfo.file)
-        base_ctor_t : TaskNodeCtor = None
-        ctor_t : TaskNodeCtor = None
-        base_params = None
-        callable = None
-#        fullname = self.name + "." + task.name
-#        rundir = task.rundir
-
-        # TODO: should we have the ctor look this up itself?
-        # Want to confirm that the value can be found.
-        # Defer final resolution until actual graph building (post-config)
-        if task.uses is not None:
-            self._log.debug("Uses: %s" % task.uses.name)
-
-            base_ctor_t = self._getTaskCtor(task.uses)
-
-            if base_ctor_t is None:
-                self._log.error("Failed to load task ctor %s" % task.uses)
-#            base_params = base_ctor_t.mkTaskParams()
-        else:
-            self._log.debug("No 'uses' specified %s" % task.name)
-
-        self._log.debug("%d needs" % len(task.needs))
-
-        # Determine the implementation constructor first
-        if task.run is not None:
-            shell = task.shell if task.shell is not None else "shell"
-
-            if shell in self._shell_m.keys():
-                self._log.debug("Use shell implementation")
-                callable = self._shell_m[shell]
-            else:
-                self._log.debug("Shell %s not found" % shell)
-                raise Exception("Shell %s not found" % shell)
-
-            # if taskdef.body.pytask is not None:
-            #     # Built-in impl
-            #     # Now, lookup the class
-            #     self._log.debug("Use PyTask implementation")
-            #     last_dot = taskdef.body.pytask.rfind('.')
-            #     clsname = taskdef.body.pytask[last_dot+1:]
-            #     modname = taskdef.body.pytask[:last_dot]
-
-            #     try:
-            #         if modname not in sys.modules:
-            #             if srcdir not in sys.path:
-            #                 sys.path.append(srcdir)
-            #             mod = importlib.import_module(modname)
-            #         else:
-            #             mod = sys.modules[modname]
-            #     except ModuleNotFoundError as e:
-            #         raise Exception("Failed to import module %s (_basedir=%s): %s" % (
-            #             modname, self._basedir, str(e)))
-                
-            #     if not hasattr(mod, clsname):
-            #         raise Exception("Method %s not found in module %s" % (clsname, modname))
-            #     callable = getattr(mod, clsname)
-            # elif taskdef.body.run is not None:
-            #     callable = self._getRunCallable(taskdef)
-        else:
-            # TODO: use null task
-            pass
-
-        # Determine if we need to use a new 
-        if task.paramT is None:
-            raise Exception()
-        paramT = task.paramT
-        needs = []
-
-        # TODO:
-        rundir : RundirE = task.rundir
-        
-        if callable is not None:
-            ctor_t = TaskNodeCtorTask(
-                name=task.name,
-                srcdir=srcdir,
-                paramT=task.paramT, # TODO: need to determine the parameter type
-                passthrough=task.passthrough,
-                consumes=task.consumes,
-                needs=needs, # TODO: need to determine the needs
-                rundir=rundir,
-                task=callable)
-        elif base_ctor_t is not None:
-            # Use the existing (base) to create the implementation
-            ctor_t = TaskNodeCtorProxy(
-                name=task.name,
-                srcdir=srcdir,
-                paramT=task.paramT, # TODO: need to determine the parameter type
-                passthrough=task.passthrough,
-                consumes=task.consumes,
-                needs=needs,
-                rundir=rundir,
-                uses=base_ctor_t)
-        else:
-            self._log.debug("Use 'Null' as the class implementation")
-            ctor_t = TaskNodeCtorTask(
-                name=task.name,
-                srcdir=srcdir,
-                paramT=paramT,
-                passthrough=task.passthrough,
-                consumes=task.consumes,
-                needs=needs,
-                rundir=rundir,
-                task=TaskNull)
-
-        self._log.debug("<-- mkTaskCtor %s" % task.name)
-        return ctor_t
-    
-    def _getRunCallable(self, task):
-        self._log.debug("--> _getRunCallable %s" % task.name)
-        callable = None
-        if task.run is not None and task.shell == "python":
-            # Evaluate a Python script
-            pass
-        else:
-            # run a shell script
-            shell = None
-            body = task.run.strip()
-
-            callable = ShellCallable(body=body, shell=shell)
-            pass
-        return callable
-
-    def _mkCompoundTaskCtor(self, task) -> TaskNodeCtor:
-        self._log.debug("--> _mkCompoundTaskCtor %s" % task.name)
-        srcdir = os.path.dirname(task.srcinfo.file)
-        base_ctor_t : TaskNodeCtor = None
-        ctor_t : TaskNodeCtor = None
-        base_params = None
-        callable = None
-
-#        fullname = self._getScopeFullname()
-        fullname = task.name
-
-        if task.uses is not None:
-            self._log.debug("Uses: %s" % task.uses)
-            base_ctor_t = task.uses.ctor
-            base_params = base_ctor_t.mkTaskParams()
-
-            if base_ctor_t is None:
-                self._log.error("Failed to load task ctor %s" % task.uses)
-
-        # TODO: should build during loading
-#        passthrough, consumes, needs = self._getPTConsumesNeeds(taskdef, base_ctor_t)
-        passthrough = []
-        consumes = []
-        needs = []
-
-        # Determine if we need to use a new 
-#        paramT = self._getParamT(taskdef, base_params)
-        paramT = task.paramT
-
-        if base_ctor_t is not None:
-            ctor_t = TaskNodeCtorCompoundProxy(
-                name=fullname,
-                srcdir=srcdir,
-                paramT=paramT,
-                passthrough=passthrough,
-                consumes=consumes,
-                needs=needs,
-                task=task,
-                uses=base_ctor_t)
-        else:
-            self._log.debug("No 'uses' specified")
-            ctor_t = TaskNodeCtorCompound(
-                name=fullname,
-                srcdir=srcdir,
-                paramT=paramT,
-                passthrough=passthrough,
-                consumes=consumes,
-                needs=needs,
-                task=task)
-            
-        for st in task.subtasks:
-            ctor = self._getTaskCtor(st)
-            if ctor is None:
-                raise Exception("ctor for %s is None" % st.name)
-            ctor_t.tasks.append(st)
-
-#        for t in task.subtasks:
-#            ctor_t.tasks.append(self._mkTaskCtor(t, srcdir))
-
-        
-        self._log.debug("<-- mkCompoundTaskCtor %s (%d)" % (task.name, len(ctor_t.tasks)))
-        return ctor_t
