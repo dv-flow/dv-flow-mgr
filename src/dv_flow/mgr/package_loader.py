@@ -250,7 +250,7 @@ class PackageLoader(object):
                             severity=SeverityE.Error,
                             loc=marker_loc)
                     else:
-                        marker = TaskMarker(msg=ee['msg'])
+                        marker = TaskMarker(msg=ee['msg'], severity=SeverityE.Error)
                     self.marker(marker)
 
             if pkg_def is not None:
