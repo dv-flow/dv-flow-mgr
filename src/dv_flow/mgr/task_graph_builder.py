@@ -25,6 +25,7 @@ import logging
 from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
+from .package_loader import PackageLoader
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
@@ -60,6 +61,7 @@ class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
     root_pkg : Package
     rundir : str
+    loader : PackageLoader = None
     marker_l : Callable = lambda *args, **kwargs: None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -79,7 +81,7 @@ class TaskGraphBuilder(object):
     def __post_init__(self):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
-        self._shell_m.update(ExtRgy._inst._shell_m)
+        self._shell_m.update(ExtRgy.inst()._shell_m)
         self._task_rundir_s.append([])
 
         if self.root_pkg is not None:
@@ -210,10 +212,18 @@ class TaskGraphBuilder(object):
 
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
+        elif self.loader is not None:
+            task = self.loader.getTask(task_t)
+
+            if task is None:
+                raise Exception("task_t (%s) not present" % str(task_t))
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
         
-        ret = self._mkTaskNode(task)
+        ret = self._mkTaskNode(
+            task, 
+            name=name, 
+            srcdir=srcdir)
 
         if needs is not None:
             for need in needs:
@@ -290,7 +300,7 @@ class TaskGraphBuilder(object):
             params = task.paramT()
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(task.name)
+            self.enter_rundir(name)
 
 
         callable = None
@@ -341,7 +351,7 @@ class TaskGraphBuilder(object):
             params = task.paramT()
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(task.name)
+            self.enter_rundir(name)
 
         if task.uses is not None:
             # This is a compound task that is based on
