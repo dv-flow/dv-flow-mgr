@@ -195,6 +195,6 @@ package:
     assert runner.status == 0
     for out in output.output:
         print("Out: %s" % str(out))
-    assert len(output.output) == 2
+    assert len(output.output) == 1
     assert output.output[0].type == 'std.FileSet'
     assert len(output.output[0].files) == 1

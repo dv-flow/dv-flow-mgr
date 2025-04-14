@@ -235,7 +235,7 @@ class TaskGraphBuilder(object):
             else:
                 raise Exception("Task %s parameters do not include %s" % (task.name, k))
 
-        self._log.debug("<-- mkTaskNode: %s" % task_t)
+        self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
         return ret
     
     def _findTask(self, pkg, name):
@@ -386,13 +386,14 @@ class TaskGraphBuilder(object):
         node.input.rundir = self.get_rundir()
         self.leave_rundir()
 
-        self._log.debug("--> processing needs (%s)" % task.name)
+        self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
         for need in task.needs:
             need_n = self._getTaskNode(need.name)
             self._log.debug("Add need %s" % need_n.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
             node.input.needs.append((need_n, False))
+#            node.needs.append((need_n, False))
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -439,12 +440,12 @@ class TaskGraphBuilder(object):
                 self._log.debug("Node %s references internal node %s" % (t.name, refs_internal.name))
 
             if referenced is not None:
+                self._log.debug("Node %s has internal needs" % tn.name)
+            else:
                 # Add this task as a dependency of the output
                 # node (the root one)
                 self._log.debug("Add node %s as a top-level dependency" % tn.name)
                 node.needs.append((tn, False))
-            else:
-                self._log.debug("Node %s has internal needs" % tn.name)
 
         if task.rundir == RundirE.Unique:
             self.leave_rundir()
@@ -452,7 +453,7 @@ class TaskGraphBuilder(object):
         return node
 
     def _gatherNeeds(self, task_t, node):
-        self._log.debug("--> _gatherNeeds %s" % task_t.name)
+        self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
         if task_t.uses is not None:
             self._gatherNeeds(task_t.uses, node)
 
@@ -461,7 +462,7 @@ class TaskGraphBuilder(object):
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
             node.needs.append((need_n, False))
-        self._log.debug("<-- _gatherNeeds %s" % task_t.name)
+        self._log.debug("<-- _gatherNeeds %s (%d)" % (task_t.name, len(node.needs)))
         
     def error(self, msg, loc=None):
         if loc is not None:
