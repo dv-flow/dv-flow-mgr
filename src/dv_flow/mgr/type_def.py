@@ -19,12 +19,14 @@
 #*     Author: 
 #*
 #****************************************************************************
-from typing import List, Union
+from typing import Dict, List, Union
 from pydantic import BaseModel, Field
 from .param_def import ParamDef
+from .srcinfo import SrcInfo
 
 class TypeDef(BaseModel):
     name : str
     uses : str = None
     doc : str = None
-    fields : List[ParamDef] = Field(alias="with", default_factory=list)
+    params : Dict[str, Union[str, ParamDef]] = Field(alias="with", default_factory=list)
+    srcinfo : SrcInfo = None

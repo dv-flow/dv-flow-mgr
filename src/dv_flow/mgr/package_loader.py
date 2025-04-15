@@ -14,6 +14,7 @@ from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
+from .type import Type
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
 
 @dc.dataclass
@@ -280,9 +281,11 @@ class PackageLoader(object):
         self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
 
         taskdefs = pkg_def.tasks.copy()
+        typedefs = pkg_def.types.copy()
 
-        self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs)
+        self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
 
+        self._loadTypes(pkg, typedefs)
         self._loadTasks(pkg, taskdefs, pkg.basedir)
 
         self._pkg_s.pop()
@@ -349,11 +352,11 @@ class PackageLoader(object):
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
         pass
 
-    def _loadFragments(self, pkg, fragments, basedir, taskdefs):
+    def _loadFragments(self, pkg, fragments, basedir, taskdefs, typedefs):
         for spec in fragments:
-            self._loadFragmentSpec(pkg, spec, basedir, taskdefs)
+            self._loadFragmentSpec(pkg, spec, basedir, taskdefs, typedefs)
 
-    def _loadFragmentSpec(self, pkg, spec, basedir, taskdefs):
+    def _loadFragmentSpec(self, pkg, spec, basedir, taskdefs, typedefs):
         # We're either going to have:
         # - File path
         # - Directory path
@@ -362,20 +365,20 @@ class PackageLoader(object):
             self._loadFragmentFile(
                 pkg, 
                 os.path.join(basedir, spec),
-                taskdefs)
+                taskdefs, typedefs)
         elif os.path.isdir(os.path.join(basedir, spec)):
-            self._loadFragmentDir(pkg, os.path.join(basedir, spec), taskdefs)
+            self._loadFragmentDir(pkg, os.path.join(basedir, spec), taskdefs, typedefs)
         else:
             raise Exception("Fragment spec %s not found" % spec)
 
-    def _loadFragmentDir(self, pkg, dir, taskdefs):
+    def _loadFragmentDir(self, pkg, dir, taskdefs, typedefs):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
-                self._loadFragmentDir(pkg, os.path.join(dir, file), taskdefs)
+                self._loadFragmentDir(pkg, os.path.join(dir, file), taskdefs, typedefs)
             elif os.path.isfile(os.path.join(dir, file)) and file == "flow.dv":
-                self._loadFragmentFile(pkg, os.path.join(dir, file), taskdefs)
+                self._loadFragmentFile(pkg, os.path.join(dir, file), taskdefs, typedefs)
 
-    def _loadFragmentFile(self, pkg, file, taskdefs):
+    def _loadFragmentFile(self, pkg, file, taskdefs, typedefs):
         if file in self._file_s:
             raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(self._file_s)))
         self._file_s.append(file)
@@ -389,8 +392,9 @@ class PackageLoader(object):
                 pkg.fragment_def_l.append(frag)
 
                 self._loadPackageImports(pkg, frag.imports, basedir)
-                self._loadFragments(pkg, frag.fragments, basedir, taskdefs)
+                self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
                 taskdefs.extend(frag.tasks)
+                typedefs.extend(frag.types)
             else:
                 print("Warning: file %s is not a fragment" % file)
 
@@ -465,6 +469,19 @@ class PackageLoader(object):
                 task.shell = task.uses.shell
 
         self._log.debug("<-- _loadTasks %s" % pkg.name)
+
+    def _loadTypes(self, pkg, typedefs):
+        self._log.debug("--> _loadTypes")
+        for td in typedefs:
+            tt = Type(
+                name=self._getScopeFullname(td.name),
+                doc=td.doc,
+                srcinfo=td.srcinfo)
+            for key in td.params.keys():
+                tdf = td.params[key]
+            pkg.type_m[td.name] = tt
+        self._log.debug("<-- _loadTypes")
+        pass
 
     def _mkTaskBody(self, task, taskdef):
         self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))
@@ -551,44 +568,6 @@ class PackageLoader(object):
         # Determine 
         pass
 
-    # def _mkPackage(self, pkg : PackageDef, params : Dict[str,Any] = None) -> 'Package':
-    #     self._log.debug("--> mkPackage %s" % pkg.name)
-    #     ret = Package(pkg.name)
-
-    #     self.push_package(ret, add=True)
-
-    #     tasks_m : Dict[str,str,TaskNodeCtor]= {}
-
-    #     for task in ret.tasks:
-    #         if task.name in tasks_m.keys():
-    #             raise Exception("Duplicate task %s" % task.name)
-    #         tasks_m[task.name] = (task, self._basedir, ) # We'll add a TaskNodeCtor later
-
-    #     for frag in pkg._fragment_l:
-    #         for task in frag.tasks:
-    #             if task.name in tasks_m.keys():
-    #                 raise Exception("Duplicate task %s" % task.name)
-    #             tasks_m[task.name] = (task, frag._basedir, ) # We'll add a TaskNodeCtor later
-
-    #     # Now we have a unified map of the tasks declared in this package
-    #     for name in list(tasks_m.keys()):
-    #         task_i = tasks_m[name]
-    #         fullname = pkg.name + "." + name
-    #         if len(task_i) < 3:
-    #             # Need to create the task ctor
-    #             # TODO:
-    #             ctor_t = self.mkTaskCtor(task_i[0], task_i[1], tasks_m)
-    #             tasks_m[name] = (task_i[0], task_i[1], ctor_t)
-    #         ret.tasks[name] = tasks_m[name][2]
-    #         ret.tasks[fullname] = tasks_m[name][2]
-
-    #     self.pop_package(ret)
-
-    #     self._log.debug("<-- mkPackage %s" % pkg.name)
-    #     return ret
-    
-
-    
     def _getPTConsumesRundir(self, taskdef : TaskDef, base_t : Task):
         self._log.debug("_getPTConsumesRundir %s" % taskdef.name)
         passthrough = taskdef.passthrough

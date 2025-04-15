@@ -168,6 +168,29 @@ package:
           item:
             type: str
 
+    types:
+    - name: DataItem
+      with:
+        src: 
+          type: str
+        seq: 
+          type: int
+    - name: FileSet
+      uses: DataItem
+      with:
+        filetype: 
+          type: str
+        basedir:
+          type: str
+        files:
+          type: list
+          item:
+            type: str
+        incdirs:
+          type: list
+          item:
+            type: str
+
     # type:
     #   list: (str,int)
     #     - complex type

@@ -22,6 +22,7 @@
 import os
 import dataclasses as dc
 import logging
+import pydantic
 from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
@@ -38,6 +39,7 @@ from .task_node_ctor_task import TaskNodeCtorTask
 from .task_node_ctor_wrapper import TaskNodeCtorWrapper
 from .task_node_compound import TaskNodeCompound
 from .task_node_leaf import TaskNodeLeaf
+from .type import Type
 from .std.task_null import TaskNull
 from .exec_callable import ExecCallable
 from .null_callable import NullCallable
@@ -65,7 +67,9 @@ class TaskGraphBuilder(object):
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
     _task_m : Dict[str,Task] = dc.field(default_factory=dict)
+    _type_m : Dict[str,Type] = dc.field(default_factory=dict)
     _task_node_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
+    _type_node_m : Dict[str,Any] = dc.field(default_factory=dict)
     _task_ctor_m : Dict[Task,TaskNodeCtor] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
@@ -85,13 +89,15 @@ class TaskGraphBuilder(object):
         if self.root_pkg is not None:
             # Collect all the tasks
             pkg_s = set()
-            self._addPackageTasks(self.root_pkg, pkg_s)
+            self._addPackageDecl(self.root_pkg, pkg_s)
 
-    def _addPackageTasks(self, pkg, pkg_s):
+    def _addPackageDecl(self, pkg, pkg_s):
         if pkg not in pkg_s:
             pkg_s.add(pkg)
             for task in pkg.task_m.values():
                 self._addTask(task)
+            for tt in pkg.type_m.values():
+                self._addType(tt)
             for subpkg in pkg.pkg_m.values():
                 self._addPackageTasks(subpkg, pkg_s)
 
@@ -100,6 +106,10 @@ class TaskGraphBuilder(object):
             self._task_m[task.name] = task
             for st in task.subtasks:
                 self._addTask(st)
+
+    def _addType(self, tt):
+        if tt.name not in self._type_m.keys():
+            self._type_m[tt.name] = tt
 
     def addOverride(self, key : str, val : str):
         self._override_m[key] = val
@@ -227,6 +237,63 @@ class TaskGraphBuilder(object):
 
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
+    
+    def mkDataItem(self, name, **kwargs):
+        self._log.debug("--> mkDataItem: %s" % name)
+
+        if name in self._type_m.keys():
+            tt = self._type_m[name]
+        else:
+            raise Exception("Type %s does not exist" % name)
+        
+        if tt in self._type_node_m.keys():
+            tn = self._type_node_m[tt]
+        else:
+            tn = self._mkDataItem(tt)
+            self._type_node_m[tt] = tn
+
+        ret = tn()
+
+        self._log.debug("<-- mkDataItem: %s" % name)
+        return ret
+    
+    def _findType(self, pkg, name):
+        tt = None
+        if name in pkg.type_m.keys():
+            tt = pkg.type_m[name]
+        else:
+            for subpkg in pkg.pkg_m.values():
+                tt = self._findType(subpkg, name)
+                if tt is not None:
+                    break
+        return tt
+    
+    def _mkDataItem(self, tt : Type):
+        field_m = {}
+
+        # Save the type name in each instance 
+        field_m["type"] = (str, tt.name)
+        exclude_s = set()
+        exclude_s.add("type")
+
+        self._mkDataItemI(tt, field_m, exclude_s)
+
+        ret = pydantic.create_model(tt.name, **field_m)
+
+        return ret
+    
+    def _mkDataItemI(self, tt : Type, field_m, exclude_s):
+        # First, identify cases where the value is set
+        for pt in tt.params.values():
+            if pt.name not in exclude_s:
+                if pt.type is not None:
+                    # Defining a new attribute
+                    field_m[pt.name] = (str, pt.value)
+                else:
+                    # TODO: determine whether 
+                    field_m[pt.name] = (str, None)
+        if tt.uses is not None:
+            self._mkDataItemI(tt.uses, field_m, exclude_s)
     
     def _findTask(self, pkg, name):
         task = None
