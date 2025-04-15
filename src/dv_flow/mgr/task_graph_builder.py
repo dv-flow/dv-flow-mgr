@@ -389,9 +389,9 @@ class TaskGraphBuilder(object):
         self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
         for need in task.needs:
             need_n = self._getTaskNode(need.name)
-            self._log.debug("Add need %s" % need_n.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
+            self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
             node.input.needs.append((need_n, False))
 #            node.needs.append((need_n, False))
         self._log.debug("<-- processing needs")
@@ -415,10 +415,13 @@ class TaskGraphBuilder(object):
             self._log.debug("Process node %s" % t.name)
 
             referenced = None
-            for tt in task.subtasks:
-                if tt in t.needs:
-                    referenced = tt
-                    break
+            for tt in node.tasks:
+                self._log.debug("  Checking task %s" % tt.name)
+                for tnn,_ in tt.needs:
+                    self._log.debug("    Check against need %s" % tnn.name)
+                    if tn == tnn:
+                        referenced = tnn
+                        break
 
             refs_internal = None
             # Assess how this task is connected to others in the compound node
@@ -440,7 +443,7 @@ class TaskGraphBuilder(object):
                 self._log.debug("Node %s references internal node %s" % (t.name, refs_internal.name))
 
             if referenced is not None:
-                self._log.debug("Node %s has internal needs" % tn.name)
+                self._log.debug("Node %s has internal needs: %s" % (tn.name, referenced.name))
             else:
                 # Add this task as a dependency of the output
                 # node (the root one)

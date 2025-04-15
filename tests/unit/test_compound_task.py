@@ -376,3 +376,60 @@ package:
     assert os.path.isfile(os.path.join(rundir, "rundir/foo.entry/foo.entry.mytask/mytask.txt"))
     content = open(os.path.join(rundir, "rundir/foo.entry/foo.entry.mytask/mytask.txt"), "r").read().strip()
     assert content == "inputs: 1"
+
+def test_compound_input_auto_bind_chain(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: TopLevelTask
+      uses: std.CreateFile
+      with:
+        filename: TopLevelTask.txt
+        content: "TopLevelTask.txt"
+
+    - name: entry
+      needs: [TopLevelTask]
+      body:
+      - name: mytask1
+        passthrough: all
+      - name: mytask2
+        passthrough: all
+        needs: [mytask1]
+      - name: mytask3
+        passthrough: all
+        needs: [mytask2]
+      - name: mytask4
+        passthrough: all
+        needs: [mytask3]
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    marker_collector = MarkerCollector()
+    pkg_def = PackageLoader(
+        marker_listeners=[marker_collector]).load(
+            os.path.join(rundir, "flow.dv"))
+    assert len(marker_collector.markers) == 0
+
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry")
+
+    TaskGraphDotWriter().write(
+        t1, 
+        os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    assert len(output.output) == 1
+    assert output.output[0].src == 'foo.TopLevelTask'
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
