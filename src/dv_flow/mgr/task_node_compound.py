@@ -21,7 +21,7 @@
 #****************************************************************************
 import dataclasses as dc
 from pydantic import BaseModel
-from .task_def import ConsumesE
+from .task_def import ConsumesE, PassthroughE, PassthroughE, PassthroughE, PassthroughE
 from .task_node import TaskNode
 from .task_node_leaf import TaskNodeLeaf
 from .task_data import TaskDataResult, TaskDataInput, TaskDataOutput
@@ -44,7 +44,9 @@ class TaskNodeCompound(TaskNode):
         self.input = TaskNodeLeaf(
             name=self.name + ".in",
             srcdir=self.srcdir,
-            params=NullParams())
+            params=NullParams(),
+            consumes=ConsumesE.No,
+            passthrough=PassthroughE.All)
         self.input.task = null_run
         self.tasks.append(self.input)
 
@@ -55,7 +57,7 @@ class TaskNodeCompound(TaskNode):
         return self.input
     
     async def do_run(self, 
-                     runner : TaskRunner, 
+                     ctxt : TaskRunner, 
                      rundir, 
                      memento : Any=None) -> TaskDataResult:
         self._log.debug("Compound task %s (%d)" % (self.name, len(self.needs)))
@@ -90,6 +92,9 @@ class TaskNodeCompound(TaskNode):
             changed=changed,
             output=output,
             dep_m={})
+        
+#        if self.save_exec_data:
+#            self._save_exec_data(rundir, ctxt, self.input.input)
 
         return 0
 

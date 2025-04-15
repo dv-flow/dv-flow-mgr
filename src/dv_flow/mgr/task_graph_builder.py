@@ -26,6 +26,7 @@ import pydantic
 from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
+from .package_loader import PackageLoader
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
@@ -62,6 +63,7 @@ class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
     root_pkg : Package
     rundir : str
+    loader : PackageLoader = None
     marker_l : Callable = lambda *args, **kwargs: None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -83,7 +85,7 @@ class TaskGraphBuilder(object):
     def __post_init__(self):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
-        self._shell_m.update(ExtRgy._inst._shell_m)
+        self._shell_m.update(ExtRgy.inst()._shell_m)
         self._task_rundir_s.append([])
 
         if self.root_pkg is not None:
@@ -220,10 +222,18 @@ class TaskGraphBuilder(object):
 
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
+        elif self.loader is not None:
+            task = self.loader.getTask(task_t)
+
+            if task is None:
+                raise Exception("task_t (%s) not present" % str(task_t))
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
         
-        ret = self._mkTaskNode(task)
+        ret = self._mkTaskNode(
+            task, 
+            name=name, 
+            srcdir=srcdir)
 
         if needs is not None:
             for need in needs:
@@ -235,7 +245,7 @@ class TaskGraphBuilder(object):
             else:
                 raise Exception("Task %s parameters do not include %s" % (task.name, k))
 
-        self._log.debug("<-- mkTaskNode: %s" % task_t)
+        self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
         return ret
     
     def mkDataItem(self, name, **kwargs):
@@ -357,7 +367,7 @@ class TaskGraphBuilder(object):
             params = task.paramT()
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(task.name)
+            self.enter_rundir(name)
 
 
         callable = None
@@ -408,7 +418,7 @@ class TaskGraphBuilder(object):
             params = task.paramT()
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(task.name)
+            self.enter_rundir(name)
 
         if task.uses is not None:
             # This is a compound task that is based on
@@ -443,13 +453,14 @@ class TaskGraphBuilder(object):
         node.input.rundir = self.get_rundir()
         self.leave_rundir()
 
-        self._log.debug("--> processing needs (%s)" % task.name)
+        self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
         for need in task.needs:
             need_n = self._getTaskNode(need.name)
-            self._log.debug("Add need %s" % need_n.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
+            self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
             node.input.needs.append((need_n, False))
+#            node.needs.append((need_n, False))
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -471,10 +482,13 @@ class TaskGraphBuilder(object):
             self._log.debug("Process node %s" % t.name)
 
             referenced = None
-            for tt in task.subtasks:
-                if tt in t.needs:
-                    referenced = tt
-                    break
+            for tt in node.tasks:
+                self._log.debug("  Checking task %s" % tt.name)
+                for tnn,_ in tt.needs:
+                    self._log.debug("    Check against need %s" % tnn.name)
+                    if tn == tnn:
+                        referenced = tnn
+                        break
 
             refs_internal = None
             # Assess how this task is connected to others in the compound node
@@ -496,12 +510,12 @@ class TaskGraphBuilder(object):
                 self._log.debug("Node %s references internal node %s" % (t.name, refs_internal.name))
 
             if referenced is not None:
+                self._log.debug("Node %s has internal needs: %s" % (tn.name, referenced.name))
+            else:
                 # Add this task as a dependency of the output
                 # node (the root one)
                 self._log.debug("Add node %s as a top-level dependency" % tn.name)
                 node.needs.append((tn, False))
-            else:
-                self._log.debug("Node %s has internal needs" % tn.name)
 
         if task.rundir == RundirE.Unique:
             self.leave_rundir()
@@ -509,7 +523,7 @@ class TaskGraphBuilder(object):
         return node
 
     def _gatherNeeds(self, task_t, node):
-        self._log.debug("--> _gatherNeeds %s" % task_t.name)
+        self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
         if task_t.uses is not None:
             self._gatherNeeds(task_t.uses, node)
 
@@ -518,7 +532,7 @@ class TaskGraphBuilder(object):
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
             node.needs.append((need_n, False))
-        self._log.debug("<-- _gatherNeeds %s" % task_t.name)
+        self._log.debug("<-- _gatherNeeds %s (%d)" % (task_t.name, len(node.needs)))
         
     def error(self, msg, loc=None):
         if loc is not None:

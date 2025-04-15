@@ -398,6 +398,10 @@ class PackageLoader(object):
             else:
                 print("Warning: file %s is not a fragment" % file)
 
+    def getTask(self, name) -> Task:
+        task = self._findTask(name)
+        return task
+
     def _loadTasks(self, pkg, taskdefs : List[TaskDef], basedir : str):
         self._log.debug("--> _loadTasks %s" % pkg.name)
         # Declare first
@@ -555,10 +559,16 @@ class PackageLoader(object):
         self._pkg_s[-1].pop_scope()
 
     def _findTaskType(self, name):
-        return self._pkg_s[-1].find(name)
+        if len(self._pkg_s):
+            return self._pkg_s[-1].find(name)
+        else:
+            return self._loader_scope.find(name)
 
     def _findTask(self, name):
-        return self._pkg_s[-1].find(name)
+        if len(self._pkg_s):
+            return self._pkg_s[-1].find(name)
+        else:
+            return self._loader_scope.find(name)
 
     
     def _getScopeFullname(self, leaf=None):
