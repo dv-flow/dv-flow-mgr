@@ -54,7 +54,7 @@
 <section id="graph">
 <h3>graph<a class="headerlink" href="#graph" title="Link to this heading">¶</a></h3>
 <p>Generates the graph of a task</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">graph</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">o</span> <span class="n">OUTPUT</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">graph</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">o</span> <span class="n">OUTPUT</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments">
@@ -72,6 +72,9 @@
 <dd><p>Specifies the output format</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">'dot'</span></code></p>
 </dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
 <dt><kbd>-o, --output</kbd></dt>
 <dd><p>Specifies the output file</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">'-'</span></code></p>
@@ -82,7 +85,7 @@
 <section id="run">
 <h3>run<a class="headerlink" href="#run" title="Link to this heading">¶</a></h3>
 <p>run a flow</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments_repeat1">
@@ -100,9 +103,12 @@
 <dd><p>Specifies degree of parallelism. Uses all cores by default</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">-1</span></code></p>
 </dd>
-<dt><kbd>-c, --clean</kbd></dt>
+<dt><kbd>--clean</kbd></dt>
 <dd><p>Cleans the rundir before running</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
 </dd>
 </dl>
 </section>
