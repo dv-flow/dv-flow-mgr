@@ -35,8 +35,16 @@ class CmdGraph(object):
 
     def __call__(self, args):
 
+        if args.root is not None:
+            rootdir = args.root
+        elif "DV_FLOW_ROOT" in os.environ.keys():
+            rootdir = os.environ["DFM_ROOT"]
+        else:
+            rootdir = os.getcwd()
+
+
         # First, find the project we're working with
-        pkg = loadProjPkgDef(os.getcwd())
+        pkg = loadProjPkgDef(rootdir)
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
