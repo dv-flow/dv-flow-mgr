@@ -330,3 +330,141 @@ fragment:
     assert len(t2.subtasks[0].needs) == 1
     assert t2.subtasks[0].needs[0] is not None
     assert t2.subtasks[0].needs[0].name == "foo.t1.t3"
+
+def test_dup_import(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+    imports:
+    - foo2/flow.dv
+    - foo2/flow.dv
+
+    tasks:
+    - name: t1
+      body:
+      - name: t2
+      - name: t3
+    - name: t2
+      uses: t1
+      body:
+      - name: t4
+        needs: [t3]
+    - name: t4
+      need: [foo2.t5]
+
+"""
+
+    foo_dv = """
+package:
+    name: foo2
+    tasks:
+    - name: t5
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    os.makedirs(os.path.join(rundir, "foo2"))
+    with open(os.path.join(rundir, "foo2/flow.dv"), "w") as fp:
+        fp.write(foo_dv)
+
+    def marker_collector(m):
+        print("Marker: %s" % str(m))
+        raise Exception("Marker not expected: %s" % m)
+
+    pkg = PackageLoader(
+        marker_listeners=[marker_collector]).load(os.path.join(tmpdir, "flow.dv"))
+
+    assert pkg is not None
+    assert pkg.pkg_def is not None
+    assert pkg.name == "foo"
+    assert pkg.basedir == rundir
+    assert len(pkg.task_m) == 3
+    assert "foo.t1" in pkg.task_m.keys()
+#    assert "foo.t2" in pkg.task_m.keys()
+#    assert "foo.t5" in pkg.task_m.keys()
+
+    t1 = pkg.task_m["foo.t1"]
+    assert t1.name == "foo.t1"
+    assert len(t1.subtasks) == 2
+
+def test_dup_import_subpkg(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+    imports:
+    - foo3/flow.dv
+    - foo4/flow.dv
+
+    tasks:
+    - name: t1
+      body:
+      - name: t2
+      - name: t3
+    - name: t2
+      uses: t1
+      body:
+      - name: t4
+        needs: [t3]
+    - name: t4
+      need: [foo2.t5]
+
+"""
+
+    foo2_dv = """
+package:
+    name: foo2
+    tasks:
+    - name: t5
+"""
+
+    foo3_dv = """
+package:
+    name: foo3
+    imports:
+    - ../foo2/flow.dv
+    tasks:
+    - name: t5
+"""
+
+    foo4_dv = """
+package:
+    name: foo4
+    imports:
+    - ../foo2/flow.dv
+    tasks:
+    - name: t5
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    os.makedirs(os.path.join(rundir, "foo2"))
+    with open(os.path.join(rundir, "foo2/flow.dv"), "w") as fp:
+        fp.write(foo2_dv)
+    os.makedirs(os.path.join(rundir, "foo3"))
+    with open(os.path.join(rundir, "foo3/flow.dv"), "w") as fp:
+        fp.write(foo3_dv)
+    os.makedirs(os.path.join(rundir, "foo4"))
+    with open(os.path.join(rundir, "foo4/flow.dv"), "w") as fp:
+        fp.write(foo4_dv)
+
+    def marker_collector(m):
+        print("Marker: %s" % str(m))
+        raise Exception("Marker not expected: %s" % m)
+
+    pkg = PackageLoader(
+        marker_listeners=[marker_collector]).load(os.path.join(tmpdir, "flow.dv"))
+
+    assert pkg is not None
+    assert pkg.pkg_def is not None
+    assert pkg.name == "foo"
+    assert pkg.basedir == rundir
+    assert len(pkg.task_m) == 3
+    assert "foo.t1" in pkg.task_m.keys()
+#    assert "foo.t2" in pkg.task_m.keys()
+#    assert "foo.t5" in pkg.task_m.keys()
+
+    t1 = pkg.task_m["foo.t1"]
+    assert t1.name == "foo.t1"
+    assert len(t1.subtasks) == 2
