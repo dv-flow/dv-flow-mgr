@@ -92,7 +92,7 @@ async def FileSet(runner, input) -> TaskDataResult:
                 fs.incdirs.extend(incdirs)
         if input.params.defines is not None:
             if isinstance(input.params.defines, list):
-                fs.defines.extend(input.params.incdirs)
+                fs.defines.extend(input.params.defines)
             else:
                 defines = input.params.defines.split()
                 fs.defines.extend(defines)
