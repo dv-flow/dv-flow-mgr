@@ -50,6 +50,7 @@ class LoaderScope(SymbolScope):
 
     def findType(self, name) -> Task:
         last_dot = name.rfind('.')
+        pkg = None
         if last_dot != -1:
             pkg_name = name[:last_dot]
             task_name = name[last_dot+1:]
