@@ -54,6 +54,8 @@ package:
         value: ""
       incdirs:
         type: list
+      defines:
+        type: list
       include:
         doc: |
           Specifies a list of files or a glob pattern for the files to include
