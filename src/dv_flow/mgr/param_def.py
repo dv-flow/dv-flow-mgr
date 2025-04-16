@@ -30,7 +30,7 @@ class MapType(BaseModel):
 #    key : Union[str, 'ComplexType']
 #    item : Union[str, 'ComplexType']
     key : Union[str, Any]
-    item : Union[str, Any]
+    val : Union[str, Any]
 
 class ComplexType(BaseModel):
     list : Union[ListType, None] = None

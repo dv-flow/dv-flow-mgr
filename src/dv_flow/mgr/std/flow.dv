@@ -111,89 +111,38 @@ package:
   types:
   - name: DataItem
     with:
-    - name: type
-      type: str
+      type:
+        type: str
   - name: FileSet
     uses: std.DataItem
     with:
-    - name: filetype
-      type: str
-      value: "FileSet"
-    - name: basedir
-      type: str
-    - name: files
-      type: list
-      item:
+      filetype:
         type: str
-
-  # - name: TaskDataItem
-  #   doc: |
-  #     Base type for a data element produced by a task.
-  #     TaskDataItem is never used directly
-  #   with:
-  #   - name: kind
-  #     type: str
-  #     kind: metadata
-  #     doc: |
-  #       Kind of data item
-  #   - name: src
-  #     type: str
-  #     kind: metadata
-  #     doc: |
-  #       Name of the task that produced this item
-  #   - name: id
-  #     type: str
-  #     kind: metadata
-  #     doc: |
-  #       Unique identiifer 
+        value: ""
+      basedir:
+        type: str
+      files:
+        type:
+          list:
+            item: str
+      incdirs:
+        type:
+          list:
+            item: str
+      defines:
+        type:
+          list:
+            item: str
 
   - name: Env
     doc: |
       Environment variables
     with:
-    - name: doc
+      vals:
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
 
-  - name: FileSet
-    uses: TaskDataItem
-    with:
-    - name: kind
-      value: "FileSet"
-    - name: base
-      type: str
-    - name: fileType
-      type: str
-    - name: files
-      type: 
-        list:
-          item:
-            type: str
-
-    types:
-    - name: DataItem
-      with:
-        src: 
-          type: str
-        seq: 
-          type: int
-    - name: FileSet
-      uses: DataItem
-      with:
-        filetype: 
-          type: str
-        basedir:
-          type: str
-        files:
-          type: list
-          item:
-            type: str
-        incdirs:
-          type: list
-          item:
-            type: str
-
-    # type:
-    #   list: (str,int)
-    #     - complex type
-    # type:
-    #   object:
-    #     

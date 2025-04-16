@@ -10,6 +10,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
+from .param_def import ComplexType
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
@@ -21,18 +22,25 @@ from .yaml_srcinfo_loader import YamlSrcInfoLoader
 class SymbolScope(object):
     name : str
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
+    type_m : Dict[str,Type] = dc.field(default_factory=dict)
 
     def add(self, task, name):
         self.task_m[name] = task
 
-    def find(self, name) -> Task:
+    def addType(self, type, name):
+        self.type_m[name] = type
+
+    def findTask(self, name) -> Task:
         if name in self.task_m.keys():
             return self.task_m[name]
         else:
             return None
 
-    def findType(self, name) -> Task:
-        pass
+    def findType(self, name) -> Type:
+        if name in self.type_m.keys():
+            return self.type_m[name]
+        else:
+            return None
 
 
 @dc.dataclass
@@ -42,18 +50,20 @@ class TaskScope(SymbolScope):
 @dc.dataclass
 class LoaderScope(SymbolScope):
     loader : 'PackageLoader' = None
+    _log : ClassVar = logging.getLogger("LoaderScope")
 
     def add(self, task, name):
         raise NotImplementedError("LoaderScope.add() not implemented")
-    
-    def find(self, name) -> Task:
-        return self.findType(name)
 
-    def findType(self, name) -> Task:
+    def addType(self, task, name):
+        raise NotImplementedError("LoaderScope.addType() not implemented")
+    
+    def findTask(self, name) -> Task:
+        self._log.debug("--> findTask: %s" % name)
         last_dot = name.rfind('.')
+        ret = None
         if last_dot != -1:
             pkg_name = name[:last_dot]
-            task_name = name[last_dot+1:]
 
             if pkg_name in self.loader._pkg_m.keys():
                 pkg = self.loader._pkg_m[pkg_name]
@@ -62,10 +72,37 @@ class LoaderScope(SymbolScope):
                 if path is not None:
                     pkg = self.loader._loadPackage(path)
                     self.loader._pkg_m[pkg_name] = pkg
-            if pkg is not None and name in pkg.task_m.keys():
-                return pkg.task_m[name]
+            if pkg is not None:
+                self._log.debug("Found pkg %s (%s)" % (pkg.name, str(pkg.task_m.keys())))
             else:
-                return None
+                self._log.debug("Failed to find pkg %s" % pkg.name)
+
+            if pkg is not None and name in pkg.task_m.keys():
+                ret = pkg.task_m[name]
+        self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
+        
+        return ret
+
+    def findType(self, name) -> Type:
+        self._log.debug("--> findType: %s" % name)
+        ret = None
+        last_dot = name.rfind('.')
+        if last_dot != -1:
+            pkg_name = name[:last_dot]
+
+            if pkg_name in self.loader._pkg_m.keys():
+                pkg = self.loader._pkg_m[pkg_name]
+            else:
+                path = self.loader.pkg_rgy.findPackagePath(pkg_name)
+                if path is not None:
+                    pkg = self.loader._loadPackage(path)
+                    self.loader._pkg_m[pkg_name] = pkg
+            if pkg is not None and name in pkg.type_m.keys():
+                ret = pkg.type_m[name]
+
+        self._log.debug("<-- findType: %s (%s)" % (name, str(ret)))
+
+        return ret
 
 @dc.dataclass
 class PackageScope(SymbolScope):
@@ -79,6 +116,12 @@ class PackageScope(SymbolScope):
             self._scope_s[-1].add(task, name)
         else:
             super().add(task, name)
+
+    def addType(self, type, name):
+        if len(self._scope_s):
+            self._scope_s[-1].addType(type, name)
+        else:
+            super().addType(type, name)
         
     def push_scope(self, scope):
         self._scope_s.append(scope)
@@ -86,17 +129,17 @@ class PackageScope(SymbolScope):
     def pop_scope(self):
         self._scope_s.pop()
 
-    def find(self, name) -> Task:
-        self._log.debug("--> %s::find %s" % (self.pkg.name, name))
+    def findTask(self, name) -> Task:
+        self._log.debug("--> %s::findTask %s" % (self.pkg.name, name))
         ret = None
         for i in range(len(self._scope_s)-1, -1, -1):
             scope = self._scope_s[i]
-            ret = scope.find(name)
+            ret = scope.findTask(name)
             if ret is not None:
                 break
 
         if ret is None:
-            ret = super().find(name)
+            ret = super().findTask(name)
 
         if ret is None and name in self.pkg.task_m.keys():
             ret = self.pkg.task_m[name]
@@ -110,33 +153,41 @@ class PackageScope(SymbolScope):
 
         if ret is None:
             self._log.debug("Searching loader for %s" % name)
-            ret = self.loader.findType(name)
+            ret = self.loader.findTask(name)
 
-        self._log.debug("<-- %s::find %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
+        self._log.debug("<-- %s::findTask %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
         return ret
 
-    def findType(self, name) -> Task:
+    def findType(self, name) -> Type:
+        self._log.debug("--> %s::findType %s" % (self.pkg.name, name))
         ret = None
+        for i in range(len(self._scope_s)-1, -1, -1):
+            scope = self._scope_s[i]
+            ret = scope.findType(name)
+            if ret is not None:
+                break
 
-        if name in self.task_m.keys():
-            ret = self.task_m[name]
-
-        if ret is None:
-            for i in range(len(self._scope_s)-1, -1, -1):
-                scope = self._scope_s[i]
-                ret = scope.findType(name)
-                if ret is not None:
-                    break
-        
         if ret is None:
             ret = super().findType(name)
 
-        if ret is None and name in self.pkg.task_m.keys():
-            ret = self.pkg.task_m[name]
+        print("   types: %s" % str(self.pkg.type_m.keys()))
+        print("   tasks: %s" % str(self.pkg.task_m.keys()))
+
+        if ret is None and name in self.pkg.type_m.keys():
+            ret = self.pkg.type_m[name]
 
         if ret is None:
+            for pkg in self.pkg.pkg_m.values():
+                self._log.debug("Searching pkg %s for %s" % (pkg.name, name))
+                if name in pkg.type_m.keys():
+                    ret = pkg.type_m[name]
+                    break
+
+        if ret is None:
+            self._log.debug("Searching loader for %s" % name)
             ret = self.loader.findType(name)
-        
+
+        self._log.debug("<-- %s::findType %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
         return ret
 
     def getScopeFullname(self, leaf=None) -> str:
@@ -431,7 +482,7 @@ class PackageLoader(object):
         for taskdef, task in tasks:
 
             if taskdef.uses is not None:
-                task.uses = self._findTaskType(taskdef.uses)
+                task.uses = self._findTask(taskdef.uses)
 
                 if task.uses is None:
                     raise Exception("Failed to link task %s" % taskdef.uses)
@@ -476,14 +527,26 @@ class PackageLoader(object):
 
     def _loadTypes(self, pkg, typedefs):
         self._log.debug("--> _loadTypes")
+        types = []
         for td in typedefs:
             tt = Type(
                 name=self._getScopeFullname(td.name),
                 doc=td.doc,
                 srcinfo=td.srcinfo)
-            for key in td.params.keys():
-                tdf = td.params[key]
-            pkg.type_m[td.name] = tt
+            pkg.type_m[tt.name] = tt
+            self._pkg_s[-1].addType(tt, td.name)
+            types.append((td, tt))
+        
+        # Now, resolve 'uses' and build out
+        for td,tt in types:
+            if td.uses is not None:
+                tt.uses = self._findType(td.uses)
+                if tt.uses is None:
+                    raise Exception("Failed to find type %s" % td.uses)
+            tt.paramT = self._getParamT(
+                td, 
+                tt.uses.paramT if tt.uses is not None else None,
+                typename=tt.name)
         self._log.debug("<-- _loadTypes")
         pass
 
@@ -517,7 +580,7 @@ class PackageLoader(object):
         for td, st in subtasks:
             if td.uses is not None:
                 if st.uses is None:
-                    st.uses = self._findTaskType(td.uses)
+                    st.uses = self._findTask(td.uses)
                     if st.uses is None:
                         raise Exception("Failed to find task %s" % td.uses)
 
@@ -558,17 +621,17 @@ class PackageLoader(object):
 
         self._pkg_s[-1].pop_scope()
 
-    def _findTaskType(self, name):
+    def _findType(self, name):
         if len(self._pkg_s):
-            return self._pkg_s[-1].find(name)
+            return self._pkg_s[-1].findType(name)
         else:
-            return self._loader_scope.find(name)
+            return self._loader_scope.findType(name)
 
     def _findTask(self, name):
         if len(self._pkg_s):
-            return self._pkg_s[-1].find(name)
+            return self._pkg_s[-1].findTask(name)
         else:
-            return self._loader_scope.find(name)
+            return self._loader_scope.findTask(name)
 
     
     def _getScopeFullname(self, leaf=None):
@@ -601,7 +664,7 @@ class PackageLoader(object):
 
         return (passthrough, consumes, rundir)
 
-    def _getParamT(self, taskdef, base_t : BaseModel):
+    def _getParamT(self, taskdef, base_t : BaseModel, typename=None):
         self._log.debug("--> _getParamT %s" % taskdef.name)
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
@@ -643,17 +706,29 @@ class PackageLoader(object):
             param = taskdef.params[p]
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
             if hasattr(param, "type") and param.type is not None:
-                ptype_s = param.type
-                if ptype_s not in ptype_m.keys():
-                    raise Exception("Unknown type %s" % ptype_s)
-                ptype = ptype_m[ptype_s]
+                if isinstance(param.type, ComplexType):
+                    if param.type.list is not None:
+                        ptype = List
+                        pdflt = []
+                    elif param.type.map is not None:
+                        ptype = Dict
+                        pdflt = {}
+                    else:
+                        raise Exception("Complex type %s not supported" % str(param.type))
+                    pass
+                else:
+                    ptype_s = param.type
+                    if ptype_s not in ptype_m.keys():
+                        raise Exception("Unknown type %s" % ptype_s)
+                    ptype = ptype_m[ptype_s]
+                    pdflt = pdflt_m[ptype_s]
 
                 if p in field_m.keys():
                     raise Exception("Duplicate field %s" % p)
                 if param.value is not None:
                     field_m[p] = (ptype, param.value)
                 else:
-                    field_m[p] = (ptype, pdflt_m[ptype_s])
+                    field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
             else:
                 if p not in field_m.keys():
@@ -668,7 +743,11 @@ class PackageLoader(object):
                 field_m[p] = (field_m[p][0], value)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
 
-        params_t = pydantic.create_model("Task%sParams" % taskdef.name, **field_m)
+        if typename is not None:
+            field_m["type"] = (str, typename)
+            params_t = pydantic.create_model(typename, **field_m)
+        else:
+            params_t = pydantic.create_model("Task%sParams" % taskdef.name, **field_m)
 
         self._log.debug("== Params")
         for name,info in params_t.model_fields.items():

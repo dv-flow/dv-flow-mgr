@@ -15,8 +15,8 @@ package:
     - name: Params
       with:
         param1:
-            type: str
-            value: "1"
+          type: str
+          value: "1"
 """
 
     with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
@@ -33,8 +33,9 @@ package:
         rundir=os.path.join(tmpdir, "rundir"))
     runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
 
-    params = builder.mkDataItem("foo.Params", params="2")
+    params = builder.mkDataItem("foo.Params", param1="2")
     assert hasattr(params, "type")
     assert getattr(params, "type") == "foo.Params"
+    print("params: %s" % str(params))
     assert hasattr(params, "param1")
     assert getattr(params, "param1") == "2"

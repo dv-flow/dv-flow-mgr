@@ -61,11 +61,13 @@ class Package(object):
         pkg = {
             "name": self.name,
             "basedir": self.basedir,
-            "params": self.params,
             "tasks": tasks,
             "types": types,
             "fragments": [f.dump() for f in self.fragment_def_l]
         }
+
+        if self.paramT is not None:
+            pkg["paramT"] = self.paramT.model_dump()
 
         return pkg
             

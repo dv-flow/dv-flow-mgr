@@ -91,9 +91,9 @@ class TaskGraphBuilder(object):
         if self.root_pkg is not None:
             # Collect all the tasks
             pkg_s = set()
-            self._addPackageDecl(self.root_pkg, pkg_s)
+            self._addPackageTasks(self.root_pkg, pkg_s)
 
-    def _addPackageDecl(self, pkg, pkg_s):
+    def _addPackageTasks(self, pkg, pkg_s):
         if pkg not in pkg_s:
             pkg_s.add(pkg)
             for task in pkg.task_m.values():
@@ -259,10 +259,17 @@ class TaskGraphBuilder(object):
         if tt in self._type_node_m.keys():
             tn = self._type_node_m[tt]
         else:
-            tn = self._mkDataItem(tt)
+#            tn = self._mkDataItem(tt)
+            tn = tt.paramT
             self._type_node_m[tt] = tn
 
         ret = tn()
+
+        for k, v in kwargs.items():
+            if hasattr(ret, k):
+                setattr(ret, k, v)
+            else:
+                raise Exception("Data item %s parameters do not include %s" % (name, k))
 
         self._log.debug("<-- mkDataItem: %s" % name)
         return ret
@@ -304,6 +311,9 @@ class TaskGraphBuilder(object):
                     field_m[pt.name] = (str, None)
         if tt.uses is not None:
             self._mkDataItemI(tt.uses, field_m, exclude_s)
+
+    def _applyParameterOverrides(self, obj, **kwargs):
+        pass
     
     def _findTask(self, pkg, name):
         task = None
