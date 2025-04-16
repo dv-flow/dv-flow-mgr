@@ -38,7 +38,7 @@ class CmdGraph(object):
         if args.root is not None:
             rootdir = args.root
         elif "DV_FLOW_ROOT" in os.environ.keys():
-            rootdir = os.environ["DFM_ROOT"]
+            rootdir = os.environ["DV_FLOW_ROOT"]
         else:
             rootdir = os.getcwd()
 
