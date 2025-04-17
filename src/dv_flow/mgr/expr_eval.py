@@ -22,13 +22,17 @@
 import dataclasses as dc
 import json
 from typing import Any, Callable, Dict, List
-from .expr_parser import ExprVisitor, Expr, ExprBin, ExprBinOp, ExprCall, ExprId, ExprString, ExprInt
+from .expr_parser import ExprVisitor, Expr, ExprBin, ExprBinOp
+from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt
 
 @dc.dataclass
 class ExprEval(ExprVisitor):
     methods : Dict[str, Callable] = dc.field(default_factory=dict)
     variables : Dict[str, object] = dc.field(default_factory=dict)
     value : Any = None
+
+    def set(self, name : str, value : object):
+        self.variables[name] = value
 
     def eval(self, e : Expr) -> str:
         self.value = None
@@ -58,6 +62,25 @@ class ExprEval(ExprVisitor):
             rval = val.model_dump()
 
         return rval
+
+    def visitExprHId(self, e : ExprHId):
+        print("Hid: %s" % ".".join(e.id))
+        if e.id[0] in self.variables:
+            # Always represent data as a JSON object
+            root = self.variables[e.id[0]]
+            for i in range(1, len(e.id)):
+                if isinstance(root, dict):
+                    if e.id[i] in root.keys():
+                        root = root[e.id[i]]
+                    else:
+                        raise Exception("Sub-element '%s' not found in '%s'" % (e.id[i], ".".join(e.id)))
+                elif hasattr(root, e.id[i]):
+                    root = getattr(root, e.id[i])
+                else:
+                    raise Exception("Sub-element '%s' not found in '%s'" % (e.id[i], ".".join(e.id)))
+            self.value = root
+        else:
+            raise Exception("Variable '%s' not found" % e.id[0])
 
     def visitExprId(self, e : ExprId):
         if e.id in self.variables:

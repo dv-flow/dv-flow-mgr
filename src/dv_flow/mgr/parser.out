@@ -15,22 +15,26 @@ Rule 9     expression -> expression DIVIDE expression
 Rule 10    expression -> LPAREN expression RPAREN
 Rule 11    expression -> NUMBER
 Rule 12    expression -> ID
-Rule 13    expression -> STRING1
-Rule 14    expression -> STRING2
+Rule 13    expression -> hier_id
+Rule 14    hier_id -> ID DOT hier_id
+Rule 15    hier_id -> ID
+Rule 16    expression -> STRING1
+Rule 17    expression -> STRING2
 
 Terminals, with rules where they appear
 
 COMMA                : 4
 DIVIDE               : 9
-ID                   : 1 2 12
+DOT                  : 14
+ID                   : 1 2 12 14 15
 LPAREN               : 1 2 10
 MINUS                : 6
 NUMBER               : 11
 PIPE                 : 8
 PLUS                 : 5
 RPAREN               : 1 2 10
-STRING1              : 13
-STRING2              : 14
+STRING1              : 16
+STRING2              : 17
 TIMES                : 7
 error                : 
 
@@ -38,6 +42,7 @@ Nonterminals, with rules where they appear
 
 args                 : 2 4
 expression           : 3 4 5 5 6 6 7 7 8 8 9 9 10 0
+hier_id              : 13 14
 
 Parsing method: LALR
 
@@ -54,16 +59,20 @@ state 0
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
     expression                     shift and go to state 1
+    hier_id                        shift and go to state 5
 
 state 1
 
@@ -74,11 +83,11 @@ state 1
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
 
-    PLUS            shift and go to state 7
-    MINUS           shift and go to state 8
-    TIMES           shift and go to state 9
-    PIPE            shift and go to state 10
-    DIVIDE          shift and go to state 11
+    PLUS            shift and go to state 8
+    MINUS           shift and go to state 9
+    TIMES           shift and go to state 10
+    PIPE            shift and go to state 11
+    DIVIDE          shift and go to state 12
 
 
 state 2
@@ -86,8 +95,18 @@ state 2
     (1) expression -> ID . LPAREN RPAREN
     (2) expression -> ID . LPAREN args RPAREN
     (12) expression -> ID .
+    (14) hier_id -> ID . DOT hier_id
+    (15) hier_id -> ID .
 
-    LPAREN          shift and go to state 12
+  ! reduce/reduce conflict for PLUS resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for MINUS resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for TIMES resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for PIPE resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for DIVIDE resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for $end resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for RPAREN resolved using rule 12 (expression -> ID .)
+  ! reduce/reduce conflict for COMMA resolved using rule 12 (expression -> ID .)
+    LPAREN          shift and go to state 13
     PLUS            reduce using rule 12 (expression -> ID .)
     MINUS           reduce using rule 12 (expression -> ID .)
     TIMES           reduce using rule 12 (expression -> ID .)
@@ -96,6 +115,16 @@ state 2
     $end            reduce using rule 12 (expression -> ID .)
     RPAREN          reduce using rule 12 (expression -> ID .)
     COMMA           reduce using rule 12 (expression -> ID .)
+    DOT             shift and go to state 14
+
+  ! PLUS            [ reduce using rule 15 (hier_id -> ID .) ]
+  ! MINUS           [ reduce using rule 15 (hier_id -> ID .) ]
+  ! TIMES           [ reduce using rule 15 (hier_id -> ID .) ]
+  ! PIPE            [ reduce using rule 15 (hier_id -> ID .) ]
+  ! DIVIDE          [ reduce using rule 15 (hier_id -> ID .) ]
+  ! $end            [ reduce using rule 15 (hier_id -> ID .) ]
+  ! RPAREN          [ reduce using rule 15 (hier_id -> ID .) ]
+  ! COMMA           [ reduce using rule 15 (hier_id -> ID .) ]
 
 
 state 3
@@ -111,16 +140,20 @@ state 3
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 13
+    expression                     shift and go to state 15
+    hier_id                        shift and go to state 5
 
 state 4
 
@@ -138,33 +171,47 @@ state 4
 
 state 5
 
-    (13) expression -> STRING1 .
+    (13) expression -> hier_id .
 
-    PLUS            reduce using rule 13 (expression -> STRING1 .)
-    MINUS           reduce using rule 13 (expression -> STRING1 .)
-    TIMES           reduce using rule 13 (expression -> STRING1 .)
-    PIPE            reduce using rule 13 (expression -> STRING1 .)
-    DIVIDE          reduce using rule 13 (expression -> STRING1 .)
-    $end            reduce using rule 13 (expression -> STRING1 .)
-    RPAREN          reduce using rule 13 (expression -> STRING1 .)
-    COMMA           reduce using rule 13 (expression -> STRING1 .)
+    PLUS            reduce using rule 13 (expression -> hier_id .)
+    MINUS           reduce using rule 13 (expression -> hier_id .)
+    TIMES           reduce using rule 13 (expression -> hier_id .)
+    PIPE            reduce using rule 13 (expression -> hier_id .)
+    DIVIDE          reduce using rule 13 (expression -> hier_id .)
+    $end            reduce using rule 13 (expression -> hier_id .)
+    RPAREN          reduce using rule 13 (expression -> hier_id .)
+    COMMA           reduce using rule 13 (expression -> hier_id .)
 
 
 state 6
 
-    (14) expression -> STRING2 .
+    (16) expression -> STRING1 .
 
-    PLUS            reduce using rule 14 (expression -> STRING2 .)
-    MINUS           reduce using rule 14 (expression -> STRING2 .)
-    TIMES           reduce using rule 14 (expression -> STRING2 .)
-    PIPE            reduce using rule 14 (expression -> STRING2 .)
-    DIVIDE          reduce using rule 14 (expression -> STRING2 .)
-    $end            reduce using rule 14 (expression -> STRING2 .)
-    RPAREN          reduce using rule 14 (expression -> STRING2 .)
-    COMMA           reduce using rule 14 (expression -> STRING2 .)
+    PLUS            reduce using rule 16 (expression -> STRING1 .)
+    MINUS           reduce using rule 16 (expression -> STRING1 .)
+    TIMES           reduce using rule 16 (expression -> STRING1 .)
+    PIPE            reduce using rule 16 (expression -> STRING1 .)
+    DIVIDE          reduce using rule 16 (expression -> STRING1 .)
+    $end            reduce using rule 16 (expression -> STRING1 .)
+    RPAREN          reduce using rule 16 (expression -> STRING1 .)
+    COMMA           reduce using rule 16 (expression -> STRING1 .)
 
 
 state 7
+
+    (17) expression -> STRING2 .
+
+    PLUS            reduce using rule 17 (expression -> STRING2 .)
+    MINUS           reduce using rule 17 (expression -> STRING2 .)
+    TIMES           reduce using rule 17 (expression -> STRING2 .)
+    PIPE            reduce using rule 17 (expression -> STRING2 .)
+    DIVIDE          reduce using rule 17 (expression -> STRING2 .)
+    $end            reduce using rule 17 (expression -> STRING2 .)
+    RPAREN          reduce using rule 17 (expression -> STRING2 .)
+    COMMA           reduce using rule 17 (expression -> STRING2 .)
+
+
+state 8
 
     (5) expression -> expression PLUS . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -177,18 +224,22 @@ state 7
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 14
+    expression                     shift and go to state 16
+    hier_id                        shift and go to state 5
 
-state 8
+state 9
 
     (6) expression -> expression MINUS . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -201,18 +252,22 @@ state 8
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 15
+    expression                     shift and go to state 17
+    hier_id                        shift and go to state 5
 
-state 9
+state 10
 
     (7) expression -> expression TIMES . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -225,18 +280,22 @@ state 9
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 16
+    expression                     shift and go to state 18
+    hier_id                        shift and go to state 5
 
-state 10
+state 11
 
     (8) expression -> expression PIPE . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -249,18 +308,22 @@ state 10
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 17
+    expression                     shift and go to state 19
+    hier_id                        shift and go to state 5
 
-state 11
+state 12
 
     (9) expression -> expression DIVIDE . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -273,18 +336,22 @@ state 11
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 18
+    expression                     shift and go to state 20
+    hier_id                        shift and go to state 5
 
-state 12
+state 13
 
     (1) expression -> ID LPAREN . RPAREN
     (2) expression -> ID LPAREN . args RPAREN
@@ -300,20 +367,34 @@ state 12
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
-    RPAREN          shift and go to state 19
+    RPAREN          shift and go to state 21
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    args                           shift and go to state 20
-    expression                     shift and go to state 21
+    args                           shift and go to state 22
+    expression                     shift and go to state 23
+    hier_id                        shift and go to state 5
 
-state 13
+state 14
+
+    (14) hier_id -> ID DOT . hier_id
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
+
+    ID              shift and go to state 24
+
+    hier_id                        shift and go to state 25
+
+state 15
 
     (10) expression -> LPAREN expression . RPAREN
     (5) expression -> expression . PLUS expression
@@ -322,15 +403,15 @@ state 13
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
 
-    RPAREN          shift and go to state 22
-    PLUS            shift and go to state 7
-    MINUS           shift and go to state 8
-    TIMES           shift and go to state 9
-    PIPE            shift and go to state 10
-    DIVIDE          shift and go to state 11
+    RPAREN          shift and go to state 26
+    PLUS            shift and go to state 8
+    MINUS           shift and go to state 9
+    TIMES           shift and go to state 10
+    PIPE            shift and go to state 11
+    DIVIDE          shift and go to state 12
 
 
-state 14
+state 16
 
     (5) expression -> expression PLUS expression .
     (5) expression -> expression . PLUS expression
@@ -345,17 +426,17 @@ state 14
     $end            reduce using rule 5 (expression -> expression PLUS expression .)
     RPAREN          reduce using rule 5 (expression -> expression PLUS expression .)
     COMMA           reduce using rule 5 (expression -> expression PLUS expression .)
-    TIMES           shift and go to state 9
-    DIVIDE          shift and go to state 11
+    TIMES           shift and go to state 10
+    DIVIDE          shift and go to state 12
 
   ! TIMES           [ reduce using rule 5 (expression -> expression PLUS expression .) ]
   ! DIVIDE          [ reduce using rule 5 (expression -> expression PLUS expression .) ]
-  ! PLUS            [ shift and go to state 7 ]
-  ! MINUS           [ shift and go to state 8 ]
-  ! PIPE            [ shift and go to state 10 ]
+  ! PLUS            [ shift and go to state 8 ]
+  ! MINUS           [ shift and go to state 9 ]
+  ! PIPE            [ shift and go to state 11 ]
 
 
-state 15
+state 17
 
     (6) expression -> expression MINUS expression .
     (5) expression -> expression . PLUS expression
@@ -370,17 +451,17 @@ state 15
     $end            reduce using rule 6 (expression -> expression MINUS expression .)
     RPAREN          reduce using rule 6 (expression -> expression MINUS expression .)
     COMMA           reduce using rule 6 (expression -> expression MINUS expression .)
-    TIMES           shift and go to state 9
-    DIVIDE          shift and go to state 11
+    TIMES           shift and go to state 10
+    DIVIDE          shift and go to state 12
 
   ! TIMES           [ reduce using rule 6 (expression -> expression MINUS expression .) ]
   ! DIVIDE          [ reduce using rule 6 (expression -> expression MINUS expression .) ]
-  ! PLUS            [ shift and go to state 7 ]
-  ! MINUS           [ shift and go to state 8 ]
-  ! PIPE            [ shift and go to state 10 ]
+  ! PLUS            [ shift and go to state 8 ]
+  ! MINUS           [ shift and go to state 9 ]
+  ! PIPE            [ shift and go to state 11 ]
 
 
-state 16
+state 18
 
     (7) expression -> expression TIMES expression .
     (5) expression -> expression . PLUS expression
@@ -398,14 +479,14 @@ state 16
     RPAREN          reduce using rule 7 (expression -> expression TIMES expression .)
     COMMA           reduce using rule 7 (expression -> expression TIMES expression .)
 
-  ! PLUS            [ shift and go to state 7 ]
-  ! MINUS           [ shift and go to state 8 ]
-  ! TIMES           [ shift and go to state 9 ]
-  ! PIPE            [ shift and go to state 10 ]
-  ! DIVIDE          [ shift and go to state 11 ]
+  ! PLUS            [ shift and go to state 8 ]
+  ! MINUS           [ shift and go to state 9 ]
+  ! TIMES           [ shift and go to state 10 ]
+  ! PIPE            [ shift and go to state 11 ]
+  ! DIVIDE          [ shift and go to state 12 ]
 
 
-state 17
+state 19
 
     (8) expression -> expression PIPE expression .
     (5) expression -> expression . PLUS expression
@@ -420,17 +501,17 @@ state 17
     $end            reduce using rule 8 (expression -> expression PIPE expression .)
     RPAREN          reduce using rule 8 (expression -> expression PIPE expression .)
     COMMA           reduce using rule 8 (expression -> expression PIPE expression .)
-    TIMES           shift and go to state 9
-    DIVIDE          shift and go to state 11
+    TIMES           shift and go to state 10
+    DIVIDE          shift and go to state 12
 
   ! TIMES           [ reduce using rule 8 (expression -> expression PIPE expression .) ]
   ! DIVIDE          [ reduce using rule 8 (expression -> expression PIPE expression .) ]
-  ! PLUS            [ shift and go to state 7 ]
-  ! MINUS           [ shift and go to state 8 ]
-  ! PIPE            [ shift and go to state 10 ]
+  ! PLUS            [ shift and go to state 8 ]
+  ! MINUS           [ shift and go to state 9 ]
+  ! PIPE            [ shift and go to state 11 ]
 
 
-state 18
+state 20
 
     (9) expression -> expression DIVIDE expression .
     (5) expression -> expression . PLUS expression
@@ -448,14 +529,14 @@ state 18
     RPAREN          reduce using rule 9 (expression -> expression DIVIDE expression .)
     COMMA           reduce using rule 9 (expression -> expression DIVIDE expression .)
 
-  ! PLUS            [ shift and go to state 7 ]
-  ! MINUS           [ shift and go to state 8 ]
-  ! TIMES           [ shift and go to state 9 ]
-  ! PIPE            [ shift and go to state 10 ]
-  ! DIVIDE          [ shift and go to state 11 ]
+  ! PLUS            [ shift and go to state 8 ]
+  ! MINUS           [ shift and go to state 9 ]
+  ! TIMES           [ shift and go to state 10 ]
+  ! PIPE            [ shift and go to state 11 ]
+  ! DIVIDE          [ shift and go to state 12 ]
 
 
-state 19
+state 21
 
     (1) expression -> ID LPAREN RPAREN .
 
@@ -469,16 +550,16 @@ state 19
     COMMA           reduce using rule 1 (expression -> ID LPAREN RPAREN .)
 
 
-state 20
+state 22
 
     (2) expression -> ID LPAREN args . RPAREN
     (4) args -> args . COMMA expression
 
-    RPAREN          shift and go to state 23
-    COMMA           shift and go to state 24
+    RPAREN          shift and go to state 27
+    COMMA           shift and go to state 28
 
 
-state 21
+state 23
 
     (3) args -> expression .
     (5) expression -> expression . PLUS expression
@@ -489,14 +570,44 @@ state 21
 
     RPAREN          reduce using rule 3 (args -> expression .)
     COMMA           reduce using rule 3 (args -> expression .)
-    PLUS            shift and go to state 7
-    MINUS           shift and go to state 8
-    TIMES           shift and go to state 9
-    PIPE            shift and go to state 10
-    DIVIDE          shift and go to state 11
+    PLUS            shift and go to state 8
+    MINUS           shift and go to state 9
+    TIMES           shift and go to state 10
+    PIPE            shift and go to state 11
+    DIVIDE          shift and go to state 12
 
 
-state 22
+state 24
+
+    (14) hier_id -> ID . DOT hier_id
+    (15) hier_id -> ID .
+
+    DOT             shift and go to state 14
+    PLUS            reduce using rule 15 (hier_id -> ID .)
+    MINUS           reduce using rule 15 (hier_id -> ID .)
+    TIMES           reduce using rule 15 (hier_id -> ID .)
+    PIPE            reduce using rule 15 (hier_id -> ID .)
+    DIVIDE          reduce using rule 15 (hier_id -> ID .)
+    $end            reduce using rule 15 (hier_id -> ID .)
+    RPAREN          reduce using rule 15 (hier_id -> ID .)
+    COMMA           reduce using rule 15 (hier_id -> ID .)
+
+
+state 25
+
+    (14) hier_id -> ID DOT hier_id .
+
+    PLUS            reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    MINUS           reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    TIMES           reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    PIPE            reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    DIVIDE          reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    $end            reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    RPAREN          reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    COMMA           reduce using rule 14 (hier_id -> ID DOT hier_id .)
+
+
+state 26
 
     (10) expression -> LPAREN expression RPAREN .
 
@@ -510,7 +621,7 @@ state 22
     COMMA           reduce using rule 10 (expression -> LPAREN expression RPAREN .)
 
 
-state 23
+state 27
 
     (2) expression -> ID LPAREN args RPAREN .
 
@@ -524,7 +635,7 @@ state 23
     COMMA           reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
 
 
-state 24
+state 28
 
     (4) args -> args COMMA . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -537,18 +648,22 @@ state 24
     (10) expression -> . LPAREN expression RPAREN
     (11) expression -> . NUMBER
     (12) expression -> . ID
-    (13) expression -> . STRING1
-    (14) expression -> . STRING2
+    (13) expression -> . hier_id
+    (16) expression -> . STRING1
+    (17) expression -> . STRING2
+    (14) hier_id -> . ID DOT hier_id
+    (15) hier_id -> . ID
 
     ID              shift and go to state 2
     LPAREN          shift and go to state 3
     NUMBER          shift and go to state 4
-    STRING1         shift and go to state 5
-    STRING2         shift and go to state 6
+    STRING1         shift and go to state 6
+    STRING2         shift and go to state 7
 
-    expression                     shift and go to state 25
+    expression                     shift and go to state 29
+    hier_id                        shift and go to state 5
 
-state 25
+state 29
 
     (4) args -> args COMMA expression .
     (5) expression -> expression . PLUS expression
@@ -559,9 +674,14 @@ state 25
 
     RPAREN          reduce using rule 4 (args -> args COMMA expression .)
     COMMA           reduce using rule 4 (args -> args COMMA expression .)
-    PLUS            shift and go to state 7
-    MINUS           shift and go to state 8
-    TIMES           shift and go to state 9
-    PIPE            shift and go to state 10
-    DIVIDE          shift and go to state 11
+    PLUS            shift and go to state 8
+    MINUS           shift and go to state 9
+    TIMES           shift and go to state 10
+    PIPE            shift and go to state 11
+    DIVIDE          shift and go to state 12
 
+WARNING: 
+WARNING: Conflicts:
+WARNING: 
+WARNING: reduce/reduce conflict in state 2 resolved using rule (expression -> ID)
+WARNING: rejected rule (hier_id -> ID) in state 2

@@ -27,6 +27,7 @@ from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader import PackageLoader
+from .param_ref_eval import ParamRefEval
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
@@ -66,6 +67,7 @@ class TaskGraphBuilder(object):
     loader : PackageLoader = None
     marker_l : Callable = lambda *args, **kwargs: None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
+    _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
     _task_m : Dict[str,Task] = dc.field(default_factory=dict)
@@ -78,6 +80,7 @@ class TaskGraphBuilder(object):
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
     _task_node_s : List[TaskNode] = dc.field(default_factory=list)
+    _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _uses_count : int = 0
 
     _log : logging.Logger = None
@@ -86,14 +89,47 @@ class TaskGraphBuilder(object):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
         self._shell_m.update(ExtRgy.inst()._shell_m)
-        self._task_rundir_s.append([])
+        self._task_rundir_s.append([self.rundir])
+
+        self._eval.set("env", os.environ)
+
 
         if self.root_pkg is not None:
             # Collect all the tasks
             pkg_s = set()
+
+            self._eval.set("root", {
+                "dir": self.root_pkg.basedir
+            })
+
+            params = self.root_pkg.paramT()
+
+            self._expandParams(params, self._eval)
+
+            for key in self.root_pkg.paramT.model_fields.keys():
+                self._eval.set(key, getattr(params, key))
+
+            self._pkg_params_m[self.root_pkg.name] = params
+
             self._addPackageTasks(self.root_pkg, pkg_s)
 
+    def setParam(self, name, value):
+        if self.root_pkg is None:
+            raise Exception("No root package")
+        params = self._pkg_params_m[self.root_pkg.name]
+
+        if not hasattr(params, name):
+            raise Exception("Package %s does not have parameter %s" % (self.root_pkg.name, name))
+        setattr(params, name, value)
+
     def _addPackageTasks(self, pkg, pkg_s):
+
+        # Build out the package parameters
+        params = pkg.paramT()
+        self._expandParams(params, self._eval)
+        self._pkg_params_m[pkg.name] = params
+        self._eval.set(pkg.name, params)
+
         if pkg not in pkg_s:
             pkg_s.add(pkg)
             for task in pkg.task_m.values():
@@ -230,10 +266,14 @@ class TaskGraphBuilder(object):
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
         
+        # TODO: need to obtain the package
+
+        
         ret = self._mkTaskNode(
             task, 
             name=name, 
-            srcdir=srcdir)
+            srcdir=srcdir,
+            eval=self._eval)
 
         if needs is not None:
             for need in needs:
@@ -326,10 +366,16 @@ class TaskGraphBuilder(object):
                     break
         return task
     
-    def _mkTaskNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False):
+    def _mkTaskNode(self, 
+                    task : Task, 
+                    name=None, 
+                    srcdir=None, 
+                    params=None, 
+                    hierarchical=False,
+                    eval=None):
 
         if not hierarchical:
-            self._task_rundir_s.append([])
+            self._task_rundir_s.append([self.rundir])
 
         # Determine how to build this node
         if self._isCompound(task):
@@ -338,14 +384,16 @@ class TaskGraphBuilder(object):
                 name=name,
                 srcdir=srcdir,
                 params=params,
-                hierarchical=hierarchical)
+                hierarchical=hierarchical,
+                eval=eval)
         else:
             ret = self._mkTaskLeafNode(
                 task, 
                 name=name,
                 srcdir=srcdir,
                 params=params,
-                hierarchical=hierarchical)
+                hierarchical=hierarchical,
+                eval=eval)
 
         if not hierarchical:
             self._task_rundir_s.pop()
@@ -364,7 +412,12 @@ class TaskGraphBuilder(object):
         else:
             return self.mkTaskNode(name)
     
-    def _mkTaskLeafNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
+    def _mkTaskLeafNode(self, 
+                        task : Task, name=None, 
+                        srcdir=None, 
+                        params=None, 
+                        hierarchical=False,
+                        eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
 
         if name is None:
@@ -375,6 +428,22 @@ class TaskGraphBuilder(object):
         
         if params is None:
             params = task.paramT()
+
+            print("RUNDIR: %s" % "/".join(self.get_rundir()))
+            eval.set("rundir", "/".join(self.get_rundir()))
+
+#            self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
+#            eval.setVar("in", in_params)
+#            eval.setVar("rundir", rundir)
+
+            # Set variables from the inputs
+            # for need in self.needs:
+            #     for name,value in {"rundir" : need[0].rundir}.items():
+            #         eval.setVar("%s.%s" % (need[0].name, name), value)
+
+            # expand any variable references
+            self._expandParams(params, eval)
+
 
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
@@ -415,7 +484,13 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
-    def _mkTaskCompoundNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
+    def _mkTaskCompoundNode(self, 
+                            task : Task, 
+                            name=None, 
+                            srcdir=None, 
+                            params=None, 
+                            hierarchical=False,
+                            eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
 
         if name is None:
@@ -426,6 +501,9 @@ class TaskGraphBuilder(object):
 
         if params is None:
             params = task.paramT()
+
+            # expand any variable references
+            self._expandParams(params, eval)
 
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
@@ -438,7 +516,8 @@ class TaskGraphBuilder(object):
                 name=name, 
                 srcdir=srcdir,
                 params=params,
-                hierarchical=True)
+                hierarchical=True,
+                eval=eval)
             
             if not isinstance(node, TaskNodeCompound):
                 # TODO: need to enclose the leaf node in a compound wrapper
@@ -479,7 +558,7 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
         for t in task.subtasks:
-            nn = self._mkTaskNode(t, hierarchical=True)
+            nn = self._mkTaskNode(t, hierarchical=True, eval=eval)
             node.tasks.append(nn)
 #            tasks.append((t, self._getTaskNode(t.name)))
             tasks.append((t, nn))
@@ -531,6 +610,21 @@ class TaskGraphBuilder(object):
             self.leave_rundir()
 
         return node
+
+    def _expandParams(self, params, eval):
+        for name in type(params).model_fields.keys():
+            value = getattr(params, name)
+            if type(value) == str:
+                if value.find("${{") != -1:
+                    print("Expr: %s" % str(value), flush=True)
+                    new_val = eval.eval(value)
+                    self._log.debug("Param %s: Evaluate expression \"%s\" => \"%s\"" % (name, value, new_val))
+                    setattr(params, name, new_val)
+            elif isinstance(value, list):
+                for i,elem in enumerate(value):
+                    if elem.find("${{") != -1:
+                        new_val = eval.eval(elem)
+                        value[i] = new_val
 
     def _gatherNeeds(self, task_t, node):
         self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))

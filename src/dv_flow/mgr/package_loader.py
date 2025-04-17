@@ -318,6 +318,9 @@ class PackageLoader(object):
         self._log.debug("--> _mkPackage %s" % pkg_def.name)
         pkg = Package(pkg_def, os.path.dirname(root))
 
+        # TODO: handle 'uses' for packages
+        pkg.paramT = self._getParamT(pkg_def, None)
+
         pkg_scope = self.package_scope()
         if pkg_scope is not None:
             self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))

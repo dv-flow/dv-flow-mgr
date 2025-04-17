@@ -10,7 +10,6 @@ from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskMarker
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
-from .param_ref_eval import ParamRefEval
 from .param import Param
 
 @dc.dataclass
@@ -73,17 +72,7 @@ class TaskNodeLeaf(TaskNode):
 
         self._log.debug("in_params[1]: %s" % ",".join(p.src for p in in_params))
 
-        # Create an evaluator for substituting param values
-        eval = ParamRefEval()
 
-        self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
-        eval.setVar("in", in_params)
-        eval.setVar("rundir", rundir)
-
-        # Set variables from the inputs
-        for need in self.needs:
-            for name,value in {"rundir" : need[0].rundir}.items():
-                eval.setVar("%s.%s" % (need[0].name, name), value)
 
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
@@ -97,19 +86,6 @@ class TaskNodeLeaf(TaskNode):
             self._log.debug("consumes(all): %s" % str(self.consumes))
         else:
             self._log.debug("consumes(unknown): %s" % str(self.consumes))
-
-        for name,field in type(self.params).model_fields.items():
-            value = getattr(self.params, name)
-            if type(value) == str:
-                if value.find("${{") != -1:
-                    new_val = eval.eval(value)
-                    self._log.debug("Param %s: Evaluate expression \"%s\" => \"%s\"" % (name, value, new_val))
-                    setattr(self.params, name, new_val)
-            elif isinstance(value, list):
-                for i,elem in enumerate(value):
-                    if elem.find("${{") != -1:
-                        new_val = eval.eval(elem)
-                        value[i] = new_val
 
         input = TaskDataInput(
             name=self.name,

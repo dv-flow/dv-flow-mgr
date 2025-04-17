@@ -37,6 +37,13 @@ class ExprId(Expr):
     def accept(self, v):
         v.visitExprId(self)
 
+@dc.dataclass
+class ExprHId(Expr):
+    id : List[str] = dc.field(default_factory=list)
+
+    def accept(self, v):
+        v.visitExprHId(self)
+
 class ExprBinOp(enum.Enum):
     Pipe = enum.auto()
     Plus = enum.auto()
@@ -76,6 +83,9 @@ class ExprInt(Expr):
         v.visitExprInt(self)
 
 class ExprVisitor(object):
+    def visitExprHId(self, e : ExprId):
+        pass
+
     def visitExprId(self, e : ExprId):
         pass
 
@@ -148,7 +158,7 @@ class ExprParser(object):
         return cls._inst
 
     tokens = (
-        'ID','NUMBER','COMMA',
+        'ID', 'DOT', 'NUMBER','COMMA',
         'PLUS','MINUS','TIMES','DIVIDE',
         'LPAREN','RPAREN','PIPE','STRING1','STRING2'
         )
@@ -163,6 +173,7 @@ class ExprParser(object):
     t_LPAREN  = r'\('
     t_RPAREN  = r'\)'
     t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    t_DOT     = r'\.'
     t_PIPE    = r'\|'
     
     def t_NUMBER(self, t):
@@ -243,6 +254,20 @@ class ExprParser(object):
     def p_expression_name(self, t):
         'expression : ID'
         t[0] = ExprId(t[1])
+
+    def p_expression_hid(self, t):
+        'expression : hier_id'
+        t[0] = t[1]
+
+    def p_hier_id(self, t):
+        '''hier_id : ID DOT hier_id 
+                   | ID'''
+        if len(t) == 2:
+            t[0] = ExprHId()
+            t[0].id.append(t[1])
+        else:
+            t[3].id.insert(0, t[1])
+            t[0] = t[3]
 
     def p_expression_string1(self, t):
         'expression : STRING1'

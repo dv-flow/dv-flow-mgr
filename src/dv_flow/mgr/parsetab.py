@@ -6,9 +6,9 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'leftPLUSMINUSPIPEleftTIMESDIVIDECOMMA DIVIDE ID LPAREN MINUS NUMBER PIPE PLUS RPAREN STRING1 STRING2 TIMESexpression : ID LPAREN RPAREN \n                      | ID LPAREN args RPARENargs : expression \n                | args COMMA expressionexpression : expression PLUS expression\n                      | expression MINUS expression\n                      | expression TIMES expression\n                      | expression PIPE expression\n                      | expression DIVIDE expressionexpression : LPAREN expression RPARENexpression : NUMBERexpression : IDexpression : STRING1expression : STRING2'
+_lr_signature = 'leftPLUSMINUSPIPEleftTIMESDIVIDECOMMA DIVIDE DOT ID LPAREN MINUS NUMBER PIPE PLUS RPAREN STRING1 STRING2 TIMESexpression : ID LPAREN RPAREN \n                      | ID LPAREN args RPARENargs : expression \n                | args COMMA expressionexpression : expression PLUS expression\n                      | expression MINUS expression\n                      | expression TIMES expression\n                      | expression PIPE expression\n                      | expression DIVIDE expressionexpression : LPAREN expression RPARENexpression : NUMBERexpression : IDexpression : hier_idhier_id : ID DOT hier_id \n                   | IDexpression : STRING1expression : STRING2'
     
-_lr_action_items = {'ID':([0,3,7,8,9,10,11,12,24,],[2,2,2,2,2,2,2,2,2,]),'LPAREN':([0,2,3,7,8,9,10,11,12,24,],[3,12,3,3,3,3,3,3,3,3,]),'NUMBER':([0,3,7,8,9,10,11,12,24,],[4,4,4,4,4,4,4,4,4,]),'STRING1':([0,3,7,8,9,10,11,12,24,],[5,5,5,5,5,5,5,5,5,]),'STRING2':([0,3,7,8,9,10,11,12,24,],[6,6,6,6,6,6,6,6,6,]),'$end':([1,2,4,5,6,14,15,16,17,18,19,22,23,],[0,-12,-11,-13,-14,-5,-6,-7,-8,-9,-1,-10,-2,]),'PLUS':([1,2,4,5,6,13,14,15,16,17,18,19,21,22,23,25,],[7,-12,-11,-13,-14,7,-5,-6,-7,-8,-9,-1,7,-10,-2,7,]),'MINUS':([1,2,4,5,6,13,14,15,16,17,18,19,21,22,23,25,],[8,-12,-11,-13,-14,8,-5,-6,-7,-8,-9,-1,8,-10,-2,8,]),'TIMES':([1,2,4,5,6,13,14,15,16,17,18,19,21,22,23,25,],[9,-12,-11,-13,-14,9,9,9,-7,9,-9,-1,9,-10,-2,9,]),'PIPE':([1,2,4,5,6,13,14,15,16,17,18,19,21,22,23,25,],[10,-12,-11,-13,-14,10,-5,-6,-7,-8,-9,-1,10,-10,-2,10,]),'DIVIDE':([1,2,4,5,6,13,14,15,16,17,18,19,21,22,23,25,],[11,-12,-11,-13,-14,11,11,11,-7,11,-9,-1,11,-10,-2,11,]),'RPAREN':([2,4,5,6,12,13,14,15,16,17,18,19,20,21,22,23,25,],[-12,-11,-13,-14,19,22,-5,-6,-7,-8,-9,-1,23,-3,-10,-2,-4,]),'COMMA':([2,4,5,6,14,15,16,17,18,19,20,21,22,23,25,],[-12,-11,-13,-14,-5,-6,-7,-8,-9,-1,24,-3,-10,-2,-4,]),}
+_lr_action_items = {'ID':([0,3,8,9,10,11,12,13,14,28,],[2,2,2,2,2,2,2,2,24,2,]),'LPAREN':([0,2,3,8,9,10,11,12,13,28,],[3,13,3,3,3,3,3,3,3,3,]),'NUMBER':([0,3,8,9,10,11,12,13,28,],[4,4,4,4,4,4,4,4,4,]),'STRING1':([0,3,8,9,10,11,12,13,28,],[6,6,6,6,6,6,6,6,6,]),'STRING2':([0,3,8,9,10,11,12,13,28,],[7,7,7,7,7,7,7,7,7,]),'$end':([1,2,4,5,6,7,16,17,18,19,20,21,24,25,26,27,],[0,-12,-11,-13,-16,-17,-5,-6,-7,-8,-9,-1,-15,-14,-10,-2,]),'PLUS':([1,2,4,5,6,7,15,16,17,18,19,20,21,23,24,25,26,27,29,],[8,-12,-11,-13,-16,-17,8,-5,-6,-7,-8,-9,-1,8,-15,-14,-10,-2,8,]),'MINUS':([1,2,4,5,6,7,15,16,17,18,19,20,21,23,24,25,26,27,29,],[9,-12,-11,-13,-16,-17,9,-5,-6,-7,-8,-9,-1,9,-15,-14,-10,-2,9,]),'TIMES':([1,2,4,5,6,7,15,16,17,18,19,20,21,23,24,25,26,27,29,],[10,-12,-11,-13,-16,-17,10,10,10,-7,10,-9,-1,10,-15,-14,-10,-2,10,]),'PIPE':([1,2,4,5,6,7,15,16,17,18,19,20,21,23,24,25,26,27,29,],[11,-12,-11,-13,-16,-17,11,-5,-6,-7,-8,-9,-1,11,-15,-14,-10,-2,11,]),'DIVIDE':([1,2,4,5,6,7,15,16,17,18,19,20,21,23,24,25,26,27,29,],[12,-12,-11,-13,-16,-17,12,12,12,-7,12,-9,-1,12,-15,-14,-10,-2,12,]),'RPAREN':([2,4,5,6,7,13,15,16,17,18,19,20,21,22,23,24,25,26,27,29,],[-12,-11,-13,-16,-17,21,26,-5,-6,-7,-8,-9,-1,27,-3,-15,-14,-10,-2,-4,]),'COMMA':([2,4,5,6,7,16,17,18,19,20,21,22,23,24,25,26,27,29,],[-12,-11,-13,-16,-17,-5,-6,-7,-8,-9,-1,28,-3,-15,-14,-10,-2,-4,]),'DOT':([2,24,],[14,14,]),}
 
 _lr_action = {}
 for _k, _v in _lr_action_items.items():
@@ -17,7 +17,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'expression':([0,3,7,8,9,10,11,12,24,],[1,13,14,15,16,17,18,21,25,]),'args':([12,],[20,]),}
+_lr_goto_items = {'expression':([0,3,8,9,10,11,12,13,28,],[1,15,16,17,18,19,20,23,29,]),'hier_id':([0,3,8,9,10,11,12,13,14,28,],[5,5,5,5,5,5,5,5,25,5,]),'args':([13,],[22,]),}
 
 _lr_goto = {}
 for _k, _v in _lr_goto_items.items():
@@ -27,18 +27,21 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S' -> expression","S'",1,None,None,None),
-  ('expression -> ID LPAREN RPAREN','expression',3,'p_call','expr_parser.py',180),
-  ('expression -> ID LPAREN args RPAREN','expression',4,'p_call','expr_parser.py',181),
-  ('args -> expression','args',1,'p_args','expr_parser.py',185),
-  ('args -> args COMMA expression','args',3,'p_args','expr_parser.py',186),
-  ('expression -> expression PLUS expression','expression',3,'p_expression_binop','expr_parser.py',194),
-  ('expression -> expression MINUS expression','expression',3,'p_expression_binop','expr_parser.py',195),
-  ('expression -> expression TIMES expression','expression',3,'p_expression_binop','expr_parser.py',196),
-  ('expression -> expression PIPE expression','expression',3,'p_expression_binop','expr_parser.py',197),
-  ('expression -> expression DIVIDE expression','expression',3,'p_expression_binop','expr_parser.py',198),
-  ('expression -> LPAREN expression RPAREN','expression',3,'p_expression_group','expr_parser.py',209),
-  ('expression -> NUMBER','expression',1,'p_expression_number','expr_parser.py',213),
-  ('expression -> ID','expression',1,'p_expression_name','expr_parser.py',217),
-  ('expression -> STRING1','expression',1,'p_expression_string1','expr_parser.py',221),
-  ('expression -> STRING2','expression',1,'p_expression_string2','expr_parser.py',225),
+  ('expression -> ID LPAREN RPAREN','expression',3,'p_call','expr_parser.py',208),
+  ('expression -> ID LPAREN args RPAREN','expression',4,'p_call','expr_parser.py',209),
+  ('args -> expression','args',1,'p_args','expr_parser.py',213),
+  ('args -> args COMMA expression','args',3,'p_args','expr_parser.py',214),
+  ('expression -> expression PLUS expression','expression',3,'p_expression_binop','expr_parser.py',222),
+  ('expression -> expression MINUS expression','expression',3,'p_expression_binop','expr_parser.py',223),
+  ('expression -> expression TIMES expression','expression',3,'p_expression_binop','expr_parser.py',224),
+  ('expression -> expression PIPE expression','expression',3,'p_expression_binop','expr_parser.py',225),
+  ('expression -> expression DIVIDE expression','expression',3,'p_expression_binop','expr_parser.py',226),
+  ('expression -> LPAREN expression RPAREN','expression',3,'p_expression_group','expr_parser.py',237),
+  ('expression -> NUMBER','expression',1,'p_expression_number','expr_parser.py',241),
+  ('expression -> ID','expression',1,'p_expression_name','expr_parser.py',245),
+  ('expression -> hier_id','expression',1,'p_expression_hid','expr_parser.py',249),
+  ('hier_id -> ID DOT hier_id','hier_id',3,'p_hier_id','expr_parser.py',253),
+  ('hier_id -> ID','hier_id',1,'p_hier_id','expr_parser.py',254),
+  ('expression -> STRING1','expression',1,'p_expression_string1','expr_parser.py',259),
+  ('expression -> STRING2','expression',1,'p_expression_string2','expr_parser.py',263),
 ]

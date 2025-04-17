@@ -34,6 +34,9 @@ class ParamRefEval(object):
     def __post_init__(self):
         self.expr_eval.methods["jq"] = eval_jq
 
+    def set(self, name : str, value : object):
+        self.expr_eval.set(name, value)
+
     def eval(self, val : str) -> str:
         idx = 0
 

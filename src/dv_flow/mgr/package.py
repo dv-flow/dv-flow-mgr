@@ -67,7 +67,7 @@ class Package(object):
         }
 
         if self.paramT is not None:
-            pkg["paramT"] = self.paramT.model_dump()
+            pkg["paramT"] = self.paramT().model_dump()
 
         return pkg
             
