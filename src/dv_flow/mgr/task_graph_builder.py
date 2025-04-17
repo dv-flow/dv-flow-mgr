@@ -429,7 +429,6 @@ class TaskGraphBuilder(object):
         if params is None:
             params = task.paramT()
 
-            print("RUNDIR: %s" % "/".join(self.get_rundir()))
             eval.set("rundir", "/".join(self.get_rundir()))
 
 #            self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
