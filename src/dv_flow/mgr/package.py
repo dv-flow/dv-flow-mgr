@@ -24,6 +24,7 @@ import logging
 from typing import Any, ClassVar, Dict, List
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
+from .srcinfo import SrcInfo
 from .task import Task
 from .type import Type
 
@@ -38,6 +39,7 @@ class Package(object):
     type_m : Dict[str,Type] = dc.field(default_factory=dict)
     fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
     pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
+    srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")
 
     @property

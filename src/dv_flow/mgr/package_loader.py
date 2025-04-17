@@ -12,6 +12,7 @@ from .package_def import PackageDef
 from .package import Package
 from .param_def import ComplexType
 from .ext_rgy import ExtRgy
+from .srcinfo import SrcInfo
 from .task import Task
 from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
@@ -62,6 +63,7 @@ class LoaderScope(SymbolScope):
         self._log.debug("--> findTask: %s" % name)
         last_dot = name.rfind('.')
         ret = None
+        pkg = None
         if last_dot != -1:
             pkg_name = name[:last_dot]
 
@@ -70,6 +72,7 @@ class LoaderScope(SymbolScope):
             else:
                 path = self.loader.pkg_rgy.findPackagePath(pkg_name)
                 if path is not None:
+                    path = os.path.normpath(path)
                     pkg = self.loader._loadPackage(path)
                     self.loader._pkg_m[pkg_name] = pkg
             if pkg is not None:
@@ -220,6 +223,7 @@ class PackageLoader(object):
 
     def load(self, root) -> Package:
         self._log.debug("--> load %s" % root)
+        root = os.path.normpath(root)
         ret = self._loadPackage(root, None)
         self._log.debug("<-- load %s" % root)
         return ret
@@ -234,6 +238,7 @@ class PackageLoader(object):
             pp = self.pkg_rgy.findPackagePath(nn)
             if pp is None:
                 raise Exception("Package %s not found" % nn)
+            root = os.path.normpath(pp)
             pp_n = self._loadPackage(pp)
             pkg.pkg_m[pp_n.name] = pp_n
         self._log.debug("<-- load_rgy %s" % name)
@@ -316,7 +321,10 @@ class PackageLoader(object):
 
     def _mkPackage(self, pkg_def : PackageDef, root : str) -> Package:
         self._log.debug("--> _mkPackage %s" % pkg_def.name)
-        pkg = Package(pkg_def, os.path.dirname(root))
+        pkg = Package(
+            pkg_def, 
+            os.path.dirname(root),
+            srcinfo=SrcInfo(file=root))
 
         # TODO: handle 'uses' for packages
         pkg.paramT = self._getParamT(pkg_def, None)
@@ -327,22 +335,30 @@ class PackageLoader(object):
             pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
         if pkg.name in self._pkg_m.keys():
-            raise Exception("Duplicate package %s" % pkg.name)
+            epkg = self._pkg_m[pkg.name]
+            if epkg.srcinfo.file != pkg.srcinfo.file:
+                self.error("Package %s already loaded from %s. Duplicate defined in %s" % (
+                    pkg.name, epkg.srcinfo.file, pkg.srcinfo.file))
+        else:
+            pkg_scope = self.package_scope()
+            if pkg_scope is not None:
+                self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
+                pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
-        self._pkg_m[pkg.name] = pkg
-        self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
-        # Imports are loaded first
-        self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
+            self._pkg_m[pkg.name] = pkg
+            self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
+            # Imports are loaded first
+            self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
 
-        taskdefs = pkg_def.tasks.copy()
-        typedefs = pkg_def.types.copy()
+            taskdefs = pkg_def.tasks.copy()
+            typedefs = pkg_def.types.copy()
 
-        self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
+            self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
 
-        self._loadTypes(pkg, typedefs)
-        self._loadTasks(pkg, taskdefs, pkg.basedir)
+            self._loadTypes(pkg, typedefs)
+            self._loadTasks(pkg, taskdefs, pkg.basedir)
 
-        self._pkg_s.pop()
+            self._pkg_s.pop()
 
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
@@ -399,6 +415,7 @@ class PackageLoader(object):
             sub_pkg = self._pkg_path_m[imp_path]
         else:
             self._log.info("Loading imported file %s" % imp_path)
+            imp_path = os.path.normpath(imp_path)
             sub_pkg = self._loadPackage(imp_path)
             self._log.info("Loaded imported package %s" % sub_pkg.name)
 
@@ -761,10 +778,10 @@ class PackageLoader(object):
     
     def error(self, msg, loc=None):
         if loc is not None:
-            marker = TaskMarker(msg=msg, severity=TaskMarker.SeverityE.Error,
+            marker = TaskMarker(msg=msg, severity=SeverityE.Error,
                                 loc=loc)
         else:
-            marker = TaskMarker(msg=msg, severity=TaskMarker.SeverityE.Error)
+            marker = TaskMarker(msg=msg, severity=SeverityE.Error)
         self.marker(marker)
 
     def marker(self, marker):

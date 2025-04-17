@@ -90,6 +90,12 @@ async def FileSet(runner, input) -> TaskDataResult:
             else:
                 incdirs = input.params.incdirs.split()
                 fs.incdirs.extend(incdirs)
+        if input.params.defines is not None:
+            if isinstance(input.params.defines, list):
+                fs.defines.extend(input.params.defines)
+            else:
+                defines = input.params.defines.split()
+                fs.defines.extend(defines)
 
     # Check to see if the filelist or fileset have changed
     # Only bother doing this if the upstream task data has not changed
