@@ -231,15 +231,21 @@ class PackageLoader(object):
 #                    t.fullname = pkg.name + "." + t.name
 
             except pydantic.ValidationError as e:
-                print("Errors: %s" % root)
+#                print("Errors: %s" % root)
                 error_paths = []
                 loc = None
+                loc_s = ""
                 for ee in e.errors():
 #                    print("  Error: %s" % str(ee))
                     obj = doc["package"]
                     loc = None
+                    print("Errors: %s" % str(ee))
                     for el in ee['loc']:
-                        print("el: %s" % str(el))
+#                        print("el: %s" % str(el))
+                        if loc_s != "":
+                            loc_s += "." + str(el)
+                        else:
+                            loc_s = str(el)
                         obj = obj[el]
                         if type(obj) == dict and 'srcinfo' in obj.keys():
                             loc = obj['srcinfo']
@@ -255,7 +261,11 @@ class PackageLoader(object):
                             severity=SeverityE.Error,
                             loc=marker_loc)
                     else:
-                        marker = TaskMarker(msg=ee['msg'])
+                        marker_loc = TaskMarkerLoc(path=root)   
+                        marker = TaskMarker(
+                            msg=("%s (at '%s')" % (ee['msg'], loc_s)),
+                            severity=SeverityE.Error,
+                            loc=marker_loc)
                     self.marker(marker)
 
             if pkg_def is not None:
