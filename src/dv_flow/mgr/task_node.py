@@ -29,6 +29,7 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_node_ctxt import TaskNodeCtxt
 from .task_run_ctxt import TaskRunCtxt
 from .param import Param
 
@@ -44,6 +45,7 @@ class TaskNode(object):
     srcdir : str
     # This can be the resolved parameters
     params : Any
+    ctxt : TaskNodeCtxt
 
     # Runtime fields -- these get populated during execution
     changed : bool = False

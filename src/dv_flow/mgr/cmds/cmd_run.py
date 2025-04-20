@@ -24,6 +24,7 @@ import os
 import logging
 from typing import ClassVar
 from ..util import loadProjPkgDef
+from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
@@ -42,7 +43,11 @@ class CmdRun(object):
 
         # First, find the project we're working with
         listener = TaskListenerLog()
-        pkg = loadProjPkgDef(rootdir, listener=listener)
+        pkg = loadProjPkgDef(rootdir, listener=listener.marker)
+
+        if listener.has_severity[SeverityE.Error] > 0:
+            print("Error(s) encountered while loading package definition")
+            return 1
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())

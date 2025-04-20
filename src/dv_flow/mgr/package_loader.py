@@ -76,9 +76,9 @@ class LoaderScope(SymbolScope):
                     pkg = self.loader._loadPackage(path)
                     self.loader._pkg_m[pkg_name] = pkg
             if pkg is not None:
-                self._log.debug("Found pkg %s (%s)" % (pkg.name, str(pkg.task_m.keys())))
+                self._log.debug("Found pkg %s (%s)" % (pkg_name, str(pkg.task_m.keys())))
             else:
-                self._log.debug("Failed to find pkg %s" % pkg.name)
+                self._log.debug("Failed to find pkg %s" % pkg_name)
 
             if pkg is not None and name in pkg.task_m.keys():
                 ret = pkg.task_m[name]
@@ -172,9 +172,6 @@ class PackageScope(SymbolScope):
 
         if ret is None:
             ret = super().findType(name)
-
-        print("   types: %s" % str(self.pkg.type_m.keys()))
-        print("   tasks: %s" % str(self.pkg.task_m.keys()))
 
         if ret is None and name in self.pkg.type_m.keys():
             ret = self.pkg.type_m[name]
@@ -505,7 +502,8 @@ class PackageLoader(object):
                 task.uses = self._findTask(taskdef.uses)
 
                 if task.uses is None:
-                    raise Exception("Failed to link task %s" % taskdef.uses)
+                    self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
+                    continue
             
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
 
@@ -602,7 +600,8 @@ class PackageLoader(object):
                 if st.uses is None:
                     st.uses = self._findTask(td.uses)
                     if st.uses is None:
-                        raise Exception("Failed to find task %s" % td.uses)
+                        self.error("failed to find task %s" % td.uses, td.srcinfo)
+#                        raise Exception("Failed to find task %s" % td.uses)
 
             passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
 
@@ -776,14 +775,15 @@ class PackageLoader(object):
         self._log.debug("<-- _getParamT %s" % taskdef.name)
         return params_t
     
-    def error(self, msg, loc=None):
+    def error(self, msg, loc : SrcInfo =None):
         if loc is not None:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error,
-                                loc=loc)
+                                loc=TaskMarkerLoc(path=loc.file, line=loc.lineno, pos=loc.linepos))
         else:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error)
         self.marker(marker)
 
     def marker(self, marker):
+        print("listeners: %d" % len(self.marker_listeners))
         for l in self.marker_listeners:
             l(marker)
