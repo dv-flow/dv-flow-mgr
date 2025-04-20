@@ -61,11 +61,15 @@ class LoaderScope(SymbolScope):
     
     def findTask(self, name) -> Task:
         self._log.debug("--> findTask: %s" % name)
-        last_dot = name.rfind('.')
+
         ret = None
         pkg = None
-        if last_dot != -1:
-            pkg_name = name[:last_dot]
+
+        # Split the name into elements
+        name_elems = name.split('.')
+
+        def find_pkg(pkg_name):
+            pkg = None
 
             if pkg_name in self.loader._pkg_m.keys():
                 pkg = self.loader._pkg_m[pkg_name]
@@ -79,9 +83,22 @@ class LoaderScope(SymbolScope):
                 self._log.debug("Found pkg %s (%s)" % (pkg_name, str(pkg.task_m.keys())))
             else:
                 self._log.debug("Failed to find pkg %s" % pkg_name)
+            
+            return pkg
 
-            if pkg is not None and name in pkg.task_m.keys():
-                ret = pkg.task_m[name]
+        if len(name_elems) > 1:
+            for i in range(len(name_elems)-1, -1, -1):
+                pkg_name = ".".join(name_elems[:i+1])
+
+                pkg = find_pkg(pkg_name)
+                if pkg is not None:
+                    break;
+        else:
+            raise Exception("Task name %s is not fully qualified" % name)
+
+        if pkg is not None and name in pkg.task_m.keys():
+            ret = pkg.task_m[name]
+
         self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
         
         return ret
@@ -525,6 +542,7 @@ class PackageLoader(object):
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
                 if nt is None:
+                    self.error("failed to find task %s" % need, taskdef.srcinfo)
                     raise Exception("Failed to find task %s" % need)
                 task.needs.append(nt)
 
