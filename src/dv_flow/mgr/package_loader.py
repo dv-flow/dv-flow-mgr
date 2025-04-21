@@ -61,11 +61,15 @@ class LoaderScope(SymbolScope):
     
     def findTask(self, name) -> Task:
         self._log.debug("--> findTask: %s" % name)
-        last_dot = name.rfind('.')
+
         ret = None
         pkg = None
-        if last_dot != -1:
-            pkg_name = name[:last_dot]
+
+        # Split the name into elements
+        name_elems = name.split('.')
+
+        def find_pkg(pkg_name):
+            pkg = None
 
             if pkg_name in self.loader._pkg_m.keys():
                 pkg = self.loader._pkg_m[pkg_name]
@@ -76,12 +80,25 @@ class LoaderScope(SymbolScope):
                     pkg = self.loader._loadPackage(path)
                     self.loader._pkg_m[pkg_name] = pkg
             if pkg is not None:
-                self._log.debug("Found pkg %s (%s)" % (pkg.name, str(pkg.task_m.keys())))
+                self._log.debug("Found pkg %s (%s)" % (pkg_name, str(pkg.task_m.keys())))
             else:
-                self._log.debug("Failed to find pkg %s" % pkg.name)
+                self._log.debug("Failed to find pkg %s" % pkg_name)
+            
+            return pkg
 
-            if pkg is not None and name in pkg.task_m.keys():
-                ret = pkg.task_m[name]
+        if len(name_elems) > 1:
+            for i in range(len(name_elems)-1, -1, -1):
+                pkg_name = ".".join(name_elems[:i+1])
+
+                pkg = find_pkg(pkg_name)
+                if pkg is not None:
+                    break;
+        else:
+            raise Exception("Task name %s is not fully qualified" % name)
+
+        if pkg is not None and name in pkg.task_m.keys():
+            ret = pkg.task_m[name]
+
         self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
         
         return ret
@@ -172,9 +189,6 @@ class PackageScope(SymbolScope):
 
         if ret is None:
             ret = super().findType(name)
-
-        print("   types: %s" % str(self.pkg.type_m.keys()))
-        print("   tasks: %s" % str(self.pkg.task_m.keys()))
 
         if ret is None and name in self.pkg.type_m.keys():
             ret = self.pkg.type_m[name]
@@ -387,7 +401,7 @@ class PackageLoader(object):
         if not os.path.isabs(imp_path):
             self._log.debug("_basedir: %s ; imp_path: %s" % (basedir, imp_path))
             imp_path = os.path.join(basedir, imp_path)
-        
+            
         # Search down the tree looking for a flow.dv file
         if os.path.isdir(imp_path):
             path = imp_path
@@ -458,14 +472,45 @@ class PackageLoader(object):
             doc = yaml.load(fp, Loader=YamlSrcInfoLoader(file))
             self._log.debug("doc: %s" % str(doc))
             if doc is not None and "fragment" in doc.keys():
-                frag = FragmentDef(**(doc["fragment"]))
-                basedir = os.path.dirname(file)
-                pkg.fragment_def_l.append(frag)
+                try:
+                    frag = FragmentDef(**(doc["fragment"]))
+                    basedir = os.path.dirname(file)
+                    pkg.fragment_def_l.append(frag)
 
-                self._loadPackageImports(pkg, frag.imports, basedir)
-                self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
-                taskdefs.extend(frag.tasks)
-                typedefs.extend(frag.types)
+                    self._loadPackageImports(pkg, frag.imports, basedir)
+                    self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
+                    taskdefs.extend(frag.tasks)
+                    typedefs.extend(frag.types)
+                except pydantic.ValidationError as e:
+                    print("Errors: %s" % file)
+                    error_paths = []
+                    loc = None
+                    for ee in e.errors():
+#                    print("  Error: %s" % str(ee))
+                        obj = doc["fragment"]
+                        loc = None
+                        for el in ee['loc']:
+                            print("el: %s" % str(el))
+                            obj = obj[el]
+                            if type(obj) == dict and 'srcinfo' in obj.keys():
+                                loc = obj['srcinfo']
+                        if loc is not None:
+                            marker_loc = TaskMarkerLoc(path=loc['file'])
+                            if 'lineno' in loc.keys():
+                                marker_loc.line = loc['lineno']
+                            if 'linepos' in loc.keys():
+                                marker_loc.pos = loc['linepos']
+
+                            marker = TaskMarker(
+                                msg=("%s (in %s)" % (ee['msg'], str(ee['loc'][-1]))),
+                                severity=SeverityE.Error,
+                                loc=marker_loc)
+                        else:
+                            marker = TaskMarker(
+                                msg=ee['msg'], 
+                                severity=SeverityE.Error,
+                                loc=TaskMarkerLoc(path=file))
+                        self.marker(marker)
             else:
                 print("Warning: file %s is not a fragment" % file)
 
@@ -509,8 +554,8 @@ class PackageLoader(object):
                 task.uses = self._findTask(taskdef.uses)
 
                 if task.uses is None:
-                    raise Exception("Failed to link task %s" % taskdef.uses)
-                
+                    self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
+                    continue
             
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
 
@@ -532,6 +577,7 @@ class PackageLoader(object):
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
                 if nt is None:
+                    self.error("failed to find task %s" % need, taskdef.srcinfo)
                     raise Exception("Failed to find task %s" % need)
                 task.needs.append(nt)
 
@@ -611,7 +657,8 @@ class PackageLoader(object):
                 if st.uses is None:
                     st.uses = self._findTask(td.uses)
                     if st.uses is None:
-                        raise Exception("Failed to find task %s" % td.uses)
+                        self.error("failed to find task %s" % td.uses, td.srcinfo)
+#                        raise Exception("Failed to find task %s" % td.uses)
 
             passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
 
@@ -785,14 +832,15 @@ class PackageLoader(object):
         self._log.debug("<-- _getParamT %s" % taskdef.name)
         return params_t
     
-    def error(self, msg, loc=None):
+    def error(self, msg, loc : SrcInfo =None):
         if loc is not None:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error,
-                                loc=loc)
+                                loc=TaskMarkerLoc(path=loc.file, line=loc.lineno, pos=loc.linepos))
         else:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error)
         self.marker(marker)
 
     def marker(self, marker):
+        print("listeners: %d" % len(self.marker_listeners))
         for l in self.marker_listeners:
             l(marker)

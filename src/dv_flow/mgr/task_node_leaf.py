@@ -101,7 +101,10 @@ class TaskNodeLeaf(TaskNode):
             inputs=inputs,
             memento=memento)
         
-        ctxt = TaskRunCtxt(runner=runner, rundir=input.rundir)
+        ctxt = TaskRunCtxt(
+            runner=runner, 
+            ctxt=self.ctxt,
+            rundir=input.rundir)
 
         self._log.debug("--> Call task method %s" % str(self.task))
         try:

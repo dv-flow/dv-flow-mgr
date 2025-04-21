@@ -40,6 +40,7 @@ from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
 from .task_node_ctor_wrapper import TaskNodeCtorWrapper
 from .task_node_compound import TaskNodeCompound
+from .task_node_ctxt import TaskNodeCtxt
 from .task_node_leaf import TaskNodeLeaf
 from .type import Type
 from .std.task_null import TaskNull
@@ -81,6 +82,7 @@ class TaskGraphBuilder(object):
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
     _task_node_s : List[TaskNode] = dc.field(default_factory=list)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+    _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
 
     _log : logging.Logger = None
@@ -94,9 +96,14 @@ class TaskGraphBuilder(object):
         self._eval.set("env", os.environ)
 
 
+
         if self.root_pkg is not None:
             # Collect all the tasks
             pkg_s = set()
+
+            self._ctxt = TaskNodeCtxt(
+                root_pkgdir=self.root_pkg.basedir,
+                root_rundir=self.rundir)
 
             self._eval.set("root", {
                 "dir": self.root_pkg.basedir
@@ -112,6 +119,11 @@ class TaskGraphBuilder(object):
             self._pkg_params_m[self.root_pkg.name] = params
 
             self._addPackageTasks(self.root_pkg, pkg_s)
+        else:
+            self._ctxt = TaskNodeCtxt(
+                root_pkgdir=None,
+                root_rundir=self.rundir)
+
 
     def setParam(self, name, value):
         if self.root_pkg is None:
@@ -490,6 +502,7 @@ class TaskGraphBuilder(object):
             name=name,
             srcdir=srcdir,
             params=params,
+            ctxt=self._ctxt,
             passthrough=task.passthrough,
             consumes=task.consumes,
             task=callable(task.run))
@@ -553,7 +566,8 @@ class TaskGraphBuilder(object):
             node = TaskNodeCompound(
                 name=name,
                 srcdir=srcdir,
-                params=params)
+                params=params,
+                ctxt=self._ctxt)
 
         if len(self._task_node_s):
             node.parent = self._task_node_s[-1]

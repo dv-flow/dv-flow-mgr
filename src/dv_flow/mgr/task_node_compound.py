@@ -45,6 +45,7 @@ class TaskNodeCompound(TaskNode):
             name=self.name + ".in",
             srcdir=self.srcdir,
             params=NullParams(),
+            ctxt=self.ctxt,
             consumes=ConsumesE.No,
             passthrough=PassthroughE.All)
         self.input.task = null_run
