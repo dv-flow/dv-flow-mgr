@@ -472,14 +472,45 @@ class PackageLoader(object):
             doc = yaml.load(fp, Loader=YamlSrcInfoLoader(file))
             self._log.debug("doc: %s" % str(doc))
             if doc is not None and "fragment" in doc.keys():
-                frag = FragmentDef(**(doc["fragment"]))
-                basedir = os.path.dirname(file)
-                pkg.fragment_def_l.append(frag)
+                try:
+                    frag = FragmentDef(**(doc["fragment"]))
+                    basedir = os.path.dirname(file)
+                    pkg.fragment_def_l.append(frag)
 
-                self._loadPackageImports(pkg, frag.imports, basedir)
-                self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
-                taskdefs.extend(frag.tasks)
-                typedefs.extend(frag.types)
+                    self._loadPackageImports(pkg, frag.imports, basedir)
+                    self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
+                    taskdefs.extend(frag.tasks)
+                    typedefs.extend(frag.types)
+                except pydantic.ValidationError as e:
+                    print("Errors: %s" % file)
+                    error_paths = []
+                    loc = None
+                    for ee in e.errors():
+#                    print("  Error: %s" % str(ee))
+                        obj = doc["fragment"]
+                        loc = None
+                        for el in ee['loc']:
+                            print("el: %s" % str(el))
+                            obj = obj[el]
+                            if type(obj) == dict and 'srcinfo' in obj.keys():
+                                loc = obj['srcinfo']
+                        if loc is not None:
+                            marker_loc = TaskMarkerLoc(path=loc['file'])
+                            if 'lineno' in loc.keys():
+                                marker_loc.line = loc['lineno']
+                            if 'linepos' in loc.keys():
+                                marker_loc.pos = loc['linepos']
+
+                            marker = TaskMarker(
+                                msg=("%s (in %s)" % (ee['msg'], str(ee['loc'][-1]))),
+                                severity=SeverityE.Error,
+                                loc=marker_loc)
+                        else:
+                            marker = TaskMarker(
+                                msg=ee['msg'], 
+                                severity=SeverityE.Error,
+                                loc=TaskMarkerLoc(path=file))
+                        self.marker(marker)
             else:
                 print("Warning: file %s is not a fragment" % file)
 
