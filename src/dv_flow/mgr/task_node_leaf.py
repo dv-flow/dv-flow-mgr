@@ -33,9 +33,14 @@ class TaskNodeLeaf(TaskNode):
         # TODO: Form dep-map from inputs
 
         dep_m = {}
-        for need,block in self.needs:
+        for i,(need,block) in enumerate(self.needs):
             self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
             if not block:
+                # This input also depends on all that came before
+                for j in range(i):
+                    if need.name not in dep_m.keys():
+                        dep_m[need.name] = []
+                    dep_m[need.name].append(self.needs[j][0].name)
                 for subdep in need.output.dep_m.keys():
                     if subdep not in dep_m.keys():
                         dep_m[subdep] = []

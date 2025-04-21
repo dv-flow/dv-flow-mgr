@@ -56,6 +56,7 @@ class TaskNode(object):
     start : float = dc.field(default=None)
     end : float = dc.field(default=None)
     save_exec_data : bool = dc.field(default=True)
+    iff : bool = dc.field(default=True)
     parent : 'TaskNode' = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")

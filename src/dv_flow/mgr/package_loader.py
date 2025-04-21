@@ -494,6 +494,10 @@ class PackageLoader(object):
                 desc=desc,
                 doc=doc,
                 srcinfo=taskdef.srcinfo)
+
+            if taskdef.iff is not None:
+                task.iff = taskdef.iff
+
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
             self._pkg_s[-1].add(task, taskdef.name)
@@ -506,6 +510,7 @@ class PackageLoader(object):
 
                 if task.uses is None:
                     raise Exception("Failed to link task %s" % taskdef.uses)
+                
             
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
 
@@ -592,6 +597,10 @@ class PackageLoader(object):
                 desc=desc,
                 doc=doc,
                 srcinfo=td.srcinfo)
+
+            if td.iff is not None:
+                st.iff = td.iff
+
             subtasks.append((td, st))
             task.subtasks.append(st)
             self._pkg_s[-1].add(st, td.name)

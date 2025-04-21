@@ -377,23 +377,50 @@ class TaskGraphBuilder(object):
         if not hierarchical:
             self._task_rundir_s.append([self.rundir])
 
+        # If the task has an enable condition, evaluate
+        # that now
+        iff = True
+        if task.iff is not None:
+            self._log.debug("Evaluate iff condition \"%s\"" % task.iff)
+            iff = self._expandParam(task.iff, eval)
+
+            if iff:
+                self._log.debug("Condition \"%s\" is true" % task.iff)
+            else:
+                self._log.debug("Condition \"%s\" is false" % task.iff)
+
         # Determine how to build this node
-        if self._isCompound(task):
-            ret = self._mkTaskCompoundNode(
-                task, 
-                name=name,
-                srcdir=srcdir,
-                params=params,
-                hierarchical=hierarchical,
-                eval=eval)
+        if iff:
+            if self._isCompound(task):
+                ret = self._mkTaskCompoundNode(
+                    task, 
+                    name=name,
+                    srcdir=srcdir,
+                    params=params,
+                    hierarchical=hierarchical,
+                    eval=eval)
+            else:
+                ret = self._mkTaskLeafNode(
+                    task, 
+                    name=name,
+                    srcdir=srcdir,
+                    params=params,
+                    hierarchical=hierarchical,
+                    eval=eval)
         else:
-            ret = self._mkTaskLeafNode(
-                task, 
+            if name is None:
+                name = task.name
+
+            # Create a null task
+            ret = TaskNodeLeaf(
                 name=name,
                 srcdir=srcdir,
                 params=params,
-                hierarchical=hierarchical,
-                eval=eval)
+                passthrough=task.passthrough,
+                consumes=task.consumes,
+                task=NullCallable(task.run),
+                iff=False)
+            self._task_node_m[name] = ret
 
         if not hierarchical:
             self._task_rundir_s.pop()
@@ -546,9 +573,11 @@ class TaskGraphBuilder(object):
             need_n = self._getTaskNode(need.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
-            self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
-            node.input.needs.append((need_n, False))
-#            node.needs.append((need_n, False))
+            elif need_n.iff:
+                self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
+                node.input.needs.append((need_n, False))
+            else:
+                self._log.debug("Needed node %s is not enabled" % need_n.name)
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -613,17 +642,26 @@ class TaskGraphBuilder(object):
     def _expandParams(self, params, eval):
         for name in type(params).model_fields.keys():
             value = getattr(params, name)
-            if type(value) == str:
-                if value.find("${{") != -1:
-                    print("Expr: %s" % str(value), flush=True)
-                    new_val = eval.eval(value)
-                    self._log.debug("Param %s: Evaluate expression \"%s\" => \"%s\"" % (name, value, new_val))
-                    setattr(params, name, new_val)
-            elif isinstance(value, list):
-                for i,elem in enumerate(value):
-                    if elem.find("${{") != -1:
-                        new_val = eval.eval(elem)
-                        value[i] = new_val
+            new_val = self._expandParam(value, eval)
+            setattr(params, name, new_val)
+
+
+
+    def _expandParam(self, value, eval):
+        new_val = value
+        if type(value) == str:
+            if value.find("${{") != -1:
+                print("Expr: %s" % str(value), flush=True)
+                new_val = eval.eval(value)
+                self._log.debug("Param: Evaluate expression \"%s\" => \"%s\"" % (value, new_val))
+        elif isinstance(value, list):
+            new_val = []
+            for i,elem in enumerate(value):
+                if elem.find("${{") != -1:
+                    new_val.append(eval.eval(elem))
+                else:
+                    new_val.append(elem)
+        return new_val
 
     def _gatherNeeds(self, task_t, node):
         self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
