@@ -48,6 +48,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
             srcdir=srcdir, 
             params=params, 
             task=self.T, 
+            ctxt=None,
             needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
