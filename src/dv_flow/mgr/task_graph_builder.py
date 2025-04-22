@@ -422,6 +422,12 @@ class TaskGraphBuilder(object):
         else:
             if name is None:
                 name = task.name
+            
+            if params is None:
+                params = task.paramT()
+
+            if srcdir is None:
+                srcdir = os.path.dirname(task.srcinfo.file)
 
             # Create a null task
             ret = TaskNodeLeaf(
@@ -431,8 +437,10 @@ class TaskGraphBuilder(object):
                 passthrough=task.passthrough,
                 consumes=task.consumes,
                 task=NullCallable(task.run),
+                ctxt=None,
                 iff=False)
             self._task_node_m[name] = ret
+
 
         if not hierarchical:
             self._task_rundir_s.pop()
@@ -658,8 +666,6 @@ class TaskGraphBuilder(object):
             value = getattr(params, name)
             new_val = self._expandParam(value, eval)
             setattr(params, name, new_val)
-
-
 
     def _expandParam(self, value, eval):
         new_val = value

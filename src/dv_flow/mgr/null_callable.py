@@ -7,4 +7,5 @@ class NullCallable(object):
 
     async def __call__(self, ctxt, input):
         """Null callable that does nothing"""
+        print("__call__")
         return TaskDataResult()

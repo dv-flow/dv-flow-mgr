@@ -20,6 +20,19 @@ class TaskNodeLeaf(TaskNode):
                   runner,
                   rundir,
                   memento : Any = None) -> 'TaskDataResult':
+        try:
+            ret = await self._do_run(runner, rundir, memento)
+        except Exception as e:
+            print("Exception: %s" % str(e))
+            ret = TaskDataResult()
+            raise e
+
+        return ret
+
+    async def _do_run(self, 
+                  runner,
+                  rundir,
+                  memento : Any = None) -> 'TaskDataResult':
         self._log.debug("--> do_run: %s" % self.name)
         changed = False
         for dep,_ in self.needs:
