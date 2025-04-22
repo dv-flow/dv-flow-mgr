@@ -36,11 +36,6 @@ class TaskNodeLeaf(TaskNode):
         for i,(need,block) in enumerate(self.needs):
             self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
             if not block:
-                # This input also depends on all that came before
-                for j in range(i):
-                    if need.name not in dep_m.keys():
-                        dep_m[need.name] = []
-                    dep_m[need.name].append(self.needs[j][0].name)
                 for subdep in need.output.dep_m.keys():
                     if subdep not in dep_m.keys():
                         dep_m[subdep] = []
@@ -128,10 +123,7 @@ class TaskNodeLeaf(TaskNode):
 
         self.result.markers.extend(ctxt._markers)
 
-        output=self.result.output.copy()
-        for i,out in enumerate(output):
-            out.src = self.name
-            out.seq = i
+        output = []
 
         self._log.debug("output[1]: %s" % str(output))
 
@@ -176,6 +168,13 @@ class TaskNodeLeaf(TaskNode):
 #            dep_m = {
 #                self.name : []
 #            }
+
+        # Add our own output
+        local_out = self.result.output.copy()
+        for i,out in enumerate(local_out):
+            out.src = self.name
+            out.seq = i
+            output.append(out)
 
         self._log.debug("output dep_m: %s %s" % (self.name, str(dep_m)))
         self._log.debug("output[2]: %s" % str(output))
