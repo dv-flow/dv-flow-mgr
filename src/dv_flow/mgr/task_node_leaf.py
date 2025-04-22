@@ -57,31 +57,43 @@ class TaskNodeLeaf(TaskNode):
                             dep_m[subdep].append(dep)
         self._log.debug("input dep_m: %s %s" % (self.name, str(dep_m)))
 
-        sorted = toposort.toposort(dep_m)
+        # This gets the dependencies in topological order
+#        sorted = toposort.toposort(dep_m)
 
-        in_params_m = {}
-        added_srcs = set()
-        for need,block in self.needs:
-            self._log.debug("Process need=%s block=%s" % (need.name, block))
-            if not block:
-                for p in need.output.output:
-
-                    # Avoid adding parameters from a single task more than once
-                    key = (p.src, p.seq)
-                    if key not in added_srcs:
-                        added_srcs.add(key)
-                        if p.src not in in_params_m.keys():
-                            in_params_m[p.src] = []
-                        in_params_m[p.src].append(p)
-
-        # in_params holds parameter sets ordered by dependency
+        # Now, process the 'needs' in the order that they're listed
         in_params = []
-        for sorted_s in sorted:
-            self._log.debug("sorted_s: %s" % str(sorted_s))
-            for dep in sorted_s:
-                if dep in in_params_m.keys():
-                    self._log.debug("(%s) Extend with: %s" % (dep, str(in_params_m[dep])))
-                    in_params.extend(in_params_m[dep])
+        in_task_s = set()
+
+        for need, _ in self.needs:
+            if need in in_task_s:
+                continue
+            in_task_s.add(need)
+            in_params.extend(need.output.output)
+
+        # 
+        # in_params_m = {}
+        # added_srcs = set()
+        # for need,block in self.needs:
+        #     self._log.debug("Process need=%s block=%s" % (need.name, block))
+        #     if not block:
+        #         for p in need.output.output:
+
+        #             # Avoid adding parameters from a single task more than once
+        #             key = (p.src, p.seq)
+        #             if key not in added_srcs:
+        #                 added_srcs.add(key)
+        #                 if p.src not in in_params_m.keys():
+        #                     in_params_m[p.src] = []
+        #                 in_params_m[p.src].append(p)
+
+        # # in_params holds parameter sets ordered by dependency
+        # in_params = []
+        # for sorted_s in sorted:
+        #     self._log.debug("sorted_s: %s" % str(sorted_s))
+        #     for dep in sorted_s:
+        #         if dep in in_params_m.keys():
+        #             self._log.debug("(%s) Extend with: %s" % (dep, str(in_params_m[dep])))
+        #             in_params.extend(in_params_m[dep])
 
         self._log.debug("in_params[1]: %s" % ",".join(p.src for p in in_params))
 
@@ -210,6 +222,17 @@ class TaskNodeLeaf(TaskNode):
         if self.output is None:
             raise Exception("Task %s did not produce a result" % self.name)
         return self.result
+    
+    def _processNeed(self, need, in_params, in_task_s):
+        # Go depth-first
+        for nn, _ in need.needs:
+            self._processNeed(nn, in_params, in_task_s)
+
+        if need not in in_task_s:
+            in_params.extend(need.output.output)
+        
+
+
 
     def __hash__(self):
         return id(self)
