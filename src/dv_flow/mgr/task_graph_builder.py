@@ -494,6 +494,8 @@ class TaskGraphBuilder(object):
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
 
+        # TODO: handle callable in light of overrides
+
 
         callable = None
         if task.run is not None:
@@ -558,17 +560,25 @@ class TaskGraphBuilder(object):
         if task.uses is not None:
             # This is a compound task that is based on
             # another. Create the base implementation
+            task_uses = task.uses
+
+            if not self.in_uses():
+                # Determine whether this task is overridden
+                task_uses = self._findOverride(task_uses)
+
+            self.enter_uses()
             node = self._mkTaskNode(
-                task.uses,
+                task_uses,
                 name=name, 
                 srcdir=srcdir,
                 params=params,
                 hierarchical=True,
                 eval=eval)
+            self.leave_uses()
             
             if not isinstance(node, TaskNodeCompound):
                 # TODO: need to enclose the leaf node in a compound wrapper
-                raise Exception("Task %s is not compound" % task.uses)
+                raise Exception("Task %s is not compound" % task_uses)
         else:
             # Node represents the terminal node of the sub-DAG
             node = TaskNodeCompound(
@@ -704,4 +714,7 @@ class TaskGraphBuilder(object):
 
     def marker(self, marker):
         self.marker_l(marker)
+
+    def _findOverride(self, task):
+        return task
 

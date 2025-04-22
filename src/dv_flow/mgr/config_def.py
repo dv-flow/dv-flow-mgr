@@ -27,7 +27,7 @@ class ConfigDef(BaseModel):
         description="Name of the configuration to use as a base")
     overrides : List[OverrideDef] = pdc.Field(
         default_factory=list,
-        description="List of package and task overrides")
+        description="List of package overrides")
     extensions : List[ExtendDef] = pdc.Field(
         default_factory=list,
         description="List of extensions to apply")

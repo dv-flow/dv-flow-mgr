@@ -667,12 +667,18 @@ class PackageLoader(object):
             st.rundir = rundir
 
             for need in td.needs:
+                nn = None
                 if isinstance(need, str):
-                    st.needs.append(self._findTask(need))
+                    nn = self._findTask(need)
                 elif isinstance(need, TaskDef):
-                    st.needs.append(self._findTask(need.name))
+                    nn = self._findTask(need.name)
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
+                
+                if nn is None:
+                    raise Exception("failed to find task %s" % need)
+                
+                st.needs.append(nn)
 
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, td)
