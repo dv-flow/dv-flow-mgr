@@ -676,7 +676,8 @@ class PackageLoader(object):
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
                 if nn is None:
-                    raise Exception("failed to find task %s" % need)
+                    self.error("failed to find task %s" % need, td.srcinfo)
+#                    raise Exception("failed to find task %s" % need)
                 
                 st.needs.append(nn)
 
