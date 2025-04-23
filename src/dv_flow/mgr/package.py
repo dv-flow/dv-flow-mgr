@@ -75,4 +75,59 @@ class Package(object):
             
     def __hash__(self):
         return id(self)
+    
+    def to_json(self, markers=None) -> dict:
+        """Convert package data to a JSON-compatible dictionary format.
+        
+        Args:
+            markers: Optional list of marker objects, each with 'msg' and 'severity' attributes
+        
+        Returns:
+            dict: Dictionary containing required package data and markers
+        """
+        # Collect all imported packages recursively
+        imports = set()
+        def collect_imports(pkg):
+            for name, p in pkg.pkg_m.items():
+                if name not in imports:
+                    imports.add(name)
+                    collect_imports(p)
+        collect_imports(self)
+        
+        # Get files from fragments
+        files = []
+        for frag in self.fragment_def_l:
+            if frag.srcinfo and frag.srcinfo.file:
+                files.append(frag.srcinfo.file)
 
+        def format_srcinfo(srcinfo):
+            if srcinfo:
+                ret = srcinfo.file
+                if srcinfo.lineno != -1:
+                    ret += ":" + str(srcinfo.lineno)
+                if srcinfo.linepos != -1:
+                    ret += ":" + str(srcinfo.linepos)
+                return ret
+            return None
+        result = {
+            "name": self.name,
+            "file": self.srcinfo.file if self.srcinfo else None,
+            "imports": sorted(list(imports)),
+            "files": files,
+            "markers": [],
+            "tasks": [
+                {
+                    "name": name,
+                    "srcinfo": format_srcinfo(task.srcinfo)
+                }
+                for name, task in self.task_m.items()
+            ]
+        }
+        
+        if markers:
+            result["markers"] = [
+                {"msg": marker.msg, "severity": marker.severity}
+                for marker in markers
+            ]
+            
+        return result

@@ -37,7 +37,6 @@ def loadProjPkgDef(path, listener=None):
                 if "package" in data.keys():
                     found = True
                     listeners = [listener] if listener is not None else []
-                    found = True
                     ret = PackageLoader(marker_listeners=listeners).load(os.path.join(dir, "flow.dv"))
                     break
         dir = os.path.dirname(dir)
