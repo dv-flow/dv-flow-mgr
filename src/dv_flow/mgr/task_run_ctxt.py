@@ -66,6 +66,13 @@ class TaskRunCtxt(object):
         if status != 0:
             self.error("Command failed: %s" % " ".join(cmd))
 
+        if logfilter is not None:
+            with open(os.path.join(self.rundir, logfile), "r") as fp:
+                for line in fp.readlines():
+                    if logfilter(line):
+                        self.info(line.strip())
+                logfilter("")
+
         return status
 
     def create(self, path, content):
