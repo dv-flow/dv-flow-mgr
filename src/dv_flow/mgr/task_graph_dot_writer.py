@@ -48,8 +48,30 @@ class TaskGraphDotWriter(object):
             self._node_id += 1
             node_name = "n%d" % node_id
             self._node_id_m[node] = node_name
-            self.println("%s[label=\"%s\"];" % (node_name, node.name))
+            self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
+                node_name, 
+                node.name,
+                self._genLeafTooltip(node)))
         self._log.debug("<-- build_node %s (%d)" % (node.name, len(node.needs),))
+
+    def _genLeafTooltip(self, node):
+        params = type(node.params).model_fields
+        ret = ""
+        if len(params):
+            ret += "Parameters:\\n"
+            for k in type(node.params).model_fields.keys():
+                ret += "- %s: " % k
+                v = getattr(node.params, k)
+                if isinstance(v, str):
+                    ret += "%s" % v
+                elif isinstance(v, list):
+                    ret += "[%s]" % ", ".join([str(x) for x in v])
+                elif isinstance(v, dict):
+                    ret += "{%s}" % ", ".join(["%s: %s" % (str(k), str(v)) for k,v in v.items()])
+                else:
+                    ret += "%s" % str(v)
+                ret += "\\n"
+        return ret
 
     def process_needs(self, node):
         self._log.debug("--> process_needs %s (%d)" % (node.name, len(node.needs),))
@@ -99,13 +121,17 @@ class TaskGraphDotWriter(object):
         self.println("subgraph cluster_%d {" % id)
         self.inc_ind()
         self.println("label=\"%s\";" % node.name)
+        self.println("tooltip=\"%s\";" % self._genLeafTooltip(node))
         self.println("color=blue;")
         self.println("style=dashed;")
 
         task_node_id = self._node_id
         self._node_id += 1
         task_node_name = "n%d" % task_node_id
-        self.println("%s[label=\"%s\"];" % (task_node_name, node.name))
+        self.println("%s[label=\"%s\", tooltip=\"%s\"];" % (
+            task_node_name, 
+            node.name,
+            self._genLeafTooltip(node)))
         self._node_id_m[node] = task_node_name
 
         for n in node.tasks:
@@ -119,7 +145,10 @@ class TaskGraphDotWriter(object):
                 node_name = "n%d" % node_id
                 self._node_id_m[n] = node_name
                 leaf_name = n.name[n.name.rfind(".") + 1:]
-                self.println("%s[label=\"%s\"];" % (node_name, leaf_name))
+                self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
+                    node_name, 
+                    leaf_name,
+                    self._genLeafTooltip(n)))
         self.dec_ind()
         self.println("}")
 
