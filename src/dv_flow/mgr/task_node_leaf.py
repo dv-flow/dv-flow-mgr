@@ -65,10 +65,9 @@ class TaskNodeLeaf(TaskNode):
         in_task_s = set()
 
         for need, _ in self.needs:
-            if need in in_task_s:
-                continue
-            in_task_s.add(need)
-            in_params.extend(need.output.output)
+            if need not in in_task_s:
+                in_task_s.add(need)
+                in_params.extend(need.output.output)
 
         # 
         # in_params_m = {}
