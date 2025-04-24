@@ -86,11 +86,11 @@ class Package(object):
             dict: Dictionary containing required package data and markers
         """
         # Collect all imported packages recursively
-        imports = set()
+        imports = {}
         def collect_imports(pkg):
             for name, p in pkg.pkg_m.items():
-                if name not in imports:
-                    imports.add(name)
+                if name not in imports.keys():
+                    imports[name] = p.basedir
                     collect_imports(p)
         collect_imports(self)
         
