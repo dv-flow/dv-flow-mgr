@@ -82,6 +82,12 @@ package:
         type: str
       content:
         type: str
+  - name: IncDirs
+    shell: pytask
+    run: dv_flow.mgr.std.incdirs.IncDirs
+    doc: |
+      Creates a list of include directories from a set of
+      input files.
   - name: Exec
     shell: pytask
     run: dv_flow.mgr.std.exec.Exec
