@@ -116,6 +116,18 @@ package:
         doc: |
           Optional timestamp file to determine if running 
           the command changed the output
+
+  - name: DataItem
+    shell: pytask
+    run: dv_flow.mgr.std.data_item.DataItem
+    doc: |
+      Creates and outputs a data item
+    with:
+      type:
+        type: str
+        value: ""
+      with:
+        type: dict
   types:
   - name: DataItem
     with:
