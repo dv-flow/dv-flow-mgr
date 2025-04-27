@@ -7,10 +7,8 @@ from .param_def import ParamDef
 
 class OverrideDef(BaseModel):
     """Override definition"""
-    package : Union[str, None] = pdc.Field(
-        description="Package to override")
-    task : Union[str, None] = pdc.Field(
-        description="Task to override")
+    override : Union[str, None] = pdc.Field(
+        description="Task or package to override")
     value : str = pdc.Field(
         description="Override to use",
         alias="with")
