@@ -129,7 +129,7 @@ class TaskDef(BaseModel):
     needs : List[Union[str]] = dc.Field(
         default_factory=list, 
         description="List of tasks that this task depends on")
-    params: Dict[str,Union[str,list,ParamDef]] = dc.Field(
+    params: Dict[str,Union[str,list,bool,ParamDef]] = dc.Field(
         default_factory=dict, 
         alias="with",
         description="Parameters for the task")

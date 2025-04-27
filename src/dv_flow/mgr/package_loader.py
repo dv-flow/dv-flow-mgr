@@ -312,7 +312,8 @@ class PackageLoader(object):
                             loc_s += "." + str(el)
                         else:
                             loc_s = str(el)
-                        obj = obj[el]
+                        if hasattr(obj, "__getitem__"):
+                            obj = obj[el]
                         if type(obj) == dict and 'srcinfo' in obj.keys():
                             loc = obj['srcinfo']
                     if loc is not None:
@@ -824,17 +825,18 @@ class PackageLoader(object):
                     field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
             else:
-                if p not in field_m.keys():
-                    raise Exception("Field %s not found" % p)
-                if type(param) != dict:
-                    value = param
-                elif "value" in param.keys():
-                    value = param["value"]
+                if p in field_m.keys():
+                    if type(param) != dict:
+                        value = param
+                    elif "value" in param.keys():
+                        value = param["value"]
+                    else:
+                        raise Exception("No value specified for param %s: %s" % (
+                            p, str(param)))
+                    field_m[p] = (field_m[p][0], value)
+                    self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
                 else:
-                    raise Exception("No value specified for param %s: %s" % (
-                        p, str(param)))
-                field_m[p] = (field_m[p][0], value)
-                self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
+                    self.error("Field %s not found in task %s" % (p, taskdef.name), taskdef.srcinfo)
 
         if typename is not None:
             field_m["type"] = (str, typename)
