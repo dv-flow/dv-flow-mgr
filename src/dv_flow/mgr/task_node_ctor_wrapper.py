@@ -28,6 +28,7 @@ import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Tuple
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
+from .task_def import PassthroughE, ConsumesE
 from .param import Param
 from .task_node import TaskNode
 from .task_node_leaf import TaskNodeLeaf
@@ -47,6 +48,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
             srcdir=srcdir, 
             params=params, 
             task=self.T, 
+            ctxt=None,
             needs=needs)
         node.passthrough = self.passthrough
         node.consumes = self.consumes
@@ -87,7 +89,7 @@ class TaskNodeCtorWrapper(TaskNodeCtor):
                     setattr(obj, key, value)
         return obj
     
-def task(paramT,passthrough=False,consumes=None):
+def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
     """Decorator to wrap a task method as a TaskNodeCtor"""
     def wrapper(T):
         task_mname = T.__module__

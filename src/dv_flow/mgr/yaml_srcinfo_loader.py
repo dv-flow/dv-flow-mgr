@@ -4,6 +4,7 @@ from yaml.loader import SafeLoader
 class YamlSrcInfoLoader(SafeLoader):
     scopes = {
         "tasks",
+        "types",
         "body",
         "package",
         "fragment"

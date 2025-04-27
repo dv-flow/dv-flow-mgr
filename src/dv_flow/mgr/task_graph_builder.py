@@ -22,10 +22,12 @@
 import os
 import dataclasses as dc
 import logging
+import pydantic
 from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader import PackageLoader
+from .param_ref_eval import ParamRefEval
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
@@ -38,7 +40,9 @@ from .task_node_ctor_proxy import TaskNodeCtorProxy
 from .task_node_ctor_task import TaskNodeCtorTask
 from .task_node_ctor_wrapper import TaskNodeCtorWrapper
 from .task_node_compound import TaskNodeCompound
+from .task_node_ctxt import TaskNodeCtxt
 from .task_node_leaf import TaskNodeLeaf
+from .type import Type
 from .std.task_null import TaskNull
 from .exec_callable import ExecCallable
 from .null_callable import NullCallable
@@ -64,16 +68,21 @@ class TaskGraphBuilder(object):
     loader : PackageLoader = None
     marker_l : Callable = lambda *args, **kwargs: None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
+    _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
     _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
     _task_m : Dict[str,Task] = dc.field(default_factory=dict)
+    _type_m : Dict[str,Type] = dc.field(default_factory=dict)
     _task_node_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
+    _type_node_m : Dict[str,Any] = dc.field(default_factory=dict)
     _task_ctor_m : Dict[Task,TaskNodeCtor] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
     _task_node_s : List[TaskNode] = dc.field(default_factory=list)
+    _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+    _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
 
     _log : logging.Logger = None
@@ -82,18 +91,63 @@ class TaskGraphBuilder(object):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
         self._shell_m.update(ExtRgy.inst()._shell_m)
-        self._task_rundir_s.append([])
+        self._task_rundir_s.append([self.rundir])
+
+        self._eval.set("env", os.environ)
+
+
 
         if self.root_pkg is not None:
             # Collect all the tasks
             pkg_s = set()
+
+            self._ctxt = TaskNodeCtxt(
+                root_pkgdir=self.root_pkg.basedir,
+                root_rundir=self.rundir)
+
+            self._eval.set("root", {
+                "dir": self.root_pkg.basedir
+            })
+
+            params = self.root_pkg.paramT()
+
+            self._expandParams(params, self._eval)
+
+            for key in self.root_pkg.paramT.model_fields.keys():
+                self._eval.set(key, getattr(params, key))
+
+            self._pkg_params_m[self.root_pkg.name] = params
+
             self._addPackageTasks(self.root_pkg, pkg_s)
+        else:
+            self._ctxt = TaskNodeCtxt(
+                root_pkgdir=None,
+                root_rundir=self.rundir)
+
+
+    def setParam(self, name, value):
+        if self.root_pkg is None:
+            raise Exception("No root package")
+        params = self._pkg_params_m[self.root_pkg.name]
+
+        if not hasattr(params, name):
+            raise Exception("Package %s does not have parameter %s" % (self.root_pkg.name, name))
+        setattr(params, name, value)
 
     def _addPackageTasks(self, pkg, pkg_s):
+
+        # Build out the package parameters
+        params = pkg.paramT()
+        self._expandParams(params, self._eval)
+        self._pkg_params_m[pkg.name] = params
+        self._eval.set(pkg.name, params)
+
         if pkg not in pkg_s:
             pkg_s.add(pkg)
             for task in pkg.task_m.values():
                 self._addTask(task)
+            for tt in pkg.type_m.values():
+                self._addType(tt)
             for subpkg in pkg.pkg_m.values():
                 self._addPackageTasks(subpkg, pkg_s)
 
@@ -102,6 +156,10 @@ class TaskGraphBuilder(object):
             self._task_m[task.name] = task
             for st in task.subtasks:
                 self._addTask(st)
+
+    def _addType(self, tt):
+        if tt.name not in self._type_m.keys():
+            self._type_m[tt.name] = tt
 
     def addOverride(self, key : str, val : str):
         self._override_m[key] = val
@@ -220,10 +278,14 @@ class TaskGraphBuilder(object):
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
         
+        # TODO: need to obtain the package
+
+        
         ret = self._mkTaskNode(
             task, 
             name=name, 
-            srcdir=srcdir)
+            srcdir=srcdir,
+            eval=self._eval)
 
         if needs is not None:
             for need in needs:
@@ -238,6 +300,73 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
         return ret
     
+    def mkDataItem(self, name, **kwargs):
+        self._log.debug("--> mkDataItem: %s" % name)
+
+        if name in self._type_m.keys():
+            tt = self._type_m[name]
+        else:
+            raise Exception("Type %s does not exist" % name)
+        
+        if tt in self._type_node_m.keys():
+            tn = self._type_node_m[tt]
+        else:
+#            tn = self._mkDataItem(tt)
+            tn = tt.paramT
+            self._type_node_m[tt] = tn
+
+        ret = tn()
+
+        for k, v in kwargs.items():
+            if hasattr(ret, k):
+                setattr(ret, k, v)
+            else:
+                raise Exception("Data item %s parameters do not include %s" % (name, k))
+
+        self._log.debug("<-- mkDataItem: %s" % name)
+        return ret
+    
+    def _findType(self, pkg, name):
+        tt = None
+        if name in pkg.type_m.keys():
+            tt = pkg.type_m[name]
+        else:
+            for subpkg in pkg.pkg_m.values():
+                tt = self._findType(subpkg, name)
+                if tt is not None:
+                    break
+        return tt
+    
+    def _mkDataItem(self, tt : Type):
+        field_m = {}
+
+        # Save the type name in each instance 
+        field_m["type"] = (str, tt.name)
+        exclude_s = set()
+        exclude_s.add("type")
+
+        self._mkDataItemI(tt, field_m, exclude_s)
+
+        ret = pydantic.create_model(tt.name, **field_m)
+
+        return ret
+    
+    def _mkDataItemI(self, tt : Type, field_m, exclude_s):
+        # First, identify cases where the value is set
+        for pt in tt.params.values():
+            if pt.name not in exclude_s:
+                if pt.type is not None:
+                    # Defining a new attribute
+                    field_m[pt.name] = (str, pt.value)
+                else:
+                    # TODO: determine whether 
+                    field_m[pt.name] = (str, None)
+        if tt.uses is not None:
+            self._mkDataItemI(tt.uses, field_m, exclude_s)
+
+    def _applyParameterOverrides(self, obj, **kwargs):
+        pass
+    
     def _findTask(self, pkg, name):
         task = None
         if name in pkg.task_m.keys():
@@ -249,26 +378,69 @@ class TaskGraphBuilder(object):
                     break
         return task
     
-    def _mkTaskNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False):
+    def _mkTaskNode(self, 
+                    task : Task, 
+                    name=None, 
+                    srcdir=None, 
+                    params=None, 
+                    hierarchical=False,
+                    eval=None):
 
         if not hierarchical:
-            self._task_rundir_s.append([])
+            self._task_rundir_s.append([self.rundir])
+
+        # If the task has an enable condition, evaluate
+        # that now
+        iff = True
+        if task.iff is not None:
+            self._log.debug("Evaluate iff condition \"%s\"" % task.iff)
+            iff = self._expandParam(task.iff, eval)
+
+            if iff:
+                self._log.debug("Condition \"%s\" is true" % task.iff)
+            else:
+                self._log.debug("Condition \"%s\" is false" % task.iff)
 
         # Determine how to build this node
-        if self._isCompound(task):
-            ret = self._mkTaskCompoundNode(
-                task, 
-                name=name,
-                srcdir=srcdir,
-                params=params,
-                hierarchical=hierarchical)
+        if iff:
+            if self._isCompound(task):
+                ret = self._mkTaskCompoundNode(
+                    task, 
+                    name=name,
+                    srcdir=srcdir,
+                    params=params,
+                    hierarchical=hierarchical,
+                    eval=eval)
+            else:
+                ret = self._mkTaskLeafNode(
+                    task, 
+                    name=name,
+                    srcdir=srcdir,
+                    params=params,
+                    hierarchical=hierarchical,
+                    eval=eval)
         else:
-            ret = self._mkTaskLeafNode(
-                task, 
+            if name is None:
+                name = task.name
+            
+            if params is None:
+                params = task.paramT()
+
+            if srcdir is None:
+                srcdir = os.path.dirname(task.srcinfo.file)
+
+            # Create a null task
+            ret = TaskNodeLeaf(
                 name=name,
                 srcdir=srcdir,
                 params=params,
-                hierarchical=hierarchical)
+                passthrough=task.passthrough,
+                consumes=task.consumes,
+                task=NullCallable(task.run),
+                ctxt=None,
+                iff=False)
+            self._task_node_m[name] = ret
+
 
         if not hierarchical:
             self._task_rundir_s.pop()
@@ -287,7 +459,12 @@ class TaskGraphBuilder(object):
         else:
             return self.mkTaskNode(name)
     
-    def _mkTaskLeafNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
+    def _mkTaskLeafNode(self, 
+                        task : Task, name=None, 
+                        srcdir=None, 
+                        params=None, 
+                        hierarchical=False,
+                        eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
 
         if name is None:
@@ -299,8 +476,25 @@ class TaskGraphBuilder(object):
         if params is None:
             params = task.paramT()
 
+            eval.set("rundir", "/".join(self.get_rundir()))
+
+#            self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
+#            eval.setVar("in", in_params)
+#            eval.setVar("rundir", rundir)
+
+            # Set variables from the inputs
+            # for need in self.needs:
+            #     for name,value in {"rundir" : need[0].rundir}.items():
+            #         eval.setVar("%s.%s" % (need[0].name, name), value)
+
+            # expand any variable references
+            self._expandParams(params, eval)
+
+
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
+
+        # TODO: handle callable in light of overrides
 
 
         callable = None
@@ -318,6 +512,7 @@ class TaskGraphBuilder(object):
             name=name,
             srcdir=srcdir,
             params=params,
+            ctxt=self._ctxt,
             passthrough=task.passthrough,
             consumes=task.consumes,
             task=callable(task.run))
@@ -338,7 +533,13 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
-    def _mkTaskCompoundNode(self, task : Task, name=None, srcdir=None, params=None, hierarchical=False) -> TaskNode:
+    def _mkTaskCompoundNode(self, 
+                            task : Task, 
+                            name=None, 
+                            srcdir=None, 
+                            params=None, 
+                            hierarchical=False,
+                            eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
 
         if name is None:
@@ -350,28 +551,41 @@ class TaskGraphBuilder(object):
         if params is None:
             params = task.paramT()
 
+            # expand any variable references
+            self._expandParams(params, eval)
+
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
 
         if task.uses is not None:
             # This is a compound task that is based on
             # another. Create the base implementation
+            task_uses = task.uses
+
+            if not self.in_uses():
+                # Determine whether this task is overridden
+                task_uses = self._findOverride(task_uses)
+
+            self.enter_uses()
             node = self._mkTaskNode(
-                task.uses,
+                task_uses,
                 name=name, 
                 srcdir=srcdir,
                 params=params,
-                hierarchical=True)
+                hierarchical=True,
+                eval=eval)
+            self.leave_uses()
             
             if not isinstance(node, TaskNodeCompound):
                 # TODO: need to enclose the leaf node in a compound wrapper
-                raise Exception("Task %s is not compound" % task.uses)
+                raise Exception("Task %s is not compound" % task_uses)
         else:
             # Node represents the terminal node of the sub-DAG
             node = TaskNodeCompound(
                 name=name,
                 srcdir=srcdir,
-                params=params)
+                params=params,
+                ctxt=self._ctxt)
 
         if len(self._task_node_s):
             node.parent = self._task_node_s[-1]
@@ -391,9 +605,11 @@ class TaskGraphBuilder(object):
             need_n = self._getTaskNode(need.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
-            self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
-            node.input.needs.append((need_n, False))
-#            node.needs.append((need_n, False))
+            elif need_n.iff:
+                self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
+                node.input.needs.append((need_n, False))
+            else:
+                self._log.debug("Needed node %s is not enabled" % need_n.name)
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -402,7 +618,7 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
         for t in task.subtasks:
-            nn = self._mkTaskNode(t, hierarchical=True)
+            nn = self._mkTaskNode(t, hierarchical=True, eval=eval)
             node.tasks.append(nn)
 #            tasks.append((t, self._getTaskNode(t.name)))
             tasks.append((t, nn))
@@ -455,6 +671,28 @@ class TaskGraphBuilder(object):
 
         return node
 
+    def _expandParams(self, params, eval):
+        for name in type(params).model_fields.keys():
+            value = getattr(params, name)
+            new_val = self._expandParam(value, eval)
+            setattr(params, name, new_val)
+
+    def _expandParam(self, value, eval):
+        new_val = value
+        if type(value) == str:
+            if value.find("${{") != -1:
+                print("Expr: %s" % str(value), flush=True)
+                new_val = eval.eval(value)
+                self._log.debug("Param: Evaluate expression \"%s\" => \"%s\"" % (value, new_val))
+        elif isinstance(value, list):
+            new_val = []
+            for i,elem in enumerate(value):
+                if elem.find("${{") != -1:
+                    new_val.append(eval.eval(elem))
+                else:
+                    new_val.append(elem)
+        return new_val
+
     def _gatherNeeds(self, task_t, node):
         self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
         if task_t.uses is not None:
@@ -476,4 +714,7 @@ class TaskGraphBuilder(object):
 
     def marker(self, marker):
         self.marker_l(marker)
+
+    def _findOverride(self, task):
+        return task
 

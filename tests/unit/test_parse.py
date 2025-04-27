@@ -11,20 +11,20 @@ package:
   types:
   - name: T1
     with:
-    - name: F1
-      doc: "Field 1"
-      type: str
-    - name: F2
-      type:
-        list:
-          item: str
-    - name: F3
-      type:
-        map:
-          key: str
-          item:
-            list:
-              item: str
+      F1:
+        doc: "Field 1"
+        type: str
+      F2:
+        type:
+          list:
+            item: str
+      F3:
+        type:
+          map:
+            key: str
+            val:
+              list:
+                item: str
 """
 
     data = yaml.load(io.StringIO(flow_dv), yaml.FullLoader)

@@ -26,16 +26,17 @@ from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .srcinfo import SrcInfo
 from .task import Task
+from .type import Type
 
 @dc.dataclass
 class Package(object):
     pkg_def : PackageDef
     basedir : str = None
-    params : Dict[str,Any] = dc.field(default_factory=dict)
+    paramT : Any = None
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
-    types : Dict[str,Any] = dc.field(default_factory=dict)
+    type_m : Dict[str,Type] = dc.field(default_factory=dict)
     fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
     pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
     srcinfo : SrcInfo = None
@@ -53,16 +54,22 @@ class Package(object):
     
     def dump(self):
         tasks = {}
+        types = {}
         for k, v in self.task_m.items():
             tasks[k] = v.dump()
+        for k, v in self.type_m.items():
+            types[k] = v.dump()
 
         pkg = {
             "name": self.name,
             "basedir": self.basedir,
-            "params": self.params,
             "tasks": tasks,
+            "types": types,
             "fragments": [f.dump() for f in self.fragment_def_l]
         }
+
+        if self.paramT is not None:
+            pkg["paramT"] = self.paramT().model_dump()
 
         return pkg
             
@@ -79,11 +86,11 @@ class Package(object):
             dict: Dictionary containing required package data and markers
         """
         # Collect all imported packages recursively
-        imports = set()
+        imports = {}
         def collect_imports(pkg):
             for name, p in pkg.pkg_m.items():
-                if name not in imports:
-                    imports.add(name)
+                if name not in imports.keys():
+                    imports[name] = p.basedir
                     collect_imports(p)
         collect_imports(self)
         

@@ -122,21 +122,21 @@ def test_smoke_4(tmpdir):
     @task(Params)
     async def MyTask3(runner, input):
             nonlocal called
-            called.append(("MyTask3", input.params.p1))
+            print("inputs: %d" % len(input.inputs))
+            called.append(("MyTask3", [o.val for o in input.inputs]))
             return TaskDataResult()
 
     task1 = MyTask1(srcdir="srcdir", p1="1")
     task2 = MyTask2(srcdir="srcdir", p1="2")
-    task3 = MyTask3(srcdir="srcdir", 
-                    p1="${{ in | jq('[.[] .val]') }}", 
-                    needs=[task1, task2])
+    task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
+#                    p1="${{ in | jq('[.[] .val]') }}", 
     runner = TaskSetRunner("rundir")
 
     result = asyncio.run(runner.run(task3))
 
     assert len(called) == 3
     assert called[-1][0] == "MyTask3"
-    assert called[-1][1] == "[1, 2]" or called[-1][1] == "[2, 1]"
+    assert called[-1][1] == [1, 2] or called[-1][1] == [2, 1]
 
 def test_smoke_5(tmpdir):
 
@@ -167,15 +167,15 @@ def test_smoke_5(tmpdir):
     @task(Params)
     async def MyTask3(runner, input):
             nonlocal called
-            called.append(("MyTask3", input.params.p1))
+            files = []
+            for inp in input.inputs:
+                  files.extend(inp.files)
+            called.append(("MyTask3", files))
             return TaskDataResult()
 
     task1 = MyTask1(srcdir="srcdir", p1="1")
     task2 = MyTask2(srcdir="srcdir", p1="2")
-    task3 = MyTask3(srcdir="srcdir", 
-                    p1="${{ in | jq('[.[] .files]') | jq('flatten') }}", 
-#                    p1="${{ in | jq('.[] .files') }}", 
-                    needs=[task1, task2])
+    task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
     runner = TaskSetRunner("rundir")
 
     result = asyncio.run(runner.run(task3))
@@ -214,15 +214,15 @@ def test_smoke_6(tmpdir):
     @task(Params)
     async def MyTask3(runner, input):
             nonlocal called
-            called.append(("MyTask3", input.params.p1))
+            files = []
+            for inp in input.inputs:
+                  files.extend(inp.files)
+            called.append(("MyTask3", files))
             return TaskDataResult()
 
     task1 = MyTask1(srcdir="srcdir", p1="3")
     task2 = MyTask2(srcdir="srcdir", p1=Param(append=["4"]))
-    task3 = MyTask3(srcdir="srcdir", 
-                    p1="${{ in | jq('[.[] .files]') | jq('flatten') }}", 
-#                    p1="${{ in | jq('.[] .files') }}", 
-                    needs=[task1, task2])
+    task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
     runner = TaskSetRunner("rundir")
 
     result = asyncio.run(runner.run(task3))

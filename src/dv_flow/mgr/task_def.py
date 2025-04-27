@@ -103,6 +103,10 @@ class TaskDef(BaseModel):
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
         description="Sub-tasks")
+    iff : Union[str, bool, Any] = dc.Field(
+        default=None,
+        title="Task enable condition",
+        description="Condition that must be true for this task to run")
     pytask : str = dc.Field(
         default=None,
         description="Python-based implementation (deprecated)")
@@ -125,7 +129,7 @@ class TaskDef(BaseModel):
     needs : List[Union[str]] = dc.Field(
         default_factory=list, 
         description="List of tasks that this task depends on")
-    params: Dict[str,Union[str,list,ParamDef]] = dc.Field(
+    params: Dict[str,Union[str,list,bool,ParamDef]] = dc.Field(
         default_factory=dict, 
         alias="with",
         description="Parameters for the task")

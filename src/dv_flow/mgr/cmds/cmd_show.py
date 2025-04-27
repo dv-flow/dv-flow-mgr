@@ -47,9 +47,9 @@ class CmdShow(object):
         if args.task is None:
             # Print out available tasks
             tasks = []
-            for task in pkg.tasks:
+            for task in pkg.task_m.values():
                 tasks.append(task)
-            for frag in pkg._fragment_l:
+            for frag in pkg.fragment_def_l:
                 for task in frag.tasks:
                     tasks.append(task)
             tasks.sort(key=lambda x: x.name)
@@ -66,7 +66,7 @@ class CmdShow(object):
                     "<no descripion>"
                 print("%s - %s" % (t.name.ljust(max_name_len), desc))
         else:
-            rundir = os.path.join(pkg._basedir, "rundir")
+            rundir = os.path.join(pkg.basedir, "rundir")
 
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
 

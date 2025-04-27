@@ -10,7 +10,6 @@ from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskMarker
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
-from .param_ref_eval import ParamRefEval
 from .param import Param
 
 @dc.dataclass
@@ -18,6 +17,19 @@ class TaskNodeLeaf(TaskNode):
     task : Callable[['TaskRunner','TaskDataInput'],'TaskDataResult'] = dc.field(default=None)
 
     async def do_run(self, 
+                  runner,
+                  rundir,
+                  memento : Any = None) -> 'TaskDataResult':
+        try:
+            ret = await self._do_run(runner, rundir, memento)
+        except Exception as e:
+            print("Exception: %s" % str(e))
+            ret = TaskDataResult()
+            raise e
+
+        return ret
+
+    async def _do_run(self, 
                   runner,
                   rundir,
                   memento : Any = None) -> 'TaskDataResult':
@@ -34,7 +46,7 @@ class TaskNodeLeaf(TaskNode):
         # TODO: Form dep-map from inputs
 
         dep_m = {}
-        for need,block in self.needs:
+        for i,(need,block) in enumerate(self.needs):
             self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
             if not block:
                 for subdep in need.output.dep_m.keys():
@@ -45,45 +57,46 @@ class TaskNodeLeaf(TaskNode):
                             dep_m[subdep].append(dep)
         self._log.debug("input dep_m: %s %s" % (self.name, str(dep_m)))
 
-        sorted = toposort.toposort(dep_m)
+        # This gets the dependencies in topological order
+#        sorted = toposort.toposort(dep_m)
 
-        in_params_m = {}
-        added_srcs = set()
-        for need,block in self.needs:
-            self._log.debug("Process need=%s block=%s" % (need.name, block))
-            if not block:
-                for p in need.output.output:
-
-                    # Avoid adding parameters from a single task more than once
-                    key = (p.src, p.seq)
-                    if key not in added_srcs:
-                        added_srcs.add(key)
-                        if p.src not in in_params_m.keys():
-                            in_params_m[p.src] = []
-                        in_params_m[p.src].append(p)
-
-        # in_params holds parameter sets ordered by dependency
+        # Now, process the 'needs' in the order that they're listed
         in_params = []
-        for sorted_s in sorted:
-            self._log.debug("sorted_s: %s" % str(sorted_s))
-            for dep in sorted_s:
-                if dep in in_params_m.keys():
-                    self._log.debug("(%s) Extend with: %s" % (dep, str(in_params_m[dep])))
-                    in_params.extend(in_params_m[dep])
+        in_task_s = set()
+
+        for need, _ in self.needs:
+            if need not in in_task_s:
+                in_task_s.add(need)
+                in_params.extend(need.output.output)
+
+        # 
+        # in_params_m = {}
+        # added_srcs = set()
+        # for need,block in self.needs:
+        #     self._log.debug("Process need=%s block=%s" % (need.name, block))
+        #     if not block:
+        #         for p in need.output.output:
+
+        #             # Avoid adding parameters from a single task more than once
+        #             key = (p.src, p.seq)
+        #             if key not in added_srcs:
+        #                 added_srcs.add(key)
+        #                 if p.src not in in_params_m.keys():
+        #                     in_params_m[p.src] = []
+        #                 in_params_m[p.src].append(p)
+
+        # # in_params holds parameter sets ordered by dependency
+        # in_params = []
+        # for sorted_s in sorted:
+        #     self._log.debug("sorted_s: %s" % str(sorted_s))
+        #     for dep in sorted_s:
+        #         if dep in in_params_m.keys():
+        #             self._log.debug("(%s) Extend with: %s" % (dep, str(in_params_m[dep])))
+        #             in_params.extend(in_params_m[dep])
 
         self._log.debug("in_params[1]: %s" % ",".join(p.src for p in in_params))
 
-        # Create an evaluator for substituting param values
-        eval = ParamRefEval()
 
-        self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
-        eval.setVar("in", in_params)
-        eval.setVar("rundir", rundir)
-
-        # Set variables from the inputs
-        for need in self.needs:
-            for name,value in {"rundir" : need[0].rundir}.items():
-                eval.setVar("%s.%s" % (need[0].name, name), value)
 
         # Default inputs is the list of parameter sets that match 'consumes'
         inputs = []
@@ -98,19 +111,6 @@ class TaskNodeLeaf(TaskNode):
         else:
             self._log.debug("consumes(unknown): %s" % str(self.consumes))
 
-        for name,field in type(self.params).model_fields.items():
-            value = getattr(self.params, name)
-            if type(value) == str:
-                if value.find("${{") != -1:
-                    new_val = eval.eval(value)
-                    self._log.debug("Param %s: Evaluate expression \"%s\" => \"%s\"" % (name, value, new_val))
-                    setattr(self.params, name, new_val)
-            elif isinstance(value, list):
-                for i,elem in enumerate(value):
-                    if elem.find("${{") != -1:
-                        new_val = eval.eval(elem)
-                        value[i] = new_val
-
         input = TaskDataInput(
             name=self.name,
             changed=changed,
@@ -120,7 +120,10 @@ class TaskNodeLeaf(TaskNode):
             inputs=inputs,
             memento=memento)
         
-        ctxt = TaskRunCtxt(runner=runner, rundir=input.rundir)
+        ctxt = TaskRunCtxt(
+            runner=runner, 
+            ctxt=self.ctxt,
+            rundir=input.rundir)
 
         self._log.debug("--> Call task method %s" % str(self.task))
         try:
@@ -144,10 +147,7 @@ class TaskNodeLeaf(TaskNode):
 
         self.result.markers.extend(ctxt._markers)
 
-        output=self.result.output.copy()
-        for i,out in enumerate(output):
-            out.src = self.name
-            out.seq = i
+        output = []
 
         self._log.debug("output[1]: %s" % str(output))
 
@@ -193,6 +193,13 @@ class TaskNodeLeaf(TaskNode):
 #                self.name : []
 #            }
 
+        # Add our own output
+        local_out = self.result.output.copy()
+        for i,out in enumerate(local_out):
+            out.src = self.name
+            out.seq = i
+            output.append(out)
+
         self._log.debug("output dep_m: %s %s" % (self.name, str(dep_m)))
         self._log.debug("output[2]: %s" % str(output))
 
@@ -214,6 +221,17 @@ class TaskNodeLeaf(TaskNode):
         if self.output is None:
             raise Exception("Task %s did not produce a result" % self.name)
         return self.result
+    
+    def _processNeed(self, need, in_params, in_task_s):
+        # Go depth-first
+        for nn, _ in need.needs:
+            self._processNeed(nn, in_params, in_task_s)
+
+        if need not in in_task_s:
+            in_params.extend(need.output.output)
+        
+
+
 
     def __hash__(self):
         return id(self)

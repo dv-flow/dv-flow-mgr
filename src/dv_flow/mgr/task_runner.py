@@ -126,11 +126,14 @@ class TaskSetRunner(TaskRunner):
 
                     # TaskNode rundir is a list of path elements relative
                     # to the root rundir
-                    rundir = self.rundir
+                    rundir = ""
 
-                    for rundir_e in t.rundir:
-                        rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
-                        rundir = os.path.join(rundir, rundir_e)
+                    for i, rundir_e in enumerate(t.rundir):
+                        if i:
+                            rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
+                            rundir = os.path.join(rundir, rundir_e)
+                        else:
+                            rundir = rundir_e
 
                     # if t.rundir_t == RundirE.Unique:
                     #     # Replace invalid characters with the replacement string.

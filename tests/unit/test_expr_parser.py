@@ -13,4 +13,13 @@ def test_smoke():
     expr = parser.parse(content)
     print("Expr: %s" % ExprVisitor2String.toString(expr))
 
+def test_hier_path():
+#    content = "in | jq('.[] | select(.name == \"foo\")') | out"
+    content = "env.HOME.foo"
 
+    parser = ExprParser()
+    expr = parser.parse(content)
+    print("Expr: %s" % ExprVisitor2String.toString(expr))
+
+    expr = parser.parse(content)
+    print("Expr: %s" % ExprVisitor2String.toString(expr))

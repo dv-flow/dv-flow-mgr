@@ -5,6 +5,7 @@ import pydantic.dataclasses as pdc
 import os
 from typing import List
 from .task_data import TaskMarker, SeverityE, TaskMarkerLoc
+from .task_node_ctxt import TaskNodeCtxt
 
 class ExecInfo(BaseModel):
     cmd : List[str] = pdc.Field(default_factory=list)
@@ -13,9 +14,19 @@ class ExecInfo(BaseModel):
 @dc.dataclass
 class TaskRunCtxt(object):
     runner : 'TaskRunner'
+    ctxt : TaskNodeCtxt
     rundir : str
+
     _markers : List[TaskMarker] = dc.field(default_factory=list)
     _exec_info : List[ExecInfo] = dc.field(default_factory=list)
+
+    @property
+    def root_pkgdir(self):
+        return self.ctxt.root_pkgdir
+    
+    @property
+    def root_rundir(self):
+        return self.ctxt.root_rundir
 
     async def exec(self, 
                    cmd : List[str],
@@ -54,6 +65,13 @@ class TaskRunCtxt(object):
 
         if status != 0:
             self.error("Command failed: %s" % " ".join(cmd))
+
+        if logfilter is not None:
+            with open(os.path.join(self.rundir, logfile), "r") as fp:
+                for line in fp.readlines():
+                    if logfilter(line):
+                        self.info(line.strip())
+                logfilter("")
 
         return status
 

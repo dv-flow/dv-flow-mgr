@@ -19,6 +19,7 @@
 #*     Author: 
 #*
 #****************************************************************************
+import enum
 from typing import Any, List, Union
 from pydantic import BaseModel, Field, model_validator
 
@@ -30,7 +31,7 @@ class MapType(BaseModel):
 #    key : Union[str, 'ComplexType']
 #    item : Union[str, 'ComplexType']
     key : Union[str, Any]
-    item : Union[str, Any]
+    val : Union[str, Any]
 
 class ComplexType(BaseModel):
     list : Union[ListType, None] = None
@@ -38,10 +39,14 @@ class ComplexType(BaseModel):
 #    list : Union[Any, None] = None
 #    map : Union[Any, None] = None
 
+class VisibilityE(enum.Enum):
+    LOCAL = "local"
+    EXPORT = "export"
+
 class ParamDef(BaseModel):
     doc : str = None
     type : Union[str, 'ComplexType'] = None
-    derived : bool = Field(default=False)
+#    derived : bool = Field(default=False)
     value : Union[Any, None] = None
     append : Union[Any, None] = None
     prepend : Union[Any, None] = None
