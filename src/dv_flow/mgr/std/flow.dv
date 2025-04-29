@@ -127,7 +127,7 @@ package:
         type: str
         value: ""
       with:
-        type: dict
+        type: map
   types:
   - name: DataItem
     with:

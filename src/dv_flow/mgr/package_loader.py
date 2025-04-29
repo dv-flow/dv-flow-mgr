@@ -768,14 +768,16 @@ class PackageLoader(object):
             "int" : int,
             "float" : float,
             "bool" : bool,
-            "list" : List
+            "list" : List,
+            "map" : Dict
         }
         pdflt_m = {
             "str" : "",
             "int" : 0,
             "float" : 0.0,
             "bool" : False,
-            "list" : []
+            "list" : [],
+            "map" : {}
         }
 
         fields = []

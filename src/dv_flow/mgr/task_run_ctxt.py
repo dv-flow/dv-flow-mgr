@@ -27,6 +27,22 @@ class TaskRunCtxt(object):
     @property
     def root_rundir(self):
         return self.ctxt.root_rundir
+    
+    def mkDataItem(self, type, **kwargs):
+        """
+        Create a data item in the task's rundir. The data item will be
+        created in the task's rundir, and will be available to the
+        task's implementation.
+        """
+        try:
+            item = self.runner.mkDataItem(
+                type=type,
+                rundir=self.rundir,
+                **kwargs)
+        except Exception as e:
+            self.error("Failed to create data item: %s" % str(e))
+            raise e
+        
 
     async def exec(self, 
                    cmd : List[str],
