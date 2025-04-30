@@ -21,26 +21,40 @@
 #****************************************************************************
 import dataclasses as dc
 import json
-from typing import Any, Callable, Dict, List
-from .expr_parser import ExprVisitor, Expr, ExprBin, ExprBinOp
+from typing import Any, Callable, Dict, List, Optional
+from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp
 from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt
+from .name_resolution import NameResolutionContext
 
 @dc.dataclass
 class ExprEval(ExprVisitor):
-    methods : Dict[str, Callable] = dc.field(default_factory=dict)
-    variables : Dict[str, object] = dc.field(default_factory=dict)
-    value : Any = None
+    methods: Dict[str, Callable] = dc.field(default_factory=dict)
+    name_resolution: Optional[NameResolutionContext] = None
+    variables: Dict[str, object] = dc.field(default_factory=dict)
+    value: Any = None
 
-    def set(self, name : str, value : object):
+    def set(self, name: str, value: object):
         self.variables[name] = value
 
-    def eval(self, e : Expr) -> str:
-        self.value = None
-        e.accept(self)
+    def set_name_resolution(self, ctx: NameResolutionContext):
+        self.name_resolution = ctx
 
-        val = self._toString(self.value)
+    def eval(self, expr_s: str) -> str:
+        if expr_s is None:
+            return None
+        elif isinstance(expr_s, Expr):
+            expr_s.accept(self)
+            return self._toString(self.value)
+        elif isinstance(expr_s, bool):
+            return expr_s
+        else:
+            parser = ExprParser()
+            ast = parser.parse(expr_s)
 
-        return val
+            self.value = None
+            ast.accept(self)
+            val = self._toString(self.value)
+            return val
     
     def _toString(self, val):
         rval = val
@@ -48,11 +62,6 @@ class ExprEval(ExprVisitor):
             obj = self._toObject(val)
             rval = json.dumps(obj)
         return rval
-#        if isinstance(val, list):
-#            val = '[' + ",".join(self._toString(v) for v in val) + ']'
-#        elif hasattr(val, "model_dump_json"):
-#            val = val.model_dump_json()
-#        return val
     
     def _toObject(self, val):
         rval = val
@@ -63,33 +72,47 @@ class ExprEval(ExprVisitor):
 
         return rval
 
-    def visitExprHId(self, e : ExprHId):
-        print("Hid: %s" % ".".join(e.id))
-        if e.id[0] in self.variables:
-            # Always represent data as a JSON object
-            root = self.variables[e.id[0]]
-            for i in range(1, len(e.id)):
-                if isinstance(root, dict):
-                    if e.id[i] in root.keys():
-                        root = root[e.id[i]]
-                    else:
-                        raise Exception("Sub-element '%s' not found in '%s'" % (e.id[i], ".".join(e.id)))
-                elif hasattr(root, e.id[i]):
-                    root = getattr(root, e.id[i])
-                else:
-                    raise Exception("Sub-element '%s' not found in '%s'" % (e.id[i], ".".join(e.id)))
-            self.value = root
-        else:
+    def visitExprHId(self, e: ExprHId):
+        # First try to resolve using name resolution context
+        value = None
+
+        if self.name_resolution:
+            value = self.name_resolution.resolve_variable(e.id[0])
+
+        # Fall back to variables dict
+        if value is None and e.id[0] in self.variables:
+            value = self.variables[e.id[0]]
+
+        if value is None:
             raise Exception("Variable '%s' not found" % e.id[0])
 
-    def visitExprId(self, e : ExprId):
+        for i in range(1, len(e.id)):
+            if isinstance(value, dict):
+                if e.id[i] in value.keys():
+                    value = value[e.id[i]]
+                else:
+                    raise Exception("Sub-element '%s' not found in '%s'" % (e.id[i], ".".join(e.id)))
+            elif hasattr(value, e.id[i]):
+                value = getattr(value, e.id[i])
+            else:
+                raise Exception("Sub-element '%s' not found in '%s' (%s)" % (e.id[i], ".".join(e.id), value))
+        self.value = value
+
+    def visitExprId(self, e: ExprId):
+        # First try to resolve using name resolution context
+        if self.name_resolution:
+            resolved = self.name_resolution.resolve_variable(e.id)
+            if resolved is not None:
+                self.value = resolved
+                return
+
+        # Fall back to variables dict
         if e.id in self.variables:
-            # Always represent data as a JSON object
             self.value = self._toObject(self.variables[e.id])
         else:
             raise Exception("Variable '%s' not found" % e.id)
 
-    def visitExprString(self, e : ExprString):
+    def visitExprString(self, e: ExprString):
         self.value = e.value
     
     def visitExprBin(self, e):
@@ -101,7 +124,7 @@ class ExprEval(ExprVisitor):
         elif e.op == ExprBinOp.Plus:
             pass
     
-    def visitExprCall(self, e : ExprCall):
+    def visitExprCall(self, e: ExprCall):
         if e.id in self.methods:
             # Need to gather up argument values
             in_value = self.value
@@ -115,5 +138,5 @@ class ExprEval(ExprVisitor):
         else:
             raise Exception("Method %s not found" % e.id)
         
-    def visitExprInt(self, e : ExprInt):
+    def visitExprInt(self, e: ExprInt):
         self.value = e.value

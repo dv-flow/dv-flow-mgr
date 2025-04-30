@@ -28,17 +28,13 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader import PackageLoader
 from .param_ref_eval import ParamRefEval
+from .name_resolution import NameResolutionContext, TaskNameResolutionScope
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
-from .task_node_ctor_compound import TaskNodeCtorCompound
-from .task_node_ctor_compound_proxy import TaskNodeCtorCompoundProxy
-from .task_node_ctor_proxy import TaskNodeCtorProxy
-from .task_node_ctor_task import TaskNodeCtorTask
-from .task_node_ctor_wrapper import TaskNodeCtorWrapper
 from .task_node_compound import TaskNodeCompound
 from .task_node_ctxt import TaskNodeCtxt
 from .task_node_leaf import TaskNodeLeaf
@@ -80,6 +76,7 @@ class TaskGraphBuilder(object):
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
+    _name_resolution_stack : List[NameResolutionContext] = dc.field(default_factory=list)
     _task_node_s : List[TaskNode] = dc.field(default_factory=list)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _ctxt : TaskNodeCtxt = None
@@ -135,6 +132,8 @@ class TaskGraphBuilder(object):
         setattr(params, name, value)
 
     def _addPackageTasks(self, pkg, pkg_s):
+
+        self._pkg_m[pkg.name] = pkg
 
         # Build out the package parameters
         params = pkg.paramT()
@@ -265,40 +264,75 @@ class TaskGraphBuilder(object):
     def mkTaskGraph(self, task : str, rundir=None) -> TaskNode:
         return self.mkTaskNode(task, rundir=rundir)
         
+    def push_name_resolution_context(self, pkg: Package):
+        """Create and push a new name resolution context"""
+        ctx = NameResolutionContext(
+            builder=self,
+            package=pkg)
+        self._name_resolution_stack.append(ctx)
+
+    def pop_name_resolution_context(self):
+        """Pop the current name resolution context"""
+        if self._name_resolution_stack:
+            self._name_resolution_stack.pop()
+
+    def push_task_scope(self, task: TaskNode):
+        """Push a new task scope onto the current context"""
+        if self._name_resolution_stack:
+            scope = TaskNameResolutionScope(task=task)
+            # Add task parameters as 'this' in the scope's variables
+            if isinstance(task, TaskNodeCompound):
+                scope.variables['this'] = task.params
+            self._name_resolution_stack[-1].task_scopes.append(scope)
+
+    def pop_task_scope(self):
+        """Pop the current task scope"""
+        if self._name_resolution_stack and self._name_resolution_stack[-1].task_scopes:
+            self._name_resolution_stack[-1].task_scopes.pop()
+
+    def resolve_variable(self, name: str) -> Any:
+        """Resolve a variable using the current name resolution context"""
+        if self._name_resolution_stack:
+            ret = self._name_resolution_stack[-1].resolve_variable(name)
+        return ret
+
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
 
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
+            # Get the package for this task
+            self.push_name_resolution_context(task.package)
         elif self.loader is not None:
             task = self.loader.getTask(task_t)
-
             if task is None:
                 raise Exception("task_t (%s) not present" % str(task_t))
+            self.push_name_resolution_context(task.package)
         else:
             raise Exception("task_t (%s) not present" % str(task_t))
-        
-        # TODO: need to obtain the package
 
-        
-        ret = self._mkTaskNode(
-            task, 
-            name=name, 
-            srcdir=srcdir,
-            eval=self._eval)
+        try:
+            ret = self._mkTaskNode(
+                task, 
+                name=name, 
+                srcdir=srcdir,
+                eval=self._eval)
 
-        if needs is not None:
-            for need in needs:
-                ret.needs.append((need, False))
+            if needs is not None:
+                for need in needs:
+                    ret.needs.append((need, False))
 
-        for k,v in kwargs.items():
-            if hasattr(ret.params, k):
-                setattr(ret.params, k, v)
-            else:
-                raise Exception("Task %s parameters do not include %s" % (task.name, k))
+            for k,v in kwargs.items():
+                if hasattr(ret.params, k):
+                    setattr(ret.params, k, v)
+                else:
+                    raise Exception("Task %s parameters do not include %s" % (task.name, k))
 
-        self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
-        return ret
+            self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
+            return ret
+        finally:
+            # Clean up package context if we created one
+            self.pop_name_resolution_context()
     
     def mkDataItem(self, name, **kwargs):
         self._log.debug("--> mkDataItem: %s" % name)
@@ -475,20 +509,22 @@ class TaskGraphBuilder(object):
         
         if params is None:
             params = task.paramT()
-
             eval.set("rundir", "/".join(self.get_rundir()))
 
-#            self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
-#            eval.setVar("in", in_params)
-#            eval.setVar("rundir", rundir)
-
-            # Set variables from the inputs
-            # for need in self.needs:
-            #     for name,value in {"rundir" : need[0].rundir}.items():
-            #         eval.setVar("%s.%s" % (need[0].name, name), value)
-
-            # expand any variable references
-            self._expandParams(params, eval)
+        # Create and push task scope for parameter resolution
+        node = TaskNodeLeaf(
+            name=name,
+            srcdir=srcdir,
+            params=params,
+            ctxt=self._ctxt,
+            passthrough=task.passthrough,
+            consumes=task.consumes,
+            task=None)  # We'll set this later
+            
+        self.push_task_scope(node)
+        
+        # Now expand parameters in the scope context
+        self._expandParams(params, eval)
 
 
         if task.rundir == RundirE.Unique:
@@ -497,25 +533,16 @@ class TaskGraphBuilder(object):
         # TODO: handle callable in light of overrides
 
 
-        callable = None
+        # Setup the callable
         if task.run is not None:
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
-                callable = self._shell_m[shell]
+                node.task = self._shell_m[shell](task.run)
             else:
                 raise Exception("Shell %s not found" % shell)
         else:
-            callable = NullCallable
-
-        node = TaskNodeLeaf(
-            name=name,
-            srcdir=srcdir,
-            params=params,
-            ctxt=self._ctxt,
-            passthrough=task.passthrough,
-            consumes=task.consumes,
-            task=callable(task.run))
+            node.task = NullCallable(task.run)
         self._task_node_m[name] = node
         node.rundir = self.get_rundir()
 
@@ -530,6 +557,9 @@ class TaskGraphBuilder(object):
         if task.rundir == RundirE.Unique:
             self.leave_rundir()
 
+        # Clean up
+        self.pop_task_scope()
+        
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
@@ -554,6 +584,13 @@ class TaskGraphBuilder(object):
             # expand any variable references
             self._expandParams(params, eval)
 
+        # Create a new task scope for this compound task
+        node = TaskNodeCompound(
+            name=name,
+            srcdir=srcdir,
+            params=params,
+            ctxt=self._ctxt)
+
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
 
@@ -566,8 +603,9 @@ class TaskGraphBuilder(object):
                 # Determine whether this task is overridden
                 task_uses = self._findOverride(task_uses)
 
+            self.push_task_scope(node)  # Push scope before enter_uses
             self.enter_uses()
-            node = self._mkTaskNode(
+            uses_node = self._mkTaskNode(
                 task_uses,
                 name=name, 
                 srcdir=srcdir,
@@ -576,16 +614,18 @@ class TaskGraphBuilder(object):
                 eval=eval)
             self.leave_uses()
             
-            if not isinstance(node, TaskNodeCompound):
+            if not isinstance(uses_node, TaskNodeCompound):
                 # TODO: need to enclose the leaf node in a compound wrapper
                 raise Exception("Task %s is not compound" % task_uses)
+            
+            # Copy properties from uses_node to our node
+            node.tasks = uses_node.tasks
+            node.input = uses_node.input
+            node.needs = uses_node.needs
+            self.pop_task_scope()  # Pop the scope
         else:
             # Node represents the terminal node of the sub-DAG
-            node = TaskNodeCompound(
-                name=name,
-                srcdir=srcdir,
-                params=params,
-                ctxt=self._ctxt)
+            self.push_task_scope(node)  # Push scope for non-uses compound task
 
         if len(self._task_node_s):
             node.parent = self._task_node_s[-1]
@@ -617,10 +657,10 @@ class TaskGraphBuilder(object):
         # Need a local map of name -> task 
         # For now, build out local tasks and link up the needs
         tasks = []
+
         for t in task.subtasks:
             nn = self._mkTaskNode(t, hierarchical=True, eval=eval)
             node.tasks.append(nn)
-#            tasks.append((t, self._getTaskNode(t.name)))
             tasks.append((t, nn))
 
         # Pop the node stack, since we're done constructing the body
@@ -669,6 +709,10 @@ class TaskGraphBuilder(object):
         if task.rundir == RundirE.Unique:
             self.leave_rundir()
 
+        # Clean up task scope if we created one for a non-uses compound task
+        if not task.uses:
+            self.pop_task_scope()
+
         return node
 
     def _expandParams(self, params, eval):
@@ -681,14 +725,18 @@ class TaskGraphBuilder(object):
         new_val = value
         if type(value) == str:
             if value.find("${{") != -1:
-                print("Expr: %s" % str(value), flush=True)
+                if len(self._name_resolution_stack) > 0:
+                    eval.set_name_resolution(self._name_resolution_stack[-1])
                 new_val = eval.eval(value)
                 self._log.debug("Param: Evaluate expression \"%s\" => \"%s\"" % (value, new_val))
         elif isinstance(value, list):
             new_val = []
             for i,elem in enumerate(value):
                 if elem.find("${{") != -1:
-                    new_val.append(eval.eval(elem))
+                    if len(self._name_resolution_stack) > 0:
+                        eval.set_name_resolution(self._name_resolution_stack[-1])
+                    resolved = eval.eval(elem)
+                    new_val.append(resolved)
                 else:
                     new_val.append(elem)
         return new_val
@@ -717,4 +765,3 @@ class TaskGraphBuilder(object):
 
     def _findOverride(self, task):
         return task
-

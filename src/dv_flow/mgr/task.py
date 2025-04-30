@@ -23,6 +23,7 @@ class Task(object):
     doc : str = ""
     paramT : Any = None
     uses : 'Task' = None
+    package : 'Package' = None
     iff : str = None
     needs : List[str] = dc.field(default_factory=list)
     consumes : Union[ConsumesE, List[Dict[str, Any]]] = dc.field(default=None)

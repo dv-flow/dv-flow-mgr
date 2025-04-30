@@ -5,7 +5,10 @@ async def DataItem(ctxt : TaskRunCtxt, input : TaskDataInput) -> TaskDataResult:
     status = 0
     output = []
 
-    item = ctxt.mkDataItem(type=input.type, **getattr(input.params, "with"))
+    print("DataItem: %s" % input.params)
+
+    with_c = getattr(input.params, "with")
+    item = ctxt.mkDataItem(type=input.params.type, **with_c)
 
     return TaskDataResult(
         status=status,

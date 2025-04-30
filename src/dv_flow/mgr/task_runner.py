@@ -29,7 +29,6 @@ from datetime import datetime
 from toposort import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Set, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
-from .task_graph_builder import TaskGraphBuilder
 from .task_node import TaskNode, RundirE
 
 @dc.dataclass
@@ -60,7 +59,7 @@ class TaskRunner(object):
 
 @dc.dataclass
 class TaskSetRunner(TaskRunner):
-    builder : TaskGraphBuilder = None
+    builder : 'TaskGraphBuilder' = None
     nproc : int = -1
     status : int = 0
 

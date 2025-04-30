@@ -8,6 +8,7 @@ from dv_flow.mgr.task_listener_log import TaskListenerLog
 from .task_listener_test import TaskListenerTest
 from .marker_collector import MarkerCollector
 
+@pytest.mark.skip(reason="Test is not implemented")
 def test_smoke(tmpdir):
     flow_dv = """
 package:

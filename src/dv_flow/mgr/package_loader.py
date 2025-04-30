@@ -549,6 +549,7 @@ class PackageLoader(object):
                 name=self._getScopeFullname(taskdef.name),
                 desc=desc,
                 doc=doc,
+                package=pkg,
                 srcinfo=taskdef.srcinfo)
 
             if taskdef.iff is not None:
@@ -634,6 +635,7 @@ class PackageLoader(object):
 
     def _mkTaskBody(self, task, taskdef):
         self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))
+        pkg = self.package_scope()
 
         # Need to add subtasks from 'uses' scope?
         if task.uses is not None:
@@ -653,6 +655,7 @@ class PackageLoader(object):
                 name=self._getScopeFullname(td.name),
                 desc=desc,
                 doc=doc,
+                package=pkg.pkg,
                 srcinfo=td.srcinfo)
 
             if td.iff is not None:
@@ -862,6 +865,5 @@ class PackageLoader(object):
         self.marker(marker)
 
     def marker(self, marker):
-        print("listeners: %d" % len(self.marker_listeners))
         for l in self.marker_listeners:
             l(marker)
