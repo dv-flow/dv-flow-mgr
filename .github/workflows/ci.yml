@@ -5,45 +5,11 @@ on:
   - workflow_dispatch
 
 jobs:
-  ci-linux:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Configure Python
-      run: |
-        # Install dependencies required to load ivpm.yaml file
-        python3 -m venv packages/python
-        ./packages/python/bin/python -m pip install ivpm setuptools build --upgrade
-        ./packages/python/bin/python3 -m ivpm update -a
-#    - name: Run Tests
-#      run: |
-#        export PYTHONPATH=$(pwd)/src:$(pwd)/test
-#        cd test
-#        ../packages/python/bin/python3 -m unittest 
-    - name: Build Package
-      run: |
-        sed -i -e "s/version = \"\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\"/version = \"\1.${GITHUB_RUN_ID}a1\"/g" pyproject.toml
-        ./packages/python/bin/python3 -m build .
-
-    - name: Build Docs
-      run: |
-        cd docs
-        PYTHONPATH=$(pwd)/../src make html
-        cp ../src/dv_flow/mgr/share/flow.json _build/html/
-        touch _build/html/.nojekyll
-
-    - name: Publish to PyPi
-      if: ${{ startsWith(github.ref, 'refs/heads/main') }}
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
-
-    - name: Publish Docs
-      if: ${{ startsWith(github.ref, 'refs/heads/main') }}
-      uses: JamesIves/github-pages-deploy-action@4.1.7
-      with:
-        branch: gh-pages
-        folder: docs/_build/html
+  ci:
+    uses: dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main
+    with:
+        version_dir: "src/dv_flow/mgr"
+    secrets:
+        PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 
