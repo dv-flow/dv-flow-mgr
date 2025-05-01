@@ -33,5 +33,5 @@ from .task_listener_log import TaskListenerLog
 
 VERSION="1.5.0"
 SUFFIX=""
-__version__="%s%s" % (BASE, SUFFIX)
+__version__="%s%s" % (VERSION, SUFFIX)
 
