@@ -10,6 +10,7 @@ jobs:
     with:
         version_dir: "src/dv_flow/mgr"
         tests_dir: "tests"
+        pythonpath: "$(pwd)/src"
     secrets:
         PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
