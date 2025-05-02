@@ -40,6 +40,7 @@ from .task_node_ctxt import TaskNodeCtxt
 from .task_node_leaf import TaskNodeLeaf
 from .type import Type
 from .std.task_null import TaskNull
+from .data_callable import DataCallable
 from .exec_callable import ExecCallable
 from .null_callable import NullCallable
 from .shell_callable import ShellCallable
@@ -482,10 +483,13 @@ class TaskGraphBuilder(object):
         return ret        
     
     def _isCompound(self, task):
-        if task.subtasks is not None and len(task.subtasks):
-            return True
-        elif task.uses is not None:
-            return self._isCompound(task.uses)
+        if isinstance(task, Task):
+            if task.subtasks is not None and len(task.subtasks):
+                return True
+            elif task.uses is not None:
+                return self._isCompound(task.uses)
+        else:
+            return False
     
     def _getTaskNode(self, name):
         if name in self._task_node_m.keys():
@@ -494,7 +498,8 @@ class TaskGraphBuilder(object):
             return self.mkTaskNode(name)
     
     def _mkTaskLeafNode(self, 
-                        task : Task, name=None, 
+                        task : Task, 
+                        name=None, 
                         srcdir=None, 
                         params=None, 
                         hierarchical=False,
@@ -532,17 +537,29 @@ class TaskGraphBuilder(object):
 
         # TODO: handle callable in light of overrides
 
+        callable = None
 
-        # Setup the callable
         if task.run is not None:
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
-                node.task = self._shell_m[shell](task.run)
+                callable = self._shell_m[shell](task.run)
             else:
                 raise Exception("Shell %s not found" % shell)
-        else:
-            node.task = NullCallable(task.run)
+            
+        # Setup the callable
+        if callable is None and task.uses is not None:
+            if isinstance(task.uses, Type):
+                callable = DataCallable(task.uses.paramT)
+            else:
+                uses = self._getTaskNode(task.uses.name)
+                callable = uses.task
+        
+        if callable is None:
+            callable = NullCallable(task.run)
+
+        node.task = callable
+
         self._task_node_m[name] = node
         node.rundir = self.get_rundir()
 
@@ -743,7 +760,7 @@ class TaskGraphBuilder(object):
 
     def _gatherNeeds(self, task_t, node):
         self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
-        if task_t.uses is not None:
+        if task_t.uses is not None and isinstance(task_t.uses, Task):
             self._gatherNeeds(task_t.uses, node)
 
         for need in task_t.needs:

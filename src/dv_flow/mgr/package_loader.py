@@ -6,7 +6,7 @@ import pydantic
 import sys
 import yaml
 from pydantic import BaseModel
-from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Tuple, Union
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
@@ -93,8 +93,6 @@ class LoaderScope(SymbolScope):
                 pkg = find_pkg(pkg_name)
                 if pkg is not None:
                     break;
-        else:
-            raise Exception("Task name %s is not fully qualified" % name)
 
         if pkg is not None and name in pkg.task_m.keys():
             ret = pkg.task_m[name]
@@ -563,7 +561,7 @@ class PackageLoader(object):
         for taskdef, task in tasks:
 
             if taskdef.uses is not None:
-                task.uses = self._findTask(taskdef.uses)
+                task.uses = self._findTaskOrType(taskdef.uses)
 
                 if task.uses is None:
                     self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
@@ -593,6 +591,7 @@ class PackageLoader(object):
                     raise Exception("Failed to find task %s" % need)
                 task.needs.append(nt)
 
+            # Determine how to implement this task
             if taskdef.body is not None and len(taskdef.body) > 0:
                 self._mkTaskBody(task, taskdef)
             elif taskdef.run is not None:
@@ -602,7 +601,7 @@ class PackageLoader(object):
             elif taskdef.pytask is not None: # Deprecated case
                 task.run = taskdef.pytask
                 task.shell = "pytask"
-            elif task.uses is not None and task.uses.run is not None:
+            elif task.uses is not None and isinstance(task.uses, Task) and task.uses.run is not None:
                 task.run = task.uses.run
                 task.shell = task.uses.shell
 
@@ -629,7 +628,8 @@ class PackageLoader(object):
             tt.paramT = self._getParamT(
                 td, 
                 tt.uses.paramT if tt.uses is not None else None,
-                typename=tt.name)
+                typename=tt.name,
+                is_type=True)
         self._log.debug("<-- _loadTypes")
         pass
 
@@ -729,6 +729,16 @@ class PackageLoader(object):
             return self._pkg_s[-1].findTask(name)
         else:
             return self._loader_scope.findTask(name)
+        
+    def _findTaskOrType(self, name):
+        self._log.debug("--> _findTaskOrType %s" % name)
+        uses = self._findTask(name)
+
+        if uses is None:
+            uses = self._findType(name)
+
+        self._log.debug("<-- _findTaskOrType %s (%s)" % (name, ("found" if uses is not None else "not found")))
+        return uses
 
     
     def _getScopeFullname(self, leaf=None):
@@ -738,14 +748,14 @@ class PackageLoader(object):
         # Determine 
         pass
 
-    def _getPTConsumesRundir(self, taskdef : TaskDef, base_t : Task):
+    def _getPTConsumesRundir(self, taskdef : TaskDef, base_t : Union[Task,Type]):
         self._log.debug("_getPTConsumesRundir %s" % taskdef.name)
         passthrough = taskdef.passthrough
         consumes = taskdef.consumes.copy() if isinstance(taskdef.consumes, list) else taskdef.consumes
         rundir = taskdef.rundir
 #        needs = [] if task.needs is None else task.needs.copy()
 
-        if base_t is not None:
+        if base_t is not None and isinstance(base_t, Task):
             if passthrough is None:
                 passthrough = base_t.passthrough
             if consumes is None:
@@ -761,7 +771,12 @@ class PackageLoader(object):
 
         return (passthrough, consumes, rundir)
 
-    def _getParamT(self, taskdef, base_t : BaseModel, typename=None):
+    def _getParamT(
+            self, 
+            taskdef, 
+            base_t : BaseModel, 
+            typename=None,
+            is_type=False):
         self._log.debug("--> _getParamT %s" % taskdef.name)
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
@@ -800,6 +815,9 @@ class PackageLoader(object):
                 field_m[name] = (f.annotation, getattr(base_o, name))
         else:
             self._log.debug("No base type")
+            if is_type:
+                field_m["src"] = (str, "")
+                field_m["seq"] = (int, "")
 
         for p in taskdef.params.keys():
             param = taskdef.params[p]
