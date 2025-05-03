@@ -521,7 +521,42 @@ class TaskGraphBuilder(object):
         if params is None:
             params = task.paramT()
 
+<<<<<<< HEAD
         # Create and push task scope for parameter resolution
+=======
+            eval.set("rundir", "/".join([str(e) for e in self.get_rundir()]))
+
+#            self._log.debug("in_params[2]: %s" % ",".join(p.src for p in in_params))
+#            eval.setVar("in", in_params)
+#            eval.setVar("rundir", rundir)
+
+            # Set variables from the inputs
+            # for need in self.needs:
+            #     for name,value in {"rundir" : need[0].rundir}.items():
+            #         eval.setVar("%s.%s" % (need[0].name, name), value)
+
+            # expand any variable references
+            self._expandParams(params, eval)
+
+
+        if task.rundir == RundirE.Unique:
+            self.enter_rundir(name)
+
+        # TODO: handle callable in light of overrides
+
+
+        callable = None
+        if task.run is not None:
+            shell = task.shell if task.shell is not None else "shell"
+            if shell in self._shell_m.keys():
+                self._log.debug("Use shell implementation")
+                callable = self._shell_m[shell]
+            else:
+                raise Exception("Shell %s not found" % shell)
+        else:
+            callable = NullCallable
+
+>>>>>>> origin/main
         node = TaskNodeLeaf(
             name=name,
             srcdir=srcdir,
