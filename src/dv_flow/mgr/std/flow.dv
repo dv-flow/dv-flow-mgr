@@ -82,6 +82,9 @@ package:
         type: str
       content:
         type: str
+      incdir: 
+        type: bool
+        value: false
   - name: IncDirs
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs
