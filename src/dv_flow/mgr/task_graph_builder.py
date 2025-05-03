@@ -286,6 +286,12 @@ class TaskGraphBuilder(object):
                 scope.variables['this'] = task.params
             self._name_resolution_stack[-1].task_scopes.append(scope)
 
+    def task_scope(self):
+        """Get the current task scope"""
+        if self._name_resolution_stack and self._name_resolution_stack[-1].task_scopes:
+            return self._name_resolution_stack[-1].task_scopes[-1]
+        return None
+
     def pop_task_scope(self):
         """Pop the current task scope"""
         if self._name_resolution_stack and self._name_resolution_stack[-1].task_scopes:
@@ -514,7 +520,6 @@ class TaskGraphBuilder(object):
         
         if params is None:
             params = task.paramT()
-            eval.set("rundir", "/".join(self.get_rundir()))
 
         # Create and push task scope for parameter resolution
         node = TaskNodeLeaf(
@@ -527,6 +532,8 @@ class TaskGraphBuilder(object):
             task=None)  # We'll set this later
             
         self.push_task_scope(node)
+
+        self.task_scope().variables["rundir"] = "/".join([str(e) for e in self.get_rundir()])
         
         # Now expand parameters in the scope context
         self._expandParams(params, eval)
