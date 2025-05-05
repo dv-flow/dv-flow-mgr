@@ -116,7 +116,7 @@ class TaskSetRunner(TaskRunner):
             for t in active_s:
                 while len(active_task_l) >= self.nproc and t not in done_task_s:
                     # Wait for at least one job to complete
-                    done, pending = await asyncio.wait(at[1] for at in active_task_l)
+                    done, pending = await asyncio.wait([at[1] for at in active_task_l])
                     self._completeTasks(active_task_l, done_task_s, done, dst_memento)
 
                 if self.status == 0 and t not in done_task_s:
@@ -163,7 +163,7 @@ class TaskSetRunner(TaskRunner):
             # Wait for them to all complete
             while len(active_task_l):
                 # TODO: Shouldn't gather here -- reach to each completion
-                done, pending = await asyncio.wait(at[1] for at in active_task_l)
+                done, pending = await asyncio.wait([at[1] for at in active_task_l])
                 self._completeTasks(active_task_l, done_task_s, done, dst_memento)
             
             if self.status != 0:
