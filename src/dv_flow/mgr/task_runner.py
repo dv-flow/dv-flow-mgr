@@ -200,6 +200,8 @@ class TaskSetRunner(TaskRunner):
                     else:
                         dst_memento[tt.name] = None
                     self.status |= tt.result.status 
+                    if self.status:
+                        self._log.debug("Task %s failed with status %d" % (tt.name, tt.result.status))
                     self._notify(tt, "leave")
                     done_task_s.add(tt)
                     active_task_l.pop(i)
