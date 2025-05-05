@@ -104,6 +104,7 @@ class LoaderScope(SymbolScope):
     def findType(self, name) -> Type:
         self._log.debug("--> findType: %s" % name)
         ret = None
+        pkg = None
         last_dot = name.rfind('.')
         if last_dot != -1:
             pkg_name = name[:last_dot]
@@ -407,13 +408,45 @@ class PackageLoader(object):
         
         self._log.info("Loading imported package %s" % imp_path)
 
-        if not os.path.isabs(imp_path):
-            self._log.debug("_basedir: %s ; imp_path: %s" % (basedir, imp_path))
-            imp_path = os.path.join(basedir, imp_path)
-            
-        # Search down the tree looking for a flow.dv file
-        if os.path.isdir(imp_path):
-            path = imp_path
+        if os.path.isabs(imp_path):
+            imp_path = self._findFlowDvInDir(imp_path)
+        else:
+            for root in (basedir, os.path.dirname(self._file_s[0])):
+                self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
+
+                resolved_path = self._findFlowDvInDir(root, imp_path)
+
+                if resolved_path is not None and os.path.isfile(resolved_path):
+                    self._log.debug("Found root file: %s" % resolved_path)
+                    imp_path = resolved_path
+                    break
+
+        if not os.path.isfile(imp_path):
+            self.error("Import file %s not found" % imp_path, pkg.srcinfo)
+            # Don't want to error out 
+            return
+#            raise Exception("Import file %s not found" % imp_path)
+
+        if imp_path in self._pkg_path_m.keys():
+            sub_pkg = self._pkg_path_m[imp_path]
+        else:
+            self._log.info("Loading imported file %s" % imp_path)
+            imp_path = os.path.normpath(imp_path)
+            sub_pkg = self._loadPackage(imp_path)
+            self._log.info("Loaded imported package %s" % sub_pkg.name)
+
+        pkg.pkg_m[sub_pkg.name] = sub_pkg
+        self._log.debug("<-- _loadPackageImport %s" % str(imp))
+
+    def _findFlowDvInDir(self, base, leaf):
+        """Search down the tree looking for a flow.dv file"""
+        self._log.debug("--> _findFlowDvInDir (%s, %s)" % (base, leaf))
+        imp_path = None
+        if os.path.isfile(os.path.join(base, leaf)):
+            imp_path = os.path.join(base, leaf)
+            self._log.debug("Found: %s" % imp_path)
+        elif os.path.isdir(os.path.join(base, leaf)):
+            path = os.path.join(base, leaf)
 
             while path is not None and os.path.isdir(path) and not os.path.isfile(os.path.join(path, "flow.dv")):
                 # Look one directory down
@@ -427,24 +460,11 @@ class PackageLoader(object):
                             break
                 if path is not None:
                     path = next_dir
-
             if path is not None and os.path.isfile(os.path.join(path, "flow.dv")):
                 imp_path = os.path.join(path, "flow.dv")
-
-        if not os.path.isfile(imp_path):
-            raise Exception("Import file %s not found" % imp_path)
-
-        if imp_path in self._pkg_path_m.keys():
-            sub_pkg = self._pkg_path_m[imp_path]
-        else:
-            self._log.info("Loading imported file %s" % imp_path)
-            imp_path = os.path.normpath(imp_path)
-            sub_pkg = self._loadPackage(imp_path)
-            self._log.info("Loaded imported package %s" % sub_pkg.name)
-
-        pkg.pkg_m[sub_pkg.name] = sub_pkg
-        self._log.debug("<-- _loadPackageImport %s" % str(imp))
-        pass
+                self._log.debug("Found: %s" % imp_path)
+        self._log.debug("<-- _findFlowDvInDir %s" % imp_path)
+        return imp_path
 
     def _loadFragments(self, pkg, fragments, basedir, taskdefs, typedefs):
         for spec in fragments:
