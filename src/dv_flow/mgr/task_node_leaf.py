@@ -66,16 +66,6 @@ class TaskNodeLeaf(TaskNode):
         in_task_s = set()
 
         for need, _ in self.needs:
-<<<<<<< HEAD
-            for out in need.output.output:
-                key = (out.src, out.seq)
-                if key not in in_task_s:
-                    in_task_s.add(key)
-                    in_params.append(out)
-#            if need not in in_task_s:
-#                in_task_s.add(need)
-#                in_params.extend(need.output.output)
-=======
             if need not in in_task_s:
                 in_task_s.add(need)
                 for item in need.output.output:
@@ -83,7 +73,6 @@ class TaskNodeLeaf(TaskNode):
                     if key not in in_params_s:
                         in_params_s.add(key)
                         in_params.append(item)
->>>>>>> refs/remotes/origin/main
 
         # 
         # in_params_m = {}
