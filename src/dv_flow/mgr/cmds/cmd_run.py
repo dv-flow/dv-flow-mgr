@@ -93,7 +93,7 @@ class CmdRun(object):
             os.makedirs(rundir)
 
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
-        runner = TaskSetRunner(rundir)
+        runner = TaskSetRunner(rundir, builder=builder)
 
         if args.j != -1:
             runner.nproc = int(args.j)
