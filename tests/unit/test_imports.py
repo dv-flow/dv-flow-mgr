@@ -110,3 +110,65 @@ package:
 
     task = builder.mkTaskNode("top.top")
     output = asyncio.run(runner.run(task))
+
+def test_pkg_path_imp_search(tmpdir):
+    """Test that a sub-package can find a sibling relative to root project"""
+    top_flow_dv = """
+package:
+    name: top
+
+    imports:
+    - packages/subpkg1/flow.dv
+
+    tasks:
+    - name: top
+      uses: subpkg2.top
+#      with:
+#        msg: "top.top"
+"""
+    subpkg1_flow_dv = """
+package:
+    name: subpkg1
+    imports:
+    - packages/subpkg2/flow.dv
+
+    tasks:
+    - name: top
+      uses: std.Message
+      with:
+        msg: "subpkg1.top"
+"""
+    subpkg2_flow_dv = """
+package:
+    name: subpkg2
+
+    tasks:
+    - name: top
+      uses: std.Message
+      with:
+        msg: "subpkg2.top"
+"""
+
+    os.makedirs(os.path.join(tmpdir, "packages/subpkg1"))
+    os.makedirs(os.path.join(tmpdir, "packages/subpkg2"))
+
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(top_flow_dv)
+
+    with open(os.path.join(tmpdir, "packages/subpkg1/flow.dv"), "w") as f:
+        f.write(subpkg1_flow_dv)
+    with open(os.path.join(tmpdir, "packages/subpkg2/flow.dv"), "w") as f:
+        f.write(subpkg2_flow_dv)
+
+    def markers(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg_def = PackageLoader(marker_listeners=[markers]).load(
+        os.path.join(tmpdir, "flow.dv"))
+    print("pkg_def: %s" % str(pkg_def), flush=True)
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
+
+    task = builder.mkTaskNode("top.top")
+    output = asyncio.run(runner.run(task))

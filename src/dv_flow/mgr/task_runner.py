@@ -59,6 +59,7 @@ class TaskRunner(object):
 
 @dc.dataclass
 class TaskSetRunner(TaskRunner):
+    builder : 'TaskGraphBuilder' = None
     nproc : int = -1
     status : int = 0
 
@@ -185,6 +186,11 @@ class TaskSetRunner(TaskRunner):
                 return task.output
         else:
             return None
+        
+    def mkDataItem(self, name, **kwargs):
+        if self.builder is None:
+            raise Exception("TaskSetRunner.mkDataItem() requires a builder")
+        return self.builder.mkDataItem(name, **kwargs)
         
     def _completeTasks(self, active_task_l, done_task_s, done_l, dst_memento):
         for d in done_l:

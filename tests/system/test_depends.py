@@ -6,6 +6,9 @@ import sys
 def test_seq_1(tmpdir):
     rundir = os.path.join(tmpdir)
 
+    proj_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../.."))
+
     flow_dv = """
 package:
   name: p1
@@ -31,6 +34,7 @@ package:
     
     env = os.environ.copy()
     env["DV_FLOW_PATH"] = rundir
+    env["PYTHONPATH"] = os.path.join(proj_dir, "src")
 
     cmd = [
         sys.executable,
@@ -51,6 +55,8 @@ package:
 
 def test_seq_2(tmpdir):
     rundir = os.path.join(tmpdir)
+    proj_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../.."))
 
     flow_dv = """
 package:
@@ -77,6 +83,7 @@ package:
     
     env = os.environ.copy()
     env["DV_FLOW_PATH"] = rundir
+    env["PYTHONPATH"] = os.path.join(proj_dir, "src")
 
     cmd = [
         sys.executable,
@@ -96,6 +103,8 @@ package:
 
 def test_seq_3(tmpdir):
     rundir = os.path.join(tmpdir)
+    proj_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../.."))
 
     flow_dv = """
 package:
@@ -126,6 +135,7 @@ package:
     
     env = os.environ.copy()
     env["DV_FLOW_PATH"] = rundir
+    env["PYTHONPATH"] = os.path.join(proj_dir, "src")
 
     cmd = [
         sys.executable,

@@ -37,6 +37,9 @@ class ParamRefEval(object):
     def set(self, name : str, value : object):
         self.expr_eval.set(name, value)
 
+    def set_name_resolution(self, ctx: 'NameResolutionContext'):
+        self.expr_eval.set_name_resolution(ctx)
+
     def eval(self, val : str) -> str:
         idx = 0
 
@@ -51,8 +54,8 @@ class ParamRefEval(object):
                 
                 ref = val[idx+3:eidx].strip()
 
-                expr_ast = self.parser.parse(ref)
-                exp_val = self.expr_eval.eval(expr_ast)
+#                expr_ast = self.parser.parse(ref)
+                exp_val = self.expr_eval.eval(ref)
 
                 # Replacing [idx..eidx+2] with len(exp_val)
                 val = val[:idx] + exp_val + val[eidx+2:]

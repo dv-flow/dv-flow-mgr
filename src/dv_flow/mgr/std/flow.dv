@@ -82,6 +82,9 @@ package:
         type: str
       content:
         type: str
+      incdir: 
+        type: bool
+        value: false
   - name: IncDirs
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs
@@ -116,6 +119,18 @@ package:
         doc: |
           Optional timestamp file to determine if running 
           the command changed the output
+
+  - name: DataItem
+    shell: pytask
+    run: dv_flow.mgr.std.data_item.DataItem
+    doc: |
+      Creates and outputs a data item
+    with:
+      type:
+        type: str
+        value: ""
+      with:
+        type: map
   types:
   - name: DataItem
     with:

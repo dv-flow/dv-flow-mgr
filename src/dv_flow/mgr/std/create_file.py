@@ -76,6 +76,9 @@ async def CreateFile(runner, input) -> TaskDataResult:
                 src=input.name, 
                 basedir=input.rundir,
                 files=[input.params.filename])
+    
+    if input.params.incdir:
+        fs.incdirs = [input.rundir]
 
     _log.debug("<-- FileSet(%s) changed=%s" % (input.name, changed))
 
