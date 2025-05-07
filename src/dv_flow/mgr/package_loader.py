@@ -19,6 +19,9 @@ from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
 
+class EmptyParams(pydantic.BaseModel):
+    pass
+
 @dc.dataclass
 class SymbolScope(object):
     name : str
@@ -243,7 +246,8 @@ class PackageLoader(object):
     
     def load_rgy(self, name) -> Package:
         self._log.debug("--> load_rgy %s" % name)
-        pkg = Package(None)
+        pkg = Package(PackageDef(name="anonymous"))
+        pkg.paramT = EmptyParams
 
         name = name if isinstance(name, list) else [name]
 

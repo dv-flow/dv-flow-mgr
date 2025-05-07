@@ -57,6 +57,7 @@ class CompoundTaskCtxt(object):
     task_m : Dict[str,TaskNode] = dc.field(default_factory=dict)
     uses_s : List[Dict[str, TaskNode]] = dc.field(default_factory=list)
 
+
 @dc.dataclass
 class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
