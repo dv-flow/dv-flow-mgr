@@ -408,9 +408,7 @@ class PackageLoader(object):
         
         self._log.info("Loading imported package %s" % imp_path)
 
-        if os.path.isabs(imp_path):
-            imp_path = self._findFlowDvInDir(imp_path)
-        else:
+        if not os.path.isabs(imp_path):
             for root in (basedir, os.path.dirname(self._file_s[0])):
                 self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
 
