@@ -58,6 +58,32 @@ class TaskListenerTrace(object):
             del self._task_tid_map[task]
             self._free_tids.append(tid)
 
+    def _get_task_data(self, task: TaskNode) -> dict:
+        """Extract serializable task data"""
+        data = {}
+        
+        # Add any parameters
+        if hasattr(task, 'params') and task.params:
+            # If params is a dataclass or has __dict__, get its fields
+            if hasattr(task.params, '__dict__'):
+                data['params'] = task.params.__dict__
+            elif isinstance(task.params, dict):
+                data['params'] = task.params
+
+        # Add inputs if present
+        if hasattr(task, 'needs') and task.needs:
+            inputs = []
+            for need, _ in task.needs:
+                if hasattr(need, 'output') and need.output:
+                    inputs.append({
+                        'task': need.name,
+                        'data': need.output.__dict__ if hasattr(need.output, '__dict__') else need.output
+                    })
+            if inputs:
+                data['inputs'] = inputs
+
+        return data
+
     def event(self, task: TaskNode, reason: str):
         """Record a task execution event.
         
@@ -74,87 +100,72 @@ class TaskListenerTrace(object):
         # Get current timestamp in microseconds
         ts = int(time.time() * 1_000_000) if reason == "enter" else int(task.end.timestamp() * 1_000_000)
 
-        # Create the duration event
+        # Create the duration event with initial args
+        args = {}
+        
+        # Add task data
+        if reason == "enter":
+            # Add input data on task start
+            input_data = self._get_task_data(task)
+            if input_data:
+                args = input_data
+
+        elif reason == 'leave':
+            if task.result:
+                # Add status and change info
+                args["status"] = task.result.status
+                args["changed"] = task.result.changed
+                
+                # Add output data if present
+                if hasattr(task.result, 'output') and task.result.output:
+                    args["output"] = [
+                        out.__dict__ if hasattr(out, '__dict__') else out 
+                        for out in task.result.output
+                    ]
+
+            self._release_tid(task)
+
+        # Create the event with collected args
         event = {
             "name": task.name,
             "cat": "task",
             "ph": ph, 
             "pid": 1,
             "tid": tid,
-            "ts": ts
+            "ts": ts,
+            "args": args
         }
 
         # Store the duration event
         self._events.append(event)
 
+        # Add flow event for dependencies
         if reason == "enter":
-            # When a task starts, create flow events from all its dependencies
+            # When task starts, add flow event from each dependency
             for need, _ in task.needs:
-                flow_id = self._next_flow_id
-                self._next_flow_id += 1
-
-                # # Add flow end event connecting to this task
-                # flow_end = {
-                #     "name": f"{need.name} -> {task.name}",
-                #     "cat": "flow",
-                #     "ph": "e",  # Flow end
-                #     "pid": 1,
-                #     "tid": tid,  # Target task's thread
-                #     "ts": ts,
-                #     "id": flow_id,
-                #     "bp": "e"  # Connect to enclosing slice
-                # }
-                # self._events.append(flow_end)
-
-                # # Add flow start event from dependency
-                # flow_start = {
-                #     "name": f"{need.name} -> {task.name}",
-                #     "cat": "flow",
-                #     "ph": "b",  # Flow begin
-                #     "pid": 1,
-                #     "tid": self._task_tid_map.get(need, 0),  # Source task's thread
-                #     "ts": int(need.end.timestamp() * 1_000_000) if need.end else ts,
-                #     "id": flow_id,
-                #     "bp": "e"  # Connect to enclosing slice
-                # }
-                # self._events.append(flow_start)
-
-        elif reason == 'leave':
-            # For completed tasks, emit flow start events
-            if task.result:
-                event["args"] = {
-                    "status": task.result.status,
-                    "changed": task.result.changed
+                # Create flow start from completed task to this one
+                flow = {
+                    "name": f"{need.name} -> {task.name}",
+                    "cat": "flow",
+                    "ph": "s",  # Flow start 
+                    "pid": 1,
+                    "tid": self._task_tid_map.get(need, 0),
+                    "ts": int(need.end.timestamp() * 1_000_000) if need.end else ts,
+                    "id": self._next_flow_id,
+                    "bp": "e"
                 }
-
-                # Find any tasks that depend on this one and create flow events
-                for dep_task, dep_tid in self._task_tid_map.items():
-                    if any(need[0] is task for need in dep_task.needs):
-                        # # Create flow start event
-                        # flow = {
-                        #     "name": f"{task.name} -> {dep_task.name}",
-                        #     "cat": "flow",
-                        #     "ph": "s",  # Flow start
-                        #     "pid": 1,
-                        #     "tid": tid,  # Source task's thread
-                        #     "ts": ts,  # Use task end time
-                        #     "id": self._next_flow_id,
-                        #     "bp": "e"  # Connect to enclosing slice
-                        # }
-                        # self._events.append(flow)
-
-                        # # Create flow end event
-                        # flow_end = {
-                        #     "name": f"{task.name} -> {dep_task.name}",
-                        #     "cat": "flow",
-                        #     "ph": "f",  # Flow finish
-                        #     "pid": 1,
-                        #     "tid": dep_tid,  # Target task's thread
-                        #     "ts": ts,  # Will be updated when target task starts
-                        #     "id": self._next_flow_id,
-                        #     "bp": "e"  # Connect to enclosing slice
-                        # }
-                        # self._events.append(flow_end)
-                        self._next_flow_id += 1
-
-            self._release_tid(task)
+                self._events.append(flow)
+                
+                # Create flow finish at the start of this task
+                flow_end = {
+                    "name": f"{need.name} -> {task.name}",
+                    "cat": "flow",
+                    "ph": "f",  # Flow finish
+                    "pid": 1, 
+                    "tid": tid,
+                    "ts": ts,
+                    "id": self._next_flow_id,
+                    "bp": "e"
+                }
+                self._events.append(flow_end)
+                self._next_flow_id += 1
