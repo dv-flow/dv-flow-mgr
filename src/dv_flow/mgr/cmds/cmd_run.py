@@ -28,6 +28,7 @@ from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
+from ..task_listener_trace import TaskListenerTrace
 
 
 class CmdRun(object):
@@ -98,7 +99,14 @@ class CmdRun(object):
         if args.j != -1:
             runner.nproc = int(args.j)
 
+        if not os.path.isdir(os.path.join(rundir, "log")):
+            os.makedirs(os.path.join(rundir, "log"))
+        
+        fp = open(os.path.join(rundir, "log", "%s.trace.json" % pkg.name), "w")
+        trace = TaskListenerTrace(fp)
+
         runner.add_listener(listener.event)
+        runner.add_listener(trace.event)
 
         tasks = []
 
@@ -109,6 +117,9 @@ class CmdRun(object):
             tasks.append(task)
 
         asyncio.run(runner.run(tasks))
+
+        trace.close()
+        fp.close()
 
         return runner.status
 
