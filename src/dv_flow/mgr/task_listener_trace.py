@@ -3,6 +3,7 @@ import json
 import time
 from typing import Dict, List, TextIO
 from .task_node import TaskNode
+from .fileset import FileSet
 
 @dc.dataclass
 class TaskListenerTrace(object):
@@ -75,9 +76,13 @@ class TaskListenerTrace(object):
             inputs = []
             for need, _ in task.needs:
                 if hasattr(need, 'output') and need.output:
+                    _items = []
+                    for out in need.output.output:
+                        if hasattr(out, 'model_dump'):
+                            _items.append(out.model_dump())
                     inputs.append({
                         'task': need.name,
-                        'data': need.output.__dict__ if hasattr(need.output, '__dict__') else need.output
+                        'data': _items
                     })
             if inputs:
                 data['inputs'] = inputs
