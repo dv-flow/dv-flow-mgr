@@ -448,25 +448,27 @@ class PackageLoader(object):
             imp_path = os.path.join(base, leaf)
             self._log.debug("Found: %s" % imp_path)
         elif os.path.isdir(os.path.join(base, leaf)):
-            path = os.path.join(base, leaf)
-
-            while path is not None and os.path.isdir(path) and not os.path.isfile(os.path.join(path, "flow.dv")):
-                # Look one directory down
-                next_dir = None
-                for dir in os.listdir(path):
-                    if os.path.isdir(os.path.join(path, dir)):
-                        if next_dir is None:
-                            next_dir = dir
-                        else:
-                            path = None
-                            break
-                if path is not None:
-                    path = next_dir
-            if path is not None and os.path.isfile(os.path.join(path, "flow.dv")):
-                imp_path = os.path.join(path, "flow.dv")
-                self._log.debug("Found: %s" % imp_path)
+            if os.path.isfile(os.path.join(base, leaf, "flow.dv")):
+                imp_path = os.path.join(base, leaf, "flow.dv")
+                self._log.debug("Found: %s" % imp_path) 
+            else:
+                imp_path = self._findFlowDvSubdir(os.path.join(base, leaf))
         self._log.debug("<-- _findFlowDvInDir %s" % imp_path)
         return imp_path
+    
+    def _findFlowDvSubdir(self, dir):
+        ret = None
+        # Search deeper
+        ret = None
+        for subdir in os.listdir(dir):
+            if os.path.isfile(os.path.join(dir, subdir, "flow.dv")):
+                ret = os.path.join(dir, subdir, "flow.dv")
+                self._log.debug("Found: %s" % ret)
+            elif os.path.isdir(os.path.join(dir, subdir)):
+                ret = self._findFlowDvSubdir(os.path.join(dir, subdir))
+            if ret is not None:
+                break
+        return ret
 
     def _loadFragments(self, pkg, fragments, basedir, taskdefs, typedefs):
         for spec in fragments:
