@@ -550,6 +550,10 @@ class PackageLoader(object):
     def getTask(self, name) -> Task:
         task = self._findTask(name)
         return task
+    
+    def getType(self, name) -> Type:
+        type = self._findType(name)
+        return type
 
     def _loadTasks(self, pkg, taskdefs : List[TaskDef], basedir : str):
         self._log.debug("--> _loadTasks %s" % pkg.name)
@@ -752,16 +756,8 @@ class PackageLoader(object):
         ret = None
         if len(self._pkg_s):
             ret = self._pkg_s[-1].findTask(name)
-            if ret is None:
-                type = self._pkg_s[-1].findType(name)
-                if type is not None:
-                    raise Exception("TODO: create task around type")
         else:
             ret = self._loader_scope.findTask(name)
-            if ret is None:
-                type = self._loader_scope.findType(name)
-                if type is not None:
-                    raise Exception("TODO: create task around type")
         return ret
         
     def _findTaskOrType(self, name):

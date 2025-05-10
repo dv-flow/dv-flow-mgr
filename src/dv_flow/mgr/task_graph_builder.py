@@ -317,6 +317,11 @@ class TaskGraphBuilder(object):
             if task is None:
                 if task_t in self._type_m.keys():
                     type = self._type_m[task_t]
+                
+                if type is None:
+                    type = self.loader.getType(task_t)
+                
+                if type is not None:
                     if srcdir is None:
                         srcdir = os.path.dirname(type.srcinfo.file)
                     ret = TaskNodeLeaf(
