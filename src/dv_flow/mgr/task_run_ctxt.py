@@ -37,11 +37,11 @@ class TaskRunCtxt(object):
         try:
             item = self.runner.mkDataItem(
                 type=type,
-                rundir=self.rundir,
                 **kwargs)
         except Exception as e:
             self.error("Failed to create data item: %s" % str(e))
             raise e
+        return item
         
 
     async def exec(self, 

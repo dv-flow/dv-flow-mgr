@@ -187,10 +187,10 @@ class TaskSetRunner(TaskRunner):
         else:
             return None
         
-    def mkDataItem(self, name, **kwargs):
+    def mkDataItem(self, type, **kwargs):
         if self.builder is None:
             raise Exception("TaskSetRunner.mkDataItem() requires a builder")
-        return self.builder.mkDataItem(name, **kwargs)
+        return self.builder.mkDataItem(type, **kwargs)
         
     def _completeTasks(self, active_task_l, done_task_s, done_l, dst_memento):
         for d in done_l:
