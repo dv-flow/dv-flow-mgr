@@ -22,6 +22,7 @@
 import asyncio
 import os
 import logging
+import sys
 from typing import ClassVar
 from ..util import loadProjPkgDef
 from ..task_data import SeverityE
@@ -47,7 +48,7 @@ class CmdRun(object):
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")
-            return 1
+            sys.exit(1)
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
