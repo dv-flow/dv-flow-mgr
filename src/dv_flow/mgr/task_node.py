@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import dataclasses as dc
+import datetime
 import pydantic.dataclasses as pdc
 import logging
 import toposort
@@ -55,8 +56,8 @@ class TaskNode(object):
     rundir : List[str] = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
     result : TaskDataResult = dc.field(default=None)
-    start : float = dc.field(default=None)
-    end : float = dc.field(default=None)
+    start : datetime.datetime = dc.field(default=None)
+    end : datetime.datetime = dc.field(default=None)
     save_exec_data : bool = dc.field(default=True)
     iff : bool = dc.field(default=True)
     parent : 'TaskNode' = dc.field(default=None)

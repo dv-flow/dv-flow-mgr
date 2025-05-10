@@ -306,41 +306,71 @@ class TaskGraphBuilder(object):
 
     def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
+        ret = None
 
+        task = None
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
-            # Get the package for this task
-            self.push_name_resolution_context(task.package)
         elif self.loader is not None:
             task = self.loader.getTask(task_t)
+
+            if task is None:
+                if task_t in self._type_m.keys():
+                    type = self._type_m[task_t]
+                    if srcdir is None:
+                        srcdir = os.path.dirname(type.srcinfo.file)
+                    ret = TaskNodeLeaf(
+                        name=name,
+                        srcdir=srcdir,
+                        params=type.paramT(),
+                        ctxt=self._ctxt,
+                        task=DataCallable(type.paramT))
+                    self._task_node_m[name] = ret
+                else:
+                    raise Exception("task_t (%s) is neither a task nor type" % str(task_t))
+
+        elif task_t in self._type_m.keys():
+            # Create a task around the type
+            type = self._type_m[task_t]
+            if srcdir is None:
+                srcdir = os.path.dirname(type.srcinfo.file)
+            ret = TaskNodeLeaf(
+                name=name,
+                srcdir=srcdir,
+                params=type.paramT(),
+                ctxt=self._ctxt,
+                task=DataCallable(type.paramT)
+            )
+            self._task_node_m[name] = ret
+
+        if ret is None:
             if task is None:
                 raise Exception("task_t (%s) not present" % str(task_t))
+
             self.push_name_resolution_context(task.package)
-        else:
-            raise Exception("task_t (%s) not present" % str(task_t))
 
-        try:
-            ret = self._mkTaskNode(
-                task, 
-                name=name, 
-                srcdir=srcdir,
-                eval=self._eval)
+            try:
+                ret = self._mkTaskNode(
+                    task, 
+                    name=name, 
+                    srcdir=srcdir,
+                    eval=self._eval)
 
-            if needs is not None:
-                for need in needs:
-                    ret.needs.append((need, False))
+                if needs is not None:
+                    for need in needs:
+                        ret.needs.append((need, False))
 
-            for k,v in kwargs.items():
-                if hasattr(ret.params, k):
-                    setattr(ret.params, k, v)
-                else:
-                    raise Exception("Task %s parameters do not include %s" % (task.name, k))
+                for k,v in kwargs.items():
+                    if hasattr(ret.params, k):
+                        setattr(ret.params, k, v)
+                    else:
+                        raise Exception("Task %s parameters do not include %s" % (task.name, k))
+            finally:
+                # Clean up package context if we created one
+                self.pop_name_resolution_context()
 
-            self._log.debug("<-- mkTaskNode: %s (%d needs)" % (task_t, len(ret.needs)))
-            return ret
-        finally:
-            # Clean up package context if we created one
-            self.pop_name_resolution_context()
+        self._log.debug("<-- mkTaskNode: %s" % task_t)
+        return ret
     
     def mkDataItem(self, name, **kwargs):
         self._log.debug("--> mkDataItem: %s" % name)
