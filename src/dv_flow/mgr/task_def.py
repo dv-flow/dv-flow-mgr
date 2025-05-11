@@ -50,8 +50,13 @@ class PassthroughE(enum.Enum):
     All = "all"
     Unused = "unused"
 
+class GenerateSpec(BaseModel):
+    shell: Union[str, None] = dc.Field(default=None)
+    run: str
+
 class StrategyDef(BaseModel):
     chain: Union[bool, None] = dc.Field(default=None)
+    generate: Union[GenerateSpec, None] = dc.Field(default=None)
     matrix : Union[Dict[str,List[Any]],None] = dc.Field(
         default=None,
         description="Matrix of parameter values to explore")

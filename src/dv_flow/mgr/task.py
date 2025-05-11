@@ -1,5 +1,5 @@
 import dataclasses as dc
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 from .srcinfo import SrcInfo
 from .task_def import TaskDef, RundirE, PassthroughE, ConsumesE
 from .task_node_ctor import TaskNodeCtor
@@ -8,6 +8,16 @@ from .task_node_ctor import TaskNodeCtor
 class Need(object):
     task : 'Task'
     cond : str = None
+
+@dc.dataclass
+class StrategyGenerate(object):
+    shell : str = "pytask"
+    run : str = None
+
+@dc.dataclass
+class Strategy(object):
+    generate : StrategyGenerate = None
+    matrix : Dict[str, List[Any]] = dc.field(default_factory=dict)
 
 @dc.dataclass
 class Task(object):
@@ -31,6 +41,7 @@ class Task(object):
     rundir : RundirE = None
     # TODO: strategy / matrix
     subtasks : List['Task'] = dc.field(default_factory=list)
+    strategy : Strategy = dc.field(default=None)
     run : str = None
     shell : str = "bash"
     srcinfo : SrcInfo = None

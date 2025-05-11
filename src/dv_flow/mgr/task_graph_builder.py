@@ -29,10 +29,12 @@ from .package_def import PackageDef, PackageSpec
 from .package_loader import PackageLoader
 from .param_ref_eval import ParamRefEval
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope
+from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
+from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_node import TaskNode
 from .task_node_ctor import TaskNodeCtor
 from .task_node_compound import TaskNodeCompound
@@ -480,22 +482,25 @@ class TaskGraphBuilder(object):
 
         # Determine how to build this node
         if iff:
-            if self._isCompound(task):
-                ret = self._mkTaskCompoundNode(
-                    task, 
-                    name=name,
-                    srcdir=srcdir,
-                    params=params,
-                    hierarchical=hierarchical,
-                    eval=eval)
+            if task.strategy is not None:
+                ret = self._applyStrategy(task, name, srcdir, params, hierarchical, eval)
             else:
-                ret = self._mkTaskLeafNode(
-                    task, 
-                    name=name,
-                    srcdir=srcdir,
-                    params=params,
-                    hierarchical=hierarchical,
-                    eval=eval)
+                if self._isCompound(task):
+                    ret = self._mkTaskCompoundNode(
+                        task, 
+                        name=name,
+                        srcdir=srcdir,
+                        params=params,
+                        hierarchical=hierarchical,
+                        eval=eval)
+                else:
+                    ret = self._mkTaskLeafNode(
+                        task, 
+                        name=name,
+                        srcdir=srcdir,
+                        params=params,
+                        hierarchical=hierarchical,
+                        eval=eval)
         else:
             if name is None:
                 name = task.name
@@ -523,6 +528,105 @@ class TaskGraphBuilder(object):
             self._task_rundir_s.pop()
 
         return ret        
+    
+    def _applyStrategy(self, task, name, srcdir, params, hierarchical, eval):
+        self._log.debug("--> _applyStrategy %s" % task.name)
+
+        if name is None:
+            name = task.name
+
+        if srcdir is None:
+            srcdir = os.path.dirname(task.srcinfo.file)
+
+        if params is None:
+            params = task.paramT()
+
+        ret = TaskNodeCompound(
+            name=name,
+            srcdir=srcdir,
+            params=params,
+            ctxt=self._ctxt)
+
+        if ret.input is None:
+            raise Exception("Task %s does not have an input" % task.name)
+
+        self._gatherNeeds(task, ret)
+
+        ctxt = TaskGenCtxt(
+            rundir=self.get_rundir(),
+            input=ret.input,
+            builder=self
+        )
+
+        # In both cases, the result 'lives' inside a compound task
+
+        res = None
+        if task.strategy.generate is not None:
+            callable = ExecGenCallable(body=task.strategy.generate.run)
+            input = TaskGenInputData(params=params)
+
+            res = callable(ctxt, input)
+        elif len(task.strategy.matrix):
+            matrix = {}
+            matrix_items = []
+            for k in task.strategy.matrix.keys():
+                matrix[k] = None
+                matrix_items.append((k, task.strategy.matrix[k]))
+
+            res = self._applyStrategyMatrix(task.tasks, matrix_items, 0)
+            
+            pass
+
+
+#        tasks = [ret.input]
+        tasks = []
+        tasks.extend(ret.tasks[1:])
+
+        tasks.extend(ctxt.tasks.copy())
+        if res is not None:
+            if isinstance(res, list):
+                tasks.extend(res)
+            else:
+                tasks.append(res)
+
+        # Finish hooking this up...
+        for tn in tasks:
+            if tn is None:
+                raise Exception("Generator yielded a null class")
+            referenced = None
+            for tt in tasks:
+                for tnn,_ in tt.needs:
+                    if tn == tnn:
+                        referenced = tnn
+                        break
+
+            refs_internal = None
+            for nn,_ in tn.first.needs:
+                for tnn in tasks:
+                    if nn == tnn:
+                        refs_internal = tnn
+                        break
+                if refs_internal is not None:
+                    break
+            
+            if not refs_internal:
+                if ret.input is None:
+                    raise Exception("Adding None input")
+                if tn == ret.input:
+                    raise Exception("Adding input to itself")
+                tn.needs.append((ret.input, False))
+            
+            if referenced is None:
+                if tn is None:
+                    raise Exception("Adding None input")
+                ret.needs.append((tn, False))
+
+        self._log.debug("<-- _applyStrategy %s" % task.name)
+        return ret
+    
+    def _applyStrategyMatrix(self, tasks, matrix_items, idx):
+        raise Exception("_applyStrategyMatrix not implemented")
+
     
     def _isCompound(self, task):
         if isinstance(task, Task):
