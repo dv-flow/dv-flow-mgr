@@ -49,6 +49,10 @@ class TaskNodeLeaf(TaskNode):
         for i,(need,block) in enumerate(self.needs):
             self._log.debug("dep %s dep_m: %s" % (need.name, str(dep_m)))
             if not block:
+                if need.output is None:
+                    raise Exception("Need %s has no output (in %s)" % (
+                        need.name,
+                        self.name))
                 for subdep in need.output.dep_m.keys():
                     if subdep not in dep_m.keys():
                         dep_m[subdep] = []
