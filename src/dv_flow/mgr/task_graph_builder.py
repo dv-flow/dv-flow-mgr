@@ -560,15 +560,23 @@ class TaskGraphBuilder(object):
 
         # In both cases, the result 'lives' inside a compound task
 
-        callable = None
+        res = None
         if task.strategy.generate is not None:
             callable = ExecGenCallable(body=task.strategy.generate.run)
+            input = TaskGenInputData(params=params)
+
+            res = callable(ctxt, input)
         elif len(task.strategy.matrix):
+            matrix = {}
+            matrix_items = []
+            for k in task.strategy.matrix.keys():
+                matrix[k] = None
+                matrix_items.append((k, task.strategy.matrix[k]))
+
+            res = self._applyStrategyMatrix(task.tasks, matrix_items, 0)
+            
             pass
 
-        input = TaskGenInputData(params=params)
-
-        res = callable(ctxt, input)
 
 #        tasks = [ret.input]
         tasks = []
@@ -615,6 +623,9 @@ class TaskGraphBuilder(object):
 
         self._log.debug("<-- _applyStrategy %s" % task.name)
         return ret
+    
+    def _applyStrategyMatrix(self, tasks, matrix_items, idx):
+        raise Exception("_applyStrategyMatrix not implemented")
 
     
     def _isCompound(self, task):
