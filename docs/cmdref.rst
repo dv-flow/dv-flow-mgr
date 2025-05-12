@@ -38,5 +38,5 @@ An execution is shown in the Perfetto UI below. In addition to seeing informatio
 about how tasks executed with respect to each other, data about individual
 tasks can be seen.
 
-.. image:: imgs/perfetto_trace_view.performing
+.. image:: imgs/perfetto_trace_view.png
 
