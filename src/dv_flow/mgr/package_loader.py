@@ -13,7 +13,7 @@ from .package import Package
 from .param_def import ComplexType
 from .ext_rgy import ExtRgy
 from .srcinfo import SrcInfo
-from .task import Task
+from .task import Task, Strategy, StrategyGenerate
 from .task_def import TaskDef, PassthroughE, ConsumesE, RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
@@ -637,6 +637,20 @@ class PackageLoader(object):
                     self.error("failed to find task %s" % need, taskdef.srcinfo)
                     raise Exception("Failed to find task %s" % need)
                 task.needs.append(nt)
+
+            if taskdef.strategy is not None:
+                self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
+                if taskdef.strategy.generate is not None:
+                    shell = taskdef.strategy.generate.shell
+                    if shell is None:
+                        shell = "pytask"
+                    task.strategy = Strategy(
+                        generate=StrategyGenerate(
+                            shell=shell,
+                            run=taskdef.strategy.generate.run))
+
+#                task.strategy = taskdef.strategy
+
 
             # Determine how to implement this task
             if taskdef.body is not None and len(taskdef.body) > 0:
