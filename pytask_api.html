@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Python Task API &#8212; DV Flow Manager  documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
     <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
     <script src="_static/documentation_options.js?v=5929fcd5"></script>
@@ -14,6 +14,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Task Runners" href="task_runners.html" />
     <link rel="prev" title="Command reference" href="cmdref.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -123,6 +124,14 @@ fails, an error marker will be added.</p>
 <dd><p>Add a marker related to the task’s execution</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.mkDataItem">
+<span class="sig-name descname"><span class="pre">mkDataItem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.mkDataItem" title="Link to this definition">¶</a></dt>
+<dd><p>Create a data item in the task’s rundir. The data item will be
+created in the task’s rundir, and will be available to the
+task’s implementation.</p>
+</dd></dl>
+
 </dd></dl>
 
 </section>
@@ -203,6 +212,7 @@ an associated severity level (error, warning, info).</p>
 <li class="toctree-l2"><a class="reference internal" href="#taskmarker">TaskMarker</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
 </ul>
 
 <div class="relations">
@@ -210,6 +220,7 @@ an associated severity level (error, warning, info).</p>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="cmdref.html" title="previous chapter">Command reference</a></li>
+      <li>Next: <a href="task_runners.html" title="next chapter">Task Runners</a></li>
   </ul></li>
 </ul>
 </div>

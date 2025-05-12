@@ -19,3 +19,4 @@ You can learn more about the input specification <here>.
    quickstart
    cmdref
    pytask_api
+   task_runners
