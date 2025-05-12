@@ -96,13 +96,14 @@ class TaskListenerLog(object):
         else:
             sev_pref = ""
 
+        # Escape anything that looks like a styling marker
+        marker_m = m.msg.replace("[", "\\[")
+
         msg = "  %s%s: %s" % (
             sev_pref,
             (" " + name) if name is not None and name != "" else "",
-            m.msg)
+            marker_m)
         
-        # Escape anything that looks like a styling marker
-        msg = msg.replace("[", "\\[")
 
 
         if m.loc is not None:
