@@ -71,11 +71,29 @@ class LoaderScope(SymbolScope):
         # Split the name into elements
         name_elems = name.split('.')
 
+        def find_pkg(pkg_name):
+            pkg = None
+
+            if pkg_name in self.loader._pkg_m.keys():
+                pkg = self.loader._pkg_m[pkg_name]
+            else:
+                path = self.loader.pkg_rgy.findPackagePath(pkg_name)
+                if path is not None:
+                    path = os.path.normpath(path)
+                    pkg = self.loader._loadPackage(path)
+                    self.loader._pkg_m[pkg_name] = pkg
+            if pkg is not None:
+                self._log.debug("Found pkg %s (%s)" % (pkg_name, str(pkg.task_m.keys())))
+            else:
+                self._log.debug("Failed to find pkg %s" % pkg_name)
+            
+            return pkg
+
         if len(name_elems) > 1:
             for i in range(len(name_elems)-1, -1, -1):
                 pkg_name = ".".join(name_elems[:i+1])
 
-                pkg = self.findPackage(pkg_name)
+                pkg = find_pkg(pkg_name)
                 if pkg is not None:
                     break;
 
@@ -107,25 +125,6 @@ class LoaderScope(SymbolScope):
         self._log.debug("<-- findType: %s (%s)" % (name, str(ret)))
 
         return ret
-    
-    def findPackage(self, name) -> Package:
-        pkg = None
-
-        if name in self.loader._pkg_m.keys():
-            pkg = self.loader._pkg_m[name]
-        else:
-            path = self.loader.pkg_rgy.findPackagePath(name)
-            if path is not None:
-                path = os.path.normpath(path)
-                pkg = self.loader._loadPackage(path)
-                self.loader._pkg_m[name] = pkg
-        if pkg is not None:
-            self._log.debug("Found pkg %s (%s)" % (name, str(pkg.task_m.keys())))
-        else:
-            self._log.debug("Failed to find pkg %s" % name)
-            
-        return pkg
-
 
 @dc.dataclass
 class PackageScope(SymbolScope):
@@ -357,6 +356,13 @@ class PackageLoader(object):
 
         # TODO: handle 'uses' for packages
         pkg.paramT = self._getParamT(pkg_def, None)
+
+        # Apply any overrides from above
+
+        # Now, apply these overrides to the 
+        for target,override in pkg_def.overrides.items():
+            # TODO: expand target, override
+            pass
 
         pkg_scope = self.package_scope()
         if pkg_scope is not None:
@@ -593,13 +599,7 @@ class PackageLoader(object):
                 task.uses = self._findTaskOrType(taskdef.uses)
 
                 if task.uses is None:
-                    closest = self.find_closest_name(taskdef.uses)
-                    if closest:
-                        self.error("failed to resolve task-uses %s. Did you mean %s?" % (
-                            taskdef.uses, 
-                            closest), taskdef.srcinfo)
-                    else:
-                        self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
+                    self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
                     continue
             
             passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
@@ -936,29 +936,3 @@ class PackageLoader(object):
     def marker(self, marker):
         for l in self.marker_listeners:
             l(marker)
-
-    def find_closest_name(self, name):
-        import difflib
-
-        # First see if we can find the package
-
-        name_s = set()
-        pkg_s = set()
-        for p in self._pkg_m.values():
-            self._gatherTaskNames(name_s, pkg_s, p)
-
-        closest_matches = difflib.get_close_matches(name, name_s)
-
-        if closest_matches and len(closest_matches) > 0:
-            closest_match = closest_matches[0]
-            self._log.debug("Closest match: %s" % closest_match)
-            return closest_match
-
-    def _gatherTaskNames(self, name_s, pkg_s, pkg):
-        if pkg.name not in pkg_s:
-            pkg_s.add(pkg.name)
-            for t in pkg.task_m.keys():
-                name_s.add(t)
-            for p in pkg.pkg_m.values():
-                self._gatherTaskNames(name_s, pkg_s, p)
-

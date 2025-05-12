@@ -39,6 +39,9 @@ from .srcinfo import SrcInfo
 from .task_def import TaskDef
 from .type_def import TypeDef
 
+class Override(BaseModel):
+    name : str = dc.Field()
+    override : str = dc.Field(alias="with")
 
 class PackageDef(BaseModel):
     name : str = dc.Field(
@@ -50,6 +53,8 @@ class PackageDef(BaseModel):
     imports : List[Union[str,PackageImportSpec]] = dc.Field(
         default_factory=list,
         description="List of packages to import")
+    overrides : Dict[str, str] = dc.Field(default_factory=dict,
+        description="Overrides for packages and parameters")
     fragments: List[str] = dc.Field(
         default_factory=list,
         description="List of fragments to include")

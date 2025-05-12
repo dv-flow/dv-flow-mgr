@@ -21,12 +21,17 @@
 #****************************************************************************
 import dataclasses as dc
 import logging
-from typing import Any, ClassVar, Dict, List
+from typing import Any, ClassVar, Dict, List, Union
 from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .srcinfo import SrcInfo
 from .task import Task
 from .type import Type
+
+@dc.dataclass
+class Override(object):
+    target : Union[str, 'Package']
+    override : Union[str, 'Package']
 
 @dc.dataclass
 class Package(object):
@@ -39,6 +44,7 @@ class Package(object):
     type_m : Dict[str,Type] = dc.field(default_factory=dict)
     fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
     pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
+#    overrides : Dict[str, str]
     srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")
 
