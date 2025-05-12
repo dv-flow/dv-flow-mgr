@@ -100,9 +100,17 @@ class TaskListenerLog(object):
             sev_pref,
             (" " + name) if name is not None and name != "" else "",
             m.msg)
+        
+        # Escape anything that looks like a styling marker
+        msg = msg.replace("[", "\\[")
+
 
         if m.loc is not None:
-            self.console.print("%s" % msg)
+
+            try:
+                self.console.print("%s" % msg)
+            except Exception as e:
+                self._log.error("Problem displaying message \"%s\" to the console: %s" % (msg, e))
             if m.loc.line != -1 and m.loc.pos != -1:
                 self.console.print("    %s:%d:%d" % (m.loc.path, m.loc.line, m.loc.pos))
             elif m.loc.line != -1:
@@ -110,9 +118,12 @@ class TaskListenerLog(object):
             else:
                 self.console.print("    %s" % m.loc.path)
         else:
-            self.console.print("%s%s" % (
-                msg, 
-                ("(%s)" % rundir) if rundir is not None else ""))
+            try:
+                self.console.print("%s%s" % (
+                    msg, 
+                    ("(%s)" % rundir) if rundir is not None else ""))
+            except Exception as e:
+                self._log.error("Problem displaying message \"%s\" to the console: %s" % (msg, e))
 
         pass
 
