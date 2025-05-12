@@ -27,6 +27,7 @@ class SymbolScope(object):
     name : str
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
     type_m : Dict[str,Type] = dc.field(default_factory=dict)
+    override_m : Dict[str,Any] = dc.field(default_factory=dict)
 
     def add(self, task, name):
         self.task_m[name] = task
@@ -276,6 +277,16 @@ class PackageLoader(object):
                 ret = scope
                 break
         return ret
+    
+    def push_package_scope(self, pkg):
+        if len(self._pkg_s):
+            # Pull forward the overrides 
+            pkg.override_m = self._pkg_s[-1].override_m.copy()
+        self._pkg_s.append(pkg)
+        pass
+
+    def pop_package_scope(self):
+        self._pkg_s.pop()
 
     def _loadPackage(self, root, exp_pkg_name=None) -> Package:
         if root in self._file_s:
@@ -375,7 +386,8 @@ class PackageLoader(object):
                 pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
             self._pkg_m[pkg.name] = pkg
-            self._pkg_s.append(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
+            self.push_package_scope(PackageScope(name=pkg.name, pkg=pkg, loader=self._loader_scope))
+
             # Imports are loaded first
             self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
 
@@ -387,7 +399,7 @@ class PackageLoader(object):
             self._loadTypes(pkg, typedefs)
             self._loadTasks(pkg, taskdefs, pkg.basedir)
 
-            self._pkg_s.pop()
+            self.pop_package_scope()
 
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
