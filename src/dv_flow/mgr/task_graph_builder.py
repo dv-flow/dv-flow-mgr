@@ -896,13 +896,26 @@ class TaskGraphBuilder(object):
         elif isinstance(value, list):
             new_val = []
             for i,elem in enumerate(value):
-                if elem.find("${{") != -1:
-                    if len(self._name_resolution_stack) > 0:
-                        eval.set_name_resolution(self._name_resolution_stack[-1])
-                    resolved = eval.eval(elem)
-                    new_val.append(resolved)
-                else:
-                    new_val.append(elem)
+                if isinstance(elem, str):
+                    if elem.find("${{") != -1:
+                        if len(self._name_resolution_stack) > 0:
+                            eval.set_name_resolution(self._name_resolution_stack[-1])
+                        resolved = eval.eval(elem)
+                        new_val.append(resolved)
+                    else:
+                        new_val.append(elem)
+                elif isinstance(elem, dict):
+                    for k, v in elem.items():
+                        if isinstance(v, str):
+                            if v.find("${{") != -1:
+                                if len(self._name_resolution_stack) > 0:
+                                    eval.set_name_resolution(self._name_resolution_stack[-1])
+                                resolved = eval.eval(v)
+                                new_val.append({k: resolved})
+                            else:
+                                new_val.append({k: v})
+                        else:
+                            new_val.append(elem)
         return new_val
 
     def _gatherNeeds(self, task_t, node):
