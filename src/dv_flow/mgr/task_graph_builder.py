@@ -67,6 +67,7 @@ class TaskGraphBuilder(object):
     rundir : str
     loader : PackageLoader = None
     marker_l : Callable = lambda *args, **kwargs: None
+    env : Dict[str, str] = dc.field(default=None)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -94,7 +95,10 @@ class TaskGraphBuilder(object):
         self._shell_m.update(ExtRgy.inst()._shell_m)
         self._task_rundir_s.append([self.rundir])
 
-        self._eval.set("env", os.environ)
+        if self.env is None:
+            self.env = os.environ.copy()
+
+        self._eval.set("env", self.env)
 
 
 

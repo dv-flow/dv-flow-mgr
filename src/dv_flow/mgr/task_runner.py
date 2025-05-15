@@ -34,11 +34,16 @@ from .task_node import TaskNode, RundirE
 @dc.dataclass
 class TaskRunner(object):
     rundir : str
+    env : Dict[str, str] = dc.field(default=None)
 
     # List of [Listener:Callable[Task],Recurisve:bool]
     listeners : List[Tuple[Callable['Task','Reason'], bool]] = dc.field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskRunner")
+
+    def __post_init__(self):
+        if self.env is None:
+            self.env = os.environ.copy()
 
     def add_listener(self, l, recursive=False):
         self.listeners.append((l, recursive))
@@ -68,6 +73,7 @@ class TaskSetRunner(TaskRunner):
     _log : ClassVar = logging.getLogger("TaskSetRunner")
 
     def __post_init__(self):
+        super().__post_init__()
         if self.nproc == -1:
             self.nproc = os.cpu_count()
 

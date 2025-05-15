@@ -225,6 +225,7 @@ class PackageScope(SymbolScope):
 class PackageLoader(object):
     pkg_rgy : ExtRgy = dc.field(default=None)
     marker_listeners : List[Callable] = dc.field(default_factory=list)
+    env : Dict[str, str] = dc.field(default=None)
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
@@ -235,6 +236,9 @@ class PackageLoader(object):
     def __post_init__(self):
         if self.pkg_rgy is None:
             self.pkg_rgy = ExtRgy.inst()
+
+        if self.env is None:
+            self.env = os.environ.copy()
 
         self._loader_scope = LoaderScope(name=None, loader=self)
 

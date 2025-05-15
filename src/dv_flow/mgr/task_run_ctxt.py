@@ -3,7 +3,7 @@ import dataclasses as dc
 from pydantic import BaseModel
 import pydantic.dataclasses as pdc
 import os
-from typing import List
+from typing import Dict, List
 from .task_data import TaskMarker, SeverityE, TaskMarkerLoc
 from .task_node_ctxt import TaskNodeCtxt
 
@@ -19,6 +19,7 @@ class TaskRunCtxt(object):
 
     _markers : List[TaskMarker] = dc.field(default_factory=list)
     _exec_info : List[ExecInfo] = dc.field(default_factory=list)
+    _env : Dict[str, str] = dc.field(default=None)
 
     @property
     def root_pkgdir(self):
@@ -27,6 +28,10 @@ class TaskRunCtxt(object):
     @property
     def root_rundir(self):
         return self.ctxt.root_rundir
+    
+    @property
+    def env(self):
+        return self._env
     
     def mkDataItem(self, type, **kwargs):
         """
@@ -65,6 +70,9 @@ class TaskRunCtxt(object):
         """
         if logfile is None:
             logfile = "cmd_%d.log" % (self._exec_info.__len__() + 1)
+
+        if env is None:
+            env = self._env
 
         fp = open(os.path.join(self.rundir, logfile), "w")
         proc = await asyncio.create_subprocess_exec(
