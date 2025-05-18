@@ -108,7 +108,8 @@ class TaskGraphBuilder(object):
 
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=self.root_pkg.basedir,
-                root_rundir=self.rundir)
+                root_rundir=self.rundir,
+                env=self.env)
 
             self._eval.set("root", {
                 "dir": self.root_pkg.basedir
@@ -694,7 +695,7 @@ class TaskGraphBuilder(object):
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
-                callable = self._shell_m[shell](task.run)
+                callable = self._shell_m[shell](task.run, task.shell)
             else:
                 raise Exception("Shell %s not found" % shell)
             

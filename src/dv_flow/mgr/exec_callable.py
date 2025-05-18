@@ -10,6 +10,7 @@ from .task_data import TaskDataResult
 @dc.dataclass
 class ExecCallable(object):
     body : str
+    shell: str = "pytask"
     _log : ClassVar = logging.getLogger("ExecCallable")
 
     async def __call__(self, ctxt, input):

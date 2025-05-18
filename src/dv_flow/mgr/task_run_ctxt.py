@@ -19,7 +19,6 @@ class TaskRunCtxt(object):
 
     _markers : List[TaskMarker] = dc.field(default_factory=list)
     _exec_info : List[ExecInfo] = dc.field(default_factory=list)
-    _env : Dict[str, str] = dc.field(default=None)
 
     @property
     def root_pkgdir(self):
@@ -31,7 +30,7 @@ class TaskRunCtxt(object):
     
     @property
     def env(self):
-        return self._env
+        return self.ctxt.env if self.ctxt is not None else os.environ
     
     def mkDataItem(self, type, **kwargs):
         """

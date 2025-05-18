@@ -98,6 +98,9 @@ class ExtRgy(object):
 
         # Register built-in shells
         self._shell_m["shell"] = ShellCallable
+        self._shell_m["bash"] = ShellCallable
+        self._shell_m["csh"] = ShellCallable
+        self._shell_m["tcsh"] = ShellCallable
         self._shell_m["pytask"] = ExecCallable
 
 
