@@ -71,7 +71,7 @@ class TaskRunCtxt(object):
             logfile = "cmd_%d.log" % (self._exec_info.__len__() + 1)
 
         if env is None:
-            env = self._env
+            env = self.env
 
         fp = open(os.path.join(self.rundir, logfile), "w")
         proc = await asyncio.create_subprocess_exec(
