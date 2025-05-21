@@ -132,7 +132,7 @@ class Package(object):
         
         if markers:
             result["markers"] = [
-                {"msg": marker.msg, "severity": marker.severity}
+                {"msg": marker.msg, "severity": str(marker.severity)}
                 for marker in markers
             ]
             
