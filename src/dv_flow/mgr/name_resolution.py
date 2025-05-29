@@ -69,5 +69,4 @@ class NameResolutionContext:
 #            pkg = self.builder._pkg_m[name]
 #            ret = pkg.paramT
 
-        print("<-- resolve: %s" % type(ret))
         return ret

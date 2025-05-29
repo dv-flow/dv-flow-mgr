@@ -54,11 +54,11 @@ class CmdGraph(object):
         if args.task is None:
             # Print out available tasks
             tasks = []
-            for task in pkg.tasks:
+            for task in pkg.task_m.values():
                 tasks.append(task)
-            for frag in pkg._fragment_l:
-                for task in frag.tasks:
-                    tasks.append(task)
+#            for frag in pkg._fragment_l:
+#                for task in frag.tasks:
+#                    tasks.append(task)
             tasks.sort(key=lambda x: x.name)
 
             max_name_len = 0
@@ -77,7 +77,16 @@ class CmdGraph(object):
 
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
 
-            t = builder.mkTaskNode(pkg.name + "." + args.task)
+            for pref in ("", "%s." % pkg.name):
+                name = "%s%s" % (pref, args.task)
+                task = builder.findTask(name)
+                if task is not None:
+                    break
+
+            if task is None:
+                raise Exception("Task '%s' not found in package '%s'" % (args.task, pkg.name))
+
+            t = builder.mkTaskNode(task.name)
 
             TaskGraphDotWriter().write(
                 t,

@@ -199,12 +199,12 @@ class TaskGraphBuilder(object):
     def leave_uses(self):
         self._uses_count -= 1
 
-    def enter_compound(self, task : TaskNode, rundir=None):
-        self._compound_task_ctxt_s.append(CompoundTaskCtxt(
-            parent=self, task=task, rundir=rundir))
-
-        if rundir is None or rundir == RundirE.Unique:
-            self._rundir_s.append(task.name)
+#    def enter_compound(self, task : TaskNode, rundir=None):
+#        self._compound_task_ctxt_s.append(CompoundTaskCtxt(
+#            parent=self, task=task, rundir=rundir))
+#
+#        if rundir is None or rundir == RundirE.Unique:
+#            self._rundir_s.append(task.name)
 
     def enter_compound_uses(self):
         self._compound_task_ctxt_s[-1].uses_s.append({})
@@ -253,10 +253,6 @@ class TaskGraphBuilder(object):
             if name in self.root_pkg.task_m.keys():
                 task = self.mkTaskGraph(name)
                 self._log.debug("Found task %s in root package" % name)
-            else:
-                raise Exception("Failed to find task %s" % name)
-                pass
-            # Go search type definitions
             pass
 
             # Check the current package
@@ -265,13 +261,13 @@ class TaskGraphBuilder(object):
         
         return task
 
-    def leave_compound(self, task : TaskNode):
-        ctxt = self._compound_task_ctxt_s.pop()
-        if ctxt.rundir is None or ctxt.rundir == RundirE.Unique:
-            self._rundir_s.pop()
+#    def leave_compound(self, task : TaskNode):
+#        ctxt = self._compound_task_ctxt_s.pop()
+#        if ctxt.rundir is None or ctxt.rundir == RundirE.Unique:
+#            self._rundir_s.pop()
 
-    def mkTaskGraph(self, task : str, rundir=None) -> TaskNode:
-        return self.mkTaskNode(task, rundir=rundir)
+    def mkTaskGraph(self, task : str) -> TaskNode:
+        return self.mkTaskNode(task)
         
     def push_name_resolution_context(self, pkg: Package):
         """Create and push a new name resolution context"""
