@@ -25,6 +25,7 @@ import os
 from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 from .cmds.cmd_show import CmdShow
+from .cmds.cmd_util import CmdUtil
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -75,6 +76,12 @@ def get_parser():
                         action="store_true",
                         help="Shows additional information about tasks")
     show_parser.set_defaults(func=CmdShow())
+
+    util_parser = subparsers.add_parser('util',
+        help="Internal utility command")
+    util_parser.add_argument("cmd")
+    util_parser.add_argument("args", nargs=argparse.REMAINDER)
+    util_parser.set_defaults(func=CmdUtil())
 
     return parser
 
