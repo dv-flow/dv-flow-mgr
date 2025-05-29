@@ -1,11 +1,16 @@
 import json
 import os
-from ...package import Package
-from ...util.util import loadProjPkgDef
+from ..package import Package
+from ..util.util import loadProjPkgDef
 
-class CmdWorkspace(object):
+class CmdUtil(object):
 
     def __call__(self, args):
+
+        if args.cmd == "workspace":
+            self.workspace(args)
+
+    def workspace(self, args):
 
         pkg : Package = None
         markers = None
