@@ -128,7 +128,8 @@ class TaskGraphBuilder(object):
         else:
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=None,
-                root_rundir=self.rundir)
+                root_rundir=self.rundir,
+                env=self.env)
 
 
     def setParam(self, name, value):

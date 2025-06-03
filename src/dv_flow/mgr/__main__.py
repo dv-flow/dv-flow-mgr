@@ -26,6 +26,7 @@ from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 from .cmds.cmd_show import CmdShow
 from .cmds.cmd_util import CmdUtil
+from .ext_rgy import ExtRgy
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -34,6 +35,9 @@ def get_parser():
     # parser.add_argument("-d", "--debug", 
     #                     help="Enable debug",
     #                     action="store_true")
+
+    ext_rgy = ExtRgy.inst()
+
     parser.add_argument("--log-level", 
                         help="Configures debug level [INFO, DEBUG]",
                         choices=("NONE", "INFO", "DEBUG"))
@@ -76,6 +80,9 @@ def get_parser():
                         action="store_true",
                         help="Shows additional information about tasks")
     show_parser.set_defaults(func=CmdShow())
+
+    for ext in ext_rgy.subcmd_ext:
+        ext(subparsers)
 
     util_parser = subparsers.add_parser('util',
         help="Internal utility command")

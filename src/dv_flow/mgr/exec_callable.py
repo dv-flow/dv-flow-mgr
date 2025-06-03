@@ -4,7 +4,7 @@ import importlib.util
 import logging
 import os
 import sys
-from typing import ClassVar, List
+from typing import ClassVar, Dict, List
 from .task_data import TaskDataResult
 
 @dc.dataclass
@@ -12,6 +12,12 @@ class ExecCallable(object):
     body : str
     shell: str = "pytask"
     _log : ClassVar = logging.getLogger("ExecCallable")
+
+    def model_dump(self) -> Dict:
+        return {
+            "body": self.body,
+            "shell": self.shell
+        }
 
     async def __call__(self, ctxt, input):
         self._log.debug("--> ExecCallable")

@@ -22,7 +22,7 @@
 import enum
 import logging
 import pydantic.dataclasses as dc
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, Set, List, Tuple
 from .fileset import FileSet
 from toposort import toposort
@@ -47,6 +47,8 @@ class TaskMarker(BaseModel):
     msg : str
     severity : SeverityE
     loc : TaskMarkerLoc = dc.Field(default=None)
+
+    model_config = ConfigDict(use_enum_values=True)
 
 class TaskDataInput(BaseModel):
     """

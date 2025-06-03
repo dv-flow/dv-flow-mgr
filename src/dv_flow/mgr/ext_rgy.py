@@ -23,7 +23,7 @@ import dataclasses as dc
 import os
 import logging
 import sys
-from typing import Callable, ClassVar, Dict, Tuple
+from typing import Callable, ClassVar, Dict, List, Tuple
 from .exec_callable import ExecCallable
 from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
@@ -38,6 +38,8 @@ class ExtRgy(object):
         self._shell_m : Dict[str, Callable] = {}
         self._log = logging.getLogger(type(self).__name__)
         self._override_m : Dict[str,str] = {}
+        self._subcmd_ext : List = []
+        self._utilcmd_ext : List = []
 
     def addOverride(self, key, value):
         self._override_m[key] = value
@@ -56,6 +58,8 @@ class ExtRgy(object):
     def findShell(self, name) -> Callable:
         if name in self._shell_m.keys():
             return self._shell_m[name]
+        else:
+            return None
         
     def findPackagePath(self, name) -> str:
         ret = None
@@ -90,6 +94,14 @@ class ExtRgy(object):
                 break
 
         return ret
+
+    @property 
+    def subcmd_ext(self) -> List[Callable]:
+        return self._subcmd_ext
+    
+    @property
+    def utilcmd_ext(self) -> List[Callable]:
+        return self._utilcmd_ext
 
     def _discover_plugins(self):
         self._log.debug("--> discover_plugins")
@@ -137,6 +149,11 @@ class ExtRgy(object):
                             self._log.debug("Shell %s already registered" % name)
                         else:
                             self._shell_m[name] = shell
+                if hasattr(mod, "dfm_add_subcmd"):
+                    self._subcmd_ext.append(mod.dfm_add_subcmd)
+                if hasattr(mod, "dfm_add_utilcmd"):
+                    self._utilcmd_ext.append(mod.dfm_add_utilcmd)
+
             except Exception as e:
                 self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e
