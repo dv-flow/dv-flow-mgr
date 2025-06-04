@@ -1,3 +1,6 @@
+# 1.8.0
+- Add support for '.needs' reference on tasks.  
+
 # 1.7.0
 - Enhance import in sub-projects to search root package first for relative paths
 - Support for data-item emitting tasks

@@ -630,17 +630,31 @@ class PackageLoader(object):
 
             for need in taskdef.needs:
                 nt = None
+
+                need_name = None
                 if isinstance(need, str):
+                    need_name = need
                     nt = self._findTask(need)
                 elif isinstance(need, TaskDef):
-                    nt = self._findTask(need.name)
+                    need_name = need.name
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
-                if nt is None:
-                    self.error("failed to find task %s" % need, taskdef.srcinfo)
-                    raise Exception("Failed to find task %s" % need)
-                task.needs.append(nt)
+                if need_name.endswith(".needs"):
+                    # Find the original task first
+                    nt = self._findTask(need_name[:-len(".needs")])
+                    if nt is None:
+                        self.error("failed to find task %s" % need, taskdef.srcinfo)
+                        raise Exception("Failed to find task %s" % need)
+                    for nn in nt.needs:
+                        task.needs.append(nn)
+                else:
+                    nt = self._findTask(need_name)
+                
+                    if nt is None:
+                        self.error("failed to find task %s" % need, taskdef.srcinfo)
+                        raise Exception("Failed to find task %s" % need)
+                    task.needs.append(nt)
 
             if taskdef.strategy is not None:
                 self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
