@@ -371,7 +371,16 @@ class TaskGraphBuilder(object):
 
                 for k,v in kwargs.items():
                     if hasattr(ret.params, k):
-                        setattr(ret.params, k, v)
+                        pv = getattr(ret.params, k)
+                        if isinstance(pv, list):
+                            if isinstance(v, list):
+                                # Append to the list
+                                pv.extend(v)
+                            else:
+                                # Append a single value
+                                pv.append(v)
+                        else:
+                            setattr(ret.params, k, v)
                     else:
                         raise Exception("Task %s parameters do not include %s" % (task.name, k))
             finally:
