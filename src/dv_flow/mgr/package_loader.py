@@ -331,7 +331,10 @@ class PackageLoader(object):
                         else:
                             loc_s = str(el)
                         if hasattr(obj, "__getitem__"):
-                            obj = obj[el]
+                            try:
+                                obj = obj[el]
+                            except KeyError as ke:
+                                pass
                         if type(obj) == dict and 'srcinfo' in obj.keys():
                             loc = obj['srcinfo']
                     if loc is not None:

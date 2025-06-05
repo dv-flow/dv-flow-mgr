@@ -45,6 +45,7 @@ class VisibilityE(enum.Enum):
 
 class ParamDef(BaseModel):
     doc : str = None
+    desc : str = None
     type : Union[str, 'ComplexType'] = None
 #    derived : bool = Field(default=False)
     value : Union[Any, None] = None
