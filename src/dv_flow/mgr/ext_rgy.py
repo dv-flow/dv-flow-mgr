@@ -119,8 +119,11 @@ class ExtRgy(object):
             try:
                 mod = p.load()
 
-                if hasattr(mod, "dvfm_packages"):
-                    pkg_m = mod.dvfm_packages()
+                if hasattr(mod, "dvfm_packages") or hasattr(mod, "dfm_packages"):
+                    if hasattr(mod, "dvfm_packages"):
+                        pkg_m = mod.dvfm_packages()
+                    else:
+                        pkg_m = mod.dfm_packages()
                     
                     for name,path in pkg_m.items():
                         self._log.debug("Registering package %s: %s" % (name, path))
@@ -129,8 +132,12 @@ class ExtRgy(object):
                                 name, self._pkg_m[name][0], path))
                         else:
                             self._pkg_m[name] = path
-                if hasattr(mod, "dvfm_shells"):
-                    shell_m = mod.dvfm_shells()
+                if hasattr(mod, "dvfm_shells") or hasattr(mod, "dfm_shells"):
+                    if hasattr(mod, "dvfm_shells"):
+                        shell_m = mod.dvfm_shells()
+                    else:
+                        shell_m = mod.dfm_shells()
+
                     for name, shell in shell_m.items():
                         self._log.debug("Registering shell %s" % name)
                         if name in self._shell_m.keys():

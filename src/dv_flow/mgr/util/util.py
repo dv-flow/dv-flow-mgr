@@ -43,8 +43,9 @@ def loadProjPkgDef(path, listener=None):
     
     if not found:
         if listener:
-            listener.marker(TaskMarker(
-                msg="Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % path))
+            listener(TaskMarker(
+                msg="Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % path,
+                severity=SeverityE.Error))
     
     return ret
 

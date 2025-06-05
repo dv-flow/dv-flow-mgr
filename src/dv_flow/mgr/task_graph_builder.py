@@ -128,8 +128,12 @@ class TaskGraphBuilder(object):
         else:
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=None,
-                root_rundir=self.rundir)
+                root_rundir=self.rundir,
+                env=self.env)
 
+
+    def setEnv(self, env):
+        self.env.update(env)
 
     def setParam(self, name, value):
         if self.root_pkg is None:
@@ -318,6 +322,7 @@ class TaskGraphBuilder(object):
             task = self.loader.getTask(task_t)
 
             if task is None:
+                type = None
                 if task_t in self._type_m.keys():
                     type = self._type_m[task_t]
                 
@@ -350,6 +355,8 @@ class TaskGraphBuilder(object):
                 task=DataCallable(type.paramT)
             )
             self._task_node_m[name] = ret
+        else:
+            self._log.debug("Fallthrough")
 
         if ret is None:
             if task is None:

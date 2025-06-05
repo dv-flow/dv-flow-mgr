@@ -26,6 +26,7 @@ from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 from .cmds.cmd_show import CmdShow
 from .cmds.cmd_util import CmdUtil
+from .ext_rgy import ExtRgy
 
 def get_parser():
     parser = argparse.ArgumentParser(
