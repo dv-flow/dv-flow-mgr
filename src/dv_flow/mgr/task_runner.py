@@ -150,8 +150,13 @@ class TaskSetRunner(TaskRunner):
                     # else:
                     #     rundir = self.rundir
 
+                    print("rundir: \"%s\"" % rundir, flush=True)
                     if not os.path.isdir(rundir):
-                        os.makedirs(rundir, exist_ok=True)
+                        try:
+                            os.makedirs(rundir, exist_ok=True)
+                        except Exception as e:
+                            print("Failed to create rundir %s: %s" % (rundir, str(e)), flush=True)
+                            raise e
 
                     self._log.debug("start task %s" % t.name)
                     self._notify(t, "enter")

@@ -24,6 +24,7 @@ import os
 import logging
 import sys
 from typing import ClassVar
+from ..ext_rgy import ExtRgy
 from ..util import loadProjPkgDef
 from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
@@ -42,6 +43,8 @@ class CmdRun(object):
             rootdir = os.environ["DV_FLOW_ROOT"]
         else:
             rootdir = os.getcwd()
+
+        rgy = ExtRgy.inst()
 
         # First, find the project we're working with
         listener = TaskListenerLog()
