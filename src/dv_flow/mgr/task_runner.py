@@ -37,7 +37,7 @@ class TaskRunner(object):
     env : Dict[str, str] = dc.field(default=None)
 
     # List of [Listener:Callable[Task],Recurisve:bool]
-    listeners : List[Tuple[Callable['Task','Reason'], bool]] = dc.field(default_factory=list)
+    listeners : List[Tuple[Callable[['Task'],'Reason'], bool]] = dc.field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskRunner")
 
@@ -150,7 +150,6 @@ class TaskSetRunner(TaskRunner):
                     # else:
                     #     rundir = self.rundir
 
-                    print("rundir: \"%s\"" % rundir, flush=True)
                     if not os.path.isdir(rundir):
                         try:
                             os.makedirs(rundir, exist_ok=True)
