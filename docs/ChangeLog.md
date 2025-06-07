@@ -1,3 +1,7 @@
+
+# 1.10.0
+- Refinements to support pytest and run environment variables
+
 # 1.8.0
 - Add support for '.needs' reference on tasks.  
 
