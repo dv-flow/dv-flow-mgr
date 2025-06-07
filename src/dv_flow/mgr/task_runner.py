@@ -150,7 +150,6 @@ class TaskSetRunner(TaskRunner):
                     # else:
                     #     rundir = self.rundir
 
-                    print("rundir: \"%s\"" % rundir, flush=True)
                     if not os.path.isdir(rundir):
                         try:
                             os.makedirs(rundir, exist_ok=True)
