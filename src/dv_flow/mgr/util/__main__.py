@@ -1,7 +1,6 @@
 import argparse
 import logging
 from .cmds.cmd_schema import CmdSchema
-from .cmds.cmd_workspace import CmdWorkspace
 
 def get_parser():
     parser = argparse.ArgumentParser(description="dv-flow-mgr.util")
@@ -16,10 +15,6 @@ def get_parser():
                         help="Destination file", 
                         default="-")
     schema.set_defaults(f=CmdSchema())
-
-    workspace = subparsers.add_parser('workspace', 
-                                      help='Dumps the workspace structure in JSON')
-    workspace.set_defaults(f=CmdWorkspace())
 
     return parser
 
