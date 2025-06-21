@@ -28,6 +28,7 @@ from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_graph_dot_writer import TaskGraphDotWriter
+from .util import get_rootdir
 
 
 class CmdGraph(object):
@@ -35,16 +36,8 @@ class CmdGraph(object):
 
     def __call__(self, args):
 
-        if args.root is not None:
-            rootdir = args.root
-        elif "DV_FLOW_ROOT" in os.environ.keys():
-            rootdir = os.environ["DV_FLOW_ROOT"]
-        else:
-            rootdir = os.getcwd()
-
-
         # First, find the project we're working with
-        pkg = loadProjPkgDef(rootdir)
+        pkg = loadProjPkgDef(get_rootdir(args))
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())

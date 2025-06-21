@@ -482,22 +482,26 @@ class PackageLoader(object):
         """Search down the tree looking for a flow.dv file"""
         self._log.debug("--> _findFlowDvInDir (%s, %s)" % (base, leaf))
         imp_path = None
-        if leaf is None:
-            if os.path.isfile(base):
-                imp_path = base
-            elif os.path.isfile(os.path.join(base, "flow.dv")):
-                imp_path = os.path.join(base, "flow.dv")
-            elif os.path.isdir(base):
-                imp_path = self._findFlowDvSubdir(base)
-        elif os.path.isfile(os.path.join(base, leaf)):
-            imp_path = os.path.join(base, leaf)
-            self._log.debug("Found: %s" % imp_path)
-        elif os.path.isdir(os.path.join(base, leaf)):
-            if os.path.isfile(os.path.join(base, leaf, "flow.dv")):
-                imp_path = os.path.join(base, leaf, "flow.dv")
-                self._log.debug("Found: %s" % imp_path) 
-            else:
-                imp_path = self._findFlowDvSubdir(os.path.join(base, leaf))
+        for name in ("flow.dv", "flow.yaml", "flow.yml"):
+            if leaf is None:
+                if os.path.isfile(base):
+                    imp_path = base
+                elif os.path.isfile(os.path.join(base, name)):
+                    imp_path = os.path.join(base, name)
+                elif os.path.isdir(base):
+                    imp_path = self._findFlowDvSubdir(base)
+            elif os.path.isfile(os.path.join(base, leaf)):
+                imp_path = os.path.join(base, leaf)
+                self._log.debug("Found: %s" % imp_path)
+            elif os.path.isdir(os.path.join(base, leaf)):
+                if os.path.isfile(os.path.join(base, leaf, name)):
+                    imp_path = os.path.join(base, leaf, name)
+                    self._log.debug("Found: %s" % imp_path) 
+                else:
+                    imp_path = self._findFlowDvSubdir(os.path.join(base, leaf))
+            if imp_path is not None:
+                self._log.debug("Found: %s" % imp_path)
+                break
         self._log.debug("<-- _findFlowDvInDir %s" % imp_path)
         return imp_path
     
@@ -506,11 +510,14 @@ class PackageLoader(object):
         # Search deeper
         ret = None
         for subdir in os.listdir(dir):
-            if os.path.isfile(os.path.join(dir, subdir, "flow.dv")):
-                ret = os.path.join(dir, subdir, "flow.dv")
-                self._log.debug("Found: %s" % ret)
-            elif os.path.isdir(os.path.join(dir, subdir)):
-                ret = self._findFlowDvSubdir(os.path.join(dir, subdir))
+            for name in ("flow.dv", "flow.yaml", "flow.yml"):
+                if os.path.isfile(os.path.join(dir, subdir, name)):
+                    ret = os.path.join(dir, subdir, name)
+                    self._log.debug("Found: %s" % ret)
+                elif os.path.isdir(os.path.join(dir, subdir)):
+                    ret = self._findFlowDvSubdir(os.path.join(dir, subdir))
+                if ret is not None:
+                    break
             if ret is not None:
                 break
         return ret

@@ -31,24 +31,19 @@ from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_listener_trace import TaskListenerTrace
+from .util import get_rootdir
 
 
 class CmdRun(object):
     _log : ClassVar = logging.getLogger("CmdRun")
 
     def __call__(self, args):
-        if args.root is not None:
-            rootdir = args.root
-        elif "DV_FLOW_ROOT" in os.environ.keys():
-            rootdir = os.environ["DV_FLOW_ROOT"]
-        else:
-            rootdir = os.getcwd()
 
         rgy = ExtRgy.inst()
 
         # First, find the project we're working with
         listener = TaskListenerLog()
-        pkg = loadProjPkgDef(rootdir, listener=listener.marker)
+        pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")

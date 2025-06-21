@@ -31,14 +31,17 @@ def loadProjPkgDef(path, listener=None):
     ret = None
     found = False
     while dir != "/" and dir != "" and os.path.isdir(dir):
-        if os.path.exists(os.path.join(dir, "flow.dv")):
-            with open(os.path.join(dir, "flow.dv")) as f:
-                data = yaml.load(f, Loader=yaml.FullLoader)
-                if "package" in data.keys():
-                    found = True
-                    listeners = [listener] if listener is not None else []
-                    ret = PackageLoader(marker_listeners=listeners).load(os.path.join(dir, "flow.dv"))
-                    break
+        for name in ("flow.dv", "flow.yaml", "flow.yml"):
+            if os.path.exists(os.path.join(dir, name)):
+                with open(os.path.join(dir, name)) as f:
+                    data = yaml.load(f, Loader=yaml.FullLoader)
+                    if "package" in data.keys():
+                        found = True
+                        listeners = [listener] if listener is not None else []
+                        ret = PackageLoader(marker_listeners=listeners).load(os.path.join(dir, name))
+                        break
+        if found:
+            break
         dir = os.path.dirname(dir)
     
     if not found:
