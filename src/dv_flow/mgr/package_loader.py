@@ -297,7 +297,7 @@ class PackageLoader(object):
 
     def _loadPackage(self, root, exp_pkg_name=None) -> Package:
         if root in self._file_s:
-            raise Exception("recursive reference")
+            raise Exception("recursive reference to %s" % root)
 
         if root in self._file_s:
             # TODO: should be able to unwind stack here
@@ -450,7 +450,7 @@ class PackageLoader(object):
             for root in (basedir, os.path.dirname(self._file_s[0])):
                 self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
 
-                resolved_path = self._findFlowDvInDir(root, imp_path)
+                resolved_path = self._findFlowDvInDir(os.path.join(root, imp_path))
 
                 if resolved_path is not None and os.path.isfile(resolved_path):
                     self._log.debug("Found root file: %s" % resolved_path)
@@ -478,30 +478,20 @@ class PackageLoader(object):
         pkg.pkg_m[sub_pkg.name] = sub_pkg
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
 
-    def _findFlowDvInDir(self, base, leaf=None):
-        """Search down the tree looking for a flow.dv file"""
-        self._log.debug("--> _findFlowDvInDir (%s, %s)" % (base, leaf))
+    def _findFlowDvInDir(self, base):
+        """Search down the tree looking for a <flow.dv> file"""
+        self._log.debug("--> _findFlowDvInDir (%s)" % base)
         imp_path = None
-        for name in ("flow.dv", "flow.yaml", "flow.yml"):
-            if leaf is None:
-                if os.path.isfile(base):
-                    imp_path = base
-                elif os.path.isfile(os.path.join(base, name)):
+        if os.path.isfile(base):
+            imp_path = base
+        else:
+            for name in ("flow.dv", "flow.yaml", "flow.yml"):
+                self._log.debug("Searching for %s in %s" % (name, base))
+                if os.path.isfile(os.path.join(base, name)):
                     imp_path = os.path.join(base, name)
-                elif os.path.isdir(base):
-                    imp_path = self._findFlowDvSubdir(base)
-            elif os.path.isfile(os.path.join(base, leaf)):
-                imp_path = os.path.join(base, leaf)
-                self._log.debug("Found: %s" % imp_path)
-            elif os.path.isdir(os.path.join(base, leaf)):
-                if os.path.isfile(os.path.join(base, leaf, name)):
-                    imp_path = os.path.join(base, leaf, name)
-                    self._log.debug("Found: %s" % imp_path) 
-                else:
-                    imp_path = self._findFlowDvSubdir(os.path.join(base, leaf))
-            if imp_path is not None:
-                self._log.debug("Found: %s" % imp_path)
-                break
+                    break
+            if imp_path is None and os.path.isdir(base):
+                imp_path = self._findFlowDvSubdir(base)
         self._log.debug("<-- _findFlowDvInDir %s" % imp_path)
         return imp_path
     
