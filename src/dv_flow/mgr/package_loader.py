@@ -11,6 +11,7 @@ from .fragment_def import FragmentDef
 from .package_def import PackageDef
 from .package import Package
 from .param_def import ComplexType
+from .param_ref_eval import ParamRefEval
 from .ext_rgy import ExtRgy
 from .srcinfo import SrcInfo
 from .task import Task, Strategy, StrategyGenerate
@@ -231,6 +232,7 @@ class PackageLoader(object):
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
+    _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _loader_scope : LoaderScope = None
 
     def __post_init__(self):
@@ -239,6 +241,8 @@ class PackageLoader(object):
 
         if self.env is None:
             self.env = os.environ.copy()
+
+        self._eval.set("env", self.env)
 
         self._loader_scope = LoaderScope(name=None, loader=self)
 
@@ -438,6 +442,10 @@ class PackageLoader(object):
         
         self._log.info("Loading imported package %s" % imp_path)
 
+        if "${{" in imp_path:
+            imp_path = self._eval.eval(imp_path)
+            self._log.info("Import path with expansion: %s" % imp_path)
+
         if not os.path.isabs(imp_path):
             for root in (basedir, os.path.dirname(self._file_s[0])):
                 self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
@@ -448,6 +456,10 @@ class PackageLoader(object):
                     self._log.debug("Found root file: %s" % resolved_path)
                     imp_path = resolved_path
                     break
+        else:
+            # absolute path. 
+            if os.path.isdir(imp_path):
+                imp_path = self._findFlowDvInDir(imp_path)
 
         if not os.path.isfile(imp_path):
             self.error("Import file %s not found" % imp_path, pkg.srcinfo)
@@ -466,11 +478,18 @@ class PackageLoader(object):
         pkg.pkg_m[sub_pkg.name] = sub_pkg
         self._log.debug("<-- _loadPackageImport %s" % str(imp))
 
-    def _findFlowDvInDir(self, base, leaf):
+    def _findFlowDvInDir(self, base, leaf=None):
         """Search down the tree looking for a flow.dv file"""
         self._log.debug("--> _findFlowDvInDir (%s, %s)" % (base, leaf))
         imp_path = None
-        if os.path.isfile(os.path.join(base, leaf)):
+        if leaf is None:
+            if os.path.isfile(base):
+                imp_path = base
+            elif os.path.isfile(os.path.join(base, "flow.dv")):
+                imp_path = os.path.join(base, "flow.dv")
+            elif os.path.isdir(base):
+                imp_path = self._findFlowDvSubdir(base)
+        elif os.path.isfile(os.path.join(base, leaf)):
             imp_path = os.path.join(base, leaf)
             self._log.debug("Found: %s" % imp_path)
         elif os.path.isdir(os.path.join(base, leaf)):

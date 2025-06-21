@@ -1,4 +1,6 @@
 
+- Add support for loading package files relative to an environment variable
+
 # 1.10.0
 - Refinements to support pytest and run environment variables
 
