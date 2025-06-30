@@ -387,12 +387,16 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
     
-    def mkDataItem(self, name, **kwargs):
-        self._log.debug("--> mkDataItem: %s" % name)
+    def mkDataItem(self, type, name=None, **kwargs):
+        self._log.debug("--> mkDataItem: %s" % type)
 
-        if name in self._type_m.keys():
-            tt = self._type_m[name]
-        else:
+        tt = None
+        if type in self._type_m.keys():
+            tt = self._type_m[type]
+        elif self.loader is not None:
+            tt = self.loader.getType(type)
+
+        if type is None:
             raise Exception("Type %s does not exist" % name)
         
         if tt in self._type_node_m.keys():

@@ -31,8 +31,9 @@ from .shell_callable import ShellCallable
 @dc.dataclass
 class ExtRgy(object):
     _inst : ClassVar = None
+    _log : logging.Logger = None
 
-    def __init__(self):
+    def __post_init__(self):
         self._pkgpath = []
         self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
@@ -59,7 +60,8 @@ class ExtRgy(object):
         
     def findPackagePath(self, name) -> str:
         ret = None
-        self._log.debug("--> findPackagePath(%s)" % name)
+        self._log.debug("--> findPackagePath(%s) (%s)" % (
+            name, ",".join(self._pkg_m.keys())))
         if name in self._pkg_m.keys():
             ret = self._pkg_m[name]
         else:
@@ -147,6 +149,8 @@ class ExtRgy(object):
             except Exception as e:
                 self._log.critical("Error loading plugin %s: %s" % (p.name, str(e)))
                 raise e
+            
+        self._log.debug("Registered packages: %s" % str(",".join(self._pkg_m.keys())))
 
         # self._pkgs = {}
         # for pkg in self._load_pkg_list():
