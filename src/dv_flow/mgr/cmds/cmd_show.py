@@ -29,6 +29,7 @@ from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_graph_dot_writer import TaskGraphDotWriter
+from .util import get_rootdir
 
 
 class CmdShow(object):
@@ -37,7 +38,7 @@ class CmdShow(object):
     def __call__(self, args):
 
         # First, find the project we're working with
-        pkg = loadProjPkgDef(os.getcwd())
+        pkg = loadProjPkgDef(get_rootdir(args))
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
