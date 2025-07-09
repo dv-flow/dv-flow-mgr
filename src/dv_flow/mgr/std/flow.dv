@@ -85,6 +85,16 @@ package:
       incdir: 
         type: bool
         value: false
+  - name: SetFileType
+    consumes:
+    - type: std.FileSet 
+    desc: Outputs all input filesets with the specified filetype
+    shell: pytask
+    run: dv_flow.mgr.std.set_file_type.SetFileType
+    with:
+      filetype:
+        type: str
+        value: ""
   - name: IncDirs
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs

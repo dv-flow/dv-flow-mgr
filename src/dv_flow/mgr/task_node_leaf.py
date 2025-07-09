@@ -193,6 +193,10 @@ class TaskNodeLeaf(TaskNode):
                                     getattr(out, "type", "<unknown>"),
                                     getattr(out, "src", "<unknown>")))
                                 output.append(out)
+                            else:
+                                self._log.debug("Skipping consumed type %s from %s" % (
+                                    getattr(out, "type", "<unknown>"),
+                                    getattr(out, "src", "<unknown>")))
         else:
             self._log.debug("non-passthrough: %s (only local outputs propagated) %s" % (
                 self.name,
@@ -204,9 +208,11 @@ class TaskNodeLeaf(TaskNode):
 
         # Add our own output
         local_out = self.result.output.copy()
+        self._log.debug("local_out of %s: %d" % (self.name, len(local_out)))
         for i,out in enumerate(local_out):
             out.src = self.name
             out.seq = i
+            self._log.debug("Adding output of type %s" % out.type)
             output.append(out)
 
         self._log.debug("output dep_m: %s %s" % (self.name, str(dep_m)))
