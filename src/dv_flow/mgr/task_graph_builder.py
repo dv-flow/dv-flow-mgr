@@ -36,7 +36,6 @@ from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_node import TaskNode
-from .task_node_ctor import TaskNodeCtor
 from .task_node_compound import TaskNodeCompound
 from .task_node_ctxt import TaskNodeCtxt
 from .task_node_leaf import TaskNodeLeaf
@@ -76,7 +75,6 @@ class TaskGraphBuilder(object):
     _type_m : Dict[str,Type] = dc.field(default_factory=dict)
     _task_node_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
     _type_node_m : Dict[str,Any] = dc.field(default_factory=dict)
-    _task_ctor_m : Dict[Task,TaskNodeCtor] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
     _ns_scope_s : List[TaskNamespaceScope] = dc.field(default_factory=list)
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
@@ -574,7 +572,7 @@ class TaskGraphBuilder(object):
 
         res = None
         if task.strategy.generate is not None:
-            callable = ExecGenCallable(body=task.strategy.generate.run)
+            callable = ExecGenCallable(body=task.strategy.generate.run, srcdir=srcdir)
             input = TaskGenInputData(params=params)
 
             res = callable(ctxt, input)
@@ -702,7 +700,10 @@ class TaskGraphBuilder(object):
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
-                callable = self._shell_m[shell](task.run, task.shell)
+                callable = self._shell_m[shell](
+                    task.run, 
+                    os.path.dirname(task.srcinfo.file), 
+                    task.shell)
             else:
                 raise Exception("Shell %s not found" % shell)
             

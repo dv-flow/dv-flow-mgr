@@ -19,6 +19,7 @@ class Type(object):
     paramT : Any = None
     uses : 'Type' = None
     srcinfo : SrcInfo = None
+    typedef : 'TypeDef' = None
 
     def dump(self):
         ret = {}

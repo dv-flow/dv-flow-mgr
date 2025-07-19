@@ -10,6 +10,7 @@ from .task_data import TaskDataResult
 @dc.dataclass
 class ExecGenCallable(object):
     body : str
+    srcdir : str
     _log : ClassVar = logging.getLogger("ExecGenCallable")
 
     def __call__(self, ctxt, input):

@@ -27,7 +27,9 @@ class EmptyParams(pydantic.BaseModel):
 class SymbolScope(object):
     name : str
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
+    task_elab_m : Dict[str,bool] = dc.field(default_factory=dict)
     type_m : Dict[str,Type] = dc.field(default_factory=dict)
+    type_elab_m : Dict[str,bool] = dc.field(default_factory=dict)
     override_m : Dict[str,Any] = dc.field(default_factory=dict)
 
     def add(self, task, name):
@@ -599,6 +601,8 @@ class PackageLoader(object):
 
     def _loadTasks(self, pkg, taskdefs : List[TaskDef], basedir : str):
         self._log.debug("--> _loadTasks %s" % pkg.name)
+
+
         # Declare first
         tasks = []
         for taskdef in taskdefs:
@@ -618,7 +622,8 @@ class PackageLoader(object):
                 desc=desc,
                 doc=doc,
                 package=pkg,
-                srcinfo=taskdef.srcinfo)
+                srcinfo=taskdef.srcinfo,
+                taskdef=taskdef)
 
             if taskdef.iff is not None:
                 task.iff = taskdef.iff
@@ -629,81 +634,92 @@ class PackageLoader(object):
 
         # Now, build out tasks
         for taskdef, task in tasks:
+            task.taskdef = taskdef
+            self._elabTask(task)
 
-            if taskdef.uses is not None:
-                task.uses = self._findTaskOrType(taskdef.uses)
+        self._log.debug("<-- _loadTasks %s" % pkg.name)
 
-                if task.uses is None:
-                    self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
-                    continue
+    def _elabTask(self, task):
+        self._log.debug("--> _elabTask %s" % task.name)
+        taskdef = task.taskdef
+
+        task.taskdef = None
+        if taskdef.uses is not None:
+            task.uses = self._findTaskOrType(taskdef.uses)
+
+            if task.uses is None:
+                self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
+                return
+
+        self._eval.set("srcdir", os.path.dirname(taskdef.srcinfo.file))
+        
+        passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
+
+        task.passthrough = passthrough
+        task.consumes = consumes
+        task.rundir = rundir
+
+        task.paramT = self._getParamT(
+            taskdef, 
+            task.uses.paramT if task.uses is not None else None)
+
+        for need in taskdef.needs:
+            nt = None
+
+            need_name = None
+            if isinstance(need, str):
+                need_name = need
+                nt = self._findTask(need)
+            elif isinstance(need, TaskDef):
+                need_name = need.name
+            else:
+                raise Exception("Unknown need type %s" % str(type(need)))
             
-            passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
+            if need_name.endswith(".needs"):
+                # Find the original task first
+                nt = self._findTask(need_name[:-len(".needs")])
+                if nt is None:
+                    self.error("failed to find task %s" % need, taskdef.srcinfo)
+                    raise Exception("Failed to find task %s" % need)
+                for nn in nt.needs:
+                    task.needs.append(nn)
+            else:
+                nt = self._findTask(need_name)
+            
+                if nt is None:
+                    self.error("failed to find task %s" % need, taskdef.srcinfo)
+                    raise Exception("Failed to find task %s" % need)
+                task.needs.append(nt)
 
-            task.passthrough = passthrough
-            task.consumes = consumes
-            task.rundir = rundir
-
-            task.paramT = self._getParamT(
-                taskdef, 
-                task.uses.paramT if task.uses is not None else None)
-
-            for need in taskdef.needs:
-                nt = None
-
-                need_name = None
-                if isinstance(need, str):
-                    need_name = need
-                    nt = self._findTask(need)
-                elif isinstance(need, TaskDef):
-                    need_name = need.name
-                else:
-                    raise Exception("Unknown need type %s" % str(type(need)))
-                
-                if need_name.endswith(".needs"):
-                    # Find the original task first
-                    nt = self._findTask(need_name[:-len(".needs")])
-                    if nt is None:
-                        self.error("failed to find task %s" % need, taskdef.srcinfo)
-                        raise Exception("Failed to find task %s" % need)
-                    for nn in nt.needs:
-                        task.needs.append(nn)
-                else:
-                    nt = self._findTask(need_name)
-                
-                    if nt is None:
-                        self.error("failed to find task %s" % need, taskdef.srcinfo)
-                        raise Exception("Failed to find task %s" % need)
-                    task.needs.append(nt)
-
-            if taskdef.strategy is not None:
-                self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
-                if taskdef.strategy.generate is not None:
-                    shell = taskdef.strategy.generate.shell
-                    if shell is None:
-                        shell = "pytask"
-                    task.strategy = Strategy(
-                        generate=StrategyGenerate(
-                            shell=shell,
-                            run=taskdef.strategy.generate.run))
+        if taskdef.strategy is not None:
+            self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
+            if taskdef.strategy.generate is not None:
+                shell = taskdef.strategy.generate.shell
+                if shell is None:
+                    shell = "pytask"
+                task.strategy = Strategy(
+                    generate=StrategyGenerate(
+                        shell=shell,
+                        run=taskdef.strategy.generate.run))
 
 #                task.strategy = taskdef.strategy
 
 
-            # Determine how to implement this task
-            if taskdef.body is not None and len(taskdef.body) > 0:
-                self._mkTaskBody(task, taskdef)
-            elif taskdef.run is not None:
-                task.run = taskdef.run
-                if taskdef.shell is not None:
-                    task.shell = taskdef.shell
-            elif taskdef.pytask is not None: # Deprecated case
-                task.run = taskdef.pytask
-                task.shell = "pytask"
-            elif task.uses is not None and isinstance(task.uses, Task) and task.uses.run is not None:
-                task.run = task.uses.run
-                task.shell = task.uses.shell
+        # Determine how to implement this task
+        if taskdef.body is not None and len(taskdef.body) > 0:
+            self._mkTaskBody(task, taskdef)
+        elif taskdef.run is not None:
+            task.run = self._eval.eval(taskdef.run)
+            if taskdef.shell is not None:
+                task.shell = taskdef.shell
+        elif taskdef.pytask is not None: # Deprecated case
+            task.run = taskdef.pytask
+            task.shell = "pytask"
+        elif task.uses is not None and isinstance(task.uses, Task) and task.uses.run is not None:
+            task.run = task.uses.run
+            task.shell = task.uses.shell
 
-        self._log.debug("<-- _loadTasks %s" % pkg.name)
+        self._log.debug("<-- _elabTask %s" % task.name)
 
     def _loadTypes(self, pkg, typedefs):
         self._log.debug("--> _loadTypes")
@@ -712,24 +728,35 @@ class PackageLoader(object):
             tt = Type(
                 name=self._getScopeFullname(td.name),
                 doc=td.doc,
-                srcinfo=td.srcinfo)
+                srcinfo=td.srcinfo,
+                typedef=td)
             pkg.type_m[tt.name] = tt
             self._pkg_s[-1].addType(tt, td.name)
             types.append((td, tt))
         
         # Now, resolve 'uses' and build out
         for td,tt in types:
-            if td.uses is not None:
-                tt.uses = self._findType(td.uses)
-                if tt.uses is None:
-                    raise Exception("Failed to find type %s" % td.uses)
-            tt.paramT = self._getParamT(
-                td, 
-                tt.uses.paramT if tt.uses is not None else None,
-                typename=tt.name,
-                is_type=True)
+            self._elabType(tt)
+
         self._log.debug("<-- _loadTypes")
         pass
+
+    def _elabType(self, tt):
+        self._log.debug("--> _elabType %s" % tt.name)
+        td = tt.typedef
+
+        tt.typedef = None
+        if td.uses is not None:
+            tt.uses = self._findType(td.uses)
+            if tt.uses is None:
+                raise Exception("Failed to find type %s" % td.uses)
+        tt.paramT = self._getParamT(
+            td, 
+            tt.uses.paramT if tt.uses is not None else None,
+            typename=tt.name,
+            is_type=True)
+        self._log.debug("<-- _elabType %s" % tt.name)
+
 
     def _mkTaskBody(self, task, taskdef):
         self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))
@@ -836,6 +863,11 @@ class PackageLoader(object):
 
         if uses is None:
             uses = self._findType(name)
+            if uses is not None and uses.typedef:
+                self._elabType(uses)
+                pass
+        elif uses.taskdef:
+            self._elabTask(uses)
 
         self._log.debug("<-- _findTaskOrType %s (%s)" % (name, ("found" if uses is not None else "not found")))
         return uses

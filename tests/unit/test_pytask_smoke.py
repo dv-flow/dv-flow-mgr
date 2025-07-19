@@ -122,14 +122,13 @@ def test_smoke_4(tmpdir):
     @task(Params)
     async def MyTask3(runner, input):
             nonlocal called
-            print("inputs: %d" % len(input.inputs))
             called.append(("MyTask3", [o.val for o in input.inputs]))
             return TaskDataResult()
 
     task1 = MyTask1(srcdir="srcdir", p1="1")
     task2 = MyTask2(srcdir="srcdir", p1="2")
     task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
-#                    p1="${{ in | jq('[.[] .val]') }}", 
+
     runner = TaskSetRunner("rundir")
 
     result = asyncio.run(runner.run(task3))

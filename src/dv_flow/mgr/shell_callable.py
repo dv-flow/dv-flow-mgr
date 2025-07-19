@@ -8,6 +8,7 @@ from .task_data import TaskDataResult
 @dc.dataclass
 class ShellCallable(object):
     body : str
+    srcdir : str
     shell : str
     _log : ClassVar = logging.getLogger("ShellCallable")
 

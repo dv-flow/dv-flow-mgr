@@ -10,6 +10,7 @@ from .task_data import TaskDataResult
 @dc.dataclass
 class ExecCallable(object):
     body : str
+    srcdir : str
     shell: str = "pytask"
     _log : ClassVar = logging.getLogger("ExecCallable")
 
@@ -30,6 +31,9 @@ class ExecCallable(object):
                 # have a file to load
                 file = self.body[:ci]
                 method = self.body[ci+2:]
+                if not os.path.isabs(file):
+                    file = os.path.join(input.srcdir, file)
+
                 spec = importlib.util.spec_from_file_location(input.name, file)
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[input.name] = module

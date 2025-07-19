@@ -60,9 +60,6 @@ class ParamRefEval(object):
                 # Replacing [idx..eidx+2] with len(exp_val)
                 val = val[:idx] + exp_val + val[eidx+2:]
                 idx += len(exp_val)
-
-
-
             else:
                 break
 
