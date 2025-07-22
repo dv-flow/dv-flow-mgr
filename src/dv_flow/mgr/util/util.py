@@ -19,6 +19,7 @@
 #*     Author: 
 #*
 #****************************************************************************
+import difflib
 import os
 import yaml
 from ..package_loader import PackageLoader

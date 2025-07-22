@@ -1,5 +1,6 @@
 import os
 import dataclasses as dc
+import difflib
 import importlib
 import logging
 import pydantic
@@ -49,7 +50,6 @@ class SymbolScope(object):
             return self.type_m[name]
         else:
             return None
-
 
 @dc.dataclass
 class TaskScope(SymbolScope):
@@ -223,7 +223,6 @@ class PackageScope(SymbolScope):
             path += "." + leaf
         return path
     
-
 @dc.dataclass
 class PackageLoader(object):
     pkg_rgy : ExtRgy = dc.field(default=None)
@@ -648,7 +647,9 @@ class PackageLoader(object):
             task.uses = self._findTaskOrType(taskdef.uses)
 
             if task.uses is None:
-                self.error("failed to resolve task-uses %s" % taskdef.uses, taskdef.srcinfo)
+                similar = self._getSimilarError(taskdef.uses)
+                self.error("failed to resolve task-uses %s.%s" % (
+                    taskdef.uses, similar), taskdef.srcinfo)
                 return
 
         self._eval.set("srcdir", os.path.dirname(taskdef.srcinfo.file))
@@ -871,7 +872,32 @@ class PackageLoader(object):
 
         self._log.debug("<-- _findTaskOrType %s (%s)" % (name, ("found" if uses is not None else "not found")))
         return uses
+    
+    def _getSimilarError(self, name, only_tasks=False):
+        tasks = set()
+        all = set()
 
+        for pkg in self._pkg_m.values():
+            for t in pkg.task_m.keys():
+                tasks.add(t)
+                all.add(t)
+            for t in pkg.type_m.keys():
+                all.add(t)
+
+        similar = difflib.get_close_matches(
+            name, 
+            tasks if only_tasks else all)
+        
+        if len(similar) == 0 and len(self._pkg_s):
+            similar = difflib.get_close_matches(
+                "%s.%s" % (self._pkg_s[-1].pkg.name, name),
+                tasks if only_tasks else all,
+                cutoff=0.8)
+        
+        if len(similar) == 0:
+            return ""
+        else:
+            return " Did you mean '%s'?" % ", ".join(similar)
     
     def _getScopeFullname(self, leaf=None):
         return self._pkg_s[-1].getScopeFullname(leaf)
