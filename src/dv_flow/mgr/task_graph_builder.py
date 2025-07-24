@@ -285,12 +285,11 @@ class TaskGraphBuilder(object):
 
     def push_task_scope(self, task: TaskNode):
         """Push a new task scope onto the current context"""
-        if self._name_resolution_stack:
-            scope = TaskNameResolutionScope(task=task)
-            # Add task parameters as 'this' in the scope's variables
-            if isinstance(task, TaskNodeCompound):
-                scope.variables['this'] = task.params
-            self._name_resolution_stack[-1].task_scopes.append(scope)
+        scope = TaskNameResolutionScope(task=task)
+        # Add task parameters as 'this' in the scope's variables
+        if isinstance(task, TaskNodeCompound):
+            scope.variables['this'] = task.params
+        self._name_resolution_stack[-1].task_scopes.append(scope)
 
     def task_scope(self):
         """Get the current task scope"""
@@ -517,6 +516,8 @@ class TaskGraphBuilder(object):
             
             if params is None:
                 params = task.paramT()
+
+            self._expandParams(params, eval)
 
             if srcdir is None:
                 srcdir = os.path.dirname(task.srcinfo.file)
@@ -758,8 +759,8 @@ class TaskGraphBuilder(object):
         if params is None:
             params = task.paramT()
 
-            # expand any variable references
-            self._expandParams(params, eval)
+        # expand any variable references
+        self._expandParams(params, eval)
 
         # Create a new task scope for this compound task
         node = TaskNodeCompound(

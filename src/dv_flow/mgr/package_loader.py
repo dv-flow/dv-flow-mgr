@@ -9,6 +9,7 @@ import yaml
 from pydantic import BaseModel
 from typing import Any, Callable, ClassVar, Dict, List, Tuple, Union
 from .fragment_def import FragmentDef
+from .name_resolution import NameResolutionContext
 from .package_def import PackageDef
 from .package import Package
 from .param_def import ComplexType
@@ -212,6 +213,14 @@ class PackageScope(SymbolScope):
 
         self._log.debug("<-- %s::findType %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
         return ret
+    
+    def resolve_variable(self, name):
+        self._log.debug("--> %s::resolve_variable %s" % (self.pkg.name, name))
+        ret = None
+        if name in self.pkg.paramT.model_fields.keys():
+            ret = self.pkg.paramT.model_fields[name].default
+        self._log.debug("<-- %s::resolve_variable %s -> %s" % (self.pkg.name, name, ret))
+        return ret
 
     def getScopeFullname(self, leaf=None) -> str:
         path = self.name
@@ -234,6 +243,7 @@ class PackageLoader(object):
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+#    _eval_ctxt : NameResolutionContext = dc.field(default_factory=NameResolutionContext)
     _loader_scope : LoaderScope = None
 
     def __post_init__(self):
@@ -244,6 +254,10 @@ class PackageLoader(object):
             self.env = os.environ.copy()
 
         self._eval.set("env", self.env)
+        # Preserve rundir for expansion during task execution
+        self._eval.set("rundir", "${{ rundir }}")
+
+        self._eval.set_name_resolution(self)
 
         self._loader_scope = LoaderScope(name=None, loader=self)
 
@@ -703,9 +717,6 @@ class PackageLoader(object):
                         shell=shell,
                         run=taskdef.strategy.generate.run))
 
-#                task.strategy = taskdef.strategy
-
-
         # Determine how to implement this task
         if taskdef.body is not None and len(taskdef.body) > 0:
             self._mkTaskBody(task, taskdef)
@@ -872,6 +883,17 @@ class PackageLoader(object):
 
         self._log.debug("<-- _findTaskOrType %s (%s)" % (name, ("found" if uses is not None else "not found")))
         return uses
+
+    def resolve_variable(self, name):
+        self._log.debug("--> resolve_variable %s" % name)
+        ret = None
+        if len(self._pkg_s):
+            ret = self._pkg_s[-1].resolve_variable(name)
+        else:
+            ret = self._loader_scope.resolve_variable(name)
+
+        self._log.debug("<-- resolve_variable %s -> %s" % (name, str(ret)))
+        return ret
     
     def _getSimilarError(self, name, only_tasks=False):
         tasks = set()
@@ -928,6 +950,7 @@ class PackageLoader(object):
 
 
         return (passthrough, consumes, rundir)
+    
 
     def _getParamT(
             self, 
@@ -935,7 +958,7 @@ class PackageLoader(object):
             base_t : BaseModel, 
             typename=None,
             is_type=False):
-        self._log.debug("--> _getParamT %s" % taskdef.name)
+        self._log.debug("--> _getParamT %s (%s)" % (taskdef.name, str(taskdef.params)))
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
 

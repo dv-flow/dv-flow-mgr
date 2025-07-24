@@ -18,10 +18,17 @@
 #****************************************************************************
 
 import dataclasses as dc
-from typing import Any, Dict, List
+import logging
+from typing import Any, ClassVar, Dict, List
 from .package import Package
 from .task_node import TaskNode
 
+@dc.dataclass
+class VarResolver(object):
+
+    def resolve_variable(self, name : str) -> Any:
+        raise NotImplementedError("resolve_variable not implemented")
+    
 @dc.dataclass
 class TaskNameResolutionScope:
     """Represents a single task scope in the name resolution stack"""
@@ -29,11 +36,17 @@ class TaskNameResolutionScope:
     variables: Dict[str, Any] = dc.field(default_factory=dict)
 
 @dc.dataclass
-class NameResolutionContext:
+class NameResolutionContext(VarResolver):
     """Represents a complete name resolution context"""
     builder: 'TaskGraphBuilder'  # Forward reference to avoid circular import
     package: Package
     task_scopes: List[TaskNameResolutionScope] = dc.field(default_factory=list)
+    _log : ClassVar = logging.getLogger(__name__)
+
+    def push_task_scope(self, task: TaskNode) -> None:
+        """Push a new task scope onto the stack"""
+        self.task_scopes.append(TaskNameResolutionScope(task=task))
+
 
     def resolve_variable(self, name: str) -> Any:
         """
@@ -43,6 +56,7 @@ class NameResolutionContext:
         3. Current package variables
         4. Package-qualified variables
         """
+        self._log.debug("--> resolve_variable(%s)", name)
         # Check if this is a package-qualified reference
         ret = None
 
@@ -69,4 +83,5 @@ class NameResolutionContext:
 #            pkg = self.builder._pkg_m[name]
 #            ret = pkg.paramT
 
+        self._log.debug("<-- resolve_variable(%s) -> %s" % (name, ret))
         return ret

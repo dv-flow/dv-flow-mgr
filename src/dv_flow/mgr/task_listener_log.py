@@ -30,6 +30,7 @@ class TaskListenerLog(object):
     console : Console = dc.field(default=None)
     level : int = 0
     quiet : bool = False
+    json : bool = False
     has_severity : Dict[SeverityE, int] = dc.field(default_factory=dict)
 
     sev_pref_m : ClassVar = {

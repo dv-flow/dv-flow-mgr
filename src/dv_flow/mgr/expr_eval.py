@@ -24,19 +24,19 @@ import json
 from typing import Any, Callable, Dict, List, Optional
 from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp
 from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt
-from .name_resolution import NameResolutionContext
+from .name_resolution import VarResolver
 
 @dc.dataclass
 class ExprEval(ExprVisitor):
     methods: Dict[str, Callable] = dc.field(default_factory=dict)
-    name_resolution: Optional[NameResolutionContext] = None
+    name_resolution: Optional[VarResolver] = None
     variables: Dict[str, object] = dc.field(default_factory=dict)
     value: Any = None
 
     def set(self, name: str, value: object):
         self.variables[name] = value
 
-    def set_name_resolution(self, ctx: NameResolutionContext):
+    def set_name_resolution(self, ctx: VarResolver):
         self.name_resolution = ctx
 
     def eval(self, expr_s: str) -> str:
