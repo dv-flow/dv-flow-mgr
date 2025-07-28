@@ -70,3 +70,139 @@ void foo() {
     assert len(output.output) == 1
     len(output.output[0].files) == 1
     output.output[0].files[0] == "libfoo.so"
+
+def test_command_env_ref(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+    tasks:
+    - name: entry
+      shell: bash
+      run: |
+        echo "x${DISPLAY}x" > out.txt
+"""
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    rundir = os.path.join(tmpdir, "rundir")
+    def marker(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg = PackageLoader(marker_listeners=[marker]).load(os.path.join(tmpdir, "flow.dv"))
+
+    print("Package:\n%s\n" % pkg.dump())
+    env = os.environ.copy()
+    env["DISPLAY"] = "Hello World!"
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(tmpdir, "rundir"),
+        env=env)
+    
+    runner = TaskSetRunner(
+        os.path.join(tmpdir, "rundir"),
+        env=env)
+
+    entry = builder.mkTaskNode("foo.entry")
+
+    output = asyncio.run(runner.run(entry))
+
+    assert runner.status == 0
+    assert output is not None
+    assert os.path.isfile(os.path.join(rundir, "foo.entry/out.txt"))
+    with open(os.path.join(rundir, "foo.entry/out.txt"), "r") as fp:
+        line = fp.read().strip()
+        assert line == "xHello World!x"
+
+def test_dfm_env_var_ref(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+    with:
+      DISPLAY:
+        type: str
+        value: "Hello World!"
+    tasks:
+    - name: entry
+      shell: bash
+      run: |
+        echo "x${{ env.DISPLAY }}x" > out.txt
+"""
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    env = os.environ.copy()
+    env["DISPLAY"] = "Hello World!"
+
+    rundir = os.path.join(tmpdir, "rundir")
+    def marker(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg = PackageLoader(
+        marker_listeners=[marker],
+        env=env).load(os.path.join(tmpdir, "flow.dv"))
+
+    print("Package:\n%s\n" % pkg.dump())
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(tmpdir, "rundir"),
+        env=env)
+    
+    runner = TaskSetRunner(
+        os.path.join(tmpdir, "rundir"),
+        env=env)
+
+    entry = builder.mkTaskNode("foo.entry")
+
+    output = asyncio.run(runner.run(entry))
+
+    assert runner.status == 0
+    assert output is not None
+    assert os.path.isfile(os.path.join(rundir, "foo.entry/out.txt"))
+    with open(os.path.join(rundir, "foo.entry/out.txt"), "r") as fp:
+        line = fp.read().strip()
+        assert line == "xHello World!x"
+
+def test_package_var_ref(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+    with:
+      DISPLAY:
+        type: str
+        value: "Hello World!"
+    tasks:
+    - name: entry
+      shell: bash
+      run: |
+        echo "x${{ DISPLAY }}x" > out.txt
+"""
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    env = os.environ.copy()
+
+    rundir = os.path.join(tmpdir, "rundir")
+    def marker(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg = PackageLoader(
+        marker_listeners=[marker],
+        env=env).load(os.path.join(tmpdir, "flow.dv"))
+
+    print("Package:\n%s\n" % pkg.dump())
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(tmpdir, "rundir"),
+        env=env)
+    
+    runner = TaskSetRunner(
+        os.path.join(tmpdir, "rundir"),
+        env=env)
+
+    entry = builder.mkTaskNode("foo.entry")
+
+    output = asyncio.run(runner.run(entry))
+
+    assert runner.status == 0
+    assert output is not None
+    assert os.path.isfile(os.path.join(rundir, "foo.entry/out.txt"))
+    with open(os.path.join(rundir, "foo.entry/out.txt"), "r") as fp:
+        line = fp.read().strip()
+        assert line == "xHello World!x"
