@@ -264,6 +264,8 @@ class PackageLoader(object):
     def load(self, root) -> Package:
         self._log.debug("--> load %s" % root)
         root = os.path.normpath(root)
+        self._eval.set("root", root)
+        self._eval.set("rootdir", os.path.dirname(root))
         ret = self._loadPackage(root, None)
         self._log.debug("<-- load %s" % root)
         return ret
@@ -1037,6 +1039,15 @@ class PackageLoader(object):
                     else:
                         raise Exception("No value specified for param %s: %s" % (
                             p, str(param)))
+
+                    if type(value) == list:
+                        for i in range(len(value)):
+                            if "${{" in value[i]:
+                                value[i] = self._eval.eval(value[i])
+                    else:
+                        if "${{" in value:
+                            value = self._eval.eval(value)
+
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
                 else:
