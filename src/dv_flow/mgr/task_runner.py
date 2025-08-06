@@ -45,6 +45,14 @@ class TaskRunner(object):
         if self.env is None:
             self.env = os.environ.copy()
 
+    def enter(self):
+        for l in self.listeners:
+            l[0](None, "start")
+
+    def leave(self):
+        for l in self.listeners:
+            l[0](None, "end")
+
     def add_listener(self, l, recursive=False):
         self.listeners.append((l, recursive))
 
@@ -79,6 +87,7 @@ class TaskSetRunner(TaskRunner):
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
+        self.enter()
 
         if not os.path.isdir(self.rundir):
             os.makedirs(self.rundir)
@@ -187,6 +196,8 @@ class TaskSetRunner(TaskRunner):
 
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
+
+        self.leave()
 
         if self.status == 0:
             if isinstance(task, list):

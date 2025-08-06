@@ -30,6 +30,7 @@ from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
+from ..task_listener_tui import TaskListenerTui
 from ..task_listener_trace import TaskListenerTrace
 from .util import get_rootdir
 
@@ -43,6 +44,7 @@ class CmdRun(object):
 
         # First, find the project we're working with
         listener = TaskListenerLog()
+        listener = TaskListenerTui()
         pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
 
         if listener.has_severity[SeverityE.Error] > 0:

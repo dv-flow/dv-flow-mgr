@@ -96,6 +96,9 @@ class TaskListenerTrace(object):
             task: The task that generated the event
             reason: Either 'enter' or 'leave' marking start/end of task execution
         """
+        if reason in ("start", "end"):
+            return
+
         # Get/create thread ID for this task
         tid = self._get_tid(task)
         
