@@ -243,6 +243,7 @@ class PackageLoader(object):
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+    _feeds_map : Dict[str, List["Task"]] = dc.field(default_factory=dict)
 #    _eval_ctxt : NameResolutionContext = dc.field(default_factory=NameResolutionContext)
     _loader_scope : LoaderScope = None
 
@@ -435,6 +436,17 @@ class PackageLoader(object):
 
             self.pop_package_scope()
 
+        # Apply feeds after all tasks are loaded
+        for fed_name, feeding_tasks in self._feeds_map.items():
+            fed_task = self._findTask(fed_name)
+            if fed_task is not None:
+                for feeding_task in feeding_tasks:
+                    # Only add if not already present
+                    if all(
+                        not (isinstance(n, tuple) and n[0] == feeding_task) and n != feeding_task
+                        for n in fed_task.needs
+                    ):
+                        fed_task.needs.append((feeding_task, False))
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
     
@@ -647,6 +659,13 @@ class PackageLoader(object):
             pkg.task_m[task.name] = task
             self._pkg_s[-1].add(task, taskdef.name)
 
+        # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
+        for taskdef, task in tasks:
+            for fed_name in getattr(taskdef, "feeds", []):
+                fq_fed_name = fed_name
+                if fq_fed_name not in self._feeds_map:
+                    self._feeds_map[fq_fed_name] = []
+                self._feeds_map[fq_fed_name].append(task)
         # Now, build out tasks
         for taskdef, task in tasks:
             task.taskdef = taskdef
