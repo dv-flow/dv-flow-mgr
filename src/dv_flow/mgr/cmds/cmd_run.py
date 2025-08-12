@@ -44,7 +44,7 @@ class CmdRun(object):
 
         # First, find the project we're working with
         listener = TaskListenerLog()
-        listener = TaskListenerTui()
+#        listener = TaskListenerTui()
         pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
 
         if listener.has_severity[SeverityE.Error] > 0:
