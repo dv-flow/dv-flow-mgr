@@ -628,7 +628,10 @@ class TaskGraphBuilder(object):
                     raise Exception("Adding None input")
                 if tn == ret.input:
                     raise Exception("Adding input to itself")
-                tn.needs.append((ret.input, False))
+                
+                # Graph generators completely handle their inputs
+                if task.strategy.generate is None:
+                    tn.needs.append((ret.input, False))
             
             if referenced is None:
                 if tn is None:
