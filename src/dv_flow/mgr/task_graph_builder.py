@@ -28,7 +28,7 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader import PackageLoader
 from .param_ref_eval import ParamRefEval
-from .name_resolution import NameResolutionContext, TaskNameResolutionScope
+from .name_resolution import NameResolutionContext, TaskNameResolutionScope, DirectVarResolver
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
 from .task import Task
@@ -201,13 +201,6 @@ class TaskGraphBuilder(object):
     def leave_uses(self):
         self._uses_count -= 1
 
-#    def enter_compound(self, task : TaskNode, rundir=None):
-#        self._compound_task_ctxt_s.append(CompoundTaskCtxt(
-#            parent=self, task=task, rundir=rundir))
-#
-#        if rundir is None or rundir == RundirE.Unique:
-#            self._rundir_s.append(task.name)
-
     def enter_compound_uses(self):
         self._compound_task_ctxt_s[-1].uses_s.append({})
 
@@ -308,7 +301,13 @@ class TaskGraphBuilder(object):
             ret = self._name_resolution_stack[-1].resolve_variable(name)
         return ret
 
-    def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
+    def mkTaskNode(self, 
+                   task_t, 
+                   name=None, 
+                   srcdir=None, 
+                   needs=None, 
+                   matrix_i=None,
+                   **kwargs):
         self._log.debug("--> mkTaskNode: %s" % task_t)
         ret = None
 
@@ -472,7 +471,9 @@ class TaskGraphBuilder(object):
                     srcdir=None, 
                     params=None, 
                     hierarchical=False,
+                    matrix_i=None,
                     eval=None):
+        self._log.debug("--> _mkTaskNode %s" % task.name)
 
         if not hierarchical:
             self._task_rundir_s.append([self.rundir])
@@ -501,6 +502,7 @@ class TaskGraphBuilder(object):
                         srcdir=srcdir,
                         params=params,
                         hierarchical=hierarchical,
+                        matrix_i=matrix_i,
                         eval=eval)
                 else:
                     ret = self._mkTaskLeafNode(
@@ -509,10 +511,14 @@ class TaskGraphBuilder(object):
                         srcdir=srcdir,
                         params=params,
                         hierarchical=hierarchical,
+                        matrix_i=matrix_i,
                         eval=eval)
         else:
             if name is None:
-                name = task.name
+                if matrix_i is None:
+                    name = task.name
+                else:
+                    name = "%s_%d" % (task.name, matrix_i)
             
             if params is None:
                 params = task.paramT()
@@ -537,6 +543,8 @@ class TaskGraphBuilder(object):
 
         if not hierarchical:
             self._task_rundir_s.pop()
+
+        self._log.debug("<-- _mkTaskNode %s" % task.name)
 
         return ret        
     
@@ -584,12 +592,10 @@ class TaskGraphBuilder(object):
                 matrix[k] = None
                 matrix_items.append((k, task.strategy.matrix[k]))
 
-            res = self._applyStrategyMatrix(task.tasks, matrix_items, 0)
+            res = self._applyStrategyMatrix(task.subtasks, matrix_items, eval)
             
             pass
 
-
-#        tasks = [ret.input]
         tasks = []
         tasks.extend(ret.tasks[1:])
 
@@ -635,8 +641,52 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _applyStrategy %s" % task.name)
         return ret
     
-    def _applyStrategyMatrix(self, tasks, matrix_items, idx):
-        raise Exception("_applyStrategyMatrix not implemented")
+    def _applyStrategyMatrix(self, tasks, matrix_items, eval):
+        # Implements matrix expansion: generate all combinations of matrix variables
+        import itertools
+
+        if not tasks or not matrix_items:
+            raise Exception("Matrix strategy requires a non-empty body (subtasks) to expand.")
+
+        keys, values_lists = zip(*matrix_items)
+        combinations = list(itertools.product(*values_lists))
+        nodes = []
+
+        for combo_i,combo in enumerate(combinations):
+            # keys has the variable names ; combo has the values
+            # Treat each iteration independently
+
+            # Setup local 'matrix' variables for the builder to use
+
+            ctxt = TaskNameResolutionScope(None)
+
+            matrix = {}
+            for i,value in enumerate(combo):
+                matrix[keys[i]] = value
+            ctxt.variables["matrix"] = matrix
+
+            self._name_resolution_stack[-1].task_scopes.append(ctxt)
+
+            it_nodes = []
+            self._log.debug("--> Building matrix tasks")
+            for t in tasks:
+                it_nodes.append(self._mkTaskNode(
+                    t,
+                    hierarchical=True,
+                    matrix_i=combo_i,
+                    eval=eval))
+            self._log.debug("<-- Building matrix tasks")
+
+            # Can we back-patch the name?
+
+            # Resolve 'needs' (principally local task names)
+
+            # Evaluate each flight to determine which tasks must be
+            # connected to the upper task's inputs and outputs
+            nodes.extend(it_nodes)
+            self._name_resolution_stack[-1].task_scopes.pop()
+
+        return nodes
 
     
     def _isCompound(self, task):
@@ -654,17 +704,18 @@ class TaskGraphBuilder(object):
         else:
             return self.mkTaskNode(name)
     
-    def _mkTaskLeafNode(self, 
+    def _mkTaskLeafNode(self,
                         task : Task, 
                         name=None, 
                         srcdir=None, 
                         params=None, 
                         hierarchical=False,
+                        matrix_i=None,
                         eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
 
         if name is None:
-            name = task.name
+            name = task.name if matrix_i is None else ("%s_%d" % (task.name, matrix_i))
 
         if srcdir is None:
             srcdir = os.path.dirname(task.srcinfo.file)
@@ -729,7 +780,7 @@ class TaskGraphBuilder(object):
 
         # Now, link up the needs
         self._log.debug("--> processing needs")
-        self._gatherNeeds(task, node)
+        self._gatherNeeds(task, node, matrix_i)
         self._log.debug("<-- processing needs")
 
         if task.rundir == RundirE.Unique:
@@ -747,11 +798,15 @@ class TaskGraphBuilder(object):
                             srcdir=None, 
                             params=None, 
                             hierarchical=False,
+                            matrix_i=None,
                             eval=None) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
 
         if name is None:
-            name = task.name
+            if matrix_i is None:
+                name = task.name
+            else:
+                name = "%s_%d" % (task.name, matrix_i)
 
         if srcdir is None:
             srcdir = os.path.dirname(task.srcinfo.file)
@@ -820,9 +875,10 @@ class TaskGraphBuilder(object):
 
         self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
         for need in task.needs:
-            need_n = self._getTaskNode(need.name)
+            need_name = need.name if matrix_i is None else ("%s_%d" % (need.name, matrix_i))
+            need_n = self._getTaskNode(need_name)
             if need_n is None:
-                raise Exception("Failed to find need %s" % need.name)
+                raise Exception("Failed to find need %s" % need_name)
             elif need_n.iff:
                 self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
                 node.input.needs.append((need_n, False))
@@ -932,7 +988,7 @@ class TaskGraphBuilder(object):
                             new_val.append(elem)
         return new_val
 
-    def _gatherNeeds(self, task_t, node):
+    def _gatherNeeds(self, task_t, node, matrix_i=None):
         self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
         if task_t.uses is not None and isinstance(task_t.uses, Task):
             self._gatherNeeds(task_t.uses, node)
@@ -940,11 +996,18 @@ class TaskGraphBuilder(object):
         for need in task_t.needs:
             # Support both string and tuple (Task, bool) dependencies
             if hasattr(need, "name"):
-                need_n = self._getTaskNode(need.name)
+                need_name = need.name
             elif isinstance(need, tuple) and hasattr(need[0], "name"):
-                need_n = self._getTaskNode(need[0].name)
+                need_n = need[0].name
             else:
-                need_n = self._getTaskNode(str(need))
+                need_name = str(need)
+
+            if matrix_i is not None:
+                base_name = task_t.name[:-len("_%d" % matrix_i)]
+                print("matrix: base_name=%s" % base_name, flush=True)
+
+            need_n = self._getTaskNode(need_name)
+
             if need_n is None:
                 raise Exception("Failed to find need %s" % (getattr(need, "name", str(need))))
             node.needs.append((need_n, False))

@@ -1,3 +1,24 @@
+#****************************************************************************
+#* package_loader.py
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may 
+#* not use this file except in compliance with the License.  
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software 
+#* distributed under the License is distributed on an "AS IS" BASIS, 
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
+#* See the License for the specific language governing permissions and 
+#* limitations under the License.
+#*
+#* Created on:
+#*     Author: 
+#*
+#****************************************************************************
 import os
 import dataclasses as dc
 import difflib
@@ -100,12 +121,12 @@ class LoaderScope(SymbolScope):
 
                 pkg = find_pkg(pkg_name)
                 if pkg is not None:
-                    break;
+                    break
 
         if pkg is not None and name in pkg.task_m.keys():
             ret = pkg.task_m[name]
 
-        self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
+        self._log.debug("<-- findTask: %s (%s)" % (name, (ret is not None)))
         
         return ret
 
@@ -243,6 +264,7 @@ class PackageLoader(object):
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+    _local_var_m : List[Dict[str,object]] = dc.field(default_factory=list)
     _feeds_map : Dict[str, List["Task"]] = dc.field(default_factory=dict)
 #    _eval_ctxt : NameResolutionContext = dc.field(default_factory=NameResolutionContext)
     _loader_scope : LoaderScope = None
@@ -727,8 +749,11 @@ class PackageLoader(object):
                     raise Exception("Failed to find task %s" % need)
                 task.needs.append(nt)
 
+        matrix = {}
         if taskdef.strategy is not None:
             self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
+            if getattr(taskdef.strategy, "matrix", None) is not None:
+                matrix = dict(taskdef.strategy.matrix)
             if taskdef.strategy.generate is not None:
                 shell = taskdef.strategy.generate.shell
                 if shell is None:
@@ -736,11 +761,28 @@ class PackageLoader(object):
                 task.strategy = Strategy(
                     generate=StrategyGenerate(
                         shell=shell,
-                        run=taskdef.strategy.generate.run))
+                        run=taskdef.strategy.generate.run),
+                    matrix=matrix)
+            else:
+                task.strategy = Strategy(matrix=matrix)
 
         # Determine how to implement this task
         if taskdef.body is not None and len(taskdef.body) > 0:
+            # Defer resolution of matrix variables. We'll expand those
+            # as part of the graph-building process
+            if len(matrix):
+                vars = {
+                    "matrix": {}
+                }
+                for key in matrix.keys():
+                    vars["matrix"][key] = "${{ matrix.%s }}" % key
+                self._local_var_m.append(vars)
+
             self._mkTaskBody(task, taskdef)
+
+            if len(matrix):
+                self._local_var_m.pop()
+
         elif taskdef.run is not None:
             task.run = self._eval.eval(taskdef.run)
             if taskdef.shell is not None:
@@ -792,6 +834,7 @@ class PackageLoader(object):
 
 
     def _mkTaskBody(self, task, taskdef):
+        self._log.debug("--> _mkTaskBody")
         self._pkg_s[-1].push_scope(TaskScope(name=taskdef.name))
         pkg = self.package_scope()
 
@@ -875,6 +918,7 @@ class PackageLoader(object):
             pass
 
         self._pkg_s[-1].pop_scope()
+        self._log.debug("<-- _mkTaskBody")
 
     def _findType(self, name):
         if len(self._pkg_s):
@@ -908,7 +952,9 @@ class PackageLoader(object):
     def resolve_variable(self, name):
         self._log.debug("--> resolve_variable %s" % name)
         ret = None
-        if len(self._pkg_s):
+        if len(self._local_var_m) > 0 and name in self._local_var_m[-1].keys():
+            return self._local_var_m[-1][name]
+        elif len(self._pkg_s):
             ret = self._pkg_s[-1].resolve_variable(name)
         else:
             ret = self._loader_scope.resolve_variable(name)

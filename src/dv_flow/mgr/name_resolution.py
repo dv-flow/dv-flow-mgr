@@ -36,6 +36,18 @@ class TaskNameResolutionScope:
     variables: Dict[str, Any] = dc.field(default_factory=dict)
 
 @dc.dataclass
+class DirectVarResolver(VarResolver):
+    var_m : Dict[str,object] = dc.field(default_factory=dict)
+    _log : ClassVar = logging.getLogger(__name__)
+
+    def resolve_variable(self, name : str) -> Any:
+        self._log.debug("--> resolve_variable: %s" % name)
+        if name in self.var_m.keys():
+            return self.var_m[name]
+        else:
+            return None
+
+@dc.dataclass
 class NameResolutionContext(VarResolver):
     """Represents a complete name resolution context"""
     builder: 'TaskGraphBuilder'  # Forward reference to avoid circular import
