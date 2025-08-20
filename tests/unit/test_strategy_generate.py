@@ -52,3 +52,49 @@ package:
         assert captured.out.find("msg%d: Hello world %d" % (i, i)) >= 0
 #    assert captured.out.find("Hello, World!") >= 0
 
+def test_fileset_input(tmpdir, capsys):
+    flow_dv = """
+package:
+    name: foo
+    tasks:
+    - name: files
+      uses: std.FileSet
+      with:
+        type: cSource
+        include: "*.c"
+
+    - name: expand
+      needs: [files]
+      strategy:
+        generate:
+          run: |
+            in_params = ctxt.getInputs()
+            print("in_params: %d" % len(in_params))
+"""
+
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    with open(os.path.join(tmpdir, "file1.c"), "w") as f:
+        f.write("// file1.c\n")
+
+    with open(os.path.join(tmpdir, "file2.c"), "w") as f:
+        f.write("// file2.c\n")
+
+    rundir = os.path.join(tmpdir, "rundir")
+
+    loader, pkg_def = loadProjPkgDef(os.path.join(tmpdir))
+    assert pkg_def is not None
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=rundir)
+    runner = TaskSetRunner(rundir=rundir)
+
+    task = builder.mkTaskNode("foo.expand")
+
+    output = asyncio.run(runner.run(task))
+
+    captured = capsys.readouterr()
+    print("Captured:\n%s\n" % captured.out)
+#    for i in range(5):
+#        assert captured.out.find("msg%d: Hello world %d" % (i, i)) >= 0

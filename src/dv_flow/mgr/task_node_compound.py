@@ -97,7 +97,7 @@ class TaskNodeCompound(TaskNode):
 #        if self.save_exec_data:
 #            self._save_exec_data(rundir, ctxt, self.input.input)
 
-        return 0
+        return None
 
     def __hash__(self):
         return id(self)

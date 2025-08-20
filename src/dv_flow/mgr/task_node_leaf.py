@@ -65,18 +65,8 @@ class TaskNodeLeaf(TaskNode):
 #        sorted = toposort.toposort(dep_m)
 
         # Now, process the 'needs' in the order that they're listed
-        in_params = []
-        in_params_s = set()
-        in_task_s = set()
+        in_params = await self.get_in_params(rundir)
 
-        for need, _ in self.needs:
-            if need not in in_task_s:
-                in_task_s.add(need)
-                for item in need.output.output:
-                    key = (item.src, item.seq)
-                    if key not in in_params_s:
-                        in_params_s.add(key)
-                        in_params.append(item)
 
         # 
         # in_params_m = {}

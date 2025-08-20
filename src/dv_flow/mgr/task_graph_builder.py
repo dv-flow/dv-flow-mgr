@@ -316,7 +316,6 @@ class TaskGraphBuilder(object):
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
         elif self.loader is not None:
-            self._log.debug("Checking loader")
             task = self.loader.getTask(task_t)
 
             if task is None:
@@ -564,6 +563,8 @@ class TaskGraphBuilder(object):
 
         self._gatherNeeds(task, ret)
 
+        ret.input.needs.extend(ret.needs)
+
         ctxt = TaskGenCtxt(
             rundir=self.get_rundir(),
             srcdir=srcdir,
@@ -576,10 +577,7 @@ class TaskGraphBuilder(object):
         res = None
         if task.strategy.generate is not None:
             callable = ExecGenCallable(body=task.strategy.generate.run, srcdir=srcdir)
-            inputs = []
-            input = TaskGenInputData(
-                params=params,
-                inputs=[n[0] for n in task.needs])
+            input = TaskGenInputData(params=params)
 
             res = callable(ctxt, input)
         elif len(task.strategy.matrix):
@@ -938,20 +936,14 @@ class TaskGraphBuilder(object):
         return new_val
 
     def _gatherNeeds(self, task_t, node):
-        self._log.debug("--> _gatherNeeds %s (%d)" % (task_t.name, len(task_t.needs)))
+        self._log.debug("--> _gatherNeeds %s (%s %d)" % (task_t.name, node.name, len(task_t.needs)))
         if task_t.uses is not None and isinstance(task_t.uses, Task):
             self._gatherNeeds(task_t.uses, node)
 
         for need in task_t.needs:
-            # Support both string and tuple (Task, bool) dependencies
-            if hasattr(need, "name"):
-                need_n = self._getTaskNode(need.name)
-            elif isinstance(need, tuple) and hasattr(need[0], "name"):
-                need_n = self._getTaskNode(need[0].name)
-            else:
-                need_n = self._getTaskNode(str(need))
+            need_n = self._getTaskNode(need.name)
             if need_n is None:
-                raise Exception("Failed to find need %s" % (getattr(need, "name", str(need))))
+                raise Exception("Failed to find need %s" % need.name)
             node.needs.append((need_n, False))
         self._log.debug("<-- _gatherNeeds %s (%d)" % (task_t.name, len(node.needs)))
         

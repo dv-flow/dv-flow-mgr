@@ -444,9 +444,8 @@ class PackageLoader(object):
                     # Only add if not already present
                     if all(
                         not (isinstance(n, tuple) and n[0] == feeding_task) and n != feeding_task
-                        for n in fed_task.needs
-                    ):
-                        fed_task.needs.append((feeding_task, False))
+                        for n in fed_task.needs):
+                        fed_task.needs.append(feeding_task)
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
     

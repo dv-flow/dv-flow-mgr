@@ -151,7 +151,12 @@ class TaskSetRunner(TaskRunner):
                     # to the root rundir
                     rundir = ""
 
-                    for i, rundir_e in enumerate(t.rundir):
+                    rundir_split = t.rundir
+                    if not isinstance(t.rundir, list):
+                        rundir_split = t.rundir.split('/')
+#                        raise Exception("Task %s doesn't have an array rundir" % t.name)
+
+                    for i, rundir_e in enumerate(rundir_split):
                         if i:
                             rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
                             rundir = os.path.join(rundir, rundir_e)

@@ -50,8 +50,8 @@ class TaskRunCtxt(object):
             raise e
         return item
     
-    async def exec_group(self,
-                         cmd_list : List[Union[]] )
+#    async def exec_group(self,
+#                         cmd_list : List[Union[]] )
         
 
     async def exec(self, 

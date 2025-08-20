@@ -61,6 +61,7 @@ class TaskNode(object):
     save_exec_data : bool = dc.field(default=True)
     iff : bool = dc.field(default=True)
     parent : 'TaskNode' = dc.field(default=None)
+    in_params : List[Any] = dc.field(default=None)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 
@@ -77,6 +78,42 @@ class TaskNode(object):
     @property
     def first(self):
         return self
+    
+    async def get_in_params(self, rundir, runner = None) -> List[Any]:
+        self._log.debug("--> get_in_params %s (%d deps)" % (self.name, len(self.needs)))
+
+        if self.in_params is None:
+            from .task_runner import TaskSetRunner
+
+            self.in_params = []
+            in_params_s = set()
+            in_task_s = set()
+
+            tasks_to_update = []
+            for need, _ in self.needs:
+                if need.output is None:
+                    tasks_to_update.append(need)
+
+            self._log.debug("%d tasks to update" % len(tasks_to_update))
+
+            if len(tasks_to_update) > 0:
+                runner = TaskSetRunner(rundir=rundir)
+                await runner.run(tasks_to_update)
+                if runner.status != 0:
+                    raise Exception("Error while updating input tasks")
+
+            for need, _ in self.needs:
+                if need not in in_task_s:
+                    in_task_s.add(need)
+                    for item in need.output.output:
+                        key = (item.src, item.seq)
+                        if key not in in_params_s:
+                            in_params_s.add(key)
+                            self.in_params.append(item)
+
+        self._log.debug("<-- get_in_params")
+
+        return self.in_params
 
     async def do_run(self, 
                   runner,
