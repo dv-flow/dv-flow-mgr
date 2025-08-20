@@ -115,6 +115,8 @@ class TaskRunCtxt(object):
         with open(path, "w") as fp:
             fp.write(content)
 
+    def add_marker(self, marker : TaskMarker):
+        self._markers.append(marker)
 
     def marker(self, msg : str, severity : SeverityE, loc : TaskMarkerLoc=None):
         """Add a marker related to the task's execution"""

@@ -316,6 +316,7 @@ class TaskGraphBuilder(object):
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
         elif self.loader is not None:
+            self._log.debug("Checking loader")
             task = self.loader.getTask(task_t)
 
             if task is None:
@@ -565,6 +566,7 @@ class TaskGraphBuilder(object):
 
         ctxt = TaskGenCtxt(
             rundir=self.get_rundir(),
+            srcdir=srcdir,
             input=ret.input,
             builder=self
         )
@@ -941,9 +943,15 @@ class TaskGraphBuilder(object):
             self._gatherNeeds(task_t.uses, node)
 
         for need in task_t.needs:
-            need_n = self._getTaskNode(need.name)
+            # Support both string and tuple (Task, bool) dependencies
+            if hasattr(need, "name"):
+                need_n = self._getTaskNode(need.name)
+            elif isinstance(need, tuple) and hasattr(need[0], "name"):
+                need_n = self._getTaskNode(need[0].name)
+            else:
+                need_n = self._getTaskNode(str(need))
             if need_n is None:
-                raise Exception("Failed to find need %s" % need.name)
+                raise Exception("Failed to find need %s" % (getattr(need, "name", str(need))))
             node.needs.append((need_n, False))
         self._log.debug("<-- _gatherNeeds %s (%d)" % (task_t.name, len(node.needs)))
         

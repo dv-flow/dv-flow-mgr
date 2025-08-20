@@ -30,6 +30,7 @@ def loadProjPkgDef(path, listener=None):
 
     dir = path
     ret = None
+    loader = None
     found = False
     while dir != "/" and dir != "" and os.path.isdir(dir):
         for name in ("flow.dv", "flow.yaml", "flow.yml"):
@@ -39,7 +40,8 @@ def loadProjPkgDef(path, listener=None):
                     if "package" in data.keys():
                         found = True
                         listeners = [listener] if listener is not None else []
-                        ret = PackageLoader(marker_listeners=listeners).load(os.path.join(dir, name))
+                        loader = PackageLoader(marker_listeners=listeners)
+                        ret = loader.load(os.path.join(dir, name))
                         break
         if found:
             break
@@ -51,5 +53,5 @@ def loadProjPkgDef(path, listener=None):
                 msg="Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % path,
                 severity=SeverityE.Error))
     
-    return ret
+    return loader, ret
 

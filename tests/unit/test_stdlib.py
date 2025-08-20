@@ -20,7 +20,7 @@ package:
 
     rundir = os.path.join(tmpdir, "rundir")
 
-    pkg_def = loadProjPkgDef(os.path.join(tmpdir))
+    loader, pkg_def = loadProjPkgDef(os.path.join(tmpdir))
     assert pkg_def is not None
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,

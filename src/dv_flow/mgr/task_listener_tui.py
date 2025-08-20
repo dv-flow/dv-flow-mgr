@@ -1,5 +1,5 @@
 #****************************************************************************
-#* task_listener_log.py
+#* task_listener_tui.py
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -22,16 +22,21 @@
 import dataclasses as dc
 from datetime import datetime
 from rich.console import Console
-from typing import ClassVar, Dict
+from rich.live import Live
+from rich.table import Table
+from typing import Any, ClassVar, Dict, List
 from .task_data import SeverityE
 
 @dc.dataclass
-class TaskListenerLog(object):
+class TaskListenerTui(object):
     console : Console = dc.field(default=None)
     level : int = 0
     quiet : bool = False
     json : bool = False
     has_severity : Dict[SeverityE, int] = dc.field(default_factory=dict)
+    _table : Any = None
+    _live  : Any = None
+    _tasks : List = dc.field(default_factory=list)
 
     sev_pref_m : ClassVar = {
         "info": "[blue]I[/blue]",
@@ -48,10 +53,26 @@ class TaskListenerLog(object):
             self.has_severity[sev] = 0
 
     def enter(self):
-        pass
+        self._table = Live(self._create())
+        self._live = self._table.__enter__()
 
     def leave(self):
-        pass
+        self._table.__exit__(None, None, None)
+
+    def _create(self):
+        table = Table()
+        table.add_column("Task")
+        table.add_column("Status")
+
+        idx = 0
+        while idx < len(self._tasks):
+            row = self._tasks[idx]
+            table.add_row(row[0], row[1])
+            if "Success" in row[1] or "Fail" in row[1]:
+                self._tasks.pop(idx)
+            else:
+                idx += 1
+        return table
 
     def marker(self, marker):
         """Receives markers during loading"""
@@ -62,8 +83,7 @@ class TaskListenerLog(object):
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
             self.level += 1
-            if not self.quiet:
-                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
+            self._tasks.append((task.name, "[green]Running"))
         elif reason == 'leave':
             if self.quiet:
                 if task.result.changed:
@@ -80,17 +100,23 @@ class TaskListenerLog(object):
                 for m in task.result.markers:
                     self.show_marker(m, task.name, task.rundir)
 
+                idx = -1
+                for i,t in enumerate(self._tasks):
+                    if t[0] == task.name:
+                        idx = i
+                        break
+
                 if task.result.status == 0:
-                    self.console.print("[green]<< [%d][/green] Task %s%s%s" % (
-                        self.level, 
-                        task.name,
-                        ("" if task.result.changed else " (up-to-date)"),
-                        (delta_s if delta_s is not None else "")))
+                    self._tasks[idx] = (task.name, "[green]Success")
                 else:
-                    self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
+                    self._tasks[idx] = (task.name, "[red]Fail")
+
+            self._live.update(self._create())
             self.level -= 1
-        elif reason in ("start", "end"):
-            pass
+        elif reason == "start":
+            self.enter()
+        elif reason == "end":
+            self.leave()
         else:
             self.console.print("[red]-[/red] Task %s" % task.name)
         pass

@@ -49,7 +49,7 @@ class TaskNode(object):
     ctxt : TaskNodeCtxt
 
     # Runtime fields -- these get populated during execution
-    changed : bool = False
+    changed : bool = False # TODO: seems unused
     passthrough : bool = False
     consumes : List[Any] = dc.field(default_factory=list)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)

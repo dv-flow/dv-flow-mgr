@@ -30,6 +30,7 @@ from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
+from ..task_listener_tui import TaskListenerTui
 from ..task_listener_trace import TaskListenerTrace
 from .util import get_rootdir
 
@@ -43,7 +44,8 @@ class CmdRun(object):
 
         # First, find the project we're working with
         listener = TaskListenerLog()
-        pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
+#        listener = TaskListenerTui()
+        loader, pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")
@@ -92,7 +94,7 @@ class CmdRun(object):
                 os.rmdir(rundir)
             os.makedirs(rundir)
 
-        builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+        builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
         runner = TaskSetRunner(rundir, builder=builder)
 
         if args.j != -1:
