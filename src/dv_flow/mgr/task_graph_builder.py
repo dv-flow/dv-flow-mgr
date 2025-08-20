@@ -316,6 +316,7 @@ class TaskGraphBuilder(object):
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
         elif self.loader is not None:
+            self._log.debug("Checking loader")
             task = self.loader.getTask(task_t)
 
             if task is None:
