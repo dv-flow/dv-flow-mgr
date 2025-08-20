@@ -10,6 +10,7 @@ class TaskGenInputData(object):
 @dc.dataclass
 class TaskGenCtxt(object):
     rundir : str
+    srcdir : str
     input : TaskNode
     builder : 'TaskGraphBuilder'
     body : List['Task'] = dc.field(default_factory=list)
@@ -18,10 +19,11 @@ class TaskGenCtxt(object):
     def mkTaskNode(self, type_t, name=None, srcdir=None, needs=None, **kwargs):
         return self.builder.mkTaskNode(type_t, name, srcdir, needs, **kwargs)
 
-    def addTask(self, task : 'TaskNode'):
+    def addTask(self, task : 'TaskNode') -> TaskNode:
         if task is None:
             raise Exception("Task is None")
         self.tasks.append(task)
+        return task
 
     def mkName(self, leaf):
         # TODO: add on context

@@ -565,6 +565,7 @@ class TaskGraphBuilder(object):
 
         ctxt = TaskGenCtxt(
             rundir=self.get_rundir(),
+            srcdir=srcdir,
             input=ret.input,
             builder=self
         )
