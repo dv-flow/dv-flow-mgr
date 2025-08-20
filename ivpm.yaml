@@ -36,5 +36,7 @@ package:
       src: pypi
     - name: rich
       src: pypi
+    - name: setuptools-scm
+      src: pypi
 
 
