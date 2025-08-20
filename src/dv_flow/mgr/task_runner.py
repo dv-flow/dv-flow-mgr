@@ -56,6 +56,11 @@ class TaskRunner(object):
                   task : 'Task',
                   memento : Any = None) -> 'TaskDataResult':
         return await self.run(task, memento)
+    
+    async def exec(cmd, **kwargs):
+        # Acquire job token
+        # Create 
+        pass
 
     async def run(self, 
                   task : 'Task',

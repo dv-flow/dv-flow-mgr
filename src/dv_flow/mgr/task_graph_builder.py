@@ -574,7 +574,10 @@ class TaskGraphBuilder(object):
         res = None
         if task.strategy.generate is not None:
             callable = ExecGenCallable(body=task.strategy.generate.run, srcdir=srcdir)
-            input = TaskGenInputData(params=params)
+            inputs = []
+            input = TaskGenInputData(
+                params=params,
+                inputs=[n[0] for n in task.needs])
 
             res = callable(ctxt, input)
         elif len(task.strategy.matrix):

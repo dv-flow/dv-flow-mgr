@@ -6,6 +6,7 @@ from .task_node import TaskNode
 @dc.dataclass
 class TaskGenInputData(object):
     params : Any
+    inputs : List[TaskNode]
 
 @dc.dataclass
 class TaskGenCtxt(object):

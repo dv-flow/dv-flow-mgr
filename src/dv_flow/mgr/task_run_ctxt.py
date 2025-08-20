@@ -3,13 +3,16 @@ import dataclasses as dc
 from pydantic import BaseModel
 import pydantic.dataclasses as pdc
 import os
-from typing import Dict, List
+from typing import Dict, List, TYPE_CHECKING, Union
 from .task_data import TaskMarker, SeverityE, TaskMarkerLoc
 from .task_node_ctxt import TaskNodeCtxt
 
 class ExecInfo(BaseModel):
     cmd : List[str] = pdc.Field(default_factory=list)
     status : int = pdc.Field(default=0)
+
+if TYPE_CHECKING:
+    from .task_runner import TaskRunner
 
 @dc.dataclass
 class TaskRunCtxt(object):
@@ -46,6 +49,9 @@ class TaskRunCtxt(object):
             self.error("Failed to create data item: %s" % str(e))
             raise e
         return item
+    
+    async def exec_group(self,
+                         cmd_list : List[Union[]] )
         
 
     async def exec(self, 
