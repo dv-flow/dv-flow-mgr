@@ -37,7 +37,7 @@ class CmdGraph(object):
     def __call__(self, args):
 
         # First, find the project we're working with
-        pkg = loadProjPkgDef(get_rootdir(args))
+        loader, pkg = loadProjPkgDef(get_rootdir(args))
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
@@ -68,7 +68,7 @@ class CmdGraph(object):
         else:
             rundir = os.path.join(pkg.basedir, "rundir")
 
-            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
 
             for pref in ("", "%s." % pkg.name):
                 name = "%s%s" % (pref, args.task)

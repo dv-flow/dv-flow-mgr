@@ -30,13 +30,12 @@ class ExecGenCallable(object):
                 # have a file to load
                 file = self.body[:ci]
                 method = self.body[ci+2:]
-                spec = importlib.util.spec_from_file_location(input.name, file)
+                spec = importlib.util.spec_from_file_location(ctxt.input.name, file)
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[input.name] = module
                 spec.loader.exec_module(module)
 
                 callable = getattr(module, method)
-                pass
             else:
             #     self._log.debug("Use PyTask implementation")
                 last_dot = self.body.rfind('.')
@@ -45,8 +44,8 @@ class ExecGenCallable(object):
 
                 try:
                     if modname not in sys.modules:
-                        if input.srcdir not in sys.path:
-                           sys.path.append(input.srcdir)
+                        if ctxt.srcdir not in sys.path:
+                           sys.path.append(ctxt.srcdir)
                         mod = importlib.import_module(modname)
                     else:
                         mod = sys.modules[modname]
