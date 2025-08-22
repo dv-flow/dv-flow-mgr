@@ -93,15 +93,22 @@ class Package(object):
         """
         # Collect all imported packages recursively
         imports = {}
+        files = []
         def collect_imports(pkg):
+            nonlocal imports, files
             for name, p in pkg.pkg_m.items():
                 if name not in imports.keys():
-                    imports[name] = p.basedir
+#                    imports[name] = (p.srcinfo.file + ":" + p.srcinfo.lineno)
+                    if p.srcinfo is not None and p.srcinfo.file is not None:
+                        imports[name] = "%s:%d" % (p.srcinfo.file, p.srcinfo.lineno)
+
+#                    imports[name] = p.srcinfo.file
                     collect_imports(p)
+                    if p.srcinfo.file not in files:
+                        files.append(p.srcinfo.file)
         collect_imports(self)
         
         # Get files from fragments
-        files = []
         for frag in self.fragment_def_l:
             if frag.srcinfo and frag.srcinfo.file:
                 files.append(frag.srcinfo.file)
@@ -118,7 +125,7 @@ class Package(object):
         result = {
             "name": self.name,
             "file": self.srcinfo.file if self.srcinfo else None,
-            "imports": sorted(list(imports)),
+            "imports": imports,
             "files": files,
             "markers": [],
             "tasks": [

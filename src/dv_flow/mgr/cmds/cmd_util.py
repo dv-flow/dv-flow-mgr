@@ -21,7 +21,7 @@ class CmdUtil(object):
                 nonlocal markers
                 print("marker: %s" % str(m))
                 markers.append(m)
-            pkg = loadProjPkgDef(os.getcwd(), marker)
+            loader, pkg = loadProjPkgDef(os.getcwd(), marker)
 
 
         if pkg is None and markers is None:
