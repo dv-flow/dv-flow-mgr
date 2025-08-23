@@ -23,7 +23,7 @@ import enum
 import logging
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, ClassVar, Dict, Set, List, Tuple
+from typing import Any, ClassVar, Dict, Set, List, Tuple, Type
 from .fileset import FileSet
 from toposort import toposort
 
@@ -48,7 +48,7 @@ class TaskMarker(BaseModel):
     severity : SeverityE
     loc : TaskMarkerLoc = dc.Field(default=None)
 
-class TaskDataInput(BaseModel):
+class TaskDataInput[T](BaseModel):
     """
     Input data to a task:
 
@@ -63,7 +63,7 @@ class TaskDataInput(BaseModel):
     changed : bool
     srcdir : str
     rundir : str
-    params : Any
+    params : Type[T]
     inputs : List[Any]
     memento : Any
 

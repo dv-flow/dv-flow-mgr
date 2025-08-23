@@ -35,7 +35,7 @@ class Override(object):
 
 @dc.dataclass
 class Package(object):
-    pkg_def : PackageDef
+    name : str = "<unknown>"
     basedir : str = None
     paramT : Any = None
     # Package holds constructors for tasks
@@ -47,10 +47,6 @@ class Package(object):
 #    overrides : Dict[str, str]
     srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")
-
-    @property
-    def name(self):
-        return self.pkg_def.name
 
     def getTaskCtor(self, name : str) -> Task:
         self._log.debug("-- %s::getTaskCtor: %s" % (self.name, name))

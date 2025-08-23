@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoader
+from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoaderRoot
 from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
 from .marker_collector import MarkerCollector
 
@@ -36,7 +36,7 @@ package:
         fp.write(flow_dv)
 
     collector = MarkerCollector()
-    pkg = PackageLoader(marker_listeners=[collector]).load(
+    pkg = PackageLoaderRoot(marker_listeners=[collector]).load(
         os.path.join(rundir, "flow.dv"))
     
     print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
@@ -102,7 +102,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
     
-    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoaderRoot().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -155,7 +155,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoaderRoot().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -196,7 +196,7 @@ package:
     with open(os.path.join(rundir, "flow.dv"), "w") as fp:
         fp.write(flow_dv)
 
-    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    pkg_def = PackageLoaderRoot().load(os.path.join(rundir, "flow.dv"))
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
@@ -250,7 +250,7 @@ package:
         fp.write(flow_dv)
 
     marker_collector = MarkerCollector()
-    pkg_def = PackageLoader(
+    pkg_def = PackageLoaderRoot(
         marker_listeners=[marker_collector]).load(
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
@@ -300,7 +300,7 @@ package:
         fp.write(flow_dv)
 
     marker_collector = MarkerCollector()
-    pkg_def = PackageLoader(
+    pkg_def = PackageLoaderRoot(
         marker_listeners=[marker_collector]).load(
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
@@ -351,7 +351,7 @@ package:
         fp.write(flow_dv)
 
     marker_collector = MarkerCollector()
-    pkg_def = PackageLoader(
+    pkg_def = PackageLoaderRoot(
         marker_listeners=[marker_collector]).load(
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
@@ -410,7 +410,7 @@ package:
         fp.write(flow_dv)
 
     marker_collector = MarkerCollector()
-    pkg_def = PackageLoader(
+    pkg_def = PackageLoaderRoot(
         marker_listeners=[marker_collector]).load(
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
@@ -471,7 +471,7 @@ async def Task(ctxt, input):
         fp.write(task_py)
 
     marker_collector = MarkerCollector()
-    pkg_def = PackageLoader(
+    pkg_def = PackageLoaderRoot(
         marker_listeners=[marker_collector]).load(
             os.path.join(rundir, "flow.dv"))
     assert len(marker_collector.markers) == 0
