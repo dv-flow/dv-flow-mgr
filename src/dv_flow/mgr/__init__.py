@@ -24,6 +24,7 @@ from .package_loader import PackageLoader
 from .ext_rgy import ExtRgy
 from .task_data import *
 from .task_def import *
+from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_graph_builder import TaskGraphBuilder
 from .task_run_ctxt import TaskRunCtxt
 from .task_runner import TaskRunner

@@ -97,6 +97,7 @@ the following YAML specifies that the task will be called to generate
 the body of the compound task:
 
 .. code-block:: YAML
+
     tasks:
     - name: mytask
       strategy:
