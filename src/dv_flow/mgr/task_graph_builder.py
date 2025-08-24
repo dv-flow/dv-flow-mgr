@@ -569,6 +569,7 @@ class TaskGraphBuilder(object):
             rundir=self.get_rundir(),
             srcdir=srcdir,
             input=ret.input,
+            basename=ret.name,
             builder=self
         )
 
