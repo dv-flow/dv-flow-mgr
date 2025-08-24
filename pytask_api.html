@@ -35,6 +35,11 @@
             
   <section id="python-task-api">
 <h1>Python Task API<a class="headerlink" href="#python-task-api" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager provides two task-oriented API extension mechanisms that
+allow leaf tasks to be implemented as a Python task and allow the body
+of a compound task to be generated.</p>
+<section id="leaf-task-implementation-api">
+<h2>Leaf-Task Implementation API<a class="headerlink" href="#leaf-task-implementation-api" title="Link to this heading">¶</a></h2>
 <p>The core implementation for tasks is provided by a Python <cite>async</cite> method.
 This method is passed two parameters:</p>
 <ul class="simple">
@@ -44,7 +49,7 @@ This method is passed two parameters:</p>
 <p>The method must return a <cite>TaskDataResult</cite> object with the execution
 status of the task, result data, markers, and memento data.</p>
 <section id="taskdatainput">
-<h2>TaskDataInput<a class="headerlink" href="#taskdatainput" title="Link to this heading">¶</a></h2>
+<h3>TaskDataInput<a class="headerlink" href="#taskdatainput" title="Link to this heading">¶</a></h3>
 <p>An object of type <cite>TaskDataInput</cite> is passed as the <cite>input</cite> parameter
 of the runner method.</p>
 <dl class="py class">
@@ -63,7 +68,7 @@ of the runner method.</p>
 
 </section>
 <section id="taskdataitem">
-<h2>TaskDataItem<a class="headerlink" href="#taskdataitem" title="Link to this heading">¶</a></h2>
+<h3>TaskDataItem<a class="headerlink" href="#taskdataitem" title="Link to this heading">¶</a></h3>
 <p>Data is passed between tasks via <cite>TaskDataItem</cite>-derived objects.
 Each task may produce 0 or more <cite>TaskDataItem</cite> objects as output.
 A task receives all the <cite>TaskDataItem</cite> objects produced by its
@@ -81,7 +86,7 @@ dependencies.</p>
 
 </section>
 <section id="taskrunctxt">
-<h2>TaskRunCtxt<a class="headerlink" href="#taskrunctxt" title="Link to this heading">¶</a></h2>
+<h3>TaskRunCtxt<a class="headerlink" href="#taskrunctxt" title="Link to this heading">¶</a></h3>
 <p>The task implementaion is passed a task-run context object that
 provides utilities for the task.</p>
 <dl class="py class">
@@ -136,7 +141,7 @@ task’s implementation.</p>
 
 </section>
 <section id="taskdataresult">
-<h2>TaskDataResult<a class="headerlink" href="#taskdataresult" title="Link to this heading">¶</a></h2>
+<h3>TaskDataResult<a class="headerlink" href="#taskdataresult" title="Link to this heading">¶</a></h3>
 <p>Task implementation methods must return an object of type
 <cite>TaskDataResult</cite>. This object contains key data about
 task execution.</p>
@@ -155,7 +160,7 @@ task execution.</p>
 
 </section>
 <section id="taskmarker">
-<h2>TaskMarker<a class="headerlink" href="#taskmarker" title="Link to this heading">¶</a></h2>
+<h3>TaskMarker<a class="headerlink" href="#taskmarker" title="Link to this heading">¶</a></h3>
 <p>Tasks may produce markers to highlight key information to the
 user. A marker is typically a pointer to a file location with
 an associated severity level (error, warning, info).</p>
@@ -171,6 +176,32 @@ an associated severity level (error, warning, info).</p>
 <dd><p>Captures the source location of a marker</p>
 </dd></dl>
 
+</section>
+</section>
+<section id="task-graph-generation-api">
+<h2>Task-Graph Generation API<a class="headerlink" href="#task-graph-generation-api" title="Link to this heading">¶</a></h2>
+<p>DV flow manager supports the <cite>generate</cite> strategy by calling a Python
+task that is responsible for building the body of the compound task.</p>
+<p>A graph-building method has the following signature:</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_graph</span><span class="p">(</span><span class="n">ctxt</span> <span class="p">:</span> <span class="n">TaskGenCtxt</span><span class="p">,</span> <span class="nb">input</span> <span class="p">:</span> <span class="n">TaskGenInputData</span><span class="p">):</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>ctxt</strong> - Provides services for building and registering tasks</p></li>
+<li><p><strong>input</strong> - Input to the generator. Currently, the task parameters</p></li>
+</ul>
+<p>Assuming that this method is defined in a module named <cite>my_module</cite>,
+the following YAML specifies that the task will be called to generate
+the body of the compound task:</p>
+<section id="taskgenctxt-api">
+<h3>TaskGenCtxt API<a class="headerlink" href="#taskgenctxt-api" title="Link to this heading">¶</a></h3>
+</section>
+<section id="taskgeninputdata">
+<h3>TaskGenInputData<a class="headerlink" href="#taskgeninputdata" title="Link to this heading">¶</a></h3>
+<p>The <cite>TaskGenInputData</cite> class provides the value of task parameters
+specified on the containing compound task.</p>
+</section>
 </section>
 </section>
 
@@ -205,11 +236,8 @@ an associated severity level (error, warning, info).</p>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#taskdatainput">TaskDataInput</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#taskdataitem">TaskDataItem</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#taskrunctxt">TaskRunCtxt</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#taskdataresult">TaskDataResult</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#taskmarker">TaskMarker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#leaf-task-implementation-api">Leaf-Task Implementation API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#task-graph-generation-api">Task-Graph Generation API</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
