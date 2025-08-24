@@ -194,8 +194,49 @@ task that is responsible for building the body of the compound task.</p>
 <p>Assuming that this method is defined in a module named <cite>my_module</cite>,
 the following YAML specifies that the task will be called to generate
 the body of the compound task:</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytask</span>
+<span class="w">  </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">generate</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_module.build_graph</span>
+</pre></div>
+</div>
 <section id="taskgenctxt-api">
 <h3>TaskGenCtxt API<a class="headerlink" href="#taskgenctxt-api" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskGenCtxt">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskGenCtxt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rundir:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">srcdir:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input:</span> <span class="pre">dv_flow.mgr.task_node.TaskNode</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basename:</span> <span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">builder:</span> <span class="pre">'TaskGraphBuilder'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">body:</span> <span class="pre">List[ForwardRef('Task')]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tasks:</span> <span class="pre">List[ForwardRef('TaskNode')]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_idx:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskGenCtxt" title="Link to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskGenCtxt.addTask">
+<span class="sig-name descname"><span class="pre">addTask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TaskNode</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TaskNode</span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskGenCtxt.addTask" title="Link to this definition">¶</a></dt>
+<dd><p>Add the specified task to the graph</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskGenCtxt.getInputs">
+<span class="sig-name descname"><span class="pre">getInputs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">object</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskGenCtxt.getInputs" title="Link to this definition">¶</a></dt>
+<dd><p>Gets the input datasets of the containing task</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskGenCtxt.mkName">
+<span class="sig-name descname"><span class="pre">mkName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskGenCtxt.mkName" title="Link to this definition">¶</a></dt>
+<dd><p>Create a taskname relative to containing compound task</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskGenCtxt.mkTaskNode">
+<span class="sig-name descname"><span class="pre">mkTaskNode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type_t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">srcdir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">needs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskGenCtxt.mkTaskNode" title="Link to this definition">¶</a></dt>
+<dd><p>Creates a new task node.
+- type_t - type name of the task
+- name - (Optional) full name of the task
+- srcdir - (Optional) 
+- needs - (Optional) task nodes required by this task
+- kwargs - (Optionl) parameter overrides for the task</p>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 <section id="taskgeninputdata">
 <h3>TaskGenInputData<a class="headerlink" href="#taskgeninputdata" title="Link to this heading">¶</a></h3>
