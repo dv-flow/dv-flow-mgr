@@ -54,7 +54,7 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                 for key,value in params.items():
                     if not hasattr(obj, key):
                         raise Exception("Parameters class %s does not contain field %s" % (
-                            str(type(obj)),
+                            str(obj),
                             key
                         ))
                     else:
