@@ -55,8 +55,22 @@ async def FileSet(runner, input) -> TaskDataResult:
     _log.debug("params: %s" % str(input.params))
 
     if input.params is not None:
-        glob_root = os.path.join(input.srcdir, input.params.base)
-        glob_root = glob_root.strip()
+        base = input.params.base.strip()
+        # Check for glob pattern in base
+        is_glob = any(c in base for c in ['*', '?', '['])
+        if os.path.isabs(base):
+            base_candidates = glob.glob(base, recursive=True) if is_glob else [base]
+        else:
+            base_path = os.path.join(input.srcdir, base)
+            base_candidates = glob.glob(base_path, recursive=True) if is_glob else [base_path]
+        if is_glob:
+            if len(base_candidates) == 0:
+                raise RuntimeError(f"No directories match glob pattern: {base}")
+            if len(base_candidates) > 1:
+                raise RuntimeError(f"Multiple directories match glob pattern: {base_candidates}")
+            glob_root = base_candidates[0]
+        else:
+            glob_root = base_candidates[0]
 
         if glob_root[-1] == '/' or glob_root == '\\':
             glob_root = glob_root[:-1]
