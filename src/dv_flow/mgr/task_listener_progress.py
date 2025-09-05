@@ -59,7 +59,8 @@ class TaskListenerProgress(object):
         self._progress = Progress(
             SpinnerColumn(spinner_name="dots"),
             TextColumn("{task.fields[status]}"),
-            TextColumn("{task.fields[name]}")
+            TextColumn("{task.fields[name]}") ,
+            TextColumn("{task.fields[elapsed]}")
         )
         self._live = Live(self._render_group(), console=self.console, refresh_per_second=10)
         self._live.__enter__()
@@ -89,8 +90,11 @@ class TaskListenerProgress(object):
             # Add task row
             if task not in self._task_row_map and self._progress is not None:
                 # Create a task in Progress with a fixed total so we can mark complete to stop spinner
-                tid = self._progress.add_task("", total=1, completed=0, status="[cyan]…", name=task.name)
-                self._task_row_map[task] = { 'progress_id': tid, 'markers': [] }
+                tid = self._progress.add_task(
+                    "", total=1, completed=0,
+                    status="[cyan]…", name=task.name, elapsed=""
+                )
+                self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
                 self._order.append(task)
         elif reason == 'leave':
             info = self._task_row_map.get(task)
@@ -105,9 +109,18 @@ class TaskListenerProgress(object):
                 status_code = '[yellow]W[/yellow]'
             else:
                 status_code = '[green]D[/green]'
+            # Compute elapsed time
+            elapsed_s = ""
+            if getattr(task, 'start', None) is not None and getattr(task, 'end', None) is not None:
+                delta = task.end - task.start
+                if delta.total_seconds() >= 1.0:
+                    elapsed_s = f"{delta.total_seconds():0.2f}s"
+                else:
+                    elapsed_s = f"{delta.total_seconds()*1000:0.2f}ms"
+                info['elapsed'] = elapsed_s
             if self._progress is not None:
-                # Mark task complete to stop spinner
-                self._progress.update(info['progress_id'], status=status_code, completed=1)
+                # Mark task complete to stop spinner and update elapsed
+                self._progress.update(info['progress_id'], status=status_code, completed=1, elapsed=elapsed_s)
                 self._progress.stop_task(info['progress_id'])
             # Collect markers for later rendering below
             if task.result.markers:
