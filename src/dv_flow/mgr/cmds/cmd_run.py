@@ -56,16 +56,6 @@ class CmdRun(object):
                 print("Note: 'progress' UI requested but stdout is not a terminal. Falling back to 'log' UI.")
             ui = 'log'
 
-        if ui == 'log':
-            listener = TaskListenerLog()
-        elif ui == 'progress':
-            listener = TaskListenerProgress()
-        elif ui == 'tui':
-            listener = TaskListenerTui()
-        else:
-            if explicit:
-                print(f"Unknown UI '{ui}'. Falling back to log.")
-            listener = TaskListenerLog()
 
         # First, find the project we're working with using selected listener for load markers
         loader, pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
@@ -81,6 +71,16 @@ class CmdRun(object):
 
         if len(args.tasks) > 0:
             pass
+            if ui == 'log':
+                listener = TaskListenerLog()
+            elif ui == 'progress':
+                listener = TaskListenerProgress()
+            elif ui == 'tui':
+                listener = TaskListenerTui()
+            else:
+                if explicit:
+                    print(f"Unknown UI '{ui}'. Falling back to log.")
+                listener = TaskListenerLog()
         else:
             # Print out available tasks
             tasks = []
