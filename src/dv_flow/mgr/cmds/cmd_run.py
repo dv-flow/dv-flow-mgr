@@ -56,6 +56,7 @@ class CmdRun(object):
                 print("Note: 'progress' UI requested but stdout is not a terminal. Falling back to 'log' UI.")
             ui = 'log'
 
+        listener = TaskListenerLog()
 
         # First, find the project we're working with using selected listener for load markers
         loader, pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
