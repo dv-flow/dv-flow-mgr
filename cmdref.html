@@ -85,7 +85,8 @@
 <section id="run">
 <h3>run<a class="headerlink" href="#run" title="Link to this heading">¶</a></h3>
 <p>run a flow</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">u</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span>
+        <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments_repeat1">
@@ -109,6 +110,10 @@
 </dd>
 <dt><kbd>--root</kbd></dt>
 <dd><p>Specifies the root directory for the flow</p>
+</dd>
+<dt><kbd>-u, --ui</kbd></dt>
+<dd><p>Possible choices: log, progress, tui</p>
+<p>Console UI style (log, progress, tui). Default: progress if terminal else log</p>
 </dd>
 </dl>
 </section>
