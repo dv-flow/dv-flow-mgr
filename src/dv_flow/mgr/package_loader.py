@@ -1062,9 +1062,8 @@ class PackageLoader(object):
                         for i in range(len(value)):
                             if "${{" in value[i]:
                                 value[i] = self._eval.eval(value[i])
-                    else:
-                        if "${{" in value:
-                            value = self._eval.eval(value)
+                    elif type(value) == str and "${{" in value:
+                        value = self._eval.eval(value)
 
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
