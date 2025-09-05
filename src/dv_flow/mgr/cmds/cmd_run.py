@@ -31,6 +31,7 @@ from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_listener_tui import TaskListenerTui
+from ..task_listener_progress import TaskListenerProgress
 from ..task_listener_trace import TaskListenerTrace
 from .util import get_rootdir
 
@@ -42,9 +43,31 @@ class CmdRun(object):
 
         rgy = ExtRgy.inst()
 
-        # First, find the project we're working with
-        listener = TaskListenerLog()
-#        listener = TaskListenerTui()
+        # Determine which console listener to use
+        ui = getattr(args, 'ui', None)
+        if ui is None:
+            # Auto-select based on whether output is a terminal
+            ui = 'progress' if sys.stdout.isatty() else 'log'
+
+        # If user explicitly requested 'progress' but stdout isn't a TTY, fallback
+        explicit = getattr(args, 'ui', None) is not None
+        if ui == 'progress' and not sys.stdout.isatty():
+            if explicit:
+                print("Note: 'progress' UI requested but stdout is not a terminal. Falling back to 'log' UI.")
+            ui = 'log'
+
+        if ui == 'log':
+            listener = TaskListenerLog()
+        elif ui == 'progress':
+            listener = TaskListenerProgress()
+        elif ui == 'tui':
+            listener = TaskListenerTui()
+        else:
+            if explicit:
+                print(f"Unknown UI '{ui}'. Falling back to log.")
+            listener = TaskListenerLog()
+
+        # First, find the project we're working with using selected listener for load markers
         loader, pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
 
         if listener.has_severity[SeverityE.Error] > 0:

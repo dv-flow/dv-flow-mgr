@@ -27,6 +27,21 @@ There are two levels of schema definition for a .flow file:
 - Types (package, flow, subflow) define schemas for their respective 
   bodies that define what content is permitted.
 
+## Running Flows
+
+Use the `dfm run` command to execute one or more tasks. You can now select the console UI style with `-u/--ui`:
+
+```
+dfm run -u progress <tasks>
+dfm run -u log <tasks>
+```
+
+UI styles:
+- `progress` (default when stdout is a TTY): Shows each running task with a spinner; on completion shows D (success), W (warnings), or E (errors). Markers (warnings/errors) appear indented beneath the task and the final list remains visible.
+- `log` (default when stdout is redirected): Traditional line-oriented logging of task start/finish and markers.
+
+If `-u/--ui` is not specified the tool auto-selects `progress` when writing to a terminal and `log` otherwise.
+
 # Package
 - Packages support inheritance relationships
 - Packages can define parameters that are specified when the package is referenced

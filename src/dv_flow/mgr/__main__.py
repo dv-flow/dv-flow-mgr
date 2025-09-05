@@ -65,6 +65,10 @@ def get_parser():
                             help="Cleans the rundir before running")
     run_parser.add_argument("--root", 
                               help="Specifies the root directory for the flow")
+    run_parser.add_argument("-u", "--ui",
+                        help="Console UI style (log, progress, tui). Default: progress if terminal else log",
+                        choices=("log","progress","tui"),
+                        default=None)
     run_parser.set_defaults(func=CmdRun())
 
     show_parser = subparsers.add_parser('show', 
