@@ -12,7 +12,7 @@ from .fragment_def import FragmentDef
 from .name_resolution import NameResolutionContext
 from .package_def import PackageDef
 from .package import Package
-from .param_def import ComplexType
+from .param_def import ComplexType, ParamDef
 from .param_ref_eval import ParamRefEval
 from .ext_rgy import ExtRgy
 from .srcinfo import SrcInfo
@@ -641,6 +641,16 @@ class PackageLoader(object):
             if taskdef.srcinfo is None:
                 raise Exception("null srcinfo")
             self._log.debug("Create task %s in pkg %s" % (self._getScopeFullname(taskdef.name), pkg.name))
+
+            # Process parameters and identify ParamDefs
+            if taskdef.params is not None:
+                for k in taskdef.params.keys():
+                    v = taskdef.params[k]
+                    if type(v) == dict and "type" in v.keys():
+                        self._log.debug("Converting parameter %s to ParamDef" % k)
+                        pd = ParamDef(**v)
+                        taskdef.params[k] = pd
+
             desc = taskdef.desc if taskdef.desc is not None else ""
             doc = taskdef.doc if taskdef.doc is not None else ""
             task = Task(
@@ -805,6 +815,14 @@ class PackageLoader(object):
             if td.srcinfo is None:
                 raise Exception("null srcinfo")
 
+            # Process parameters and identify ParamDefs
+            if td.params is not None:
+                for k in td.params.keys():
+                    v = td.params[k]
+                    if type(v) == dict and "type" in v.keys():
+                        self._log.debug("Converting parameter %s to ParamDef" % k)
+                        pd = ParamDef(**v)
+                        td.params[k] = pd
             
             doc = td.doc if td.doc is not None else ""
             desc = td.desc if td.desc is not None else ""
@@ -1024,6 +1042,7 @@ class PackageLoader(object):
             param = taskdef.params[p]
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
             if hasattr(param, "type") and param.type is not None:
+                self._log.debug("=> New-param declaration")
                 if isinstance(param.type, ComplexType):
                     if param.type.list is not None:
                         ptype = List
@@ -1049,24 +1068,39 @@ class PackageLoader(object):
                     field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
             else:
+                self._log.debug("=> Set-param value")
                 if p in field_m.keys():
-                    if type(param) != dict:
-                        value = param
-                    elif "value" in param.keys():
-                        value = param["value"]
+                    self._log.debug("=> Is an existing parameter (%s)" % type(param))
+                    if hasattr(param, "copy"):
+                        value = param.copy()
                     else:
-                        raise Exception("No value specified for param %s: %s" % (
-                            p, str(param)))
+                        value = param
+                    # if type(param) != dict:
+                    # elif "value" in param.keys():
+                    #     self._log.debug("TODO: 'value' parameter")
+                    #     value = param["value"]
+                    # else:
+                    #     raise Exception("No value specified for param %s: %s" % (
+                    #         p, str(param)))
 
                     if type(value) == list:
                         for i in range(len(value)):
                             if "${{" in value[i]:
                                 value[i] = self._eval.eval(value[i])
+                    elif type(value) == dict:
+                        self._log.debug("TODO: dict value")
+                        for k in value.keys():
+                            v = value[k]
+                            if "${{" in v:
+                                v = self._eval.eval(v)
+                                value[k] = v
+                    elif type(value) == ParamDef:
+                        self._log.debug("TODO: paramdef value")
                     elif type(value) == str and "${{" in value:
                         value = self._eval.eval(value)
 
                     field_m[p] = (field_m[p][0], value)
-                    self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
+                    self._log.debug("Set param=%s to %s (type %s)" % (p, str(field_m[p][1]), type(value)))
                 else:
                     self.error("Field %s not found in task %s" % (p, taskdef.name), taskdef.srcinfo)
 
