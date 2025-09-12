@@ -17,6 +17,18 @@ class ShellCallable(object):
         shell = ("/bin/%s" % self.shell) if self.shell != "shell" else "bash"
         # Setup environment for the call
         env = ctxt.env.copy()
+        # Merge std.Env data items from inputs
+        # Collect all std.Env vals in dependency order, oldest first
+        env_items = []
+        for item in getattr(input, "inputs", []):
+            if getattr(item, "type", None) == "std.Env" and hasattr(item, "vals") and isinstance(item.vals, dict):
+                env_items.append(item.vals)
+        # Merge all keys from all std.Env, oldest first, newest override
+        merged_env = {}
+        for vals in env_items:
+            for k, v in vals.items():
+                merged_env[k] = v
+        env.update(merged_env)
         env["TASK_SRCDIR"] = input.srcdir
         env["TASK_RUNDIR"] = input.rundir
 #        env["TASK_PARAMS"] = input.params.dumpto_json()
@@ -49,5 +61,3 @@ class ShellCallable(object):
         return TaskDataResult(
             status=status
         )
-
-
