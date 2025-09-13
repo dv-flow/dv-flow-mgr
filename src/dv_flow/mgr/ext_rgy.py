@@ -19,7 +19,6 @@
 #*     Author: 
 #*
 #****************************************************************************
-import dataclasses as dc
 import os
 import logging
 import sys
@@ -28,12 +27,11 @@ from .exec_callable import ExecCallable
 from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
 
-@dc.dataclass
 class ExtRgy(object):
     _inst : ClassVar = None
-    _log : logging.Logger = None
+    _log : ClassVar[logging.Logger] = None
 
-    def __post_init__(self):
+    def __init__(self):
         self._pkgpath = []
         self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
