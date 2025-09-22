@@ -233,3 +233,158 @@ def test_smoke_6(tmpdir):
     assert called[-1][0] == "MyTask3"
     for it in ["f1", "f2", "f3", "f4", "f5", "f6"]:
         assert it in called[-1][1]
+
+# def test_compound_node(tmpdir):
+#     import sys
+#     import os
+#     import site
+#     import asyncio
+#     import subprocess
+#     import pydantic.dataclasses as pdc
+
+#     with open(os.path.join(tmpdir, "file1.c"), "w") as fp:
+#         fp.write("")
+
+#     with open(os.path.join(tmpdir, "file2.c"), "w") as fp:
+#         fp.write("")
+
+#     with open(os.path.join(tmpdir, "file3.c"), "w") as fp:
+#         fp.write("int main() { }")
+    
+#     # # Ensure user site-packages are available (for --user installs)
+#     # user_site = site.getusersitepackages()
+#     # if user_site not in sys.path:
+#     #     sys.path.insert(0, user_site)
+    
+#     # # Insert the absolute path to 'src' into sys.path
+#     # src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src"))
+#     # if src_path not in sys.path:
+#     #     sys.path.insert(0, src_path)
+    
+#     from dv_flow.mgr import task, FileSet
+#     from dv_flow.mgr.task_gen_ctxt import TaskGenCtxt
+#     from dv_flow.mgr.task_node_leaf import TaskNodeLeaf
+#     from dv_flow.mgr.task_node_compound import TaskNodeCompound
+#     from dv_flow.mgr.task_node_ctxt import TaskNodeCtxt
+#     from dv_flow.mgr.task_runner import TaskSetRunner
+#     from dv_flow.mgr.task_data import TaskDataInput, TaskDataResult, TaskDataItem
+#     from dv_flow.mgr.task_def import PassthroughE, ConsumesE
+
+#     srcdir = os.path.join(tmpdir)
+#     rundir = os.path.join(tmpdir, "rundir")
+    
+#     @pdc.dataclass
+#     class CompileParams:
+#         # Params objects must have default values
+#         src: str = pdc.Field(default="")
+#         obj: str = pdc.Field(default="")
+    
+#     @pdc.dataclass
+#     class LinkParams:
+#         objects : list = pdc.Field(default_factory=list)
+#         exe: str = pdc.Field(default="")
+
+#     # I'd use the built-in fileset type for both of these    
+#     # class ObjectFile(TaskDataItem):
+#     #     type: str
+#     #     obj: str
+    
+#     # class ExecutableFile(TaskDataItem):
+#     #     type: str
+#     #     exe: str
+
+#     @task(CompileParams)
+#     async def compile_task(run_ctxt, input: TaskDataInput):
+#         src = input.params.src
+#         obj = input.params.obj
+#         rundir = input.rundir
+#         src = input.srcdir
+#         print(f"Compiling {src} -> {obj} (cwd={rundir})")
+#         result = subprocess.run(["gcc", "-c", src, "-o", obj], capture_output=True, text=True, cwd=rundir)
+#         if result.returncode != 0:
+#             print(result.stderr)
+#             raise Exception(f"Compilation failed for {src}")
+#         # Output object file info
+#         output_item = FileSet(
+#              filetype="objFile",
+#              basedir=input.rundir,
+#              files=[obj])
+#         print(f"DEBUG: compile_task output_item = {output_item}, dict = {output_item.__dict__}")
+#         return TaskDataResult(
+#             status=0,
+#             changed=True,
+#             output=[output_item],
+#             markers=[],
+#             memento=None
+#         )
+
+#     @task(LinkParams)    
+#     async def link_task(run_ctxt, input: TaskDataInput):
+#         print(f"DEBUG: link input.inputs = {input.inputs}")
+#         # print(f"DEBUG: link ctx input.inputs = {run_ctxt.getInputs()}")
+#         obj_files = []
+#         for i, item in enumerate(input.inputs):
+#             print(f"DEBUG: link input.inputs[{i}] type={type(item)}, dict={getattr(item, '__dict__', str(item))}")
+#             for file in item.files:
+#                  obj_files.append(os.path.join(item.basedir, file))
+        
+# #        obj_files = [getattr(item, "obj", None) for item in input.inputs]
+#         exe_file = input.params.exe
+#         rundir = input.srcdir
+#         print(f"Linking {obj_files} -> {exe_file} (cwd={rundir})")
+#         result = subprocess.run(["gcc"] + obj_files + ["-o", exe_file], capture_output=True, text=True, cwd=rundir)
+#         if result.returncode != 0:
+#             print(result.stderr)
+#             raise Exception("Linking failed")
+#         output_item = ExecutableFile(type="executable", exe=exe_file)
+#         return TaskDataResult(
+#             status=0,
+#             changed=True,
+#             output=[output_item],
+#             markers=[],
+#             memento=None
+#         )
+    
+# #    rundir = os.path.dirname(__file__)
+# #    ctxt = TaskNodeCtxt(root_pkgdir="", root_rundir=rundir, env={})
+    
+#     sources = ["file1.c", "file2.c", "file3.c"]
+#     objects = [src.replace(".c", ".o") for src in sources]
+#     compile_nodes = []
+#     for src, obj in zip(sources, objects):
+#         node = compile_task(
+#             name=f"compile_{src}",
+#             srcdir=srcdir,
+# #            rundir=os.path.join(rundir, f"compile_{src}"),
+#             # Values for task parameters as passed through as kwargs
+#             src=src,
+#             obj=obj)
+#         compile_nodes.append(node)
+    
+#     # Linking task depends directly on the three compilation tasks
+#     link_node = link_task(
+#          name="link", 
+#          srcdir=srcdir, 
+#          needs=compile_nodes,
+#         rundir=os.path.join(rundir, f"compile_{src}"))
+
+#     # link_node = TaskNodeLeaf(
+#     #     name="link",
+#     #     srcdir=rundir,
+#     #     params=LinkParams(objects=objects, exe="a.out"),
+#     #     ctxt=ctxt,
+#     #     task=link_task,
+#     #     needs=compile_nodes # [(compound_node, False)] #(compound_node, False) for node in compile_nodes]
+#     # )
+    
+    
+#     runner = TaskSetRunner(rundir=rundir)
+#     # Only need to run the terminal node. 
+#     asyncio.run(runner.run([link_node]))
+
+#     assert runner.status == 0
+   
+#     print("Build completed. Run './a.out' to execute.")
+    
+#     pass
+    

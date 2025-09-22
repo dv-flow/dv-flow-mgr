@@ -206,3 +206,82 @@ package:
     with open(os.path.join(rundir, "foo.entry/out.txt"), "r") as fp:
         line = fp.read().strip()
         assert line == "xHello World!x"
+
+def test_std_env_single(tmpdir):
+    flow_dv = """
+package:
+  name: p1
+  tasks:
+  - name: env1
+    uses: std.SetEnv
+    with:
+      setenv:
+        FOO: "hello"
+        BAR: "world"
+  - name: sh1
+    shell: bash
+    needs: [env1]
+    run: |
+      echo -n "${FOO},${BAR}" > out.txt
+"""
+    flow_path = os.path.join(tmpdir, "flow.dv")
+    with open(flow_path, "w") as f:
+        f.write(flow_dv)
+
+    rundir = os.path.join(tmpdir, "rundir")
+    def marker(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg = PackageLoader(marker_listeners=[marker]).load(flow_path)
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+    runner = TaskSetRunner(rundir, builder=builder)
+    entry = builder.mkTaskNode("p1.sh1")
+    output = asyncio.run(runner.run(entry))
+    assert runner.status == 0
+    out_file = os.path.join(rundir, "p1.sh1/out.txt")
+    assert os.path.isfile(out_file)
+    with open(out_file, "r") as fp:
+        line = fp.read().strip()
+        assert line == "hello,world"
+
+def test_std_env_multi_override(tmpdir):
+    flow_dv = """
+package:
+  name: p1
+  tasks:
+  - name: env1
+    uses: std.SetEnv
+    with:
+      setenv:
+        FOO: "base"
+        MID: "m1"
+  - name: env2
+    uses: std.SetEnv
+    needs: [env1]
+    with:
+      setenv:
+        FOO: "override"
+        END: "e2"
+  - name: sh1
+    shell: bash
+    needs: [env1, env2]
+    run: |
+      echo -n "${FOO},${MID},${END}" > out.txt
+"""
+    flow_path = os.path.join(tmpdir, "flow.dv")
+    with open(flow_path, "w") as f:
+        f.write(flow_dv)
+
+    rundir = os.path.join(tmpdir, "rundir")
+    def marker(marker):
+        raise Exception("Marker: %s" % marker)
+    pkg = PackageLoader(marker_listeners=[marker]).load(flow_path)
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+    runner = TaskSetRunner(rundir, builder=builder)
+    entry = builder.mkTaskNode("p1.sh1")
+    output = asyncio.run(runner.run(entry))
+    assert runner.status == 0
+    out_file = os.path.join(rundir, "p1.sh1/out.txt")
+    assert os.path.isfile(out_file)
+    with open(out_file, "r") as fp:
+        line = fp.read().strip()
+        assert line == "override,m1,e2"

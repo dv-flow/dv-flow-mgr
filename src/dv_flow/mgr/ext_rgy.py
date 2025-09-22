@@ -19,7 +19,6 @@
 #*     Author: 
 #*
 #****************************************************************************
-import dataclasses as dc
 import os
 import logging
 import sys
@@ -41,7 +40,7 @@ class ExtRgy(PackageProvider):
 
     _pkg_m : Dict[str,PackageProvider] = dc.field(default_factory=dict)
 
-    def __post_init__(self):
+    def __init__(self):
         self._pkgpath = []
 #        self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}

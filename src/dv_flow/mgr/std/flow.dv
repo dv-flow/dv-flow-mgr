@@ -85,6 +85,14 @@ package:
       incdir: 
         type: bool
         value: false
+  - name: SetEnv
+    desc: Sets environment variables for use by other tasks
+    shell: pytask
+    run: dv_flow.mgr.std.setenv.SetEnv
+    with:
+      setenv:
+        type: map
+
   - name: SetFileType
     consumes:
     - type: std.FileSet 

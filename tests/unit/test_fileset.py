@@ -128,3 +128,90 @@ package:
     fs = output.output[0]
     assert len(fs.files) == 1
     assert fs.files[0] == "top.sv"
+
+def test_fileset_base_absolute(tmpdir):
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    abs_base = os.path.join(rundir, "absdir")
+    os.makedirs(abs_base)
+    with open(os.path.join(abs_base, "file.sv"), "w") as fp:
+        fp.write("// abs file\n")
+    flow_dv = f'''
+package:
+  name: abs_pkg
+  tasks:
+  - name: abs
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      base: "{abs_base}"
+      include: "*.sv"
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("abs_pkg.abs")
+    output = asyncio.run(runner.run(task))
+    fs = output.output[0]
+    assert len(fs.files) == 1
+    assert fs.files[0] == "file.sv"
+
+def test_fileset_base_glob_single(tmpdir):
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    glob_base = os.path.join(rundir, "globdir")
+    os.makedirs(glob_base)
+    with open(os.path.join(glob_base, "leaf"), "w") as fp:
+        fp.write("// leaf file\n")
+    flow_dv = f'''
+package:
+  name: glob_pkg
+  tasks:
+  - name: glob
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      base: "{rundir}/glob*/leaf"
+      include: ""
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("glob_pkg.glob")
+    output = asyncio.run(runner.run(task))
+    fs = output.output[0]
+    assert fs.basedir.endswith("leaf")
+
+def test_fileset_base_glob_multiple(tmpdir, caplog):
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    for i in range(2):
+        glob_base = os.path.join(rundir, f"globdir{i}")
+        os.makedirs(glob_base)
+        with open(os.path.join(glob_base, "leaf"), "w") as fp:
+            fp.write("// leaf file\n")
+    flow_dv = f'''
+package:
+  name: glob_pkg
+  tasks:
+  - name: glob
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      base: "{rundir}/globdir*/leaf"
+      include: ""
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("glob_pkg.glob")
+    with caplog.at_level("ERROR"):
+        output = asyncio.run(runner.run(task))
+    assert runner.status != 0
+    assert any("Multiple directories match glob pattern" in r.message for r in caplog.records)

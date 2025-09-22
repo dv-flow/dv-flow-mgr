@@ -27,6 +27,7 @@ from .pytask import PyTask
 from .pypkg import PyPkg
 from .task_data import *
 from .task_def import *
+from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_graph_builder import TaskGraphBuilder
 from .task_run_ctxt import TaskRunCtxt
 from .task_runner import TaskRunner
@@ -56,7 +57,7 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                 for key,value in params.items():
                     if not hasattr(obj, key):
                         raise Exception("Parameters class %s does not contain field %s" % (
-                            str(type(obj)),
+                            str(obj),
                             key
                         ))
                     else:

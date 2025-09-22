@@ -137,7 +137,7 @@ class TaskDef(BaseModel):
     feeds : List[Union[str]] = dc.Field(
         default_factory=list,
         description="List of tasks that depend on this task (inverse of needs)")
-    params: Dict[str,Union[str,list,bool,ParamDef]] = dc.Field(
+    params: Dict[str,Union[str,list,int,bool,dict]] = dc.Field(
         default_factory=dict, 
         alias="with",
         description="Parameters for the task")
