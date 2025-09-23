@@ -878,7 +878,7 @@ class PackageLoader(object):
             elif td.pytask is not None:
                 st.run = td.pytask
                 st.shell = "pytask"
-            elif st.uses is not None and st.uses.run is not None:
+            elif st.uses is not None and getattr(st.uses, "run", None) is not None:
                 st.run = st.uses.run
                 st.shell = st.uses.shell
 
