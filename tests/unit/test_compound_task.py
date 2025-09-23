@@ -751,3 +751,66 @@ package:
     assert len(output.output) == 1
     assert output.output[0].type == 'std.FileSet'
     assert len(output.output[0].files) == 1
+
+def test_compound_srcdir_ref(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: entry
+      body:
+      - name: t1
+        rundir: inherit
+        shell: bash
+        run: |
+          echo "srcdir: ${{ srcdir }}" > file1.txt
+      - name: t2
+        rundir: inherit
+        needs: [t1]
+        uses: std.FileSet
+        with:
+          type: textFile
+          base: ${{ rundir }}
+          include: "*.txt"
+
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    for m in collector.markers:
+        print("Marker: %s" % m.msg)
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="entry")
+
+    # TaskGraphDotWriter().write(
+    #     t1, 
+    #     os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    for out in output.output:
+        print("Out: %s" % str(out))
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
+
+    with open(os.path.join(output.output[0].basedir, output.output[0].files[0]), "r") as fp:
+        content = fp.read().strip()
+        assert content.find("srcdir:") != -1
+        path = content[content.find(":")+1:].strip()
+        assert path == str(tmpdir)
