@@ -873,7 +873,8 @@ class PackageLoader(object):
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, td)
             elif td.run is not None:
-                st.run = td.run
+#                st.run = self._eval.eval(td.run)
+                st.run = self._eval.eval(td.run)
                 st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:
                 st.run = td.pytask

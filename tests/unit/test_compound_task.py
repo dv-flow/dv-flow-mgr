@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import pytest
 from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner, PackageLoader
 from dv_flow.mgr.task_graph_dot_writer import TaskGraphDotWriter
 from .marker_collector import MarkerCollector
@@ -494,3 +495,259 @@ async def Task(ctxt, input):
     with open(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/task.out"), "r") as fp:
         line = fp.read().strip()
         assert line == "p1: v1"
+
+@pytest.mark.skip
+def test_compound_need(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: file1
+      uses: std.CreateFile
+      with:
+        filename: file1.tst
+        content: |
+          file1
+        type: textFile
+    - name: file2
+      uses: std.CreateFile
+      with:
+        filename: file2.tst
+        content: |
+          file2
+        type: textFile
+    - name: file3
+      uses: std.CreateFile
+      with:
+        filename: file3.tst
+        content: |
+          file3
+        type: textFile
+    - name: Compound1
+      needs: [file1, file2, file3]
+      body:
+      - name: Init
+        shell: pytask
+        run: |
+          with open(os.path.join(input.rundir, "init.txt"), "w") as fp:
+            fp.write("%d inputs\\n" % len(input.inputs))
+          return TaskDataResult(status=0)
+    - name: entry
+      needs: [Compound1]
+      body:
+      - name: Sub
+        shell: pytask
+        run: |
+          with open("sub.txt", "w") as fp:
+            fp.write("%d inputs\\n" % len(input.inputs))
+          return TaskDataResult(status=0)
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    for m in collector.markers:
+        print("Marker: %s" % m.msg)
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    # TaskGraphDotWriter().write(
+    #     t1, 
+    #     os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    for out in output.output:
+        print("Out: %s" % str(out))
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
+
+@pytest.mark.skip
+def test_compound_need_inh(tmpdir):
+    pkg_dv = """
+package:
+  name: pkg
+  tasks:
+  - name: Compound1
+    body:
+    - name: Init
+      shell: pytask
+      run: |
+        with open("init.txt", "w") as fp:
+          fp.write("%d inputs\\n" % len(input.inputs))
+        return TaskDataResult(status=0)
+  - name: entry
+    body:
+    - name: Sub
+      shell: pytask
+      run: |
+        with open("sub.txt", "w") as fp:
+          fp.write("%d inputs\\n" % len(input.inputs))
+        return TaskDataResult(status=0)
+"""
+    flow_dv = """
+package:
+    name: foo
+    imports:
+    - pkg.dv
+
+    tasks:
+    - name: file1
+      uses: std.CreateFile
+      with:
+        filename: file1.tst
+        content: |
+          file1
+        type: textFile
+    - name: file2
+      uses: std.CreateFile
+      with:
+        filename: file2.tst
+        content: |
+          file2
+        type: textFile
+    - name: file3
+      uses: std.CreateFile
+      with:
+        filename: file3.tst
+        content: |
+          file3
+        type: textFile
+    - name: Compound1
+      uses: pkg.Compound1
+      needs: [file1, file2, file3]
+    - name: entry
+      uses: pkg.entry
+      needs: [Compound1]
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    with open(os.path.join(rundir, "pkg.dv"), "w") as fp:
+        fp.write(pkg_dv)
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    for m in collector.markers:
+        print("Marker: %s" % m.msg)
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    # TaskGraphDotWriter().write(
+    #     t1, 
+    #     os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    for out in output.output:
+        print("Out: %s" % str(out))
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
+
+@pytest.mark.skip
+def test_compound_need_inh_src(tmpdir):
+    pkg_dv = """
+package:
+  name: pkg
+  tasks:
+  - name: Compound1
+    body:
+    - name: Init
+      shell: pytask
+      run: |
+        with open(os.path.join(input.rundir, "init.txt"), "w") as fp:
+          fp.write("%d inputs\\n" % len(input.inputs))
+        return TaskDataResult(status=0)
+  - name: entry
+    body:
+    - name: Sub
+      shell: pytask
+      run: |
+        with open(os.path.join(input.rundir, "sub.txt"), "w") as fp:
+          fp.write("%d inputs\\n" % len(input.inputs))
+        return TaskDataResult(status=0)
+"""
+    flow_dv = """
+package:
+    name: foo
+    imports:
+    - pkg.dv
+
+    tasks:
+    - name: file1
+      uses: std.FileSet
+      with:
+        type: textFile
+        base: ${{ srcdir }}
+        include: file1.txt
+    - name: Compound1
+      uses: pkg.Compound1
+      needs: [file1]
+    - name: entry
+      uses: pkg.entry
+      needs: [Compound1]
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    with open(os.path.join(rundir, "pkg.dv"), "w") as fp:
+        fp.write(pkg_dv)
+    with open(os.path.join(rundir, "file1.txt"), "w") as fp:
+        fp.write("file1.txt\n")
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    for m in collector.markers:
+        print("Marker: %s" % m.msg)
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry", name="t1")
+
+    # TaskGraphDotWriter().write(
+    #     t1, 
+    #     os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    for out in output.output:
+        print("Out: %s" % str(out))
+    assert len(output.output) == 1
+    assert output.output[0].type == 'std.FileSet'
+    assert len(output.output[0].files) == 1
