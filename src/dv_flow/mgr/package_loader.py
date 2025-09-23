@@ -844,7 +844,7 @@ class PackageLoader(object):
         for td, st in subtasks:
             if td.uses is not None:
                 if st.uses is None:
-                    st.uses = self._findTask(td.uses)
+                    st.uses = self._findTaskOrType(td.uses)
                     if st.uses is None:
                         self.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % td.uses)
