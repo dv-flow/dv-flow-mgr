@@ -162,3 +162,14 @@ cython_debug/
 
 packages/
 rundir/
+
+# Test artifacts
+*.exec_data.json
+MyTask*/
+consume_files/
+consumer/
+producer/
+passthrough/
+foo.entry.*/
+foo.expand/
+tmp/
