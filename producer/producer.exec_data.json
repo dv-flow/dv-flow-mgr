@@ -1,0 +1,55 @@
+{
+  "name": "producer",
+  "srcdir": "srcdir",
+  "rundir": "producer",
+  "input": {
+    "name": "producer",
+    "changed": false,
+    "srcdir": "srcdir",
+    "rundir": "producer",
+    "params": {},
+    "inputs": [],
+    "memento": null
+  },
+  "needs": [],
+  "commands": [],
+  "result": {
+    "status": 0,
+    "changed": true,
+    "memento": null
+  },
+  "output": {
+    "changed": true,
+    "output": [
+      {
+        "type": "std.FileSet",
+        "filetype": "verilogInclude",
+        "basedir": "foo",
+        "name": "",
+        "src": "producer",
+        "seq": 0,
+        "files": [],
+        "incdirs": [],
+        "defines": [],
+        "params": {}
+      },
+      {
+        "type": "std.FileSet",
+        "filetype": "simLib",
+        "basedir": "bar",
+        "name": "",
+        "src": "producer",
+        "seq": 1,
+        "files": [],
+        "incdirs": [],
+        "defines": [],
+        "params": {}
+      }
+    ],
+    "dep_m": {
+      "producer": []
+    }
+  },
+  "consumes": "ConsumesE.All",
+  "passthrough": "True"
+}

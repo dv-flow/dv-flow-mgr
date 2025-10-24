@@ -1,0 +1,43 @@
+{
+  "name": "MyTask1",
+  "srcdir": "srcdir",
+  "rundir": "MyTask1",
+  "input": {
+    "name": "MyTask1",
+    "changed": false,
+    "srcdir": "srcdir",
+    "rundir": "MyTask1",
+    "params": {
+      "p1": "3"
+    },
+    "inputs": [],
+    "memento": null
+  },
+  "needs": [],
+  "commands": [],
+  "result": {
+    "status": 0,
+    "changed": true,
+    "memento": null
+  },
+  "output": {
+    "changed": true,
+    "output": [
+      {
+        "type": "foo",
+        "src": "MyTask1",
+        "seq": 0,
+        "files": [
+          "f1",
+          "f2",
+          "f3"
+        ]
+      }
+    ],
+    "dep_m": {
+      "MyTask1": []
+    }
+  },
+  "consumes": "ConsumesE.All",
+  "passthrough": "PassthroughE.Unused"
+}
