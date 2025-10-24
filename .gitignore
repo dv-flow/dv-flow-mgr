@@ -162,3 +162,11 @@ cython_debug/
 
 packages/
 rundir/
+
+# Test artifacts - task run directories
+MyTask*/
+consume_files/
+consumer/
+foo.*/
+passthrough/
+producer/

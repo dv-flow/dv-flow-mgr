@@ -59,8 +59,13 @@ class ExprEval(ExprVisitor):
     def _toString(self, val):
         rval = val
         if type(val) != str:
-            obj = self._toObject(val)
-            rval = json.dumps(obj)
+            # For primitive types (bool, int, float), use Python's str() representation
+            # instead of JSON to preserve Python's bool representation (True/False vs true/false)
+            if isinstance(val, (bool, int, float)):
+                rval = str(val)
+            else:
+                obj = self._toObject(val)
+                rval = json.dumps(obj)
         return rval
     
     def _toObject(self, val):
