@@ -28,4 +28,4 @@ class SymbolScope(object):
         if name in self.type_m.keys():
             return self.type_m[name]
         else:
-            return None@dc.dataclass
+            return None

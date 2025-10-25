@@ -9,7 +9,7 @@ from .fragment_def import FragmentDef
 from .loader_scope import LoaderScope
 from .marker_listener import MarkerListener
 from .package import Package
-from .package_loader import PackageLoader
+from .package_loader_p import PackageLoaderP
 from .package_def import PackageDef
 from .package_provider import PackageProvider
 from .package_scope import PackageScope
@@ -27,9 +27,10 @@ class PackageProviderYaml(PackageProvider):
     path : str
     pkg : Optional[Package] = None
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
+    _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
-    def getPackageNames(self, loader : PackageLoader) -> List[str]: 
+    def getPackageNames(self, loader : PackageLoaderP) -> List[str]: 
         if self.pkg is None:
             self.pkg = Package(
                 basedir=os.path.dirname(self.path),
@@ -37,7 +38,7 @@ class PackageProviderYaml(PackageProvider):
             self._loadPackage(self.pkg, self.path, loader)
         return [self.pkg.name]
 
-    def getPackage(self, name : str, loader : PackageLoader) -> Package: 
+    def getPackage(self, name : str, loader : PackageLoaderP) -> Package: 
         if self.pkg is None:
             self.pkg = Package(
                 basedir=os.path.dirname(self.path),
@@ -48,7 +49,7 @@ class PackageProviderYaml(PackageProvider):
                 self.pkg.name, self.path))
         return self.pkg
     
-    def findPackage(self, name : str, loader : PackageLoader) -> Optional[Package]:
+    def findPackage(self, name : str, loader : PackageLoaderP) -> Optional[Package]:
         if self.pkg is None:
             self.pkg = Package(
                 basedir=os.path.dirname(self.path),
@@ -61,7 +62,7 @@ class PackageProviderYaml(PackageProvider):
     def _loadPackage(self, 
                      pkg : Package,
                      root, 
-                     loader : PackageLoader,
+                     loader : PackageLoaderP,
                      exp_pkg_name=None) -> Package:
         loader.pushPath(root)
 
@@ -134,7 +135,7 @@ class PackageProviderYaml(PackageProvider):
                    pkg : Package,
                    pkg_def : PackageDef, 
                    root : str,
-                   loader : PackageLoader) -> Package:
+                   loader : PackageLoaderP) -> Package:
         self._log.debug("--> _mkPackage %s" % pkg_def.name)
 
         pkg.name = pkg_def.name
@@ -154,8 +155,8 @@ class PackageProviderYaml(PackageProvider):
             self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
             pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
-        if loader.findPackage(pkg.name, loader) is not None:
-            epkg = loader.getPackage(pkg.name, loader)
+        if loader.findPackage(pkg.name) is not None:
+            epkg = loader.getPackage(pkg.name)
             if epkg.srcinfo.file != pkg.srcinfo.file:
                 self.error("Package %s already loaded from %s. Duplicate defined in %s" % (
                     pkg.name, epkg.srcinfo.file, pkg.srcinfo.file))
@@ -184,7 +185,7 @@ class PackageProviderYaml(PackageProvider):
             self.pop_package_scope()
 
         # Apply feeds after all tasks are loaded
-        for fed_name, feeding_tasks in self._feeds_map.items():
+        for fed_name, feeding_tasks in loader.feedsMap().items():
             fed_task = self._findTask(fed_name, loader)
             if fed_task is not None:
                 for feeding_task in feeding_tasks:
@@ -236,7 +237,7 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("<-- _loadPackageImports %s" % str(imports))
     
     def _loadPackageImport(self, 
-                           loader : PackageLoader,
+                           loader : PackageLoaderP,
                            pkg : Package, 
                            imp : Union[str,object], 
                            basedir : str):
@@ -398,7 +399,7 @@ class PackageProviderYaml(PackageProvider):
 
     def _loadTasks(self, 
                    pkg : Package, 
-                   loader : PackageLoader,
+                   loader : PackageLoaderP,
                    taskdefs : List[TaskDef], 
                    basedir : str):
         self._log.debug("--> _loadTasks %s" % pkg.name)
@@ -435,10 +436,7 @@ class PackageProviderYaml(PackageProvider):
         # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
         for taskdef, task in tasks:
             for fed_name in getattr(taskdef, "feeds", []):
-                fq_fed_name = fed_name
-                if fq_fed_name not in self._feeds_map:
-                    self._feeds_map[fq_fed_name] = []
-                self._feeds_map[fq_fed_name].append(task)
+                loader.addFeed(task, fed_name)
         # Now, build out tasks
         for taskdef, task in tasks:
             task.taskdef = taskdef
@@ -448,7 +446,7 @@ class PackageProviderYaml(PackageProvider):
 
     def _loadTypes(self, 
                    pkg, 
-                   loader : PackageLoader,
+                   loader : PackageLoaderP,
                    typedefs):
         self._log.debug("--> _loadTypes")
         types = []
@@ -583,7 +581,7 @@ class PackageProviderYaml(PackageProvider):
     
     def _elabTask(self, 
                   task,
-                  loader : PackageLoader):
+                  loader : PackageLoaderP):
         self._log.debug("--> _elabTask %s" % task.name)
         taskdef = task.taskdef
 
@@ -592,8 +590,8 @@ class PackageProviderYaml(PackageProvider):
             task.uses = self._findTaskOrType(taskdef.uses, loader)
 
             if task.uses is None:
-                similar = self._getSimilarError(taskdef.uses)
-                self.error("failed to resolve task-uses %s.%s" % (
+                similar = loader.getSimilarNamesError(taskdef.uses)
+                loader.error("failed to resolve task-uses %s.%s" % (
                     taskdef.uses, similar), taskdef.srcinfo)
                 return
 
@@ -683,7 +681,7 @@ class PackageProviderYaml(PackageProvider):
 
     def _mkTaskBody(self, 
                     task, 
-                    loader : PackageLoader,
+                    loader : PackageLoaderP,
                     taskdef):
         self._pkg_s[-1].push_scope(SymbolScope(name=taskdef.name))
         pkg = self.package_scope()

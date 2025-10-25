@@ -21,10 +21,10 @@
 #****************************************************************************
 from .package_def import *
 from .package_loader import PackageLoader
-from .package_loader_root import PackageLoaderRoot
+from .package_loader_p import PackageLoaderP
 from .ext_rgy import ExtRgy
-from .pytask import PyTask
-from .pypkg import PyPkg
+from .pytask import PyTask, pytask
+from .pypkg import PyPkg, pypkg
 from .task_data import *
 from .task_def import *
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData

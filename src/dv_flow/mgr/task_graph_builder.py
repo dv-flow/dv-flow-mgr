@@ -26,7 +26,7 @@ import pydantic
 from typing import Callable, Any, Dict, List, Union
 from .package import Package
 from .package_def import PackageDef, PackageSpec
-from .package_loader import PackageLoader
+from .package_loader_p import PackageLoaderP
 from .param_ref_eval import ParamRefEval
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope
 from .exec_gen_callable import ExecGenCallable
@@ -64,7 +64,7 @@ class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
     root_pkg : Package
     rundir : str
-    loader : PackageLoader = None
+    loader : PackageLoaderP = None
     marker_l : Callable = lambda *args, **kwargs: None
     env : Dict[str, str] = dc.field(default=None)
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)

@@ -1,11 +1,11 @@
 import abc
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Protocol, TYPE_CHECKING
 from .package import Package
 
 if TYPE_CHECKING:
-    from .package_loader import PackageLoader
+    from .package_loader_p import PackageLoader
 
-class PackageProvider(object):
+class PackageProvider(Protocol):
 
     @abc.abstractmethod
     def getPackageNames(self, loader : 'PackageLoader') -> List[str]: pass

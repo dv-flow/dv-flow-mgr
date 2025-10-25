@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any, ClassVar, Dict, List, Optional
 from .package import Package
-from .package_loader import PackageLoader
+from .package_loader_p import PackageLoaderP
 from .package_provider import PackageProvider
 from .task import Task
 from .type import Type
@@ -12,7 +12,7 @@ from .symbol_scope import SymbolScope
 
 @dc.dataclass
 class LoaderScope(SymbolScope):
-    loader : Optional[PackageLoader] = None
+    loader : Optional[PackageLoaderP] = None
     _log : ClassVar = logging.getLogger("LoaderScope")
 
     def add(self, task, name):
@@ -31,7 +31,8 @@ class LoaderScope(SymbolScope):
         name_elems = name.split('.')
 
         def find_pkg(pkg_name):
-            pkg : Package = self.loader.findPackage(pkg_name, self.loader)
+            assert self.loader is not None
+            pkg : Package = self.loader.findPackage(pkg_name)
 
             # if pkg_name in self.loader._pkg_m.keys():
             #     pkg = self.loader._pkg_m[pkg_name]
@@ -71,14 +72,10 @@ class LoaderScope(SymbolScope):
         last_dot = name.rfind('.')
         if last_dot != -1:
             pkg_name = name[:last_dot]
+            assert self.loader is not None
 
-            if pkg_name in self.loader._pkg_m.keys():
-                pkg = self.loader._pkg_m[pkg_name]
-            else:
-                path = self.loader.pkg_rgy.findPackagePath(pkg_name)
-                if path is not None:
-                    pkg = self.loader._loadPackage(path)
-                    self.loader._pkg_m[pkg_name] = pkg
+            pkg = self.loader.findPackage(pkg_name)
+
             if pkg is not None and name in pkg.type_m.keys():
                 ret = pkg.type_m[name]
 

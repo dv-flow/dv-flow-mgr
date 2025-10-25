@@ -26,23 +26,20 @@ from typing import Callable, ClassVar, Dict, List, Optional, Tuple
 from .exec_callable import ExecCallable
 from .marker_listener import MarkerListener
 from .package import Package
-from .package_loader import PackageLoader
+from .package_loader_p import PackageLoaderP
 from .package_provider import PackageProvider
 from .package_provider_yaml import PackageProviderYaml
 from .package_provider import Package
 from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
 
-@dc.dataclass
 class ExtRgy(PackageProvider):
     _inst : ClassVar = None
     _log : ClassVar[logging.Logger] = logging.getLogger("ExtRgy")
 
-    _pkg_m : Dict[str,PackageProvider] = dc.field(default_factory=dict)
-
     def __init__(self):
         self._pkgpath = []
-#        self._pkg_m : Dict[str, str] = {}
+        self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
         self._override_m : Dict[str,str] = {}
 
@@ -65,15 +62,15 @@ class ExtRgy(PackageProvider):
             return self._shell_m[name]
         return None
         
-    def getPackageNames(self, loader : PackageLoader) -> List[str]:
+    def getPackageNames(self, loader : PackageLoaderP) -> List[str]:
         return list(self._pkg_m.keys())
 
-    def getPackage(self, name : str, loader : PackageLoader) -> Package:
+    def getPackage(self, name : str, loader : PackageLoaderP) -> Package:
         if name not in self._pkg_m.keys():
             raise Exception("Package %s does not exist" % name)
         return self._pkg_m[name].getPackage(name, loader)
     
-    def findPackage(self, name : str, loader : PackageLoader) -> Optional[Package]:
+    def findPackage(self, name : str, loader : PackageLoaderP) -> Optional[Package]:
         if name in self._pkg_m.keys():
             return self._pkg_m[name].findPackage(name, loader)
         return None
