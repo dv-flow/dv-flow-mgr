@@ -937,6 +937,19 @@ class TaskGraphBuilder(object):
                                 new_val.append({k: v})
                         else:
                             new_val.append(elem)
+        elif isinstance(value, dict):
+            new_val = {}
+            for k, v in value.items():
+                if isinstance(v, str):
+                    if v.find("${{") != -1:
+                        if len(self._name_resolution_stack) > 0:
+                            eval.set_name_resolution(self._name_resolution_stack[-1])
+                            resolved = eval.eval(v)
+                            new_val[k] = resolved
+                        else:
+                            new_val[k] = v
+                    else:
+                        new_val[k] = v
         return new_val
 
     def _gatherNeeds(self, task_t, node):
