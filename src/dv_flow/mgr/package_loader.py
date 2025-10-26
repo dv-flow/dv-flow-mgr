@@ -687,8 +687,13 @@ class PackageLoader(object):
         taskdef = task.taskdef
 
         task.taskdef = None
+        # Ensure srcdir is available for variable expansion
+        self._eval.set("srcdir", os.path.dirname(taskdef.srcinfo.file))
         if taskdef.uses is not None:
-            task.uses = self._findTaskOrType(taskdef.uses)
+            uses_name = taskdef.uses
+            if isinstance(uses_name, str) and "${{" in uses_name:
+                uses_name = self._eval.eval(uses_name)
+            task.uses = self._findTaskOrType(uses_name)
 
             if task.uses is None:
                 similar = self._getSimilarError(taskdef.uses)
@@ -714,7 +719,8 @@ class PackageLoader(object):
             need_name = None
             if isinstance(need, str):
                 need_name = need
-                nt = self._findTask(need)
+                if "${{" in need_name:
+                    need_name = self._eval.eval(need_name)
             elif isinstance(need, TaskDef):
                 need_name = need.name
             else:
@@ -844,10 +850,15 @@ class PackageLoader(object):
         for td, st in subtasks:
             if td.uses is not None:
                 if st.uses is None:
-                    st.uses = self._findTaskOrType(td.uses)
+                    uses_name = td.uses
+                    if isinstance(uses_name, str) and "${{" in uses_name:
+                        # For evaluation, use the subtask's file location
+                        self._eval.set("srcdir", os.path.dirname(td.srcinfo.file))
+                        uses_name = self._eval.eval(uses_name)
+                    st.uses = self._findTaskOrType(uses_name)
                     if st.uses is None:
-                        self.error("failed to find task %s" % td.uses, td.srcinfo)
-#                        raise Exception("Failed to find task %s" % td.uses)
+                        self.error("failed to find task %s" % uses_name, td.srcinfo)
+#                        raise Exception("Failed to find task %s" % uses_name)
 
             passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
 
@@ -858,15 +869,19 @@ class PackageLoader(object):
             for need in td.needs:
                 nn = None
                 if isinstance(need, str):
-                    nn = self._findTask(need)
+                    need_name = need
+                    if "${{" in need_name:
+                        self._eval.set("srcdir", os.path.dirname(td.srcinfo.file))
+                        need_name = self._eval.eval(need_name)
+                    nn = self._findTask(need_name)
                 elif isinstance(need, TaskDef):
                     nn = self._findTask(need.name)
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
                 if nn is None:
-                    self.error("failed to find task %s" % need, td.srcinfo)
-#                    raise Exception("failed to find task %s" % need)
+                    self.error("failed to find task %s" % (need_name if isinstance(need, str) else need.name), td.srcinfo)
+#                    raise Exception("failed to find task %s" % (need_name if isinstance(need, str) else need.name))
                 
                 st.needs.append(nn)
 
