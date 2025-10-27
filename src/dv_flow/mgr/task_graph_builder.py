@@ -900,10 +900,47 @@ class TaskGraphBuilder(object):
 
         return node
 
+    def _convertValueToType(self, value, target_type):
+        """Convert a value to the target type if needed.
+        
+        This is necessary because eval() returns strings for all values,
+        but we need to preserve the actual Python types (bool, int, float, etc.)
+        for proper type checking and behavior.
+        """
+        # If value is already the right type, return it as-is
+        if type(value) == target_type:
+            return value
+        
+        # If value is a string and target is bool, convert string bool representations
+        if target_type == bool and isinstance(value, str):
+            if value.lower() in ('true', '1', 'yes', 'on'):
+                return True
+            elif value.lower() in ('false', '0', 'no', 'off', ''):
+                return False
+            else:
+                # Let pydantic handle the conversion/validation
+                return value
+        
+        # If value is a string and target is int or float, try to convert
+        if target_type in (int, float) and isinstance(value, str):
+            try:
+                return target_type(value)
+            except (ValueError, TypeError):
+                # Let pydantic handle the conversion/validation
+                return value
+        
+        # For other cases, return value as-is and let pydantic handle it
+        return value
+
     def _expandParams(self, params, eval):
         for name in type(params).model_fields.keys():
             value = getattr(params, name)
             new_val = self._expandParam(value, eval)
+            # Get the expected type from the model field
+            field_info = type(params).model_fields[name]
+            expected_type = field_info.annotation
+            # Convert the value to the expected type if needed
+            new_val = self._convertValueToType(new_val, expected_type)
             setattr(params, name, new_val)
 
     def _expandParam(self, value, eval):
