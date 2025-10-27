@@ -105,9 +105,56 @@ class LoaderScope(SymbolScope):
         if pkg is not None and name in pkg.task_m.keys():
             ret = pkg.task_m[name]
 
+        # If not found directly, try searching for hierarchical sub-tasks
+        if ret is None and pkg is not None and len(name_elems) > 1:
+            # Try to find a parent task and search its subtasks
+            for i in range(len(name_elems)-1, 0, -1):
+                parent_name = ".".join(name_elems[:i])
+                if parent_name in pkg.task_m.keys():
+                    parent_task = pkg.task_m[parent_name]
+                    # Search for the sub-task in the parent's subtasks
+                    ret = self._findSubtask(parent_task, name)
+                    if ret is not None:
+                        break
+
         self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
         
         return ret
+    
+    def _findSubtask(self, parent_task, full_name) -> Task:
+        """Search for a subtask by its full name within a parent task's subtasks
+        
+        This method searches for subtasks both by their full name and by their leaf name,
+        to handle cases where a task uses another task and we want to access the subtasks
+        of the parent task through the child task's name (e.g., foo.Ext.PrintMessage
+        where Ext uses Base and Base has PrintMessage as a subtask).
+        """
+        from .task import Task as TaskClass
+        
+        # Extract the leaf name from the full name
+        leaf_name = full_name.split('.')[-1]
+        
+        # Search direct subtasks first by full name
+        for subtask in parent_task.subtasks:
+            if subtask.name == full_name:
+                return subtask
+            # Recursively search in nested subtasks
+            result = self._findSubtask(subtask, full_name)
+            if result is not None:
+                return result
+        
+        # If not found in direct subtasks by full name, try matching by leaf name
+        for subtask in parent_task.subtasks:
+            if subtask.leafname == leaf_name:
+                return subtask
+        
+        # If still not found in direct subtasks, search in the 'uses' task's subtasks
+        if parent_task.uses is not None and isinstance(parent_task.uses, TaskClass):
+            result = self._findSubtask(parent_task.uses, full_name)
+            if result is not None:
+                return result
+        
+        return None
 
     def findType(self, name) -> Type:
         self._log.debug("--> findType: %s" % name)
@@ -177,6 +224,30 @@ class PackageScope(SymbolScope):
                 if name in pkg.task_m.keys():
                     ret = pkg.task_m[name]
                     break
+        
+        # If not found, try searching hierarchically in subtasks
+        if ret is None:
+            name_elems = name.split('.')
+            if len(name_elems) > 1:
+                # Try to find a parent task and search its subtasks
+                for i in range(len(name_elems)-1, 0, -1):
+                    parent_name = ".".join(name_elems[:i])
+                    parent_task = None
+                    
+                    # Search in current package
+                    if parent_name in self.pkg.task_m.keys():
+                        parent_task = self.pkg.task_m[parent_name]
+                    else:
+                        # Search in sub-packages
+                        for pkg in self.pkg.pkg_m.values():
+                            if parent_name in pkg.task_m.keys():
+                                parent_task = pkg.task_m[parent_name]
+                                break
+                    
+                    if parent_task is not None:
+                        ret = self._findSubtask(parent_task, name)
+                        if ret is not None:
+                            break
 
         if ret is None:
             self._log.debug("Searching loader for %s" % name)
@@ -184,6 +255,41 @@ class PackageScope(SymbolScope):
 
         self._log.debug("<-- %s::findTask %s (%s)" % (self.pkg.name, name, ("found" if ret is not None else "not found")))
         return ret
+    
+    def _findSubtask(self, parent_task, full_name) -> Task:
+        """Search for a subtask by its full name within a parent task's subtasks
+        
+        This method searches for subtasks both by their full name and by their leaf name,
+        to handle cases where a task uses another task and we want to access the subtasks
+        of the parent task through the child task's name (e.g., foo.Ext.PrintMessage
+        where Ext uses Base and Base has PrintMessage as a subtask).
+        """
+        from .task import Task as TaskClass
+        
+        # Extract the leaf name from the full name
+        leaf_name = full_name.split('.')[-1]
+        
+        # Search direct subtasks first by full name
+        for subtask in parent_task.subtasks:
+            if subtask.name == full_name:
+                return subtask
+            # Recursively search in nested subtasks
+            result = self._findSubtask(subtask, full_name)
+            if result is not None:
+                return result
+        
+        # If not found in direct subtasks by full name, try matching by leaf name
+        for subtask in parent_task.subtasks:
+            if subtask.leafname == leaf_name:
+                return subtask
+        
+        # If still not found in direct subtasks, search in the 'uses' task's subtasks
+        if parent_task.uses is not None and isinstance(parent_task.uses, TaskClass):
+            result = self._findSubtask(parent_task.uses, full_name)
+            if result is not None:
+                return result
+        
+        return None
 
     def findType(self, name) -> Type:
         self._log.debug("--> %s::findType %s" % (self.pkg.name, name))

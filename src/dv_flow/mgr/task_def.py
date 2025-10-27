@@ -107,6 +107,7 @@ class TaskDef(BaseModel):
         description="Task from which this task is derived")
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
+        alias="tasks",
         description="Sub-tasks")
     iff : Union[str, bool, Any] = dc.Field(
         default=None,
