@@ -1218,7 +1218,12 @@ class PackageLoader(object):
                     elif type(value) == ParamDef:
                         self._log.debug("TODO: paramdef value")
                     elif type(value) == str and "${{" in value:
-                        value = self._eval.eval(value)
+                        try:
+                            value = self._eval.eval(value)
+                        except Exception as e:
+                            # If evaluation fails (e.g., 'this' not available yet),
+                            # preserve the expression for later evaluation
+                            self._log.debug("Could not evaluate '%s': %s. Preserving for later." % (value, str(e)))
 
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s (type %s)" % (p, str(field_m[p][1]), type(value)))

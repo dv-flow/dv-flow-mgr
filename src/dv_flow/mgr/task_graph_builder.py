@@ -359,6 +359,33 @@ class TaskGraphBuilder(object):
             if task is None:
                 raise Exception("task_t (%s) not present" % str(task_t))
 
+            # Check if this is a sub-task of a compound task
+            # If so, we need to create the parent compound task and extract the subtask
+            if task_t.count('.') >= 2:  # e.g., foo.Ext.PrintMessage
+                parts = task_t.split('.')
+                # Try to find a parent compound task
+                for i in range(len(parts)-1, 0, -1):
+                    parent_name = '.'.join(parts[:i])
+                    parent_task = None
+                    if parent_name in self._task_m.keys():
+                        parent_task = self._task_m[parent_name]
+                    elif self.loader is not None:
+                        parent_task = self.loader.getTask(parent_name)
+                    
+                    # Check if the found task is a subtask of the parent
+                    if parent_task is not None and task.name != parent_name:
+                        # Check if task is a subtask of parent_task (directly or through uses)
+                        if self._isSubtaskOf(task, parent_task):
+                            self._log.debug("Creating parent compound task %s to access subtask %s" % (parent_name, task_t))
+                            # Create the parent compound task
+                            parent_node = self.mkTaskNode(parent_name)
+                            # Find the corresponding subtask node
+                            ret = self._findSubtaskNode(parent_node, parts[-1])
+                            if ret is not None:
+                                self._log.debug("<-- mkTaskNode: %s (via parent %s)" % (task_t, parent_name))
+                                return ret
+                            break
+
             self.push_name_resolution_context(task.package)
 
             try:
@@ -383,6 +410,40 @@ class TaskGraphBuilder(object):
 
         self._log.debug("<-- mkTaskNode: %s" % task_t)
         return ret
+    
+    def _isSubtaskOf(self, task, parent_task):
+        """Check if task is a subtask of parent_task (directly or through uses chain)"""
+        # Check direct subtasks
+        for st in parent_task.subtasks:
+            if st == task or st.name == task.name:
+                return True
+            # Recursively check nested subtasks
+            if self._isSubtaskOf(task, st):
+                return True
+        
+        # Check through uses chain
+        if parent_task.uses is not None:
+            return self._isSubtaskOf(task, parent_task.uses)
+        
+        return False
+    
+    def _findSubtaskNode(self, parent_node, subtask_leafname):
+        """Find a subtask node by its leaf name in a compound task node"""
+        from .task_node_compound import TaskNodeCompound
+        if not isinstance(parent_node, TaskNodeCompound):
+            return None
+        
+        # Search through the compound task's subtasks
+        for task_node in parent_node.tasks:
+            if task_node.name.endswith('.' + subtask_leafname):
+                return task_node
+            # Recursively search in nested compound tasks
+            if isinstance(task_node, TaskNodeCompound):
+                result = self._findSubtaskNode(task_node, subtask_leafname)
+                if result is not None:
+                    return result
+        
+        return None
     
     def mkDataItem(self, type, name=None, **kwargs):
         self._log.debug("--> mkDataItem: %s" % type)
