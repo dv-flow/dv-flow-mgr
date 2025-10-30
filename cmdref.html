@@ -37,7 +37,8 @@
 <h1>Command reference<a class="headerlink" href="#command-reference" title="Link to this heading">¶</a></h1>
 <p><p>dv_flow_mgr</p>
 </p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
 <section id="dv_flow.mgr.__main__-get_parser-named-arguments">
@@ -47,6 +48,10 @@
 <dd><p>Possible choices: NONE, INFO, DEBUG</p>
 <p>Configures debug level [INFO, DEBUG]</p>
 </dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override; may be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
 </dl>
 </section>
 <section id="Sub-commands">
@@ -54,7 +59,7 @@
 <section id="graph">
 <h3>graph<a class="headerlink" href="#graph" title="Link to this heading">¶</a></h3>
 <p>Generates the graph of a task</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">graph</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">o</span> <span class="n">OUTPUT</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">graph</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">o</span> <span class="n">OUTPUT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments">
@@ -79,6 +84,10 @@
 <dd><p>Specifies the output file</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">'-'</span></code></p>
 </dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override; may be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
 </dl>
 </section>
 </section>
@@ -86,6 +95,7 @@
 <h3>run<a class="headerlink" href="#run" title="Link to this heading">¶</a></h3>
 <p>run a flow</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">u</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span>
+        <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
         <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -115,13 +125,17 @@
 <dd><p>Possible choices: log, progress, tui</p>
 <p>Console UI style (log, progress, tui). Default: progress if terminal else log</p>
 </dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override; may be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
 </dl>
 </section>
 </section>
 <section id="show">
 <h3>show<a class="headerlink" href="#show" title="Link to this heading">¶</a></h3>
 <p>Display information about a task or tasks</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">a</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">a</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="positional-arguments_repeat2">
@@ -142,6 +156,10 @@
 <dt><kbd>-v, --verbose</kbd></dt>
 <dd><p>Shows additional information about tasks</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override; may be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
 </dd>
 </dl>
 </section>
