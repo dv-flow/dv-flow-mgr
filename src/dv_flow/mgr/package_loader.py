@@ -131,6 +131,10 @@ class LoaderScope(SymbolScope):
 
         return ret
 
+    def resolve_variable(self, name):
+        # Allow loader-scope parameter overrides to be visible for expansion
+        return self.override_m.get(name, None) if self.override_m is not None else None
+
 @dc.dataclass
 class PackageScope(SymbolScope):
     pkg : Package = None
@@ -237,6 +241,7 @@ class PackageLoader(object):
     pkg_rgy : ExtRgy = dc.field(default=None)
     marker_listeners : List[Callable] = dc.field(default_factory=list)
     env : Dict[str, str] = dc.field(default=None)
+    param_overrides : Dict[str, Any] = dc.field(default_factory=dict)
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
@@ -261,6 +266,8 @@ class PackageLoader(object):
         self._eval.set_name_resolution(self)
 
         self._loader_scope = LoaderScope(name=None, loader=self)
+        # Seed loader-scope overrides from CLI parameter overrides
+        self._loader_scope.override_m = dict(self.param_overrides) if self.param_overrides is not None else {}
 
     def load(self, root) -> Package:
         self._log.debug("--> load %s" % root)
@@ -307,8 +314,10 @@ class PackageLoader(object):
         if len(self._pkg_s):
             # Pull forward the overrides 
             pkg.override_m = self._pkg_s[-1].override_m.copy()
+        else:
+            # Seed from loader-scope overrides for the first package
+            pkg.override_m = self._loader_scope.override_m.copy()
         self._pkg_s.append(pkg)
-        pass
 
     def pop_package_scope(self):
         self._pkg_s.pop()
@@ -397,9 +406,24 @@ class PackageLoader(object):
         # TODO: handle 'uses' for packages
         pkg.paramT = self._getParamT(pkg_def, None)
 
-        # Apply any overrides from above
+        # Apply parameter overrides from CLI/scope before any elaboration
+        ov_m = self._pkg_s[-1].override_m if len(self._pkg_s) else self._loader_scope.override_m
+        if ov_m:
+            for k, sval in ov_m.items():
+                # Allow qualified form 'pkg.param' or unqualified 'param'
+                if '.' in k:
+                    pkg_sel, pname = k.split('.', 1)
+                    if pkg_sel != pkg.name:
+                        continue
+                    target_name = pname
+                else:
+                    target_name = k
+                if target_name in pkg.paramT.model_fields:
+                    ann_t = pkg.paramT.model_fields[target_name].annotation
+                    cv = self._coerce_override_value(sval, ann_t)
+                    pkg.paramT.model_fields[target_name].default = cv
 
-        # Now, apply these overrides to the 
+        # Apply any in-file package overrides (TBD)
         for target,override in pkg_def.overrides.items():
             # TODO: expand target, override
             pass
@@ -696,9 +720,9 @@ class PackageLoader(object):
             task.uses = self._findTaskOrType(uses_name)
 
             if task.uses is None:
-                similar = self._getSimilarError(taskdef.uses)
+                similar = self._getSimilarError(uses_name)
                 self.error("failed to resolve task-uses %s.%s" % (
-                    taskdef.uses, similar), taskdef.srcinfo)
+                    uses_name, similar), taskdef.srcinfo)
                 return
 
         self._eval.set("srcdir", os.path.dirname(taskdef.srcinfo.file))
@@ -730,17 +754,17 @@ class PackageLoader(object):
                 # Find the original task first
                 nt = self._findTask(need_name[:-len(".needs")])
                 if nt is None:
-                    self.error("failed to find task %s" % need, taskdef.srcinfo)
-                    raise Exception("Failed to find task %s" % need)
-                for nn in nt.needs:
-                    task.needs.append(nn)
+                    self.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                else:
+                    for nn in nt.needs:
+                        task.needs.append(nn)
             else:
                 nt = self._findTask(need_name)
             
                 if nt is None:
-                    self.error("failed to find task %s" % need, taskdef.srcinfo)
-                    raise Exception("Failed to find task %s" % need)
-                task.needs.append(nt)
+                    self.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                else:
+                    task.needs.append(nt)
 
         if taskdef.strategy is not None:
             self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
@@ -1004,6 +1028,61 @@ class PackageLoader(object):
 
         return (passthrough, consumes, rundir)
     
+    def _coerce_override_value(self, sval, expected_t):
+        # Use YAML to parse literals (ints, floats, bools, lists, dicts)
+        try:
+            parsed = yaml.safe_load(sval)
+        except Exception:
+            parsed = sval
+
+        origin = getattr(expected_t, "__origin__", None)
+
+        # String expected
+        if expected_t is str:
+            return str(sval)
+
+        # Boolean expected
+        if expected_t is bool:
+            if isinstance(parsed, bool):
+                return parsed
+            s = str(sval).strip().lower()
+            if s in ("1","true","yes","y","on"):
+                return True
+            if s in ("0","false","no","n","off"):
+                return False
+            return bool(parsed)
+
+        # Integer expected
+        if expected_t is int:
+            if isinstance(parsed, int):
+                return parsed
+            try:
+                return int(str(sval), 0)
+            except Exception:
+                try:
+                    return int(float(str(sval)))
+                except Exception:
+                    return 0
+
+        # Float expected
+        if expected_t is float:
+            if isinstance(parsed, (int, float)):
+                return float(parsed)
+            try:
+                return float(str(sval))
+            except Exception:
+                return 0.0
+
+        # List expected
+        if origin is list or expected_t in (list, List):
+            return parsed if isinstance(parsed, list) else [parsed]
+
+        # Dict expected
+        if origin is dict or expected_t in (dict, Dict):
+            return parsed if isinstance(parsed, dict) else {}
+
+        # Fallback
+        return parsed
 
     def _getParamT(
             self, 

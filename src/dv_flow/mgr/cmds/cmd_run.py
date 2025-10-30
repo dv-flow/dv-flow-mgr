@@ -25,7 +25,7 @@ import logging
 import sys
 from typing import ClassVar
 from ..ext_rgy import ExtRgy
-from ..util import loadProjPkgDef
+from ..util import loadProjPkgDef, parse_parameter_overrides
 from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
@@ -59,7 +59,10 @@ class CmdRun(object):
         listener = TaskListenerLog()
 
         # First, find the project we're working with using selected listener for load markers
-        loader, pkg = loadProjPkgDef(get_rootdir(args), listener=listener.marker)
+        loader, pkg = loadProjPkgDef(
+            get_rootdir(args),
+            listener=listener.marker,
+            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])))
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")
@@ -68,6 +71,7 @@ class CmdRun(object):
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
 
+        assert loader is not None
         self._log.debug("Root flow file defines package: %s" % pkg.name)
 
         if len(args.tasks) > 0:
@@ -147,5 +151,3 @@ class CmdRun(object):
         fp.close()
 
         return runner.status
-
-
