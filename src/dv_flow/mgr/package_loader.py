@@ -53,6 +53,8 @@ class PackageLoader(PackageLoaderP):
 
         self._eval.set_name_resolution(self)
 
+        self._loader_scope = LoaderScope(self, name="loader")
+
     def load(self, root) -> Package:
         from .package_provider_yaml import PackageProviderYaml
 
@@ -96,6 +98,7 @@ class PackageLoader(PackageLoaderP):
         return pkg
     
     def findPackage(self, name) -> Optional[Package]:
+        self._log.debug("--> findPackage %s" % name)
         pkg = None
 
         if name in self._pkg_m.keys():
@@ -106,6 +109,9 @@ class PackageLoader(PackageLoaderP):
                 if pkg:
                     self._pkg_m[name] = pkg
                     break
+
+        self._log.debug("<-- findPackage %s" % (
+            (pkg.name if pkg is not None else "None"),))
 
         return pkg
 
@@ -151,8 +157,14 @@ class PackageLoader(PackageLoaderP):
                 ", ".join(self._file_s)))
         self._file_s.append(path)
 
+    def pathStack(self) -> List[str]:
+        return self._file_s
+
     def popPath(self):
         self._file_s.pop()
+
+    def rootDir(self) -> str:
+        return self._file_s[0]
 
     def evalExpr(self, expr : str) -> str:
         if "${{" in expr:

@@ -32,10 +32,16 @@ class PackageLoaderP(MarkerListener):
     def findTaskOrType(self, name) -> Optional[Union[Type,Task]]: pass
 
     @abc.abstractmethod
+    def pathStack(self) -> List[str]: ...
+
+    @abc.abstractmethod
     def pushPath(self, path): pass
 
     @abc.abstractmethod
     def popPath(self): pass
+
+    @abc.abstractmethod
+    def rootDir(self) -> str: ...
 
     @abc.abstractmethod
     def evalExpr(self, expr : str) -> str: pass

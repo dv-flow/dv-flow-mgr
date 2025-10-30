@@ -63,7 +63,7 @@ class TaskDataInput[T](BaseModel):
     changed : bool
     srcdir : str
     rundir : str
-    params : Type[T]
+    params : Any # Type[T]
     inputs : List[Any]
     memento : Any
 

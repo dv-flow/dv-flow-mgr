@@ -58,10 +58,17 @@ class LoaderScope(SymbolScope):
                 if pkg is not None:
                     break
 
-        if pkg is not None and name in pkg.task_m.keys():
-            ret = pkg.task_m[name]
+        if pkg is not None:
+            self._log.debug("Found package %s" % pkg.name)
+            if name in pkg.task_m.keys():
+                self._log.debug("Found task %s" % name)
+                ret = pkg.task_m[name]
+            else:
+                self._log.debug("Didn't find task %s in package %s" % (name, pkg.name))
+        else:
+            self._log.debug("Did not find a package for %s" % name)
 
-        self._log.debug("<-- findTask: %s (%s)" % (name, str(ret)))
+        self._log.debug("<-- findTask: %s (%s)" % (name, ("Found" if ret is not None else "NotFound")))
         
         return ret
 

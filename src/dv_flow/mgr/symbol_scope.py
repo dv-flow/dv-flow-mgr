@@ -29,3 +29,6 @@ class SymbolScope(object):
             return self.type_m[name]
         else:
             return None
+        
+    def resolve_variable(self, name):
+        return None

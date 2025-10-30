@@ -13,7 +13,7 @@ from .package_loader_p import PackageLoaderP
 from .package_def import PackageDef
 from .package_provider import PackageProvider
 from .package_scope import PackageScope
-from .param_def import ComplexType
+from .param_def import ComplexType, ParamDef
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
 from .task import Task, Strategy, StrategyGenerate
@@ -28,42 +28,55 @@ class PackageProviderYaml(PackageProvider):
     pkg : Optional[Package] = None
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
+    _loading : bool = dc.field(default=False)
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
     def getPackageNames(self, loader : PackageLoaderP) -> List[str]: 
+        assert not self._loading
         if self.pkg is None:
+            self._loading = True
             self.pkg = Package(
                 basedir=os.path.dirname(self.path),
                 srcinfo=SrcInfo(file=self.path))
             self._loadPackage(self.pkg, self.path, loader)
+            self._loading = False
         return [self.pkg.name]
 
     def getPackage(self, name : str, loader : PackageLoaderP) -> Package: 
+        assert not self._loading
         if self.pkg is None:
+            self._loading = True
             self.pkg = Package(
                 basedir=os.path.dirname(self.path),
                 srcinfo=SrcInfo(file=self.path))
             self._loadPackage(self.pkg, self.path, loader)
+            self._loading = False
         if name != self.pkg.name:
             raise Exception("Internal error: this provider only handles %s:%s" % (
                 self.pkg.name, self.path))
         return self.pkg
     
     def findPackage(self, name : str, loader : PackageLoaderP) -> Optional[Package]:
-        if self.pkg is None:
-            self.pkg = Package(
-                basedir=os.path.dirname(self.path),
-                srcinfo=SrcInfo(file=self.path))
-            self.pkg = self._loadPackage(self.pkg, self.path, loader)
-        if name == self.pkg.name:
-            return self.getPackage(name, loader)
-        return None
+        ret = None
+        self._log.debug("--> findPackage %s" % name)
+
+        if not self._loading:
+            if self.pkg is None:
+                ret = self.getPackage(name, loader)
+                if name != ret.name:
+                    raise Exception("Package name doesn't match expected")
+            else:
+                ret = self.pkg
+
+        self._log.debug("<-- findPackage %s" % name)
+        return ret
     
     def _loadPackage(self, 
                      pkg : Package,
                      root, 
                      loader : PackageLoaderP,
                      exp_pkg_name=None) -> Package:
+        self._log.debug("--> _loadPackage")
         loader.pushPath(root)
 
         pkg_def : Optional[PackageDef] = None
@@ -129,6 +142,8 @@ class PackageProviderYaml(PackageProvider):
 
         self._pkg_path_m[root] = pkg
 
+        self._log.debug("<-- _loadPackage")
+
         return pkg
     
     def _mkPackage(self, 
@@ -136,12 +151,15 @@ class PackageProviderYaml(PackageProvider):
                    pkg_def : PackageDef, 
                    root : str,
                    loader : PackageLoaderP) -> Package:
-        self._log.debug("--> _mkPackage %s" % pkg_def.name)
+        self._log.debug("--> _mkPackage %s (%d types ; %d tasks)" % (
+            pkg_def.name,
+            len(pkg_def.tasks),
+            len(pkg_def.types)))
 
         pkg.name = pkg_def.name
 
         # TODO: handle 'uses' for packages
-        pkg.paramT = self._getParamT(pkg_def, None)
+        pkg.paramT = self._getParamT(loader, pkg_def, None)
 
         # Apply any overrides from above
 
@@ -155,34 +173,28 @@ class PackageProviderYaml(PackageProvider):
             self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
             pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
-        if loader.findPackage(pkg.name) is not None:
-            epkg = loader.getPackage(pkg.name)
-            if epkg.srcinfo.file != pkg.srcinfo.file:
-                self.error("Package %s already loaded from %s. Duplicate defined in %s" % (
-                    pkg.name, epkg.srcinfo.file, pkg.srcinfo.file))
-        else:
-            pkg_scope = self.package_scope()
-            if pkg_scope is not None:
-                self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
-                pkg_scope.pkg.pkg_m[pkg.name] = pkg
+        pkg_scope = self.package_scope()
+        if pkg_scope is not None:
+            self._log.debug("Add self (%s) as a subpkg of %s" % (pkg.name, pkg_scope.pkg.name))
+            pkg_scope.pkg.pkg_m[pkg.name] = pkg
 
-            self.push_package_scope(PackageScope(
-                name=pkg.name, 
-                pkg=pkg, 
-                loader=LoaderScope(name=None, loader=loader)))
+        self.push_package_scope(PackageScope(
+            name=pkg.name, 
+            pkg=pkg, 
+            loader=LoaderScope(name=None, loader=loader)))
 
-            # Imports are loaded first
-            self._loadPackageImports(pkg, pkg_def.imports, pkg.basedir)
+        # Imports are loaded first
+        self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
 
-            taskdefs = pkg_def.tasks.copy()
-            typedefs = pkg_def.types.copy()
+        taskdefs = pkg_def.tasks.copy()
+        typedefs = pkg_def.types.copy()
 
-            self._loadFragments(pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
+        self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
 
-            self._loadTypes(pkg, loader, typedefs)
-            self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
+        self._loadTypes(pkg, loader, typedefs)
+        self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
 
-            self.pop_package_scope()
+        self.pop_package_scope()
 
         # Apply feeds after all tasks are loaded
         for fed_name, feeding_tasks in loader.feedsMap().items():
@@ -198,7 +210,7 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
     
-    def _findType(self, name, loader):
+    def _findType(self, loader, name):
         if len(self._pkg_s):
             return self._pkg_s[-1].findType(name)
         else:
@@ -217,9 +229,9 @@ class PackageProviderYaml(PackageProvider):
         uses = self._findTask(name, loader)
 
         if uses is None:
-            uses = self._findType(name, loader)
+            uses = self._findType(loader, name)
             if uses is not None and uses.typedef:
-                self._elabType(uses, loader)
+                self._elabType(loader, uses)
                 pass
         elif uses.taskdef:
             self._elabTask(uses, loader)
@@ -227,13 +239,13 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("<-- _findTaskOrType %s (%s)" % (name, ("found" if uses is not None else "not found")))
         return uses
     
-    def _loadPackageImports(self, pkg, imports, basedir):
+    def _loadPackageImports(self, loader, pkg, imports, basedir):
         self._log.debug("--> _loadPackageImports %s" % str(imports))
         if len(imports) > 0:
             self._log.info("Loading imported packages (basedir=%s)" % basedir)
         for imp in imports:
             self._log.debug("Loading import %s" % imp)
-            self._loadPackageImport(pkg, imp, basedir)
+            self._loadPackageImport(loader, pkg, imp, basedir)
         self._log.debug("<-- _loadPackageImports %s" % str(imports))
     
     def _loadPackageImport(self, 
@@ -255,7 +267,7 @@ class PackageProviderYaml(PackageProvider):
         imp_path = loader.evalExpr(imp_path)
 
         if not os.path.isabs(imp_path):
-            for root in (basedir, os.path.dirname(self._file_s[0])):
+            for root in (basedir, os.path.dirname(loader.rootDir())):
                 self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
 
                 resolved_path = self._findFlowDvInDir(os.path.join(root, imp_path))
@@ -280,7 +292,10 @@ class PackageProviderYaml(PackageProvider):
         else:
             self._log.info("Loading imported file %s" % imp_path)
             imp_path = os.path.normpath(imp_path)
-            sub_pkg = self._loadPackage(imp_path)
+            sub_pkg = Package(
+                basedir=os.path.dirname(imp_path),
+                srcinfo=SrcInfo(file=imp_path))
+            sub_pkg = self._loadPackage(sub_pkg, imp_path, loader)
             self._log.info("Loaded imported package %s" % sub_pkg.name)
 
         pkg.pkg_m[sub_pkg.name] = sub_pkg
@@ -320,36 +335,37 @@ class PackageProviderYaml(PackageProvider):
                 break
         return ret
 
-    def _loadFragments(self, pkg, fragments, basedir, taskdefs, typedefs):
+    def _loadFragments(self, loader, pkg, fragments, basedir, taskdefs, typedefs):
         for spec in fragments:
-            self._loadFragmentSpec(pkg, spec, basedir, taskdefs, typedefs)
+            self._loadFragmentSpec(loader, pkg, spec, basedir, taskdefs, typedefs)
 
-    def _loadFragmentSpec(self, pkg, spec, basedir, taskdefs, typedefs):
+    def _loadFragmentSpec(self, loader, pkg, spec, basedir, taskdefs, typedefs):
         # We're either going to have:
         # - File path
         # - Directory path
 
         if os.path.isfile(os.path.join(basedir, spec)):
             self._loadFragmentFile(
+                loader,
                 pkg, 
                 os.path.join(basedir, spec),
                 taskdefs, typedefs)
         elif os.path.isdir(os.path.join(basedir, spec)):
-            self._loadFragmentDir(pkg, os.path.join(basedir, spec), taskdefs, typedefs)
+            self._loadFragmentDir(loader, pkg, os.path.join(basedir, spec), taskdefs, typedefs)
         else:
             raise Exception("Fragment spec %s not found" % spec)
 
-    def _loadFragmentDir(self, pkg, dir, taskdefs, typedefs):
+    def _loadFragmentDir(self, loader, pkg, dir, taskdefs, typedefs):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
-                self._loadFragmentDir(pkg, os.path.join(dir, file), taskdefs, typedefs)
+                self._loadFragmentDir(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
             elif os.path.isfile(os.path.join(dir, file)) and file == "flow.dv":
-                self._loadFragmentFile(pkg, os.path.join(dir, file), taskdefs, typedefs)
+                self._loadFragmentFile(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
 
-    def _loadFragmentFile(self, pkg, file, taskdefs, typedefs):
-        if file in self._file_s:
-            raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(self._file_s)))
-        self._file_s.append(file)
+    def _loadFragmentFile(self, loader, pkg, file, taskdefs, typedefs):
+        if file in loader.pathStack():
+            raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(loader.pathStack())))
+        loader.pushPath(file)
 
         with open(file, "r") as fp:
             doc = yaml.load(fp, Loader=YamlSrcInfoLoader(file))
@@ -360,8 +376,8 @@ class PackageProviderYaml(PackageProvider):
                     basedir = os.path.dirname(file)
                     pkg.fragment_def_l.append(frag)
 
-                    self._loadPackageImports(pkg, frag.imports, basedir)
-                    self._loadFragments(pkg, frag.fragments, basedir, taskdefs, typedefs)
+                    self._loadPackageImports(loader, pkg, frag.imports, basedir)
+                    self._loadFragments(loader, pkg, frag.fragments, basedir, taskdefs, typedefs)
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
                 except pydantic.ValidationError as e:
@@ -396,6 +412,7 @@ class PackageProviderYaml(PackageProvider):
                         self.marker(marker)
             else:
                 print("Warning: file %s is not a fragment" % file)
+        loader.popPath()
 
     def _loadTasks(self, 
                    pkg : Package, 
@@ -437,10 +454,13 @@ class PackageProviderYaml(PackageProvider):
         for taskdef, task in tasks:
             for fed_name in getattr(taskdef, "feeds", []):
                 loader.addFeed(task, fed_name)
+
         # Now, build out tasks
         for taskdef, task in tasks:
             task.taskdef = taskdef
             self._elabTask(task, loader)
+
+            assert task.paramT is not None
 
         self._log.debug("<-- _loadTasks %s" % pkg.name)
 
@@ -462,13 +482,14 @@ class PackageProviderYaml(PackageProvider):
         
         # Now, resolve 'uses' and build out
         for td,tt in types:
-            self._elabType(tt)
+            self._elabType(loader, tt)
 
         self._log.debug("<-- _loadTypes")
         pass
 
     def _getParamT(
             self, 
+            loader,
             taskdef, 
             base_t : pydantic.BaseModel, 
             typename=None,
@@ -502,7 +523,9 @@ class PackageProviderYaml(PackageProvider):
         # First, pull out existing fields (if there's a base type)
         if base_t is not None:
             base_o = base_t()
-            self._log.debug("Base type: %s" % str(base_t))
+            self._log.debug("Base type: %s (%d fields)" % (
+                str(base_t),
+                len(base_t.model_fields)))
             for name,f in base_t.model_fields.items():
                 ff : dc.Field = f
                 fields.append(f)
@@ -518,7 +541,18 @@ class PackageProviderYaml(PackageProvider):
         for p in taskdef.params.keys():
             param = taskdef.params[p]
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
+            self._log.debug("hasattr[type]: %s" % hasattr(param, "type"))
+            self._log.debug("type: %s" % getattr(param, "type", "<notpresent>"))
+            if isinstance(param, dict) and "type" in param.keys():
+                # Parameter declaration
+                try:
+                    param = ParamDef(**param)
+                except Exception as e:
+                    self._log.error("Failed to convert param-def %s to ParamDef" % str(param))
+                    raise e
+            
             if hasattr(param, "type") and param.type is not None:
+                self._log.debug("  is being defined")
                 if isinstance(param.type, ComplexType):
                     if param.type.list is not None:
                         ptype = List
@@ -544,6 +578,7 @@ class PackageProviderYaml(PackageProvider):
                     field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
             else:
+                self._log.debug("  is already defined")
                 if p in field_m.keys():
                     if type(param) != dict:
                         value = param
@@ -556,25 +591,35 @@ class PackageProviderYaml(PackageProvider):
                     if type(value) == list:
                         for i in range(len(value)):
                             if "${{" in value[i]:
-                                value[i] = self._eval.eval(value[i])
+                                value[i] = loader.evalExpr(value[i])
                     else:
                         if "${{" in value:
-                            value = self._eval.eval(value)
+                            value = loader.evalExpr(value)
 
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
                 else:
-                    self.error("Field %s not found in task %s" % (p, taskdef.name), taskdef.srcinfo)
+                    loader.error("Field %s not found in task %s (%s)" % (
+                        p, 
+                        taskdef.name,
+                        ",".join(field_m.keys())), taskdef.srcinfo)
 
+        self._log.debug("Total of %d fields" % len(field_m))
         if typename is not None:
+            self._log.debug("Creating caller-defined type %s" % typename)
             field_m["type"] = (str, typename)
             params_t = pydantic.create_model(typename, **field_m)
         else:
-            params_t = pydantic.create_model("Task%sParams" % taskdef.name, **field_m)
+            typename = "Task%sParams" % taskdef.name
+            self._log.debug("Creating TaskParams type %s" % typename)
+            params_t = pydantic.create_model(typename, **field_m)
 
         self._log.debug("== Params")
         for name,info in params_t.model_fields.items():
             self._log.debug("  %s: %s" % (name, str(info)))
+
+        if params_t is None:
+            raise Exception("Failed to build params_t")
 
         self._log.debug("<-- _getParamT %s" % taskdef.name)
         return params_t
@@ -593,6 +638,7 @@ class PackageProviderYaml(PackageProvider):
                 similar = loader.getSimilarNamesError(taskdef.uses)
                 loader.error("failed to resolve task-uses %s.%s" % (
                     taskdef.uses, similar), taskdef.srcinfo)
+                self._log.error("failed to resolve task-uses %s.%s" % (taskdef.uses, similar))
                 return
 
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
@@ -604,6 +650,7 @@ class PackageProviderYaml(PackageProvider):
         task.rundir = rundir
 
         task.paramT = self._getParamT(
+            loader,
             taskdef, 
             task.uses.paramT if task.uses is not None else None)
 
@@ -650,7 +697,7 @@ class PackageProviderYaml(PackageProvider):
         if taskdef.body is not None and len(taskdef.body) > 0:
             self._mkTaskBody(task, loader, taskdef)
         elif taskdef.run is not None:
-            task.run = self._eval.eval(taskdef.run)
+            task.run = loader.evalExpr(taskdef.run)
             if taskdef.shell is not None:
                 task.shell = taskdef.shell
         elif taskdef.pytask is not None: # Deprecated case
@@ -662,16 +709,17 @@ class PackageProviderYaml(PackageProvider):
 
         self._log.debug("<-- _elabTask %s" % task.name)
 
-    def _elabType(self, tt):
+    def _elabType(self, loader, tt):
         self._log.debug("--> _elabType %s" % tt.name)
         td = tt.typedef
 
         tt.typedef = None
         if td.uses is not None:
-            tt.uses = self._findType(td.uses)
+            tt.uses = self._findType(loader, td.uses)
             if tt.uses is None:
                 raise Exception("Failed to find type %s" % td.uses)
         tt.paramT = self._getParamT(
+            loader,
             td, 
             tt.uses.paramT if tt.uses is not None else None,
             typename=tt.name,
@@ -757,6 +805,7 @@ class PackageProviderYaml(PackageProvider):
                 st.shell = st.uses.shell
 
             st.paramT = self._getParamT(
+                loader,
                 td, 
                 st.uses.paramT if st.uses is not None else None)
 
