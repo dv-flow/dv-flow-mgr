@@ -754,7 +754,10 @@ class PackageLoader(object):
                 # Find the original task first
                 nt = self._findTask(need_name[:-len(".needs")])
                 if nt is None:
-                    self.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                    similar = self._getSimilarError(need_name)
+                    self.error("failed to find task %s. %s" % (
+                        need_name, 
+                        similar), taskdef.srcinfo)
                 else:
                     for nn in nt.needs:
                         task.needs.append(nn)
@@ -762,7 +765,10 @@ class PackageLoader(object):
                 nt = self._findTask(need_name)
             
                 if nt is None:
-                    self.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                    similar = self._getSimilarError(need_name)
+                    self.error("failed to find task %s. %s" % (
+                        need_name, 
+                        similar), taskdef.srcinfo)
                 else:
                     task.needs.append(nt)
 
