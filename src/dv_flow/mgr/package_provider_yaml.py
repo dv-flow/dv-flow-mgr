@@ -580,21 +580,42 @@ class PackageProviderYaml(PackageProvider):
             else:
                 self._log.debug("  is already defined")
                 if p in field_m.keys():
-                    if type(param) != dict:
-                        value = param
-                    elif "value" in param.keys():
-                        value = param["value"]
+                    if hasattr(param, "copy"):
+                        value = param.copy()
                     else:
-                        raise Exception("No value specified for param %s: %s" % (
-                            p, str(param)))
+                        value = param
+
+                    # if type(param) != dict:
+                    #     value = param
+                    # elif "value" in param.keys():
+                    #     value = param["value"]
+                    # else:
+                    #     raise Exception("No value specified for param %s: %s" % (
+                    #         p, str(param)))
 
                     if type(value) == list:
                         for i in range(len(value)):
                             if "${{" in value[i]:
                                 value[i] = loader.evalExpr(value[i])
-                    else:
-                        if "${{" in value:
-                            value = loader.evalExpr(value)
+                    elif type(value) == dict:
+                        self._log.debug("TODO: dict value")
+                        for k in value.keys():
+                            v = value[k]
+                            if "${{" in v:
+                                v = loader.evalExpr(v)
+                                value[k] = v
+                    elif type(value) == ParamDef:
+                        self._log.debug("TODO: paramdef value")
+                    elif type(value) == str and "${{" in value:
+                        value = loader.evalExpr(value)
+
+                    # if type(value) == list:
+                    #     for i in range(len(value)):
+                    #         if "${{" in value[i]:
+                    #             value[i] = loader.evalExpr(value[i])
+                    # else:
+                    #     if "${{" in value:
+                    #         value = loader.evalExpr(value)
 
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
