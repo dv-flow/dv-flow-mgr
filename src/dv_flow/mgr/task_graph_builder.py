@@ -316,7 +316,7 @@ class TaskGraphBuilder(object):
         if task_t in self._task_m.keys():
             task = self._task_m[task_t]
         elif self.loader is not None:
-            task = self.loader.getTask(task_t)
+            task = self.loader.findTask(task_t)
 
             if task is None:
                 type = None
@@ -324,7 +324,7 @@ class TaskGraphBuilder(object):
                     type = self._type_m[task_t]
                 
                 if type is None:
-                    type = self.loader.getType(task_t)
+                    type = self.loader.findType(task_t)
                 
                 if type is not None:
                     if srcdir is None:
