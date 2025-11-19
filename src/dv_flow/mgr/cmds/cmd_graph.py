@@ -23,7 +23,7 @@ import asyncio
 import os
 import logging
 from typing import ClassVar
-from ..util import loadProjPkgDef
+from ..util import loadProjPkgDef, parse_parameter_overrides
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
@@ -37,7 +37,9 @@ class CmdGraph(object):
     def __call__(self, args):
 
         # First, find the project we're working with
-        loader, pkg = loadProjPkgDef(get_rootdir(args))
+        loader, pkg = loadProjPkgDef(
+            get_rootdir(args),
+            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])))
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
@@ -87,5 +89,3 @@ class CmdGraph(object):
             )
 
         return 0
-
-

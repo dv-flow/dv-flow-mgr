@@ -38,6 +38,12 @@ def get_parser():
     parser.add_argument("--log-level", 
                         help="Configures debug level [INFO, DEBUG]",
                         choices=("NONE", "INFO", "DEBUG"))
+    parser.add_argument("-D",
+                        dest="param_overrides",
+                        action="append",
+                        default=[],
+                        metavar="NAME=VALUE",
+                        help="Parameter override; may be used multiple times")
     # parser.add_argument("-v", "--verbose", 
     #                     help="Enable verbose output",
     #                     action="store_true")
@@ -53,6 +59,12 @@ def get_parser():
     graph_parser.add_argument("-o", "--output", 
                               help="Specifies the output file",
                               default="-")
+    graph_parser.add_argument("-D",
+                        dest="param_overrides",
+                        action="append",
+                        default=[],
+                        metavar="NAME=VALUE",
+                        help="Parameter override; may be used multiple times")
     graph_parser.set_defaults(func=CmdGraph())
 
     run_parser = subparsers.add_parser('run', help='run a flow')
@@ -69,6 +81,12 @@ def get_parser():
                         help="Console UI style (log, progress, tui). Default: progress if terminal else log",
                         choices=("log","progress","tui"),
                         default=None)
+    run_parser.add_argument("-D",
+                        dest="param_overrides",
+                        action="append",
+                        default=[],
+                        metavar="NAME=VALUE",
+                        help="Parameter override; may be used multiple times")
     run_parser.set_defaults(func=CmdRun())
 
     show_parser = subparsers.add_parser('show', 
@@ -80,6 +98,12 @@ def get_parser():
     show_parser.add_argument("-v", "--verbose",
                         action="store_true",
                         help="Shows additional information about tasks")
+    show_parser.add_argument("-D",
+                        dest="param_overrides",
+                        action="append",
+                        default=[],
+                        metavar="NAME=VALUE",
+                        help="Parameter override; may be used multiple times")
     show_parser.set_defaults(func=CmdShow())
 
     util_parser = subparsers.add_parser('util',

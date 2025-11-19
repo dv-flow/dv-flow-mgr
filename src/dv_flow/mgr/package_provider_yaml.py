@@ -166,6 +166,35 @@ class PackageProviderYaml(PackageProvider):
 
         # TODO: handle 'uses' for packages
         pkg.paramT = self._getParamT(loader, pkg_def, None)
+        # Apply parameter overrides (qualified or unqualified) before elaboration of tasks/types
+        if hasattr(loader, 'param_overrides') and loader.param_overrides:
+            import yaml
+            for k, v in loader.param_overrides.items():
+                if '.' in k:
+                    pkg_name, pname = k.split('.',1)
+                    if pkg_name != pkg.name:
+                        continue
+                else:
+                    pname = k
+                if pname in pkg.paramT.model_fields:
+                    ann_t = pkg.paramT.model_fields[pname].annotation
+                    # Coerce value similar to main loader
+                    try:
+                        parsed = yaml.safe_load(v) if isinstance(v, str) else v
+                    except Exception:
+                        parsed = v
+                    if ann_t is int and not isinstance(parsed, int):
+                        try: parsed = int(str(v),0)
+                        except Exception: parsed = 0
+                    elif ann_t is float and not isinstance(parsed,(int,float)):
+                        try: parsed = float(str(v))
+                        except Exception: parsed = 0.0
+                    elif ann_t is bool and not isinstance(parsed,bool):
+                        s=str(v).lower().strip()
+                        parsed = s in ("1","true","yes","y","on")
+                    elif ann_t is str and not isinstance(parsed,str):
+                        parsed = str(parsed)
+                    pkg.paramT.model_fields[pname].default = parsed
 
         # Apply any overrides from above
 
@@ -693,26 +722,28 @@ class PackageProviderYaml(PackageProvider):
             need_name = None
             if isinstance(need, str):
                 need_name = need
-                nt = self._findTask(need, loader)
             elif isinstance(need, TaskDef):
                 need_name = need.name
             else:
                 raise Exception("Unknown need type %s" % str(type(need)))
+
+            assert need_name is not None
+
+            if "${{" in need_name:
+                need_name = loader.evalExpr(need_name)
             
             if need_name.endswith(".needs"):
                 # Find the original task first
                 nt = self._findTask(need_name[:-len(".needs")], loader)
                 if nt is None:
-                    self.error("failed to find task %s" % need, taskdef.srcinfo)
-                    raise Exception("Failed to find task %s" % need)
+                    loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
                 for nn in nt.needs:
                     task.needs.append(nn)
             else:
                 nt = self._findTask(need_name, loader)
             
                 if nt is None:
-                    self.error("failed to find task %s" % need, taskdef.srcinfo)
-                    raise Exception("Failed to find task %s" % need)
+                    loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
                 task.needs.append(nt)
 
         if taskdef.strategy is not None:
@@ -800,10 +831,13 @@ class PackageProviderYaml(PackageProvider):
         for td, st in subtasks:
             if td.uses is not None:
                 if st.uses is None:
-                    st.uses = self._findTask(td.uses, loader)
+                    uses_name = td.uses
+                    if "${{" in uses_name:
+                        uses_name = loader.evalExpr(uses_name)
+                    st.uses = self._findTask(uses_name, loader)
                     if st.uses is None:
-                        self.error("failed to find task %s" % td.uses, td.srcinfo)
-#                        raise Exception("Failed to find task %s" % td.uses)
+                        loader.error("failed to find task %s" % td.uses, td.srcinfo)
+#                        raise Exception("Failed to find task %s" % uses_name)
 
             passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
 
@@ -814,14 +848,17 @@ class PackageProviderYaml(PackageProvider):
             for need in td.needs:
                 nn = None
                 if isinstance(need, str):
-                    nn = self._findTask(need, loader)
+                    need_name = need
+                    if "${{" in need_name:
+                        need_name = loader.evalExpr(need_name)
+                    nn = self._findTask(need_name, loader)
                 elif isinstance(need, TaskDef):
                     nn = self._findTask(need.name, loader)
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
                 
                 if nn is None:
-                    self.error("failed to find task %s" % need, td.srcinfo)
+                    loader.error("failed to find task %s" % need, td.srcinfo)
 #                    raise Exception("failed to find task %s" % need)
                 
                 st.needs.append(nn)

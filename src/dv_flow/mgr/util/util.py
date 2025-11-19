@@ -25,7 +25,26 @@ import yaml
 from ..package_loader import PackageLoader
 from ..task_data import TaskMarker, TaskMarkerLoc, SeverityE
 
-def loadProjPkgDef(path, listener=None):
+def parse_parameter_overrides(def_list):
+    """Parses ['name=value', ...] into a dict of parameter overrides."""
+    ov = {}
+    if not def_list:
+        return ov
+    for item in def_list:
+        # Accept raw 'name=value' values (regardless of how '-D' was passed)
+        s = item.strip()
+        if s.startswith("-D"):
+            s = s[2:]
+        if "=" not in s:
+            continue
+        name, value = s.split("=", 1)
+        name = name.strip()
+        value = value.strip()
+        if name:
+            ov[name] = value
+    return ov
+
+def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     """Locates the project's flow spec and returns the PackageDef"""
 
     dir = path
@@ -40,7 +59,9 @@ def loadProjPkgDef(path, listener=None):
                     if "package" in data.keys():
                         found = True
                         listeners = [listener] if listener is not None else []
-                        loader = PackageLoader(marker_listeners=listeners)
+                        loader = PackageLoader(
+                            marker_listeners=listeners,
+                            param_overrides=(parameter_overrides or {}))
                         ret = loader.load(os.path.join(dir, name))
                         break
         if found:
@@ -54,4 +75,3 @@ def loadProjPkgDef(path, listener=None):
                 severity=SeverityE.Error))
     
     return loader, ret
-

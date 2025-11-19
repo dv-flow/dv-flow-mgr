@@ -29,6 +29,7 @@ class PackageLoader(PackageLoaderP):
     pkg_rgy : Optional[ExtRgy] = dc.field(default=None)
     marker_listeners : List[Callable] = dc.field(default_factory=list)
     env : Optional[Dict[str, str]] = dc.field(default=None)
+    param_overrides : Dict[str, Any] = dc.field(default_factory=dict)
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
@@ -53,7 +54,9 @@ class PackageLoader(PackageLoaderP):
 
         self._eval.set_name_resolution(self)
 
-        self._loader_scope = LoaderScope(self, name="loader")
+        self._loader_scope = LoaderScope(name=None, loader=self)
+        # Seed loader-scope overrides from CLI parameter overrides
+        self._loader_scope.override_m = dict(self.param_overrides) if self.param_overrides is not None else {}
 
     def load(self, root) -> Package:
         from .package_provider_yaml import PackageProviderYaml

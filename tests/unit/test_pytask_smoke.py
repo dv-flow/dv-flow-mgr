@@ -26,7 +26,7 @@ def test_smoke_1(tmpdir):
             return TaskDataResult()
 
     task1 = MyTask(name="task1", srcdir="srcdir", p1="p1")
-    runner = SingleTaskRunner("rundir")
+    runner = SingleTaskRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task1))
 
@@ -49,7 +49,7 @@ def test_smoke_2(tmpdir):
         )
 
     task1 = MyTask(name="task1", srcdir="srcdir", p1="p1")
-    runner = SingleTaskRunner("rundir")
+    runner = SingleTaskRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task1))
 
@@ -85,7 +85,8 @@ def test_smoke_3(tmpdir):
     task1 = MyTask1(srcdir="srcdir", p1="1")
     task2 = MyTask2(srcdir="srcdir", p1="2")
     task3 = MyTask3(srcdir="srcdir", p1="3", needs=[task1, task2])
-    runner = TaskSetRunner("rundir")
+    tmpdir.chdir()
+    runner = TaskSetRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task3))
 
@@ -129,7 +130,8 @@ def test_smoke_4(tmpdir):
     task2 = MyTask2(srcdir="srcdir", p1="2")
     task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
 
-    runner = TaskSetRunner("rundir")
+    tmpdir.chdir()
+    runner = TaskSetRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task3))
 
@@ -175,7 +177,8 @@ def test_smoke_5(tmpdir):
     task1 = MyTask1(srcdir="srcdir", p1="1")
     task2 = MyTask2(srcdir="srcdir", p1="2")
     task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
-    runner = TaskSetRunner("rundir")
+    tmpdir.chdir()
+    runner = TaskSetRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task3))
 
@@ -222,7 +225,8 @@ def test_smoke_6(tmpdir):
     task1 = MyTask1(srcdir="srcdir", p1="3")
     task2 = MyTask2(srcdir="srcdir", p1=Param(append=["4"]))
     task3 = MyTask3(srcdir="srcdir", needs=[task1, task2])
-    runner = TaskSetRunner("rundir")
+    tmpdir.chdir()
+    runner = TaskSetRunner(str(tmpdir))
 
     result = asyncio.run(runner.run(task3))
 
@@ -387,4 +391,3 @@ def test_smoke_6(tmpdir):
 #     print("Build completed. Run './a.out' to execute.")
     
 #     pass
-    
