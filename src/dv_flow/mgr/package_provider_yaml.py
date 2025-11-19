@@ -702,6 +702,8 @@ class PackageProviderYaml(PackageProvider):
         taskdef = task.taskdef
 
         task.taskdef = None
+        # Ensure name resolution uses current package scope for parameter lookup
+        loader._eval.set_name_resolution(self.package_scope())
         if taskdef.uses is not None:
             uses_name = taskdef.uses
             if isinstance(uses_name, str):
