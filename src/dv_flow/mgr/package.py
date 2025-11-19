@@ -35,9 +35,10 @@ class Override(object):
 
 @dc.dataclass
 class Package(object):
-    pkg_def : PackageDef
+    name : str = "<unknown>"
     basedir : str = None
     paramT : Any = None
+    pkg_def : PackageDef = None  # Added to expose original PackageDef for tests
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     task_m : Dict[str,Task] = dc.field(default_factory=dict)
@@ -47,10 +48,6 @@ class Package(object):
 #    overrides : Dict[str, str]
     srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")
-
-    @property
-    def name(self):
-        return self.pkg_def.name
 
     def getTaskCtor(self, name : str) -> Task:
         self._log.debug("-- %s::getTaskCtor: %s" % (self.name, name))

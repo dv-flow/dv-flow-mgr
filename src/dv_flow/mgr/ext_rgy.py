@@ -22,20 +22,25 @@
 import os
 import logging
 import sys
-from typing import Callable, ClassVar, Dict, Tuple
+from typing import Callable, ClassVar, Dict, List, Optional, Tuple
 from .exec_callable import ExecCallable
+from .marker_listener import MarkerListener
+from .package import Package
+from .package_loader_p import PackageLoaderP
+from .package_provider import PackageProvider
+from .package_provider_yaml import PackageProviderYaml
+from .package_provider import Package
 from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
 
-class ExtRgy(object):
+class ExtRgy(PackageProvider):
     _inst : ClassVar = None
-    _log : ClassVar[logging.Logger] = None
+    _log : ClassVar[logging.Logger] = logging.getLogger("ExtRgy")
 
     def __init__(self):
         self._pkgpath = []
         self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
-        self._log = logging.getLogger(type(self).__name__)
         self._override_m : Dict[str,str] = {}
 
     def addOverride(self, key, value):
@@ -52,9 +57,23 @@ class ExtRgy(object):
         else:
             return False
         
-    def findShell(self, name) -> Callable:
+    def findShell(self, name) -> Optional[Callable]:
         if name in self._shell_m.keys():
             return self._shell_m[name]
+        return None
+        
+    def getPackageNames(self, loader : PackageLoaderP) -> List[str]:
+        return list(self._pkg_m.keys())
+
+    def getPackage(self, name : str, loader : PackageLoaderP) -> Package:
+        if name not in self._pkg_m.keys():
+            raise Exception("Package %s does not exist" % name)
+        return self._pkg_m[name].getPackage(name, loader)
+    
+    def findPackage(self, name : str, loader : PackageLoaderP) -> Optional[Package]:
+        if name in self._pkg_m.keys():
+            return self._pkg_m[name].findPackage(name, loader)
+        return None
         
     def findPackagePath(self, name) -> str:
         ret = None
@@ -94,7 +113,8 @@ class ExtRgy(object):
     def _discover_plugins(self):
         self._log.debug("--> discover_plugins")
         # Register built-in package
-        self._pkg_m["std"] = os.path.join(os.path.dirname(__file__), "std/flow.dv")
+        self._pkg_m["std"] = PackageProviderYaml(
+            path=os.path.join(os.path.dirname(__file__), "std/flow.dv"))
 
         # Register built-in shells
         self._shell_m["shell"] = ShellCallable
@@ -102,7 +122,6 @@ class ExtRgy(object):
         self._shell_m["csh"] = ShellCallable
         self._shell_m["tcsh"] = ShellCallable
         self._shell_m["pytask"] = ExecCallable
-
 
         if "DV_FLOW_PATH" in os.environ.keys() and os.environ["DV_FLOW_PATH"] != "":
             paths = os.environ["DV_FLOW_PATH"].split(':')
@@ -131,7 +150,7 @@ class ExtRgy(object):
                             self._log.debug("Package %s already registered using path %s. Conflicting path: %s" % (
                                 name, self._pkg_m[name][0], path))
                         else:
-                            self._pkg_m[name] = path
+                            self._pkg_m[name] = PackageProviderYaml(name=name, path=path)
                 if hasattr(mod, "dvfm_shells") or hasattr(mod, "dfm_shells"):
                     if hasattr(mod, "dvfm_shells"):
                         shell_m = mod.dvfm_shells()
