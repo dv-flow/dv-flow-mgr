@@ -33,7 +33,7 @@ from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
 from .task import Task
 from .task_def import RundirE
-from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
+from .task_data import TaskMarker, TaskMarkerLoc, SeverityE, TaskDataItem
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_node import TaskNode
 from .task_node_compound import TaskNodeCompound
@@ -393,8 +393,19 @@ class TaskGraphBuilder(object):
         elif self.loader is not None:
             tt = self.loader.getType(type)
 
-        if type is None:
-            raise Exception("Type %s does not exist" % name)
+        if tt is None:
+            # Fallback for std.Env (not defined as a Type yet)
+            if type == "std.Env":
+                import pydantic
+                field_m = {"type": (str, "std.Env"), "vals": (dict, {})}
+                model_t = pydantic.create_model("std_Env", __base__=TaskDataItem, **field_m)
+                ret = model_t()
+                for k, v in kwargs.items():
+                    if hasattr(ret, k):
+                        setattr(ret, k, v)
+                self._log.debug("<-- mkDataItem(fallback): %s" % type)
+                return ret
+            raise Exception(f"Type {type} does not exist")
         
         if tt in self._type_node_m.keys():
             tn = self._type_node_m[tt]
@@ -435,7 +446,7 @@ class TaskGraphBuilder(object):
 
         self._mkDataItemI(tt, field_m, exclude_s)
 
-        ret = pydantic.create_model(tt.name, **field_m)
+        ret = pydantic.create_model(tt.name, __base__=TaskDataItem, **field_m)
 
         return ret
     

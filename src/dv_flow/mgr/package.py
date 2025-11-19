@@ -38,6 +38,7 @@ class Package(object):
     name : str = "<unknown>"
     basedir : str = None
     paramT : Any = None
+    pkg_def : PackageDef = None  # Added to expose original PackageDef for tests
     # Package holds constructors for tasks
     # - Dict holds the default parameters for the task
     task_m : Dict[str,Task] = dc.field(default_factory=dict)

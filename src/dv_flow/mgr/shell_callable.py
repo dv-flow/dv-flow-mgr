@@ -48,7 +48,7 @@ class ShellCallable(object):
 
         proc = await asyncio.create_subprocess_shell(
             cmd,
-            shell=self.shell,
+            executable=shell,
             env=env,
             cwd=input.rundir,
             stdout=fp,

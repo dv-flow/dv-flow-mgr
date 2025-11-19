@@ -157,6 +157,12 @@ class PackageProviderYaml(PackageProvider):
             len(pkg_def.types)))
 
         pkg.name = pkg_def.name
+        pkg.pkg_def = pkg_def  # expose original PackageDef for tests
+        # Register package with loader for global lookup
+        try:
+            loader._pkg_m[pkg.name] = pkg
+        except Exception:
+            pass
 
         # TODO: handle 'uses' for packages
         pkg.paramT = self._getParamT(loader, pkg_def, None)
@@ -182,6 +188,8 @@ class PackageProviderYaml(PackageProvider):
             name=pkg.name, 
             pkg=pkg, 
             loader=LoaderScope(name=None, loader=loader)))
+        # Ensure eval uses current package scope for variable resolution
+        loader._eval.set_name_resolution(self._pkg_s[-1])
 
         # Imports are loaded first
         self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
@@ -453,14 +461,15 @@ class PackageProviderYaml(PackageProvider):
         # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
         for taskdef, task in tasks:
             for fed_name in getattr(taskdef, "feeds", []):
-                loader.addFeed(task, fed_name)
+                # Qualify unqualified feed names with current package
+                qname = fed_name if '.' in fed_name else f"{pkg.name}.{fed_name}"
+                loader.addFeed(task, qname)
 
         # Now, build out tasks
         for taskdef, task in tasks:
             task.taskdef = taskdef
             self._elabTask(task, loader)
-
-            assert task.paramT is not None
+            # Allow error markers to be reported without raising here
 
         self._log.debug("<-- _loadTasks %s" % pkg.name)
 
@@ -653,13 +662,16 @@ class PackageProviderYaml(PackageProvider):
 
         task.taskdef = None
         if taskdef.uses is not None:
-            task.uses = self._findTaskOrType(taskdef.uses, loader)
+            uses_name = taskdef.uses
+            if isinstance(uses_name, str):
+                uses_name = loader.evalExpr(uses_name)
+            task.uses = self._findTaskOrType(uses_name, loader)
 
             if task.uses is None:
-                similar = loader.getSimilarNamesError(taskdef.uses)
+                similar = loader.getSimilarNamesError(uses_name)
                 loader.error("failed to resolve task-uses %s.%s" % (
-                    taskdef.uses, similar), taskdef.srcinfo)
-                self._log.error("failed to resolve task-uses %s.%s" % (taskdef.uses, similar))
+                    uses_name, similar), taskdef.srcinfo)
+                self._log.error("failed to resolve task-uses %s.%s" % (uses_name, similar))
                 return
 
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
@@ -729,6 +741,7 @@ class PackageProviderYaml(PackageProvider):
             task.shell = task.uses.shell
 
         self._log.debug("<-- _elabTask %s" % task.name)
+        loader.popEvalScope()
 
     def _elabType(self, loader, tt):
         self._log.debug("--> _elabType %s" % tt.name)
@@ -816,7 +829,9 @@ class PackageProviderYaml(PackageProvider):
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)
             elif td.run is not None:
-                st.run = td.run
+                loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
+                st.run = loader.evalExpr(td.run)
+                loader.popEvalScope()
                 st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:
                 st.run = td.pytask

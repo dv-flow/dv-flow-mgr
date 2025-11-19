@@ -202,6 +202,16 @@ class PackageLoader(PackageLoaderP):
                 "%s.%s" % (self._pkg_s[-1].pkg.name, name),
                 tasks if only_tasks else all,
                 cutoff=0.8)
+        # Fallback: try qualifying with any loaded package names
+        if len(similar) == 0 and len(self._pkg_m):
+            for pkg in self._pkg_m.values():
+                qname = f"{pkg.name}.{name}"
+                similar = difflib.get_close_matches(
+                    qname,
+                    tasks if only_tasks else all,
+                    cutoff=0.8)
+                if len(similar):
+                    break
         
         if len(similar) == 0:
             return ""
@@ -222,11 +232,21 @@ class PackageLoader(PackageLoaderP):
         for l in self.marker_listeners:
             l(marker)
 
-    def pushEvalScope(self, vars : Dict[str,object], inherit=True): 
-        pass
+    def pushEvalScope(self, vars : Dict[str,object], inherit=True):
+        if not hasattr(self, "_eval_scope_s"):
+            self._eval_scope_s = []
+        # Save current variables snapshot
+        self._eval_scope_s.append(self._eval.expr_eval.variables.copy())
+        if not inherit:
+            self._eval.expr_eval.variables = {}
+        # Apply new vars
+        for k, v in vars.items():
+            self._eval.set(k, v)
 
-    def popEvalScope(self): 
-        pass
+    def popEvalScope(self):
+        if hasattr(self, "_eval_scope_s") and len(self._eval_scope_s):
+            prev = self._eval_scope_s.pop()
+            self._eval.expr_eval.variables = prev
 
     def feedsMap(self) -> Dict[str, List[Task]]:
         return self._feeds_map
