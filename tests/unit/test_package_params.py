@@ -47,3 +47,45 @@ package:
     with open(os.path.join(rundir, "rundir/t1/out.txt"), "r") as fp:
         assert fp.read().strip() == "hello"
 
+
+def test_example(tmpdir):
+
+    flow_dv = """
+package:
+  name: uvm
+  with:
+    sim:
+      type: str
+      value: "base"
+
+  tasks:
+  - name: a.base.c
+
+  - name: t1
+    uses: "a.${{ sim }}.c"
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+    
+    print("Package:\n%s\n" % json.dumps(pkg.dump(), indent=2))
+
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("uvm.t1", name="t1")
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+#    assert os.path.isfile(os.path.join(rundir, "rundir/t1/out.txt"))
+#    with open(os.path.join(rundir, "rundir/t1/out.txt"), "r") as fp:
+#        assert fp.read().strip() == "hello"
