@@ -225,20 +225,24 @@ class PackageProviderYaml(PackageProvider):
             pkg=pkg, 
             loader=LoaderScope(name=None, loader=loader)))
         # Ensure eval uses current package scope for variable resolution
+        prev_name_res = loader._eval.expr_eval.name_resolution
         loader._eval.set_name_resolution(self._pkg_s[-1])
 
-        # Imports are loaded first
-        self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
+        try:
+            # Imports are loaded first
+            self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
 
-        taskdefs = pkg_def.tasks.copy()
-        typedefs = pkg_def.types.copy()
+            taskdefs = pkg_def.tasks.copy()
+            typedefs = pkg_def.types.copy()
 
-        self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
+            self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
 
-        self._loadTypes(pkg, loader, typedefs)
-        self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
-
-        self.pop_package_scope()
+            self._loadTypes(pkg, loader, typedefs)
+            self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
+        finally:
+            # Restore previous name-resolution context and scope
+            loader._eval.set_name_resolution(prev_name_res)
+            self.pop_package_scope()
 
         # Apply feeds after all tasks are loaded
         for fed_name, feeding_tasks in loader.feedsMap().items():

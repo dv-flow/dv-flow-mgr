@@ -116,3 +116,43 @@ package:
         raise
     assert 'sim' in pkg.paramT.model_fields
     assert pkg.paramT.model_fields['sim'].default == 'base'
+
+def test_pkg_import(tmpdir):
+    """Regression: parameter in uses expression should resolve without exception."""
+    flow_dv = """
+package:
+  name: regress
+  with:
+    sim:
+      type: str
+      value: base
+  imports:
+  - pkg.yaml
+  tasks:
+  - name: t_bad
+    uses: pkg.p1_task
+    with:
+      param:
+        type: str
+        value: "${{ sim }}"
+"""
+    pkg_yaml = """
+package:
+    name: pkg
+    tasks:
+    - name: p1_task
+"""
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    with open(os.path.join(rundir, "pkg.yaml"), "w") as fp:
+        fp.write(pkg_yaml)
+
+    from dv_flow.mgr import PackageLoader
+    try:
+        pkg = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    except Exception as e:
+        assert "Variable 'sim' not found" not in str(e), f"Parameter resolution failed: {e}"
+        raise
+    assert 'sim' in pkg.paramT.model_fields
+    assert pkg.paramT.model_fields['sim'].default == 'base'
