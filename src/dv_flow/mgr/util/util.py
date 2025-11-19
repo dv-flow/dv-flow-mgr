@@ -54,6 +54,7 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     while dir != "/" and dir != "" and os.path.isdir(dir):
         for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
             fpath = os.path.join(dir, name)
+            print("fpath: %s" % fpath)
             if os.path.exists(fpath):
                 try:
                     listeners = [listener] if listener is not None else []
@@ -64,8 +65,8 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
                     found = True
                     break
                 except Exception:
-                    # Try next candidate up the tree
-                    pass
+                    print("Fatal Error: while parsing %s" % fpath)
+                    raise
         if found:
             break
         dir = os.path.dirname(dir)

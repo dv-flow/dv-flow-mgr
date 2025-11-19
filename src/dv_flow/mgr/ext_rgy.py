@@ -150,7 +150,7 @@ class ExtRgy(PackageProvider):
                             self._log.debug("Package %s already registered using path %s. Conflicting path: %s" % (
                                 name, self._pkg_m[name][0], path))
                         else:
-                            self._pkg_m[name] = PackageProviderYaml(name=name, path=path)
+                            self._pkg_m[name] = PackageProviderYaml(path=path)
                 if hasattr(mod, "dvfm_shells") or hasattr(mod, "dfm_shells"):
                     if hasattr(mod, "dvfm_shells"):
                         shell_m = mod.dvfm_shells()
