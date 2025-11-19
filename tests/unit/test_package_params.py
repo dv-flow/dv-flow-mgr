@@ -89,3 +89,30 @@ package:
 #    assert os.path.isfile(os.path.join(rundir, "rundir/t1/out.txt"))
 #    with open(os.path.join(rundir, "rundir/t1/out.txt"), "r") as fp:
 #        assert fp.read().strip() == "hello"
+
+
+def test_param_in_uses_elab(tmpdir):
+    """Regression: parameter in uses expression should resolve without exception."""
+    flow_dv = """
+package:
+  name: regress
+  with:
+    sim:
+      type: str
+      value: base
+  tasks:
+  - name: t_bad
+    uses: "nonexist.${{ sim }}.task"
+"""
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    from dv_flow.mgr import PackageLoader
+    try:
+        pkg = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    except Exception as e:
+        assert "Variable 'sim' not found" not in str(e), f"Parameter resolution failed: {e}"
+        raise
+    assert 'sim' in pkg.paramT.model_fields
+    assert pkg.paramT.model_fields['sim'].default == 'base'
