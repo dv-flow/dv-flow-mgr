@@ -19,11 +19,13 @@
 #*     Author: 
 #*
 #****************************************************************************
-import difflib
+import logging
 import os
 import yaml
 from ..package_loader import PackageLoader
 from ..task_data import TaskMarker, TaskMarkerLoc, SeverityE
+
+_log = logging.getLogger("util")
 
 def parse_parameter_overrides(def_list):
     """Parses ['name=value', ...] into a dict of parameter overrides."""
@@ -47,6 +49,8 @@ def parse_parameter_overrides(def_list):
 def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     """Locates the project's flow spec and returns the PackageDef"""
 
+    _log.debug("--> loadProjPkgDef %s" % path)
+
     dir = path
     ret = None
     loader = None
@@ -54,7 +58,8 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     while dir != "/" and dir != "" and os.path.isdir(dir):
         for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
             fpath = os.path.join(dir, name)
-            print("fpath: %s" % fpath)
+            _log.debug("Trying path %s (%s)" % (
+                fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
             if os.path.exists(fpath):
                 try:
                     listeners = [listener] if listener is not None else []
@@ -72,9 +77,14 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
         dir = os.path.dirname(dir)
     
     if not found:
+        _log.debug("Failed to find flow.dv/flow.yaml/flow.tom")
         if listener:
             listener(TaskMarker(
                 msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
                 severity=SeverityE.Error))
+    else:
+        _log.debug("Found and loaded ")
+
+    _log.debug("<-- loadProjPkgDef %s" % path)
     
     return loader, ret
