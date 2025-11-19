@@ -52,18 +52,20 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     loader = None
     found = False
     while dir != "/" and dir != "" and os.path.isdir(dir):
-        for name in ("flow.dv", "flow.yaml", "flow.yml"):
-            if os.path.exists(os.path.join(dir, name)):
-                with open(os.path.join(dir, name)) as f:
-                    data = yaml.load(f, Loader=yaml.FullLoader)
-                    if "package" in data.keys():
-                        found = True
-                        listeners = [listener] if listener is not None else []
-                        loader = PackageLoader(
-                            marker_listeners=listeners,
-                            param_overrides=(parameter_overrides or {}))
-                        ret = loader.load(os.path.join(dir, name))
-                        break
+        for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
+            fpath = os.path.join(dir, name)
+            if os.path.exists(fpath):
+                try:
+                    listeners = [listener] if listener is not None else []
+                    loader = PackageLoader(
+                        marker_listeners=listeners,
+                        param_overrides=(parameter_overrides or {}))
+                    ret = loader.load(fpath)
+                    found = True
+                    break
+                except Exception:
+                    # Try next candidate up the tree
+                    pass
         if found:
             break
         dir = os.path.dirname(dir)
@@ -71,7 +73,7 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
     if not found:
         if listener:
             listener(TaskMarker(
-                msg="Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % path,
+                msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
                 severity=SeverityE.Error))
     
     return loader, ret

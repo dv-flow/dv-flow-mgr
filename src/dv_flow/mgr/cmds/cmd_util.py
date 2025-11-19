@@ -15,13 +15,15 @@ class CmdUtil(object):
         pkg : Package = None
         markers = None
 
-        if os.path.isfile(os.path.join(os.getcwd(), "flow.dv")):
-            markers = []
-            def marker(m):
-                nonlocal markers
-                print("marker: %s" % str(m))
-                markers.append(m)
-            loader, pkg = loadProjPkgDef(os.getcwd(), marker)
+        for name in ("flow.dv","flow.yaml","flow.yml","flow.toml"):
+            if os.path.isfile(os.path.join(os.getcwd(), name)):
+                markers = []
+                def marker(m):
+                    nonlocal markers
+                    print("marker: %s" % str(m))
+                    markers.append(m)
+                loader, pkg = loadProjPkgDef(os.getcwd(), marker)
+                break
 
 
         if pkg is None and markers is None:
