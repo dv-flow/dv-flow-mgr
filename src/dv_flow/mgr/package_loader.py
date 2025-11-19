@@ -59,13 +59,16 @@ class PackageLoader(PackageLoaderP):
         self._loader_scope.override_m = dict(self.param_overrides) if self.param_overrides is not None else {}
 
     def load(self, root) -> Package:
-        from .package_provider_yaml import PackageProviderYaml
-
         self._log.debug("--> load %s" % root)
         root = os.path.normpath(root)
         self._eval.set("root", root)
         self._eval.set("rootdir", os.path.dirname(root))
-        provider = PackageProviderYaml(path=root)
+        if root.endswith(".toml"):
+            from .package_provider_toml import PackageProviderToml
+            provider = PackageProviderToml(path=root)
+        else:
+            from .package_provider_yaml import PackageProviderYaml
+            provider = PackageProviderYaml(path=root)
         ret = provider.getPackage(
             provider.getPackageNames(self)[0],
             self)

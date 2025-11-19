@@ -11,6 +11,7 @@ dependencies = [
     'pydantic',
     'pyyaml',
     'rich',
+    'tomli; python_version < "3.11"',
     "toposort",
     "svdep"
 ]

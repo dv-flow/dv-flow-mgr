@@ -43,7 +43,7 @@ class CmdShow(object):
             parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])))
 
         if pkg is None:
-            raise Exception("Failed to find a 'flow.dv' file that defines a package in %s or its parent directories" % os.getcwd())
+            raise Exception("Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % os.getcwd())
 
         self._log.debug("Root flow file defines package: %s" % pkg.name)
 

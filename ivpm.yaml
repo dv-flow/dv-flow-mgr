@@ -19,6 +19,8 @@ package:
       src: pypi
     - name: pyyaml
       src: pypi
+    - name: tomli
+      src: pypi
     - name: Sphinx
       src: pypi
     - name: sphinx-argparse

@@ -31,6 +31,14 @@ class PackageProviderYaml(PackageProvider):
     _loading : bool = dc.field(default=False)
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
+    # Shared parser hook that dispatches based on file extension
+    def _parse_file(self, file: str, is_root: bool):
+        if file.endswith(".toml"):
+            from .package_provider_toml import PackageProviderToml
+            return PackageProviderToml(path=file)._parse_file(file, is_root)
+        with open(file, "r") as fp:
+            return yaml.load(fp, Loader=YamlSrcInfoLoader(file))
+
     def getPackageNames(self, loader : PackageLoaderP) -> List[str]: 
         assert not self._loading
         if self.pkg is None:
@@ -81,19 +89,18 @@ class PackageProviderYaml(PackageProvider):
 
         pkg_def : Optional[PackageDef] = None
 
-        with open(root, "r") as fp:
-            self._log.debug("open %s" % root)
-            doc = yaml.load(fp, Loader=YamlSrcInfoLoader(root))
+        self._log.debug("open %s" % root)
+        doc = self._parse_file(root, is_root=True)
 
-            if "package" not in doc.keys():
-                raise Exception("Missing 'package' key in %s" % root)
-            try:
-                pkg_def = PackageDef(**(doc["package"]))
+        if "package" not in doc.keys():
+            raise Exception("Missing 'package' key in %s" % root)
+        try:
+            pkg_def = PackageDef(**(doc["package"]))
 
 #                for t in pkg.tasks:
 #                    t.fullname = pkg.name + "." + t.name
 
-            except pydantic.ValidationError as e:
+        except pydantic.ValidationError as e:
 #                print("Errors: %s" % root)
                 error_paths = []
                 loc = None
@@ -135,8 +142,8 @@ class PackageProviderYaml(PackageProvider):
                             loc=marker_loc)
                     loader.marker(marker)
 
-            if pkg_def is not None:
-                self._mkPackage(pkg, pkg_def, root, loader)
+        if pkg_def is not None:
+            self._mkPackage(pkg, pkg_def, root, loader)
 
         loader.popPath()
 
@@ -320,19 +327,25 @@ class PackageProviderYaml(PackageProvider):
 
         if not os.path.isfile(imp_path):
             self.error("Import file %s not found" % imp_path, pkg.srcinfo)
-            # Don't want to error out 
             return
-#            raise Exception("Import file %s not found" % imp_path)
 
         if imp_path in self._pkg_path_m.keys():
             sub_pkg = self._pkg_path_m[imp_path]
         else:
             self._log.info("Loading imported file %s" % imp_path)
             imp_path = os.path.normpath(imp_path)
-            sub_pkg = Package(
-                basedir=os.path.dirname(imp_path),
-                srcinfo=SrcInfo(file=imp_path))
-            sub_pkg = self._loadPackage(sub_pkg, imp_path, loader)
+            if imp_path.endswith(".toml"):
+                from .package_provider_toml import PackageProviderToml
+                sub_pkg = Package(
+                    basedir=os.path.dirname(imp_path),
+                    srcinfo=SrcInfo(file=imp_path))
+                # Use TOML provider to load
+                sub_pkg = PackageProviderToml(path=imp_path)._loadPackage(sub_pkg, imp_path, loader)
+            else:
+                sub_pkg = Package(
+                    basedir=os.path.dirname(imp_path),
+                    srcinfo=SrcInfo(file=imp_path))
+                sub_pkg = self._loadPackage(sub_pkg, imp_path, loader)
             self._log.info("Loaded imported package %s" % sub_pkg.name)
 
         pkg.pkg_m[sub_pkg.name] = sub_pkg
@@ -345,7 +358,7 @@ class PackageProviderYaml(PackageProvider):
         if os.path.isfile(base):
             imp_path = base
         else:
-            for name in ("flow.dv", "flow.yaml", "flow.yml"):
+            for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
                 self._log.debug("Searching for %s in %s" % (name, base))
                 if os.path.isfile(os.path.join(base, name)):
                     imp_path = os.path.join(base, name)
@@ -360,7 +373,7 @@ class PackageProviderYaml(PackageProvider):
         # Search deeper
         ret = None
         for subdir in os.listdir(dir):
-            for name in ("flow.dv", "flow.yaml", "flow.yml"):
+            for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
                 if os.path.isfile(os.path.join(dir, subdir, name)):
                     ret = os.path.join(dir, subdir, name)
                     self._log.debug("Found: %s" % ret)
@@ -396,7 +409,7 @@ class PackageProviderYaml(PackageProvider):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
                 self._loadFragmentDir(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
-            elif os.path.isfile(os.path.join(dir, file)) and file == "flow.dv":
+            elif os.path.isfile(os.path.join(dir, file)) and file in ("flow.dv","flow.yaml","flow.yml","flow.toml"):
                 self._loadFragmentFile(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
 
     def _loadFragmentFile(self, loader, pkg, file, taskdefs, typedefs):
@@ -404,11 +417,10 @@ class PackageProviderYaml(PackageProvider):
             raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(loader.pathStack())))
         loader.pushPath(file)
 
-        with open(file, "r") as fp:
-            doc = yaml.load(fp, Loader=YamlSrcInfoLoader(file))
-            self._log.debug("doc: %s" % str(doc))
-            if doc is not None and "fragment" in doc.keys():
-                try:
+        doc = self._parse_file(file, is_root=False)
+        self._log.debug("doc: %s" % str(doc))
+        if doc is not None and "fragment" in doc.keys():
+            try:
                     frag = FragmentDef(**(doc["fragment"]))
                     basedir = os.path.dirname(file)
                     pkg.fragment_def_l.append(frag)
@@ -417,7 +429,7 @@ class PackageProviderYaml(PackageProvider):
                     self._loadFragments(loader, pkg, frag.fragments, basedir, taskdefs, typedefs)
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
-                except pydantic.ValidationError as e:
+            except pydantic.ValidationError as e:
                     print("Errors: %s" % file)
                     error_paths = []
                     loc = None
