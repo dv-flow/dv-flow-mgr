@@ -324,10 +324,18 @@ class PackageProviderYaml(PackageProvider):
         # Explicit config from loader overrides implicit selection
         cfg_name = getattr(loader, 'config_name', None)
         if cfg_name is not None:
+            # Only enforce explicit config for the root package. Imported packages
+            # may not define the same config name; in that case, silently skip.
+            is_root = False
+            try:
+                is_root = (loader.rootDir() == loader.pathStack()[-1])
+            except Exception:
+                pass
             for c in pkg_def.configs:
                 if c.name == cfg_name:
                     return c
-            loader.error(f"Configuration '{cfg_name}' not found in package {pkg_def.name}")
+            if is_root:
+                loader.error(f"Configuration '{cfg_name}' not found in package {pkg_def.name}")
             return None
         # Implicit default
         for c in pkg_def.configs:

@@ -46,7 +46,7 @@ def parse_parameter_overrides(def_list):
             ov[name] = value
     return ov
 
-def loadProjPkgDef(path, listener=None, parameter_overrides=None):
+def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None):
     """Locates the project's flow spec and returns the PackageDef"""
 
     _log.debug("--> loadProjPkgDef %s" % path)
@@ -66,7 +66,7 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None):
                     loader = PackageLoader(
                         marker_listeners=listeners,
                         param_overrides=(parameter_overrides or {}))
-                    ret = loader.load(fpath)
+                    ret = loader.load(fpath, config=config)
                     found = True
                     break
                 except Exception:

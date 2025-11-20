@@ -62,7 +62,8 @@ class CmdRun(object):
         loader, pkg = loadProjPkgDef(
             get_rootdir(args),
             listener=listener.marker,
-            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])))
+            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])),
+            config=getattr(args, "config", None))
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")
@@ -88,22 +89,31 @@ class CmdRun(object):
                 listener = TaskListenerLog()
         else:
             # Print out available tasks
+            override_targets = set()
+            if hasattr(pkg, 'pkg_def') and pkg.pkg_def is not None:
+                for td in pkg.pkg_def.tasks:
+                    if getattr(td, 'override', None):
+                        override_targets.add(td.override)
             tasks = []
+            # Root package tasks
             for task in pkg.task_m.values():
                 tasks.append(task)
-            tasks.sort(key=lambda x: x.name)
+            # Imported/base package tasks are no longer listed; only root package tasks are shown
+            # for subpkg in pkg.pkg_m.values():
+            #     for task in subpkg.task_m.values():
+            #         leaf = task.name.split('.', 1)[1] if '.' in task.name else task.name
+            #         if leaf in override_targets:
+            #             continue
+            #         tasks.append(task)
+            # De-duplicate and sort
+            tasks = sorted({t.name: t for t in tasks}.values(), key=lambda x: x.name)
 
-            max_name_len = 0
-            for t in tasks:
-                if len(t.name) > max_name_len:
-                    max_name_len = len(t.name)
+            max_name_len = max((len(t.name) for t in tasks), default=0)
 
             print("No task specified. Available Tasks:")
             for t in tasks:
-                desc = t.desc
-                if desc is None or t.desc == "":
-                    "<no descripion>"
-                print("%s - %s" % (t.name.ljust(max_name_len), desc))
+                desc = t.desc if t.desc else "<no description>"
+                print(f"{t.name.ljust(max_name_len)} - {desc}")
 
             pass
 
