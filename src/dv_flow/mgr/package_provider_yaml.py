@@ -255,11 +255,20 @@ class PackageProviderYaml(PackageProvider):
                         # base tasks are keyed by fully-qualified name
                         fq = f"{base_pkg.name}.{target}"
                         found = fq in base_pkg.task_m
+                    else:
+                        # Attempt to locate base package lazily if not yet loaded
+                        if pkg_def.uses is not None and pkg_def.uses in pkg.pkg_m:
+                            base_pkg = pkg.pkg_m[pkg_def.uses]
+                            fq = f"{base_pkg.name}.{target}"
+                            found = fq in base_pkg.task_m
                     if not found:
                         loader.error(f"override target task '{target}' not found in base (uses) package", td.srcinfo)
                     # Ensure the override task takes the target name
                     if td.name is None or td.name != target:
                         td.name = target
+                    # Implicitly inherit from overridden task if no explicit 'uses'
+                    if td.uses is None and base_pkg is not None:
+                        td.uses = f"{base_pkg.name}.{target}"
             # Alias inherited base-package tasks into root package namespace
             if base_pkg is not None:
                 override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
@@ -337,17 +346,24 @@ class PackageProviderYaml(PackageProvider):
                     break
             if base_cfg is None:
                 loader.error(f"Base configuration '{cfg.uses}' not found for '{cfg.name}'")
-        def merge_params(base_params: Dict, new_params: Dict) -> Dict:
+        def merge_params(base_params: Dict, new_params) -> Dict:
+            """Merge parameter maps.
+            ConfigDef.params is defined as a List[ParamDef]; PackageDef.params is a Dict.
+            Handle list gracefully (ignored for now, since ParamDef lacks a name field)."""
             ret = {} if base_params is None else dict(base_params)
-            for k,v in new_params.items():
-                # Convert dict with 'type'/etc to ParamDef if needed
-                if isinstance(v, dict) and ('type' in v.keys() or 'value' in v.keys()):
-                    from .param_def import ParamDef
-                    try:
-                        v = ParamDef(**v)
-                    except Exception:
-                        pass
-                ret[k] = v
+            if isinstance(new_params, dict):
+                for k,v in new_params.items():
+                    # Convert dict with 'type'/etc to ParamDef if needed
+                    if isinstance(v, dict) and ('type' in v.keys() or 'value' in v.keys()):
+                        from .param_def import ParamDef
+                        try:
+                            v = ParamDef(**v)
+                        except Exception:
+                            pass
+                    ret[k] = v
+            elif isinstance(new_params, list):
+                # Future: support list[ParamDef] updates (requires a 'name' attribute)
+                pass
             return ret
         # Merge params: package -> base_cfg -> cfg
         merged_params = pkg_def.params
@@ -384,18 +400,17 @@ class PackageProviderYaml(PackageProvider):
             for td in lst:
                 if hasattr(td, 'override') and td.override:
                     target = td.override
-                    found = False
+                    # Remove any prior taskdef with same name
                     for i in range(len(taskdefs)-1, -1, -1):
                         if taskdefs[i].name == target:
                             taskdefs.pop(i)
-                            found = True
                             break
-                    if not found:
-                        loader.error(f"override target task '{target}' not found in base (uses) package", td.srcinfo)
                     td.name = target if td.name is None else td.name
                     if td.name != target:
-                        # Force name to target for override consistency
                         td.name = target
+                    # Implicitly inherit from overridden task (base package) if no explicit 'uses'
+                    if td.uses is None and pkg_def.uses is not None:
+                        td.uses = f"{pkg_def.uses}.{target}"
                 taskdefs.append(td)
         if base_cfg is not None:
             apply_task_list(base_cfg.tasks)
