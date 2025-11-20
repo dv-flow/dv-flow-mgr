@@ -15,7 +15,7 @@ def test_run_t2_no_missing_param(tmp_path):
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
     # Use python -m to invoke dfm
     cmd = [sys.executable, '-m', 'dv_flow.mgr', 'run', 't2']
-    proc = subprocess.run(cmd, cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.run(cmd, cwd=os.path.join(repo_root, 'tests', 'unit', 'data'), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     assert proc.returncode == 0, f"dfm run t2 failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
     # Ensure no missing field error appears
     assert 'Field msg not found' not in proc.stdout

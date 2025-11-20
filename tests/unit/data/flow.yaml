@@ -1,0 +1,24 @@
+
+package:
+  name: root
+  uses: pkg1
+
+
+  imports:
+  - pkg1.yaml
+
+  tasks:
+  - override: t1
+    uses: std.Message
+    with:
+      msg: "Hello root::t1"
+
+  configs:
+  - name: default
+    tasks:
+    - override: t1
+      with:
+        msg: "Hello root::default::t1"
+
+
+ 
