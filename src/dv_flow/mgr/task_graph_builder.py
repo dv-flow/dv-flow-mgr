@@ -1002,7 +1002,7 @@ class TaskGraphBuilder(object):
 
     def _gatherNeeds(self, task_t, node):
         self._log.debug("--> _gatherNeeds %s (%s %d)" % (task_t.name, node.name, len(task_t.needs)))
-        if task_t.uses is not None and isinstance(task_t.uses, Task):
+        if task_t.uses is not None and isinstance(task_t.uses, Task) and not getattr(task_t, 'inherited', False):
             self._gatherNeeds(task_t.uses, node)
 
         for need in task_t.needs:

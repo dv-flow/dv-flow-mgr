@@ -40,7 +40,8 @@ class CmdShow(object):
         # First, find the project we're working with
         loader, pkg = loadProjPkgDef(
             get_rootdir(args),
-            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])))
+            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])),
+            config=getattr(args, "config", None))
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % os.getcwd())

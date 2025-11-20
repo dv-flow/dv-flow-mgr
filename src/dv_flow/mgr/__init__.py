@@ -30,9 +30,9 @@ from .task_def import *
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_graph_builder import TaskGraphBuilder
 from .task_run_ctxt import TaskRunCtxt
-from .task_runner import TaskRunner
-from .task_runner import TaskSetRunner
+from .task_runner import TaskRunner, TaskSetRunner
 from .task_listener_log import TaskListenerLog
+from .util.util import parse_parameter_overrides, loadProjPkgDef
 
 VERSION="1.5.0"
 SUFFIX=""

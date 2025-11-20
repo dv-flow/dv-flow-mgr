@@ -56,6 +56,8 @@ def get_parser():
                               default="dot")
     graph_parser.add_argument("--root", 
                               help="Specifies the root directory for the flow")
+    graph_parser.add_argument("-c", "--config",
+                              help="Specifies the active configuration for the root package")
     graph_parser.add_argument("-o", "--output", 
                               help="Specifies the output file",
                               default="-")
@@ -77,6 +79,8 @@ def get_parser():
                             help="Cleans the rundir before running")
     run_parser.add_argument("--root", 
                               help="Specifies the root directory for the flow")
+    run_parser.add_argument("-c", "--config",
+                            help="Specifies the active configuration for the root package")
     run_parser.add_argument("-u", "--ui",
                         help="Console UI style (log, progress, tui). Default: progress if terminal else log",
                         choices=("log","progress","tui"),
@@ -104,6 +108,8 @@ def get_parser():
                         default=[],
                         metavar="NAME=VALUE",
                         help="Parameter override; may be used multiple times")
+    show_parser.add_argument("-c", "--config",
+                        help="Specifies the active configuration for the root package")
     show_parser.set_defaults(func=CmdShow())
 
     util_parser = subparsers.add_parser('util',

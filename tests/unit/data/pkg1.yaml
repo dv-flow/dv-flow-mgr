@@ -1,0 +1,16 @@
+
+package:
+  name: pkg1
+
+  tasks:
+  - name: t1
+    uses: std.Message
+    with:
+      msg: "Hello pkg1.t1"
+  - name: t2
+    uses: std.Message
+    needs: [t1]
+    with:
+      msg: "Hello pkg1.t2"
+
+

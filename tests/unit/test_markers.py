@@ -31,7 +31,7 @@ def test_smoke_1(tmpdir):
             )
 
     task1 = MyTask(name="task1", srcdir="srcdir", p1="p1")
-    runner = TaskSetRunner("rundir")
+    runner = TaskSetRunner(str(tmpdir))
     runner.add_listener(TaskListenerLog().event)
 
     result = asyncio.run(runner.run(task1))
