@@ -18,7 +18,7 @@ class ConfigDef(BaseModel):
         description="Name of the configuration")
     params : List[ParamDef] = pdc.Field(
         default_factory=list,
-        description="List of configuration parameters",
+        description="Configuration parameters map",
         alias="with")
     uses : str = pdc.Field(
         default=None,
@@ -29,3 +29,15 @@ class ConfigDef(BaseModel):
     extensions : List[ExtendDef] = pdc.Field(
         default_factory=list,
         description="List of extensions to apply")
+    imports : List[Union[str,'PackageImportSpec']] = pdc.Field(
+        default_factory=list,
+        description="List of packages to import for this config")
+    fragments : List[str] = pdc.Field(
+        default_factory=list,
+        description="List of fragments to apply for this config")
+    tasks : List['TaskDef'] = pdc.Field(
+        default_factory=list,
+        description="List of tasks defined/overridden by this config")
+    types : List['TypeDef'] = pdc.Field(
+        default_factory=list,
+        description="List of types defined/overridden by this config")

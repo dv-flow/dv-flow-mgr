@@ -235,14 +235,171 @@ class PackageProviderYaml(PackageProvider):
             taskdefs = pkg_def.tasks.copy()
             typedefs = pkg_def.types.copy()
 
+            # Load package-level fragments before config selection
             self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
 
+            # Select and apply configuration (if any) prior to elaborating types/tasks
+            cfg = self._selectConfig(pkg_def, loader)
+            if cfg is not None:
+                self._applyConfig(pkg_def, cfg, loader, pkg, taskdefs, typedefs)
+
+            # Validate task overrides against base (uses) package when not in config
+            base_pkg = None
+            if pkg_def.uses is not None and pkg_def.uses in pkg.pkg_m:
+                base_pkg = pkg.pkg_m[pkg_def.uses]
+            for td in taskdefs:
+                if hasattr(td, 'override') and td.override:
+                    target = td.override
+                    found = False
+                    if base_pkg is not None:
+                        # base tasks are keyed by fully-qualified name
+                        fq = f"{base_pkg.name}.{target}"
+                        found = fq in base_pkg.task_m
+                    if not found:
+                        loader.error(f"override target task '{target}' not found in base (uses) package", td.srcinfo)
+                    # Ensure the override task takes the target name
+                    if td.name is None or td.name != target:
+                        td.name = target
+            # Alias inherited base-package tasks into root package namespace
+            if base_pkg is not None:
+                override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
+                from .task import Task
+                for task in base_pkg.task_m.values():
+                    leaf = task.name.split('.', 1)[1] if '.' in task.name else task.name
+                    if leaf in override_targets:
+                        continue  # overridden
+                    alias_name = f"{pkg.name}.{leaf}"
+                    if alias_name in pkg.task_m:
+                        continue  # already present
+                    alias = Task(
+                        name=alias_name,
+                        desc=task.desc,
+                        doc=task.doc,
+                        package=pkg,
+                        srcinfo=task.srcinfo)
+                    # Inherit implementation via uses chain
+                    alias.uses = task
+                    alias.paramT = task.paramT
+                    alias.run = task.run
+                    alias.shell = task.shell
+                    alias.passthrough = getattr(task, 'passthrough', None)
+                    alias.consumes = getattr(task, 'consumes', None)
+                    alias.rundir = getattr(task, 'rundir', None)
+                    # Shallow-copy needs/subtasks for graph continuity
+                    alias.needs = list(getattr(task, 'needs', []))
+                    alias.subtasks = list(getattr(task, 'subtasks', []))
+                    # Mark alias so we don't recurse into base 'uses' when gathering needs
+                    alias.inherited = True
+                    pkg.task_m[alias.name] = alias
             self._loadTypes(pkg, loader, typedefs)
             self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
+            # Remap needs of tasks in root namespace to overridden names
+            if base_pkg is not None:
+                override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
+                for ot in override_targets:
+                    overridden_name = f"{pkg.name}.{ot}"
+                    base_name = f"{base_pkg.name}.{ot}"
+                    overridden = pkg.task_m.get(overridden_name)
+                    if overridden is None:
+                        continue
+                    for task in pkg.task_m.values():
+                        for i, need in enumerate(task.needs):
+                            if need.name == base_name:
+                                task.needs[i] = overridden
         finally:
             # Restore previous name-resolution context and scope
             loader._eval.set_name_resolution(prev_name_res)
             self.pop_package_scope()
+
+    def _selectConfig(self, pkg_def, loader):
+        # Explicit config from loader overrides implicit selection
+        cfg_name = getattr(loader, 'config_name', None)
+        if cfg_name is not None:
+            for c in pkg_def.configs:
+                if c.name == cfg_name:
+                    return c
+            loader.error(f"Configuration '{cfg_name}' not found in package {pkg_def.name}")
+            return None
+        # Implicit default
+        for c in pkg_def.configs:
+            if c.name == 'default':
+                return c
+        return None
+
+    def _applyConfig(self, pkg_def, cfg, loader, pkg, taskdefs, typedefs):
+        self._log.debug(f"Applying config {cfg.name} to package {pkg_def.name}")
+        # Handle config inheritance (single level for now)
+        base_cfg = None
+        if cfg.uses is not None:
+            for c in pkg_def.configs:
+                if c.name == cfg.uses:
+                    base_cfg = c
+                    break
+            if base_cfg is None:
+                loader.error(f"Base configuration '{cfg.uses}' not found for '{cfg.name}'")
+        def merge_params(base_params: Dict, new_params: Dict) -> Dict:
+            ret = {} if base_params is None else dict(base_params)
+            for k,v in new_params.items():
+                # Convert dict with 'type'/etc to ParamDef if needed
+                if isinstance(v, dict) and ('type' in v.keys() or 'value' in v.keys()):
+                    from .param_def import ParamDef
+                    try:
+                        v = ParamDef(**v)
+                    except Exception:
+                        pass
+                ret[k] = v
+            return ret
+        # Merge params: package -> base_cfg -> cfg
+        merged_params = pkg_def.params
+        if base_cfg is not None:
+            merged_params = merge_params(merged_params, base_cfg.params)
+        merged_params = merge_params(merged_params, cfg.params)
+        # Update pkg_def params then rebuild paramT
+        pkg_def.params = merged_params
+        pkg.paramT = self._getParamT(loader, pkg_def, None)
+        # Apply imports/fragments from base then cfg
+        if base_cfg is not None:
+            self._loadPackageImports(loader, pkg, base_cfg.imports, pkg.basedir)
+            self._loadFragments(loader, pkg, base_cfg.fragments, pkg.basedir, taskdefs, typedefs)
+        self._loadPackageImports(loader, pkg, cfg.imports, pkg.basedir)
+        self._loadFragments(loader, pkg, cfg.fragments, pkg.basedir, taskdefs, typedefs)
+        # Apply types (overrides)
+        def apply_type_list(lst):
+            for td in lst:
+                # Override support
+                if hasattr(td, 'override') and td.override:
+                    target = td.override
+                    # Remove existing type definition matching target
+                    for i in range(len(typedefs)-1, -1, -1):
+                        if typedefs[i].name == target:
+                            typedefs.pop(i)
+                            break
+                    td.name = target
+                typedefs.append(td)
+        if base_cfg is not None:
+            apply_type_list(base_cfg.types)
+        apply_type_list(cfg.types)
+        # Apply tasks (overrides)
+        def apply_task_list(lst):
+            for td in lst:
+                if hasattr(td, 'override') and td.override:
+                    target = td.override
+                    found = False
+                    for i in range(len(taskdefs)-1, -1, -1):
+                        if taskdefs[i].name == target:
+                            taskdefs.pop(i)
+                            found = True
+                            break
+                    if not found:
+                        loader.error(f"override target task '{target}' not found in base (uses) package", td.srcinfo)
+                    td.name = target if td.name is None else td.name
+                    if td.name != target:
+                        # Force name to target for override consistency
+                        td.name = target
+                taskdefs.append(td)
+        if base_cfg is not None:
+            apply_task_list(base_cfg.tasks)
+        apply_task_list(cfg.tasks)
 
         # Apply feeds after all tasks are loaded
         for fed_name, feeding_tasks in loader.feedsMap().items():
@@ -330,7 +487,7 @@ class PackageProviderYaml(PackageProvider):
                 imp_path = self._findFlowDvInDir(imp_path)
 
         if not os.path.isfile(imp_path):
-            self.error("Import file %s not found" % imp_path, pkg.srcinfo)
+            loader.error("Import file %s not found" % imp_path, pkg.srcinfo)
             return
 
         if imp_path in self._pkg_path_m.keys():

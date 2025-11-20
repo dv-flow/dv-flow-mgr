@@ -49,3 +49,5 @@ class PackageSpec(object):
 class PackageImportSpec(object):
     path : str = dc.Field(default=None, alias="from")
     alias : str = dc.Field(default=None, alias="as")
+    config : str = dc.Field(default=None, alias="config")
+    params : Dict[str,Any] = dc.Field(default_factory=dict, alias="with")

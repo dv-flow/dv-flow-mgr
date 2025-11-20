@@ -29,7 +29,7 @@ import logging
 import sys
 import pydantic
 import pydantic.dataclasses as dc
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Callable, Tuple, ClassVar, Union
 from .config_def import ConfigDef
 from .fragment_def import FragmentDef
@@ -40,35 +40,35 @@ from .task_def import TaskDef
 from .type_def import TypeDef
 
 class Override(BaseModel):
-    name : str = dc.Field()
-    override : str = dc.Field(alias="with")
+    name : str = Field()
+    override : str = Field(alias="with")
 
 class PackageDef(BaseModel):
-    name : str = dc.Field(
+    name : str = Field(
         description="Name of the package")
-    type : List[PackageSpec] = dc.Field(default_factory=list)
-    tasks : List[TaskDef] = dc.Field(
+    type : List[PackageSpec] = Field(default_factory=list)
+    tasks : List[TaskDef] = Field(
         default_factory=list,
         description="List of tasks defined in the package")
-    imports : List[Union[str,PackageImportSpec]] = dc.Field(
+    imports : List[Union[str,PackageImportSpec]] = Field(
         default_factory=list,
         description="List of packages to import")
-    overrides : Dict[str, str] = dc.Field(default_factory=dict,
+    overrides : Dict[str, str] = Field(default_factory=dict,
         description="Overrides for packages and parameters")
-    fragments: List[str] = dc.Field(
+    fragments: List[str] = Field(
         default_factory=list,
         description="List of fragments to include")
-    types : List[TypeDef] = dc.Field(default_factory=list)
-    uses : str = dc.Field(
+    types : List[TypeDef] = Field(default_factory=list)
+    uses : str = Field(
         default=None,
         description="Name of the package to use as a base")
-    params : Dict[str,Union[str,list,ParamDef]] = dc.Field(
+    params : Dict[str,Union[str,list,ParamDef]] = Field(
         default_factory=dict, alias="with",
         description="Package parameters")
-    configs : List[ConfigDef] = dc.Field(
+    configs : List[ConfigDef] = Field(
         default_factory=list,
         description="List of package configurations")
-    srcinfo : SrcInfo = dc.Field(default=None)
+    srcinfo : SrcInfo = Field(default=None)
 
 #     @pydantic.model_validator(mode='before')
 #     def filter_srcinfo(self, values):
@@ -141,6 +141,7 @@ class PackageDef(BaseModel):
         return ctor_t
 
 
+PackageDef.model_rebuild()
 #     @classmethod
 #     def load(cls, path, exp_pkg_name=None):
 #         return PackageDef._loadPkgDef(path, exp_pkg_name, [])

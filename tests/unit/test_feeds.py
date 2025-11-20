@@ -48,7 +48,7 @@ package:
     assert runner.status == 0
     assert out.changed == True
 
-    assert len(out.output) == 2
+    assert len(out.output) == 1  # Only this task's output
 
 def test_feeds_2(tmpdir):
     flow_dv = """
@@ -99,7 +99,7 @@ package:
     assert runner.status == 0
     assert out.changed == True
 
-    assert len(out.output) == 2
+    assert len(out.output) == 1  # Only this task's output
 
 def test_feeds_3(tmpdir):
     flow_dv = """

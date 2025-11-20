@@ -149,19 +149,22 @@ class TaskSetRunner(TaskRunner):
 
                     # TaskNode rundir is a list of path elements relative
                     # to the root rundir
-                    rundir = ""
-
                     rundir_split = t.rundir
                     if not isinstance(t.rundir, list):
                         rundir_split = t.rundir.split('/')
 #                        raise Exception("Task %s doesn't have an array rundir" % t.name)
 
-                    for i, rundir_e in enumerate(rundir_split):
-                        if i:
-                            rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
-                            rundir = os.path.join(rundir, rundir_e)
-                        else:
-                            rundir = rundir_e
+                    # Determine base rundir: absolute first segment or anchor to self.rundir
+                    if len(rundir_split) > 0 and os.path.isabs(rundir_split[0]):
+                        rundir = rundir_split[0]
+                        segs = rundir_split[1:]
+                    else:
+                        rundir = self.rundir
+                        segs = rundir_split
+
+                    for rundir_e in segs:
+                        rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
+                        rundir = os.path.join(rundir, rundir_e)
 
                     # if t.rundir_t == RundirE.Unique:
                     #     # Replace invalid characters with the replacement string.

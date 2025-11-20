@@ -58,11 +58,13 @@ class PackageLoader(PackageLoaderP):
         # Seed loader-scope overrides from CLI parameter overrides
         self._loader_scope.override_m = dict(self.param_overrides) if self.param_overrides is not None else {}
 
-    def load(self, root) -> Package:
-        self._log.debug("--> load %s" % root)
+    def load(self, root, config: Optional[str]=None) -> Package:
+        self._log.debug("--> load %s (config=%s)" % (root, config))
+        self.config_name = config
         root = os.path.normpath(root)
         self._eval.set("root", root)
         self._eval.set("rootdir", os.path.dirname(root))
+        self._eval.set("srcdir", os.path.dirname(root))
         if root.endswith(".toml"):
             from .package_provider_toml import PackageProviderToml
             provider = PackageProviderToml(path=root)
