@@ -496,6 +496,67 @@ async def Task(ctxt, input):
         line = fp.read().strip()
         assert line == "p1: v1"
 
+def test_parameter_compound_leaf_ref_parent(tmpdir):
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: entry
+      with:
+        p1:
+          type: str
+          value: "v1"
+      body:
+      - name: t1
+        shell: pytask
+        run: task.py::Task
+        with:
+          p2: 
+            type: str
+            value: "${{ this.p1 }}"
+"""
+    task_py = """
+import os
+from dv_flow.mgr import TaskDataResult
+
+async def Task(ctxt, input):
+    with open(os.path.join(ctxt.rundir, "task.out"), "w") as fp:
+      fp.write("p2: %s" % input.params.p2)
+      return TaskDataResult()
+"""
+    rundir = os.path.join(tmpdir)
+
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    with open(os.path.join(rundir, "task.py"), "w") as fp:
+        fp.write(task_py)
+
+    marker_collector = MarkerCollector()
+    pkg_def = PackageLoader(
+        marker_listeners=[marker_collector]).load(
+            os.path.join(rundir, "flow.dv"))
+    assert len(marker_collector.markers) == 0
+
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.entry")
+
+    TaskGraphDotWriter().write(
+        t1, 
+        os.path.join(rundir, "graph.dot"))
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+    assert os.path.isfile(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/task.out"))
+    with open(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/task.out"), "r") as fp:
+        line = fp.read().strip()
+        assert line == "p2: v1"
+
 @pytest.mark.skip
 def test_compound_need(tmpdir):
     flow_dv = """
