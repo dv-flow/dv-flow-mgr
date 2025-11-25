@@ -971,6 +971,7 @@ class PackageProviderYaml(PackageProvider):
             self._mkTaskBody(task, loader, taskdef)
         elif taskdef.run is not None:
             task.run = loader.evalExpr(taskdef.run)
+            self._log.debug("Task %s run: %s (%s)" % (task.name, str(task.run), str(taskdef.run)))
             if taskdef.shell is not None:
                 task.shell = taskdef.shell
         elif taskdef.pytask is not None: # Deprecated case
@@ -1110,12 +1111,7 @@ class PackageProviderYaml(PackageProvider):
                     pass
                 loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
                 _expanded = loader.evalExpr(td.run)
-                # Preserve multiline run text for inline execution
-                # For bash shell, inline script should be the last command line
-                if getattr(td, "shell", None) == "bash" and isinstance(_expanded, str) and "\n" in _expanded:
-                    st.run = _expanded.splitlines()[-1]
-                else:
-                    st.run = _expanded
+                st.run = _expanded
                 loader.popEvalScope()
                 st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:

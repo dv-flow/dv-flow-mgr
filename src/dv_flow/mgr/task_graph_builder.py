@@ -719,6 +719,7 @@ class TaskGraphBuilder(object):
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
+                self._log.debug("task.run: %s" % task.run)
                 callable = self._shell_m[shell](
                     task.run, 
                     os.path.dirname(task.srcinfo.file), 
