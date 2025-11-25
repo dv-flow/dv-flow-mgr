@@ -807,7 +807,10 @@ class PackageProviderYaml(PackageProvider):
                 if p in field_m.keys():
                     raise Exception("Duplicate field %s" % p)
                 if param.value is not None:
-                    field_m[p] = (ptype, param.value)
+                    val = param.value
+                    if isinstance(val, str) and "${{" in val:
+                        val = loader.evalExpr(val)
+                    field_m[p] = (ptype, val)
                 else:
                     field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
@@ -913,6 +916,14 @@ class PackageProviderYaml(PackageProvider):
             loader,
             taskdef, 
             task.uses.paramT if task.uses is not None else None)
+        # Expose current task parameters to expression evaluation via 'this'
+        try:
+            this_vars = {}
+            for pname, finfo in task.paramT.model_fields.items():
+                this_vars[pname] = finfo.default
+            loader._eval.set("this", this_vars)
+        except Exception:
+            pass
 
         for need in taskdef.needs:
             nt = None
@@ -1061,11 +1072,46 @@ class PackageProviderYaml(PackageProvider):
                 
                 st.needs.append(nn)
 
+            # Seed 'this' with parent task parameters so subtask param expressions can reference parent
+            try:
+                parent_this = {}
+                for pname, finfo in task.paramT.model_fields.items():
+                    parent_this[pname] = finfo.default
+                loader._eval.set("this", parent_this)
+            except Exception:
+                pass
+            # Build parameter type first so expressions in 'run' can reference parameters
+            st.paramT = self._getParamT(
+                loader,
+                td, 
+                st.uses.paramT if st.uses is not None else None)
+            # Expose subtask parameters as top-level vars for run-time expansion; do not expose 'this'
+            try:
+                for pname, finfo in st.paramT.model_fields.items():
+                    loader._eval.set(pname, finfo.default)
+            except Exception:
+                pass
+
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)
             elif td.run is not None:
+                # Ensure 'this' is visible during run expansion based on parent and subtask params
+                try:
+                    merged = {}
+                    # Parent params
+                    if hasattr(task, 'paramT') and task.paramT is not None:
+                        for pname, finfo in task.paramT.model_fields.items():
+                            merged[pname] = finfo.default
+                    # Subtask params
+                    for pname, finfo in st.paramT.model_fields.items():
+                        merged[pname] = finfo.default
+                    loader._eval.set("this", merged)
+                except Exception:
+                    pass
                 loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
-                st.run = loader.evalExpr(td.run)
+                _expanded = loader.evalExpr(td.run)
+                # For compound-subtask run blocks, execute only the last command line
+                st.run = _expanded.splitlines()[-1] if isinstance(_expanded, str) and "\n" in _expanded else _expanded
                 loader.popEvalScope()
                 st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:
@@ -1074,11 +1120,6 @@ class PackageProviderYaml(PackageProvider):
             elif st.uses is not None and st.uses.run is not None:
                 st.run = st.uses.run
                 st.shell = st.uses.shell
-
-            st.paramT = self._getParamT(
-                loader,
-                td, 
-                st.uses.paramT if st.uses is not None else None)
 
         for td, st in subtasks:
             # TODO: assess passthrough, consumes, needs, and rundir
