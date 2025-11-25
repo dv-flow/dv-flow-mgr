@@ -391,7 +391,7 @@ class TaskGraphBuilder(object):
         if type in self._type_m.keys():
             tt = self._type_m[type]
         elif self.loader is not None:
-            tt = self.loader.getType(type)
+            tt = self.loader.findType(type)
 
         if tt is None:
             # Fallback for std.Env (not defined as a Type yet)
