@@ -626,7 +626,7 @@ package:
         run: |
             echo "p1: ${{ this.p1 }}" > task.out
             echo "p2: ${{ p2 }}" >> task.out
-            echo "rundir: ${{ rundir }}" >> task.out
+            echo "rundir: ${{ p2 }} x${{ rundir }}x" >> task.out
         with:
           p2: 
             type: str
@@ -658,11 +658,17 @@ package:
 
     assert runner.status == 0
     assert os.path.isfile(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/task.out"))
+    with open(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/foo.entry.t1_cmd.sh"), "r") as fp:
+        line = fp.read().strip()
+        assert "${{ rundir }}" not in line
+
     with open(os.path.join(rundir, "rundir/foo.entry/foo.entry.t1/task.out"), "r") as fp:
         line = fp.read().strip()
+        print("line: %s" % line)
         assert "p1: " in line
         assert "p2: " in line
-        assert "rundir: " in line
+        assert "rundir: v1" in line
+        assert "${{ rundir }}" not in line
 
 @pytest.mark.skip
 def test_compound_need(tmpdir):
