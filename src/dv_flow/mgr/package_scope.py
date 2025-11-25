@@ -94,8 +94,22 @@ class PackageScope(SymbolScope):
     def resolve_variable(self, name):
         self._log.debug("--> %s::resolve_variable %s" % (self.pkg.name, name))
         ret = None
-        if name in self.pkg.paramT.model_fields.keys():
-            ret = self.pkg.paramT.model_fields[name].default
+        # Support qualified lookup: foo.DEBUG
+        if '.' in name:
+            pkg_name, pname = name.split('.', 1)
+            if pkg_name == self.pkg.name:
+                if pname in self.pkg.paramT.model_fields.keys():
+                    # Model fields hold defaults; actual values may be set on instance
+                    ret = self.pkg.paramT.model_fields[pname].default
+            else:
+                # Check subpackages for qualified reference
+                if pkg_name in self.pkg.pkg_m.keys():
+                    subpkg = self.pkg.pkg_m[pkg_name]
+                    if pname in subpkg.paramT.model_fields.keys():
+                        ret = subpkg.paramT.model_fields[pname].default
+        else:
+            if name in self.pkg.paramT.model_fields.keys():
+                ret = self.pkg.paramT.model_fields[name].default
         self._log.debug("<-- %s::resolve_variable %s -> %s" % (self.pkg.name, name, ret))
         return ret
 

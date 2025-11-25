@@ -77,7 +77,12 @@ class ExprEval(ExprVisitor):
         value = None
 
         if self.name_resolution:
-            value = self.name_resolution.resolve_variable(e.id[0])
+            # Try full qualified name first (e.g. foo.DEBUG)
+            fq_name = ".".join(e.id)
+            value = self.name_resolution.resolve_variable(fq_name)
+            if value is None:
+                # Fallback to first identifier (e.g. package or var)
+                value = self.name_resolution.resolve_variable(e.id[0])
 
         # Fall back to variables dict
         if value is None and e.id[0] in self.variables:
@@ -86,6 +91,8 @@ class ExprEval(ExprVisitor):
         if value is None:
             raise Exception("Variable '%s' not found" % e.id[0])
 
+        # If qualified lookup returned a terminal value, stop here
+        # Otherwise, traverse remaining identifiers
         for i in range(1, len(e.id)):
             if isinstance(value, dict):
                 if e.id[i] in value.keys():
@@ -95,6 +102,9 @@ class ExprEval(ExprVisitor):
             elif hasattr(value, e.id[i]):
                 value = getattr(value, e.id[i])
             else:
+                # If value is a primitive (bool/int/str), treat as terminal
+                if isinstance(value, (bool, int, float, str)):
+                    break
                 raise Exception("Sub-element '%s' not found in '%s' (%s)" % (e.id[i], ".".join(e.id), value))
         self.value = value
 

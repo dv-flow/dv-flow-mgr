@@ -60,9 +60,19 @@ class NameResolutionContext(VarResolver):
         # Check if this is a package-qualified reference
         ret = None
 
+        # Package-qualified parameter lookup (e.g. foo.DEBUG)
         if name in self.builder._pkg_params_m.keys():
-            # Check if this is a package-qualified reference
             ret = self.builder._pkg_params_m[name]
+        else:
+            # Support dotted lookup via package map
+            last_dot = name.rfind('.')
+            if last_dot != -1:
+                pkg_name = name[:last_dot]
+                param_name = name[last_dot+1:]
+                if pkg_name in self.builder._pkg_m.keys():
+                    pkg = self.builder._pkg_m[pkg_name]
+                    if hasattr(pkg.paramT, param_name):
+                        ret = getattr(pkg.paramT, param_name)
 
         # Check task scopes from innermost to outermost
         if ret is None:

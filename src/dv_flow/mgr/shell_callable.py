@@ -35,14 +35,14 @@ class ShellCallable(object):
 
         cmd = self.body
 
-        # if self.body.find("\n") != -1:
-        #     # This is an inline command. Create a script
-        #     # file so env vars are expanded
-        #     cmd = os.path.join(input.rundir, "%s_cmd.sh" % input.name)
-        #     with open(cmd, "w") as fp:
-        #         fp.write("#!/bin/%s\n" % (self.shell if self.shell != "shell" else "bash"))
-        #         fp.write(self.body)
-        #     os.chmod(cmd, 0o755)
+        if self.body.find("\n") != -1:
+            # This is an inline command. Create a script
+            # file so env vars are expanded
+            cmd = os.path.join(input.rundir, "%s_cmd.sh" % input.name)
+            with open(cmd, "w") as fp:
+                fp.write("#!/bin/%s\n" % (self.shell if self.shell != "shell" else "bash"))
+                fp.write(self.body)
+            os.chmod(cmd, 0o755)
 
         fp = open(os.path.join(input.rundir, "%s.log" % input.name), "w")
 

@@ -182,10 +182,24 @@ class PackageLoader(PackageLoaderP):
     def resolve_variable(self, name):
         self._log.debug("--> resolve_variable %s" % name)
         ret = None
-        if len(self._pkg_s):
-            ret = self._pkg_s[-1].resolve_variable(name)
-        else:
-            ret = self._loader_scope.resolve_variable(name)
+        # Try qualified package parameter first (e.g. foo.DEBUG)
+        last_dot = name.rfind('.')
+        if last_dot != -1:
+            pkg_name = name[:last_dot]
+            param_name = name[last_dot+1:]
+            pkg = self.findPackage(pkg_name)
+            if pkg is not None:
+                # Prefer attribute access; fall back to model_fields default
+                if hasattr(pkg.paramT, param_name):
+                    ret = getattr(pkg.paramT, param_name)
+                elif param_name in pkg.paramT.model_fields.keys():
+                    ret = pkg.paramT.model_fields[param_name].default
+        
+        if ret is None:
+            if len(self._pkg_s):
+                ret = self._pkg_s[-1].resolve_variable(name)
+            else:
+                ret = self._loader_scope.resolve_variable(name)
 
         self._log.debug("<-- resolve_variable %s -> %s" % (name, str(ret)))
         return ret

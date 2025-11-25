@@ -1110,8 +1110,12 @@ class PackageProviderYaml(PackageProvider):
                     pass
                 loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
                 _expanded = loader.evalExpr(td.run)
-                # For compound-subtask run blocks, execute only the last command line
-                st.run = _expanded.splitlines()[-1] if isinstance(_expanded, str) and "\n" in _expanded else _expanded
+                # Preserve multiline run text for inline execution
+                # For bash shell, inline script should be the last command line
+                if getattr(td, "shell", None) == "bash" and isinstance(_expanded, str) and "\n" in _expanded:
+                    st.run = _expanded.splitlines()[-1]
+                else:
+                    st.run = _expanded
                 loader.popEvalScope()
                 st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:

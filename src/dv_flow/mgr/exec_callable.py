@@ -79,10 +79,11 @@ class ExecCallable(object):
                         text_lines[i] = line[least_whitespace:]
 
             method = "async def pytask(ctxt, input):\n" + "\n".join(["    %s" % l for l in text_lines])
-
-            exec(method)
-
-            callable = locals()['pytask']
+            # Provide common imports used in inline tasks
+            _ns = {}
+            _globals = {"os": os}
+            exec(method, _globals, _ns)
+            callable = _ns['pytask']
 
         result = await callable(ctxt, input)
 
