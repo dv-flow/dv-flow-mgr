@@ -3,6 +3,7 @@ import dataclasses as dc
 from pydantic import BaseModel
 import pydantic.dataclasses as pdc
 import os
+import logging
 from typing import Dict, List, TYPE_CHECKING, Union
 from .task_data import TaskMarker, SeverityE, TaskMarkerLoc
 from .task_node_ctxt import TaskNodeCtxt
@@ -22,6 +23,7 @@ class TaskRunCtxt(object):
 
     _markers : List[TaskMarker] = dc.field(default_factory=list)
     _exec_info : List[ExecInfo] = dc.field(default_factory=list)
+    _log : logging.Logger = dc.field(default_factory=lambda: logging.getLogger("TaskRunCtxt"))
 
     @property
     def root_pkgdir(self):
@@ -78,6 +80,23 @@ class TaskRunCtxt(object):
 
         if env is None:
             env = self.env
+
+        # Log command and env differences
+        try:
+            base_env = self.env if self.ctxt is not None else os.environ
+            diff_items = []
+            for k, v in env.items():
+                bv = base_env.get(k)
+                if bv != v:
+                    diff_items.append(f"{k}={v}")
+            diff_str = ", ".join(diff_items)
+            # Log via logging system and include task name if available
+            # Task name comes from the active TaskNode; include it if available
+            task_name = getattr(getattr(self.runner, '_current_task', None), 'name', None)
+            prefix = f"[{task_name}] " if task_name else ""
+            self._log.info(prefix + f"exec: cmd={' '.join(cmd)}" + (f" env_diff: {diff_str}" if diff_items else ""))
+        except Exception:
+            pass
 
         fp = open(os.path.join(self.rundir, logfile), "w")
         proc = await asyncio.create_subprocess_exec(

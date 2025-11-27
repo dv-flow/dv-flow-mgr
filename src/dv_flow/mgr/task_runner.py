@@ -184,6 +184,8 @@ class TaskSetRunner(TaskRunner):
                     self._log.debug("start task %s" % t.name)
                     self._notify(t, "enter")
                     t.start = datetime.now()
+                    # Track current task for logging context
+                    setattr(self, '_current_task', t)
                     coro = asyncio.Task(t.do_run(
                         self,
                         rundir,

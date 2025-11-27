@@ -48,6 +48,10 @@ class CmdRun(object):
         if ui is None:
             # Auto-select based on whether output is a terminal
             ui = 'progress' if sys.stdout.isatty() else 'log'
+            # When logging is enabled at INFO or above, prefer plain-text log (no rich)
+            root_level = logging.getLogger().level
+            if root_level <= logging.INFO:
+                ui = 'log'
 
         # If user explicitly requested 'progress' but stdout isn't a TTY, fallback
         explicit = getattr(args, 'ui', None) is not None
