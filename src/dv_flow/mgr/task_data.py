@@ -23,9 +23,11 @@ import enum
 import logging
 import pydantic.dataclasses as dc
 from pydantic import BaseModel
-from typing import Any, ClassVar, Dict, Set, List, Tuple, Type
+from typing import Any, ClassVar, Dict, Generic, Set, List, Tuple, Type, TypeVar
 from .fileset import FileSet
 from toposort import toposort
+
+T = TypeVar('T')
 
 class SeverityE(enum.Enum):
     Info = "info"
@@ -48,7 +50,7 @@ class TaskMarker(BaseModel):
     severity : SeverityE
     loc : TaskMarkerLoc = dc.Field(default=None)
 
-class TaskDataInput[T](BaseModel):
+class TaskDataInput(BaseModel, Generic[T]):
     """
     Input data to a task:
 

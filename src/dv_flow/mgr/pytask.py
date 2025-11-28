@@ -1,6 +1,7 @@
 import abc
 import dataclasses as dc
-from typing import Optional, Type, Self, Union
+from typing import Optional, Type, Union
+from typing_extensions import Self
 from dv_flow.mgr.task_data import TaskDataInput
 from dv_flow.mgr.task_run_ctxt import TaskRunCtxt
 
