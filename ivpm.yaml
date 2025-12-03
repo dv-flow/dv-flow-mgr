@@ -21,8 +21,9 @@ package:
       src: pypi
     - name: tomli
       src: pypi
-    - name: Sphinx
+    - name: sphinx
       src: pypi
+      version: 8.2.3
     - name: sphinx-argparse
       src: pypi
     - name: sphinx-jsonschema
