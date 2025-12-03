@@ -397,7 +397,12 @@ class TaskGraphBuilder(object):
             # Fallback for std.Env (not defined as a Type yet)
             if type == "std.Env":
                 import pydantic
-                field_m = {"type": (str, "std.Env"), "vals": (dict, {})}
+                field_m = {
+                    "type": (str, "std.Env"),
+                    "vals": (dict, {}),
+                    "append_path": (dict, {}),
+                    "prepend_path": (dict, {}),
+                }
                 model_t = pydantic.create_model("std_Env", __base__=TaskDataItem, **field_m)
                 ret = model_t()
                 for k, v in kwargs.items():

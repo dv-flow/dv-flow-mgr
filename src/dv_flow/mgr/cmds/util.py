@@ -8,4 +8,7 @@ def get_rootdir(args):
         rootdir = os.environ["DV_FLOW_ROOT"]
     else:
         rootdir = os.getcwd()
+
+    rootdir = os.path.abspath(rootdir)
+
     return rootdir

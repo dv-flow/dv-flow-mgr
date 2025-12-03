@@ -51,39 +51,47 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
 
     _log.debug("--> loadProjPkgDef %s" % path)
 
-    dir = path
     ret = None
-    loader = None
-    found = False
-    while dir != "/" and dir != "" and os.path.isdir(dir):
-        for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
-            fpath = os.path.join(dir, name)
-            _log.debug("Trying path %s (%s)" % (
-                fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
-            if os.path.exists(fpath):
-                try:
-                    listeners = [listener] if listener is not None else []
-                    loader = PackageLoader(
-                        marker_listeners=listeners,
-                        param_overrides=(parameter_overrides or {}))
-                    ret = loader.load(fpath, config=config)
-                    found = True
-                    break
-                except Exception:
-                    print("Fatal Error: while parsing %s" % fpath)
-                    raise
-        if found:
-            break
-        dir = os.path.dirname(dir)
-    
-    if not found:
-        _log.debug("Failed to find flow.dv/flow.yaml/flow.tom")
-        if listener:
-            listener(TaskMarker(
-                msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
-                severity=SeverityE.Error))
+    if os.path.isfile(path):
+        dir = os.path.dirname(path)
+        rootfile = path
     else:
-        _log.debug("Found and loaded ")
+        dir = path
+        rootfile = None
+
+        while dir != "/" and dir != "" and os.path.isdir(dir):
+            for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
+                fpath = os.path.join(dir, name)
+                _log.debug("Trying path %s (%s)" % (
+                    fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
+                if os.path.exists(fpath):
+                    rootfile = fpath
+                    break
+            if rootfile is not None:
+                break
+            else:
+                dir = os.path.dirname(dir)
+
+        if rootfile is None:
+            _log.debug("Failed to find flow.dv/flow.yaml/flow.toml")
+            if listener:
+                listener(TaskMarker(
+                    msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
+                    severity=SeverityE.Error))
+    loader = None
+    ret = None
+
+    if rootfile is not None:
+        _log.debug("Loading rootfile: %s" % rootfile)
+        try:
+            listeners = [listener] if listener is not None else []
+            loader = PackageLoader(
+                marker_listeners=listeners,
+                param_overrides=(parameter_overrides or {}))
+            ret = loader.load(rootfile, config=config)
+        except Exception:
+            print("Fatal Error: while parsing %s" % rootfile)
+            raise
 
     _log.debug("<-- loadProjPkgDef %s" % path)
     

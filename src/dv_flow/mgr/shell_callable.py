@@ -4,6 +4,7 @@ import logging
 import os
 from typing import ClassVar, List
 from .task_data import TaskDataResult
+from .exec_callable import _merge_env_filesets
 
 @dc.dataclass
 class ShellCallable(object):
@@ -15,20 +16,8 @@ class ShellCallable(object):
     async def __call__(self, ctxt, input):
 
         shell = ("/bin/%s" % self.shell) if self.shell != "shell" else "bash"
-        # Setup environment for the call
-        env = ctxt.env.copy()
-        # Merge std.Env data items from inputs
-        # Collect all std.Env vals in dependency order, oldest first
-        env_items = []
-        for item in getattr(input, "inputs", []):
-            if getattr(item, "type", None) == "std.Env" and hasattr(item, "vals") and isinstance(item.vals, dict):
-                env_items.append(item.vals)
-        # Merge all keys from all std.Env, oldest first, newest override
-        merged_env = {}
-        for vals in env_items:
-            for k, v in vals.items():
-                merged_env[k] = v
-        env.update(merged_env)
+        # Setup environment for the call, merging any std.Env items
+        env = _merge_env_filesets(ctxt, input)
         env["TASK_SRCDIR"] = input.srcdir
         env["TASK_RUNDIR"] = input.rundir
 #        env["TASK_PARAMS"] = input.params.dumpto_json()

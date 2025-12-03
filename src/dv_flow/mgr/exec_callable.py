@@ -7,6 +7,46 @@ import sys
 from typing import ClassVar, List
 from .task_data import TaskDataResult
 
+def _merge_env_filesets(ctxt, input):
+    """Collect std.Env items from inputs and merge them into the context environment.
+
+    Supports both simple value setting (vals) and path-style append/prepend
+    via the append_path / prepend_path fields on std.Env.
+    """
+    env = ctxt.env.copy()
+
+    # Collect all std.Env items in dependency order, oldest first
+    env_items = []
+    for item in getattr(input, "inputs", []):
+        if getattr(item, "type", None) == "std.Env":
+            env_items.append(item)
+
+    for item in env_items:
+        # Direct set of environment variables
+        vals = getattr(item, "vals", None)
+        if isinstance(vals, dict):
+            for k, v in vals.items():
+                env[k] = v
+
+        # Path-style appends/prepends
+        append_path = getattr(item, "append_path", None)
+        if isinstance(append_path, dict):
+            for k, v in append_path.items():
+                if v is None or v == "":
+                    continue
+                cur = env.get(k, "")
+                env[k] = f"{cur}{os.pathsep}{v}" if cur else str(v)
+
+        prepend_path = getattr(item, "prepend_path", None)
+        if isinstance(prepend_path, dict):
+            for k, v in prepend_path.items():
+                if v is None or v == "":
+                    continue
+                cur = env.get(k, "")
+                env[k] = f"{v}{os.pathsep}{cur}" if cur else str(v)
+
+    return env
+
 @dc.dataclass
 class ExecCallable(object):
     body : str
@@ -17,6 +57,10 @@ class ExecCallable(object):
     async def __call__(self, ctxt, input):
         self._log.debug("--> ExecCallable")
         self._log.debug("Body:\n%s" % self.body)
+
+        # Merge std.Env filesets into context environment for exec
+        env = _merge_env_filesets(ctxt, input)
+        ctxt.env.update(env)
 
         # If it is a single line, then we have a spec to load
         # Otherwise, we have an inline task

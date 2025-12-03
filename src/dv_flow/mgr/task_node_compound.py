@@ -72,6 +72,9 @@ class TaskNodeCompound(TaskNode):
             status |= n[0].result.status
             changed |= n[0].output.changed
             for o in n[0].output.output:
+                # Always filter out std.Env items - they are consumed by each task
+                if getattr(o, "type", None) == "std.Env":
+                    continue
                 o_id = (o.src, o.seq)
                 if not o_id in add_s:
                     if self.consumes is not None or self.consumes == ConsumesE.All:

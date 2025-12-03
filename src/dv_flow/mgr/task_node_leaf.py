@@ -98,17 +98,22 @@ class TaskNodeLeaf(TaskNode):
 
 
         # Default inputs is the list of parameter sets that match 'consumes'
+        # std.Env items are always consumed regardless of consumes setting
         inputs = []
         if isinstance(self.consumes, list) and len(self.consumes):
             self._log.debug("consumes(list): %s" % str(self.consumes))
             for in_p in in_params:
-                if self._matches(in_p, self.consumes):
+                if self._matches(in_p, self.consumes) or getattr(in_p, "type", None) == "std.Env":
                     inputs.append(in_p)
         elif self.consumes == ConsumesE.All:
             inputs = in_params.copy()
             self._log.debug("consumes(all): %s" % str(self.consumes))
         else:
             self._log.debug("consumes(unknown): %s" % str(self.consumes))
+            # Even when consumes is empty/unknown, still consume std.Env items
+            for in_p in in_params:
+                if getattr(in_p, "type", None) == "std.Env":
+                    inputs.append(in_p)
 
         input = TaskDataInput(
             name=self.name,
@@ -160,7 +165,10 @@ class TaskNodeLeaf(TaskNode):
             self._log.debug("Propagating all input parameters to output")
             for need,block in self.needs:
                 if not block:
-                    output.extend(need.output.output)
+                    # Always filter out std.Env items - they are consumed by each task
+                    for out in need.output.output:
+                        if getattr(out, "type", None) != "std.Env":
+                            output.append(out)
         elif self.passthrough == PassthroughE.Unused:
             self._log.debug("passthrough: %s" % self.name)
 
@@ -168,7 +176,10 @@ class TaskNodeLeaf(TaskNode):
                 self._log.debug("Propagating all input parameters to output")
                 for need,block in self.needs:
                     if not block:
-                        output.extend(need.output.output)
+                        # Always filter out std.Env items - they are consumed by each task
+                        for out in need.output.output:
+                            if getattr(out, "type", None) != "std.Env":
+                                output.append(out)
             elif self.consumes == ConsumesE.All:
                 self._log.debug("All inputs are consumed, so not propagating any")
             elif isinstance(self.consumes, list):
@@ -178,7 +189,11 @@ class TaskNodeLeaf(TaskNode):
                 for need,block in self.needs:
                     if not block:
                         for out in need.output.output:
-                            if not self._matches(out, self.consumes):
+                            # Always filter out std.Env items - they are consumed by each task
+                            if getattr(out, "type", None) == "std.Env":
+                                self._log.debug("Skipping std.Env type from %s" % (
+                                    getattr(out, "src", "<unknown>")))
+                            elif not self._matches(out, self.consumes):
                                 self._log.debug("Propagating type %s from %s" % (
                                     getattr(out, "type", "<unknown>"),
                                     getattr(out, "src", "<unknown>")))

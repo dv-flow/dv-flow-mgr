@@ -92,6 +92,10 @@ package:
     with:
       setenv:
         type: map
+      append_path:
+        type: map
+      prepend_path:
+        type: map
 
   - name: SetFileType
     consumes:
@@ -170,6 +174,24 @@ package:
       Environment variables
     with:
       vals:
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
+      append_path:
+        doc: |
+          Path elements to append to existing environment variables
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
+      prepend_path:
+        doc: |
+          Path elements to prepend to existing environment variables
         type:
           map:
             key:

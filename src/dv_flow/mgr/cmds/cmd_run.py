@@ -127,7 +127,7 @@ class CmdRun(object):
         # Maybe separate into a task-graph builder and a task-graph runner
 
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
-        rundir = os.path.join(pkg.basedir, "rundir")
+        rundir = os.path.join(os.getcwd(), "rundir")
 
 
         if args.clean:
