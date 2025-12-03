@@ -110,6 +110,12 @@ async def FileSet(runner, input) -> TaskDataResult:
             else:
                 defines = input.params.defines.split()
                 fs.defines.extend(defines)
+        if hasattr(input.params, 'attributes') and input.params.attributes is not None:
+            if isinstance(input.params.attributes, list):
+                fs.attributes.extend(input.params.attributes)
+            else:
+                attributes = input.params.attributes.split()
+                fs.attributes.extend(attributes)
 
     # Check to see if the filelist or fileset have changed
     # Only bother doing this if the upstream task data has not changed

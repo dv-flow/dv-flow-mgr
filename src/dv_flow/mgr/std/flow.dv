@@ -56,6 +56,8 @@ package:
         type: list
       defines:
         type: list
+      attributes:
+        type: list
       include:
         doc: |
           Specifies a list of files or a glob pattern for the files to include
@@ -165,6 +167,10 @@ package:
           list:
             item: str
       defines:
+        type:
+          list:
+            item: str
+      attributes:
         type:
           list:
             item: str

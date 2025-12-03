@@ -34,3 +34,4 @@ class FileSet(BaseModel):
     incdirs: List[str] = dc.Field(default_factory=list)
     defines: List[str] = dc.Field(default_factory=list)
     params : Dict[str,str] = dc.Field(default_factory=dict)
+    attributes : List[str] = dc.Field(default_factory=list)

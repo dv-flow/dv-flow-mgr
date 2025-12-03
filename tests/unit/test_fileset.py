@@ -215,3 +215,145 @@ package:
         output = asyncio.run(runner.run(task))
     assert runner.status != 0
     assert any("Multiple directories match glob pattern" in r.message for r in caplog.records)
+
+def test_fileset_attributes_list(tmpdir):
+    """Test FileSet with attributes as a list"""
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    with open(os.path.join(rundir, "file1.sv"), "w") as fp:
+        fp.write("// test file\n")
+    
+    flow_dv = '''
+package:
+  name: attr_pkg
+  tasks:
+  - name: with_attrs
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include: "*.sv"
+      attributes:
+        - "key1=value1"
+        - "key2=value2"
+        - "standalone_attr"
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("attr_pkg.with_attrs")
+    output = asyncio.run(runner.run(task))
+    
+    assert runner.status == 0
+    assert len(output.output) == 1
+    fs = output.output[0]
+    assert len(fs.attributes) == 3
+    assert "key1=value1" in fs.attributes
+    assert "key2=value2" in fs.attributes
+    assert "standalone_attr" in fs.attributes
+
+def test_fileset_attributes_string(tmpdir):
+    """Test FileSet with attributes as a space-separated string"""
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    with open(os.path.join(rundir, "file2.sv"), "w") as fp:
+        fp.write("// test file\n")
+    
+    flow_dv = '''
+package:
+  name: attr_str_pkg
+  tasks:
+  - name: with_attrs_str
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include: "*.sv"
+      attributes: "attr1=val1 attr2=val2 attr3"
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("attr_str_pkg.with_attrs_str")
+    output = asyncio.run(runner.run(task))
+    
+    assert runner.status == 0
+    assert len(output.output) == 1
+    fs = output.output[0]
+    assert len(fs.attributes) == 3
+    assert "attr1=val1" in fs.attributes
+    assert "attr2=val2" in fs.attributes
+    assert "attr3" in fs.attributes
+
+def test_fileset_no_attributes(tmpdir):
+    """Test FileSet without attributes (backward compatibility)"""
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    with open(os.path.join(rundir, "file3.sv"), "w") as fp:
+        fp.write("// test file\n")
+    
+    flow_dv = '''
+package:
+  name: no_attr_pkg
+  tasks:
+  - name: no_attrs
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include: "*.sv"
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("no_attr_pkg.no_attrs")
+    output = asyncio.run(runner.run(task))
+    
+    assert runner.status == 0
+    assert len(output.output) == 1
+    fs = output.output[0]
+    assert len(fs.attributes) == 0
+
+def test_fileset_attributes_key_value_pairs(tmpdir):
+    """Test FileSet with various key=value attribute formats"""
+    rundir = os.path.join(tmpdir, "rundir")
+    os.makedirs(rundir)
+    with open(os.path.join(rundir, "file4.sv"), "w") as fp:
+        fp.write("// test file\n")
+    
+    flow_dv = '''
+package:
+  name: kv_pkg
+  tasks:
+  - name: key_value_attrs
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include: "*.sv"
+      attributes:
+        - "sim_only=true"
+        - "optimization=O3"
+        - "language_version=2017"
+'''
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+    
+    pkg_def = PackageLoader().load(os.path.join(rundir, "flow.dv"))
+    builder = TaskGraphBuilder(pkg_def, rundir)
+    runner = TaskSetRunner(rundir=rundir)
+    task = builder.mkTaskNode("kv_pkg.key_value_attrs")
+    output = asyncio.run(runner.run(task))
+    
+    assert runner.status == 0
+    assert len(output.output) == 1
+    fs = output.output[0]
+    assert len(fs.attributes) == 3
+    assert "sim_only=true" in fs.attributes
+    assert "optimization=O3" in fs.attributes
+    assert "language_version=2017" in fs.attributes
