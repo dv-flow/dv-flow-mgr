@@ -27,7 +27,7 @@ jobs:
       - name: Run tests with CTRF
         run: |
           export PYTHONPATH=$(pwd)/src
-          ./packages/python/bin/pytest tests --ctrf --ctrf-report-name test-results.json
+          ./packages/python/bin/pytest tests --ctrf test-results.json
         continue-on-error: true
 
       - name: Publish Test Results
