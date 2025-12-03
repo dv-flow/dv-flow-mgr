@@ -5,11 +5,44 @@ on:
   - workflow_dispatch
 
 jobs:
-  ci:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch dependencies
+        shell: bash
+        run: |
+          python3 -m venv py
+          ./py/bin/pip install --upgrade --pre ivpm
+          ./py/bin/ivpm update -a -d default-dev 
+          ./packages/python/bin/pip install -U typing_extensions build pytest-json-ctrf
+
+      - name: Build package
+        run: |
+          export PYTHONPATH=$(pwd)/src
+          ./packages/python/bin/python -m build -n .
+
+      - name: Run tests with CTRF
+        run: |
+          export PYTHONPATH=$(pwd)/src
+          ./packages/python/bin/pytest tests --ctrf test-results.json
+        continue-on-error: true
+
+      - name: Publish Test Results
+        if: always()
+        uses: ctrf-io/github-test-reporter@v1
+        with:
+          report-path: 'test-results.json'
+
+  build:
+    needs: test
     uses: dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main
     with:
         version_dir: "src/dv_flow/mgr"
         tests_dir: "tests"
+        run_tests: false
         build_docs: true
         pythonpath: "$(pwd)/src"
     secrets:
