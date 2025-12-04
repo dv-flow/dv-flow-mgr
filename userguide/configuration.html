@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Parameters and Configuration &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Standard Library" href="stdlib.html" />
+    <link rel="prev" title="Developing Tasks" href="tasks_developing.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="parameters-and-configuration">
+<h1>Parameters and Configuration<a class="headerlink" href="#parameters-and-configuration" title="Link to this heading">¶</a></h1>
+<p>DV Flow specifications provide several mechanisms for statically
+configuring the elements of a flow. The two key mechanisms are
+<em>parameters</em> and <em>overrides</em>.</p>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h2>
+<p>Static parameters appear in multiple places within a DV Flow specification.
+Parameters can be declared at the package and task level.</p>
+<section id="parameter-resolution-order">
+<h3>Parameter-Resolution Order<a class="headerlink" href="#parameter-resolution-order" title="Link to this heading">¶</a></h3>
+<p>The value of parameters are resolved during loading and elaboration of
+a DV Flow specification in the following order.</p>
+<ul class="simple">
+<li><p>Package-level parameters</p></li>
+<li><p>Overrides</p></li>
+<li><p>Task-level parameters</p></li>
+</ul>
+</section>
+<section id="declaring-parameters">
+<h3>Declaring Parameters<a class="headerlink" href="#declaring-parameters" title="Link to this heading">¶</a></h3>
+<p>Parameters can be declared at both the package and task level. The syntax
+for declaring and setting the value of a parameter differs in that a
+parameter declaration specifies the <cite>type</cite> of the parameter.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">level</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Package&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PrintMessages</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">upper</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Compound</span><span class="nv"> </span><span class="s">Task&quot;</span>
+<span class="w">    </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">t1</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">&quot;Hello from ${{ upper }}&quot;</span>
+<span class="w">          </span><span class="no">We&#39;re in ${{ level }} scope</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">t2</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PrintMessages</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;t2&quot;</span>
+</pre></div>
+</div>
+<p>In the example above, we declare package- and task-level parameters.
+Tasks can refer to parameters declared in the scope of their
+containing package or use a fully-qualified reference to another package.
+Inner tasks can refer to parameters declared by their containing task,
+and call also refer to package-level parameters.</p>
+<p>The following parameter types are supported:</p>
+<ul class="simple">
+<li><p><strong>bool</strong></p></li>
+<li><p><strong>int</strong></p></li>
+<li><p><strong>list</strong></p></li>
+<li><p><strong>map</strong></p></li>
+<li><p><strong>str</strong></p></li>
+</ul>
+</section>
+</section>
+<section id="overrides">
+<h2>Overrides<a class="headerlink" href="#overrides" title="Link to this heading">¶</a></h2>
+<p>Overrides provide the ability to manipulate the value of parameters and
+the target of package references. For the most part, overrides control
+features that are outside the declaration scope of the override.</p>
+<section id="package-overrides">
+<h3>Package Overrides<a class="headerlink" href="#package-overrides" title="Link to this heading">¶</a></h3>
+<p>The DV Flow <cite>hdlsim</cite> library provides tasks for building HDL simulation
+images using a variety of toolchains. The key operations supported by
+these tools are sufficiently common that a core set of tasks is defined
+to be implemented by each toolchain.</p>
+<p>Overrides provide a mechanism by which the user can dynamically select
+the appropriate toolchain to use without modifying the flow specification.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">sim</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vlt</span>
+
+<span class="w">  </span><span class="nt">overrides</span><span class="p">:</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim</span>
+<span class="w">     </span><span class="nt">use</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.${{ sim }}</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.SimImage</span>
+<span class="w">    </span><span class="c1"># ...</span>
+</pre></div>
+</div>
+<p>The override directive changes how the package name <cite>hdlsim</cite> is
+resolved. Within the scope of package <cite>proj</cite>, any reference
+to package <cite>hdlsim</cite> will, instead, resolve to the package <cite>hdlsim.vlt</cite>.</p>
+</section>
+<section id="parameter-overrides">
+<h3>Parameter Overrides<a class="headerlink" href="#parameter-overrides" title="Link to this heading">¶</a></h3>
+<p>Each task within a DV Flow specification has a unique name that is
+statically known. This allows the value of individual parameters
+to be overridden. Obviously, extreme care should be taken when
+doing this, since it is a poor encapsulation practice. That said,
+this capability can be very useful when very precise control must
+be exercised over a flow specification without physically modifying it.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
+
+<span class="w">  </span><span class="nt">overrides</span><span class="p">:</span>
+<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.debug_level</span>
+<span class="w">     </span><span class="nt">use</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.SimImage</span>
+<span class="w">    </span><span class="c1"># ...</span>
+</pre></div>
+</div>
+<p>In the example above, the <cite>hdlsim</cite> package exposes a parameter named
+<cite>debug_level</cite> that controls the default debug level that tasks within
+the package will instruct the HDL simulator tools to use. For example,
+setting debug_level to <cite>1</cite> causes the simulator to save waveforms.</p>
+<p>The overrides directive changes the value of the <cite>debug_level</cite> parameter
+for all tasks under the scope of the root package <cite>proj</cite>.</p>
+<p>As described in the <cite>Resolution Order</cite> section, we could also override
+this parameter value using an environment variable or command-line argument.</p>
+</section>
+</section>
+<section id="resolution-order">
+<h2>Resolution Order<a class="headerlink" href="#resolution-order" title="Link to this heading">¶</a></h2>
+<p>DV Flow specifies the resolution order for parameters and overrides
+such that “outer” specifications take precedence over “inner” specifications.</p>
+<p>The precedence order is as follows (highest to lowest):</p>
+<ul class="simple">
+<li><p>External controls, such as command-line options</p></li>
+<li><p>Specifications in the root package</p></li>
+<li><p>Specifications within non-root packages
+* Later specifications take precedence over earlier ones in the case of conflict.</p></li>
+<li><p>Specifications within an outer task</p></li>
+<li><p>Specifications within an inner task</p></li>
+<li><p>Specifications within an base task</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="fundamentals.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="tasks_developing.html" title="previous chapter">Developing Tasks</a></li>
+      <li>Next: <a href="stdlib.html" title="next chapter">Standard Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/userguide/configuration.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

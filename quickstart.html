@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Command reference" href="cmdref.html" />
+    <link rel="next" title="User Guide" href="userguide/index.html" />
     <link rel="prev" title="DV Flow Manager" href="index.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -41,8 +41,14 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dv-flow-mgr
 </pre></div>
 </div>
-<p>Once installed, DV Flow Mananager can be invoked using the <cite>dvfm</cite> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dvfm<span class="w"> </span>--help
+<p>Once installed, DV Flow Mananager can be invoked using the <cite>dfm</cite> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dfm<span class="w"> </span>--help
+</pre></div>
+</div>
+<p>It’s common to install other plugin-ins to support various tools. The example
+below builds and runs a Verilog module. The <cite>dv-flow-libhdlsim</cite> package
+provides the required tasks:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dv-flow-libhdlsim
 </pre></div>
 </div>
 </section>
@@ -69,10 +75,6 @@ simulate this module.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
 
-<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
-<span class="w">        </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
-
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
 <span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
@@ -81,23 +83,23 @@ simulate this module.</p>
 <span class="w">          </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-image</span>
-<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimImage</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
 <span class="w">        </span><span class="nt">with</span><span class="p">:</span>
 <span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">top</span><span class="p p-Indicator">]</span>
 <span class="w">        </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-run</span>
-<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.SimRun</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimRun</span>
 <span class="w">        </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim-image</span><span class="p p-Indicator">]</span>
 </pre></div>
 </div>
-<p>If we run the <cite>dvfm run</cite> command, DV Flow Manager will:</p>
+<p>If we run the <cite>dfm run</cite> command, DV Flow Manager will:</p>
 <ul class="simple">
 <li><p>Find all files with a <cite>.sv</cite> extension in the current directory</p></li>
 <li><p>Compile them into a simulation image</p></li>
 <li><p>Run the simulation image</p></li>
 </ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dvfm<span class="w"> </span>run<span class="w"> </span>sim-run
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>dfm<span class="w"> </span>run<span class="w"> </span>sim-run
 </pre></div>
 </div>
 <p>This will compile the source, build a simulation image for module <cite>top</cite>,
@@ -107,29 +109,15 @@ and run the resulting image. Not too bad for 20-odd lines of build specification
 <p>Let’s break this down just a bit:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
-
-<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
-<span class="w">        </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
 </pre></div>
 </div>
 <p>DV Flow Manager views the world as a series of <em>packages</em> that reference each
 other and contain <em>tasks</em> to operate on sources within the <em>packages</em>.</p>
-<p>Here, we have declared a new package (my_design) and specified that it
-references a built-in package named <cite>hdl.sim.vlt</cite>. This is a package that
-implements tasks for performing HDL simulation with the Verilator simulator.</p>
-<p>Note that we specify an alias (hdl.sim) for the package when importing it.
-This will allow us to easily swap in a different simulator without changing
-anything else within our package definition.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
 
-<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vlt</span>
-<span class="w">        </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim</span>
-
-<span class="hll"><span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
-</span><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
 <span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
 <span class="w">        </span><span class="nt">with</span><span class="p">:</span>
 <span class="hll"><span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;systemVerilogSource&quot;</span>
@@ -138,7 +126,35 @@ anything else within our package definition.</p>
 </div>
 <p>Our first task is to specify the sources we want to process. This is done
 by specifying a <cite>FileSet</cite> task. The parameters of this task specify where
-the task should look for sources and which sources it should include</p>
+the task should look for sources and which sources it should include.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="hll"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-image</span>
+</span><span class="hll"><span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+</span><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">top</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>The second task creates a simulation image using the Verilator simulator.
+The <cite>type</cite> field references the <cite>hdlsim.vlt.SimImage</cite> task from the
+<cite>dv-flow-libhdlsim</cite> package. The <cite>with</cite> section specifies that <cite>top</cite> is the
+top-level module. The <cite>needs</cite> field declares that this task depends on the
+<cite>rtl</cite> task, ensuring the source files are collected before compilation.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="hll"><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim-run</span>
+</span><span class="hll"><span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimRun</span>
+</span><span class="w">        </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sim-image</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>The third task runs the simulation. It uses the <cite>hdlsim.vlt.SimRun</cite> task type
+and depends on the <cite>sim-image</cite> task. When executed, this task will run the
+compiled simulation image and produce the “Hello, World!” output.</p>
 </section>
 </section>
 </section>
@@ -176,6 +192,8 @@ the task should look for sources and which sources it should include</p>
 <li class="toctree-l2"><a class="reference internal" href="#your-first-flow">Your First Flow</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
@@ -186,7 +204,7 @@ the task should look for sources and which sources it should include</p>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="index.html" title="previous chapter">DV Flow Manager</a></li>
-      <li>Next: <a href="cmdref.html" title="next chapter">Command reference</a></li>
+      <li>Next: <a href="userguide/index.html" title="next chapter">User Guide</a></li>
   </ul></li>
 </ul>
 </div>
