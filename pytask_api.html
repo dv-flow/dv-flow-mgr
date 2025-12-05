@@ -244,6 +244,95 @@ the body of the compound task:</p>
 specified on the containing compound task.</p>
 </section>
 </section>
+<section id="custom-up-to-date-check-api">
+<h2>Custom Up-to-Date Check API<a class="headerlink" href="#custom-up-to-date-check-api" title="Link to this heading">¶</a></h2>
+<p>Tasks can define custom up-to-date check methods to determine whether
+a task needs to be re-executed. This is useful for tasks that reference
+files not explicitly listed in a fileset.</p>
+<section id="implementing-a-custom-check">
+<h3>Implementing a Custom Check<a class="headerlink" href="#implementing-a-custom-check" title="Link to this heading">¶</a></h3>
+<p>A custom up-to-date method is an async Python function with the following
+signature:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">check_uptodate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Check if task is up-to-date.</span>
+
+<span class="sd">    Returns True if the task is up-to-date and should be skipped,</span>
+<span class="sd">    False if the task needs to run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+<p>The method is specified in the task definition YAML:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_task</span>
+<span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mymodule.check_uptodate</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mymodule.run_task</span>
+</pre></div>
+</div>
+</section>
+<section id="uptodatectxt">
+<h3>UpToDateCtxt<a class="headerlink" href="#uptodatectxt" title="Link to this heading">¶</a></h3>
+<p>The context object passed to custom up-to-date methods provides access
+to the task’s run directory, parameters, inputs, and previous execution data.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.uptodate_ctxt.UpToDateCtxt">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.uptodate_ctxt.</span></span><span class="sig-name descname"><span class="pre">UpToDateCtxt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rundir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exec_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.uptodate_ctxt.UpToDateCtxt" title="Link to this definition">¶</a></dt>
+<dd><p>Context passed to custom up-to-date check methods</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.uptodate_ctxt.UpToDateCtxt.exec">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">exec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cwd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#dv_flow.mgr.uptodate_ctxt.UpToDateCtxt.exec" title="Link to this definition">¶</a></dt>
+<dd><p>Run a subprocess for dependency checking.
+Returns the exit status code.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="example-checking-file-timestamps">
+<h3>Example: Checking File Timestamps<a class="headerlink" href="#example-checking-file-timestamps" title="Link to this heading">¶</a></h3>
+<p>Here’s an example of a custom up-to-date check that verifies whether
+an external dependency file has been modified:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">dv_flow.mgr.uptodate_ctxt</span> <span class="kn">import</span> <span class="n">UpToDateCtxt</span>
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">check_external_deps</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if external dependency files are unchanged.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Get the recorded timestamp from previous execution</span>
+    <span class="n">prev_mtime</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">exec_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;dep_mtime&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">prev_mtime</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># No previous data, must run</span>
+
+    <span class="c1"># Check current timestamp</span>
+    <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;..&quot;</span><span class="p">,</span> <span class="s2">&quot;external_deps.txt&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># Dependency missing, must run</span>
+
+    <span class="n">current_mtime</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">dep_file</span><span class="p">)</span>
+
+    <span class="c1"># Up-to-date if timestamp hasn&#39;t changed</span>
+    <span class="k">return</span> <span class="n">current_mtime</span> <span class="o">==</span> <span class="n">prev_mtime</span>
+</pre></div>
+</div>
+</section>
+<section id="example-running-a-subprocess-check">
+<h3>Example: Running a Subprocess Check<a class="headerlink" href="#example-running-a-subprocess-check" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">UpToDateCtxt.exec()</span></code> method allows running subprocesses for
+dependency checking:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr.uptodate_ctxt</span> <span class="kn">import</span> <span class="n">UpToDateCtxt</span>
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">check_git_status</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if git working tree is clean.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Returns 0 if no changes, non-zero otherwise</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">exec</span><span class="p">([</span><span class="s2">&quot;git&quot;</span><span class="p">,</span> <span class="s2">&quot;diff&quot;</span><span class="p">,</span> <span class="s2">&quot;--quiet&quot;</span><span class="p">,</span> <span class="s2">&quot;HEAD&quot;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">status</span> <span class="o">==</span> <span class="mi">0</span>  <span class="c1"># Up-to-date if no changes</span>
+</pre></div>
+</div>
+</section>
+</section>
 </section>
 
 
@@ -275,12 +364,12 @@ specified on the containing compound task.</p>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#leaf-task-implementation-api">Leaf-Task Implementation API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#task-graph-generation-api">Task-Graph Generation API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-up-to-date-check-api">Custom Up-to-Date Check API</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>

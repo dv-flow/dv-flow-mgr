@@ -13,19 +13,11 @@ DV Flow Manager is most-easily installed from the PyPi repository:
     % pip install dv-flow-mgr
 
 
-Once installed, DV Flow Mananager can be invoked using the `dfm` command:
+Once installed, DV Flow Mananager can be invoked using the `dvfm` command:
 
 .. code-block:: bash
 
-    % dfm --help
-
-It's common to install other plugin-ins to support various tools. The example
-below builds and runs a Verilog module. The `dv-flow-libhdlsim` package 
-provides the required tasks:
-
-.. code-block:: bash
-
-    % pip install dv-flow-libhdlsim
+    % dvfm --help
 
 
 ===============
@@ -61,6 +53,10 @@ simulate this module.
     package:
         name: my_design
 
+        imports:
+          - name: hdl.sim.vlt
+            as: hdl.sim
+
         tasks:
           - name: rtl
             type: std.FileSet
@@ -69,17 +65,17 @@ simulate this module.
               include: "*.sv"
 
           - name: sim-image
-            type: hdlsim.vlt.SimImage
+            type: hdl.sim.SimImage
             with:
               - top: [top]
             needs: [rtl]
 
           - name: sim-run
-            type: hdlsim.vlt.SimRun
+            type: hdl.sim.SimRun
             needs: [sim-image]
 
 
-If we run the `dfm run` command, DV Flow Manager will:
+If we run the `dvfm run` command, DV Flow Manager will:
 
 - Find all files with a `.sv` extension in the current directory
 - Compile them into a simulation image
@@ -87,7 +83,7 @@ If we run the `dfm run` command, DV Flow Manager will:
 
 .. code-block:: bash
 
-    % dfm run sim-run
+    % dvfm run sim-run
 
 This will compile the source, build a simulation image for module `top`,
 and run the resulting image. Not too bad for 20-odd lines of build specification.
@@ -101,14 +97,30 @@ Let's break this down just a bit:
     package:
         name: my_design
 
+        imports:
+          - name: hdl.sim.vlt
+            as: hdl.sim
+
 DV Flow Manager views the world as a series of *packages* that reference each
 other and contain *tasks* to operate on sources within the *packages*.
+
+Here, we have declared a new package (my_design) and specified that it 
+references a built-in package named `hdl.sim.vlt`. This is a package that
+implements tasks for performing HDL simulation with the Verilator simulator.
+
+Note that we specify an alias (hdl.sim) for the package when importing it.
+This will allow us to easily swap in a different simulator without changing
+anything else within our package definition.
 
 .. code-block:: yaml
     :emphasize-lines: 8,12
 
     package:
         name: my_design
+
+        imports:
+          - name: hdl.sim.vlt
+            as: hdl.sim
 
         tasks:
           - name: rtl
@@ -119,38 +131,4 @@ other and contain *tasks* to operate on sources within the *packages*.
 
 Our first task is to specify the sources we want to process. This is done
 by specifying a `FileSet` task. The parameters of this task specify where
-the task should look for sources and which sources it should include.
-
-.. code-block:: yaml
-    :emphasize-lines: 5,6
-
-    package:
-        name: my_design
-
-        tasks:
-          - name: sim-image
-            type: hdlsim.vlt.SimImage
-            with:
-              - top: [top]
-            needs: [rtl]
-
-The second task creates a simulation image using the Verilator simulator.
-The `type` field references the `hdlsim.vlt.SimImage` task from the 
-`dv-flow-libhdlsim` package. The `with` section specifies that `top` is the
-top-level module. The `needs` field declares that this task depends on the 
-`rtl` task, ensuring the source files are collected before compilation.
-
-.. code-block:: yaml
-    :emphasize-lines: 5,6
-
-    package:
-        name: my_design
-
-        tasks:
-          - name: sim-run
-            type: hdlsim.vlt.SimRun
-            needs: [sim-image]
-
-The third task runs the simulation. It uses the `hdlsim.vlt.SimRun` task type
-and depends on the `sim-image` task. When executed, this task will run the
-compiled simulation image and produce the "Hello, World!" output.
+the task should look for sources and which sources it should include
