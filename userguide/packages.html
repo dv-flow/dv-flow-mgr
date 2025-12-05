@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Packages &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Using Tasks" href="tasks_using.html" />
+    <link rel="prev" title="Key Concepts" href="fundamentals.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packages">
+<h1>Packages<a class="headerlink" href="#packages" title="Link to this heading">¶</a></h1>
+<p>Packages are the fundamental organizational unit in DV Flow. A package is a
+<strong>parameterized namespace</strong> that defines tasks, types, and configuration. Packages
+serve two key purposes:</p>
+<ul class="simple">
+<li><p><strong>Organization</strong> - Group related tasks and provide a namespace to avoid name conflicts</p></li>
+<li><p><strong>Reusability</strong> - Enable sharing and reuse of task definitions across projects</p></li>
+</ul>
+<section id="package-structure">
+<h2>Package Structure<a class="headerlink" href="#package-structure" title="Link to this heading">¶</a></h2>
+<p>Each package has a unique name and contains zero or more tasks. The minimal
+package definition looks like this:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task1</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Hello</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">my_project!&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="built-in-packages">
+<h2>Built-in Packages<a class="headerlink" href="#built-in-packages" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager includes the <strong>std</strong> package as part of its core installation.
+The std package provides fundamental tasks that are commonly used across all flows:</p>
+<ul class="simple">
+<li><p><strong>std.FileSet</strong> - Collect files matching patterns</p></li>
+<li><p><strong>std.Message</strong> - Display messages during execution</p></li>
+<li><p><strong>std.CreateFile</strong> - Create files from literal content</p></li>
+<li><p><strong>std.Exec</strong> - Execute shell commands</p></li>
+<li><p><strong>std.SetEnv</strong> - Set environment variables</p></li>
+<li><p><strong>std.IncDirs</strong> - Extract include directories from filesets</p></li>
+</ul>
+<p>The std package is always available and does not require an explicit import.</p>
+<section id="plugin-packages">
+<h3>Plugin Packages<a class="headerlink" href="#plugin-packages" title="Link to this heading">¶</a></h3>
+<p>Additional packages are installed as <strong>Python plugins</strong> using Python’s entry point
+mechanism. When DV Flow Manager starts, it automatically discovers and loads all
+packages registered under the <code class="docutils literal notranslate"><span class="pre">dv_flow.mgr</span></code> entry point group.</p>
+<p>Common plugin packages include:</p>
+<ul class="simple">
+<li><p><strong>hdlsim</strong> packages - HDL simulation support (Verilator, Xcelium, VCS, etc.)</p></li>
+<li><p><strong>pss</strong> packages - Portable Stimulus Specification (PSS) support</p></li>
+<li><p><strong>ide</strong> packages - IDE integration (file lists, etc.)</p></li>
+</ul>
+</section>
+<section id="installing-plugin-packages">
+<h3>Installing Plugin Packages<a class="headerlink" href="#installing-plugin-packages" title="Link to this heading">¶</a></h3>
+<p>Plugin packages are typically installed via <code class="docutils literal notranslate"><span class="pre">pip</span></code> alongside dv-flow-mgr:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>dv-flow-libhdlsim<span class="w">  </span><span class="c1"># HDL simulator support</span>
+pip<span class="w"> </span>install<span class="w"> </span>dv-flow-libpss<span class="w">     </span><span class="c1"># PSS support</span>
+</pre></div>
+</div>
+<p>Once installed, plugin packages are automatically discovered and their tasks
+become available without explicit imports.</p>
+</section>
+<section id="creating-plugin-packages">
+<h3>Creating Plugin Packages<a class="headerlink" href="#creating-plugin-packages" title="Link to this heading">¶</a></h3>
+<p>To create your own plugin package, add an entry point in your <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[project.entry-points.</span><span class="s2">&quot;dv_flow.mgr&quot;</span><span class="k">]</span>
+<span class="n">my_plugin</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;my_package.plugin&quot;</span>
+</pre></div>
+</div>
+<p>Your plugin module should provide a <code class="docutils literal notranslate"><span class="pre">dfm_packages()</span></code> function that returns
+a dictionary mapping package names to their flow.dv file paths:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># my_package/plugin.py</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="k">def</span> <span class="nf">dfm_packages</span><span class="p">():</span>
+    <span class="n">pkg_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;my_tool&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pkg_dir</span><span class="p">,</span> <span class="s2">&quot;flow.dv&quot;</span><span class="p">)</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>See the developer documentation for complete details on creating plugin packages.</p>
+</section>
+<section id="using-built-in-and-plugin-packages">
+<h3>Using Built-in and Plugin Packages<a class="headerlink" href="#using-built-in-and-plugin-packages" title="Link to this heading">¶</a></h3>
+<p>All packages are referenced using dot notation, independent of their source:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">files</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">files</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="importing-packages">
+<h2>Importing Packages<a class="headerlink" href="#importing-packages" title="Link to this heading">¶</a></h2>
+<p>Packages can import other packages to use their tasks and extend their functionality.
+There are several ways to import packages:</p>
+<section id="import-by-path">
+<h3>Import by Path<a class="headerlink" href="#import-by-path" title="Link to this heading">¶</a></h3>
+<p>Import a package from a file or directory path:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subdir/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/my_lib</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">use_imported</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lib.some_task</span>
+</pre></div>
+</div>
+<p>When a directory is specified, DV Flow searches for <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code> or <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>
+files in the subdirectory tree.</p>
+</section>
+<section id="import-with-alias">
+<h3>Import with Alias<a class="headerlink" href="#import-with-alias" title="Link to this heading">¶</a></h3>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">as</span></code> keyword to give an imported package an alias:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt</span>
+<span class="w">      </span><span class="nt">as</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span><span class="w">  </span><span class="c1"># References hdlsim.vlt.SimImage</span>
+</pre></div>
+</div>
+</section>
+<section id="import-resolution">
+<h3>Import Resolution<a class="headerlink" href="#import-resolution" title="Link to this heading">¶</a></h3>
+<p>When resolving imports, DV Flow searches in the following order:</p>
+<ol class="arabic simple">
+<li><p><strong>Relative to current file</strong> - Paths relative to the importing package’s location</p></li>
+<li><p><strong>Relative to project root</strong> - Allows sibling packages to find each other</p></li>
+<li><p><strong>Package registry</strong> - Built-in and installed packages</p></li>
+</ol>
+<p>This allows sub-packages to import sibling packages naturally:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In packages/ip1/flow.dv</span>
+<span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ip1</span>
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/ip2/flow.dv</span><span class="w">  </span><span class="c1"># Finds sibling relative to project root</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="package-parameters">
+<h2>Package Parameters<a class="headerlink" href="#package-parameters" title="Link to this heading">¶</a></h2>
+<p>Packages can define parameters that control their behavior. Parameters can be
+overridden when the package is imported or instantiated:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">configurable_ip</span>
+
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">      </span><span class="nt">width</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">width=${{</span><span class="nv"> </span><span class="s">width</span><span class="nv"> </span><span class="s">}},</span><span class="nv"> </span><span class="s">debug=${{</span><span class="nv"> </span><span class="s">debug</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="package-fragments">
+<h2>Package Fragments<a class="headerlink" href="#package-fragments" title="Link to this heading">¶</a></h2>
+<p>Large packages can be split into multiple files using <strong>fragments</strong>. Fragments
+allow you to organize tasks across multiple files while maintaining a single
+package namespace:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Main package file</span>
+<span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">big_project</span>
+
+<span class="w">    </span><span class="nt">fragments</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/rtl/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/tb/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top_task</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl.build</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tb.build</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Fragment files use the <code class="docutils literal notranslate"><span class="pre">fragment</span></code> keyword instead of <code class="docutils literal notranslate"><span class="pre">package</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># src/rtl/flow.dv</span>
+<span class="nt">fragment</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+</pre></div>
+</div>
+<p>All fragments contribute to the same package namespace. Task names must be unique
+across all fragments - you cannot define <code class="docutils literal notranslate"><span class="pre">build</span></code> in multiple fragments of the
+same package.</p>
+</section>
+<section id="task-namespacing">
+<h2>Task Namespacing<a class="headerlink" href="#task-namespacing" title="Link to this heading">¶</a></h2>
+<p>Tasks within a package are referenced using dot notation: <code class="docutils literal notranslate"><span class="pre">package_name.task_name</span></code>.</p>
+<section id="local-vs-qualified-references">
+<h3>Local vs. Qualified References<a class="headerlink" href="#local-vs-qualified-references" title="Link to this heading">¶</a></h3>
+<p>Within a package, you can reference tasks by their short name:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task1</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task2</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">task1</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Short name - refers to my_pkg.task1</span>
+</pre></div>
+</div>
+<p>From outside the package, use the fully-qualified name:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/my_pkg</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">runner</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_pkg.task1</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Fully-qualified reference</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<p><strong>Package Organization</strong></p>
+<ul class="simple">
+<li><p>Use packages to group related tasks by function (e.g., RTL compilation, verification, synthesis)</p></li>
+<li><p>Keep package names short but descriptive</p></li>
+<li><p>Use fragments for large packages to improve maintainability</p></li>
+</ul>
+<p><strong>Reusability</strong></p>
+<ul class="simple">
+<li><p>Make packages parameterizable when they need to work in different contexts</p></li>
+<li><p>Document package parameters and their effects</p></li>
+<li><p>Avoid hard-coded paths - use parameters or dataflow</p></li>
+</ul>
+<p><strong>Dependencies</strong></p>
+<ul class="simple">
+<li><p>Import only the packages you need</p></li>
+<li><p>Use aliases to simplify long package names</p></li>
+<li><p>Keep import chains shallow when possible</p></li>
+</ul>
+<p><strong>Naming</strong></p>
+<ul class="simple">
+<li><p>Use descriptive task names that indicate their purpose</p></li>
+<li><p>Avoid generic names like <code class="docutils literal notranslate"><span class="pre">task1</span></code>, <code class="docutils literal notranslate"><span class="pre">task2</span></code></p></li>
+<li><p>Use consistent naming conventions across related packages</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="fundamentals.html">Key Concepts</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="fundamentals.html" title="previous chapter">Key Concepts</a></li>
+      <li>Next: <a href="tasks_using.html" title="next chapter">Using Tasks</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/userguide/packages.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
