@@ -141,12 +141,19 @@ class CmdRun(object):
 
         if args.j != -1:
             runner.nproc = int(args.j)
+        
+        # Wire up force_run from CLI
+        if getattr(args, 'force', False):
+            runner.force_run = True
 
         if not os.path.isdir(os.path.join(rundir, "log")):
             os.makedirs(os.path.join(rundir, "log"))
         
         fp = open(os.path.join(rundir, "log", "%s.trace.json" % pkg.name), "w")
         trace = TaskListenerTrace(fp)
+
+        # Pass verbose flag to listener
+        listener.verbose = getattr(args, 'verbose', False)
 
         runner.add_listener(listener.event)
         runner.add_listener(trace.event)

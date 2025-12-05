@@ -911,6 +911,7 @@ class PackageProviderYaml(PackageProvider):
         task.passthrough = passthrough
         task.consumes = consumes
         task.rundir = rundir
+        task.uptodate = taskdef.uptodate
 
         task.paramT = self._getParamT(
             loader,

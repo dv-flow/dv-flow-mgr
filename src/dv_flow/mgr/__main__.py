@@ -77,6 +77,12 @@ def get_parser():
     run_parser.add_argument("--clean",
                             action="store_true",
                             help="Cleans the rundir before running")
+    run_parser.add_argument("-f", "--force",
+                            action="store_true",
+                            help="Force all tasks to run, ignoring up-to-date status")
+    run_parser.add_argument("-v", "--verbose",
+                            action="store_true",
+                            help="Show all tasks including up-to-date ones")
     run_parser.add_argument("--root", 
                               help="Specifies the root directory for the flow")
     run_parser.add_argument("-c", "--config",

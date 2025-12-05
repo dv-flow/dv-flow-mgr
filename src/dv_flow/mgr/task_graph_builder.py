@@ -394,22 +394,6 @@ class TaskGraphBuilder(object):
             tt = self.loader.findType(type)
 
         if tt is None:
-            # Fallback for std.Env (not defined as a Type yet)
-            if type == "std.Env":
-                import pydantic
-                field_m = {
-                    "type": (str, "std.Env"),
-                    "vals": (dict, {}),
-                    "append_path": (dict, {}),
-                    "prepend_path": (dict, {}),
-                }
-                model_t = pydantic.create_model("std_Env", __base__=TaskDataItem, **field_m)
-                ret = model_t()
-                for k, v in kwargs.items():
-                    if hasattr(ret, k):
-                        setattr(ret, k, v)
-                self._log.debug("<-- mkDataItem(fallback): %s" % type)
-                return ret
             raise Exception(f"Type {type} does not exist")
         
         if tt in self._type_node_m.keys():
@@ -703,6 +687,7 @@ class TaskGraphBuilder(object):
             ctxt=self._ctxt,
             passthrough=task.passthrough,
             consumes=task.consumes,
+            uptodate=task.uptodate,
             task=None)  # We'll set this later
             
         self.push_task_scope(node)

@@ -150,6 +150,9 @@ class TaskDef(BaseModel):
     consumes : Union[ConsumesE, List[Any], None] = dc.Field(
         default=None,
         description="Specifies matching patterns for parameter sets that this task consumes")
+    uptodate : Union[bool, str, None] = dc.Field(
+        default=None,
+        description="Up-to-date check: false=always run, string=Python method, None=use default check")
     srcinfo : SrcInfo = dc.Field(default=None)
     
 

@@ -17,6 +17,7 @@ You can learn more about the input specification <here>.
    :caption: Contents:
 
    quickstart
+   incremental
    cmdref
    pytask_api
    task_runners

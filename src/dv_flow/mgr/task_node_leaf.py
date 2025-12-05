@@ -1,11 +1,12 @@
 import enum
+import json
 import os
 import sys
 import dataclasses as dc
 import pydantic.dataclasses as pdc
 import logging
 import toposort
-from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskMarker, SeverityE
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
@@ -15,6 +16,7 @@ from .param import Param
 @dc.dataclass
 class TaskNodeLeaf(TaskNode):
     task : Callable[['TaskRunner','TaskDataInput'],'TaskDataResult'] = dc.field(default=None)
+    uptodate : Union[bool, str, None] = dc.field(default=None)
 
     async def do_run(self, 
                   runner,
@@ -115,6 +117,88 @@ class TaskNodeLeaf(TaskNode):
                 if getattr(in_p, "type", None) == "std.Env":
                     inputs.append(in_p)
 
+        # Check if task is up-to-date (unless force_run is set)
+        force_run = getattr(runner, 'force_run', False)
+        if not force_run:
+            is_uptodate, exec_data = await self._check_uptodate(rundir, inputs, changed)
+            if is_uptodate and exec_data is not None:
+                # Task is up-to-date, load previous results
+                self._log.debug("Task %s is up-to-date, loading previous results" % self.name)
+                
+                # Restore result from exec_data
+                result_data = exec_data.get("result", {})
+                self.result = TaskDataResult(
+                    status=result_data.get("status", 0),
+                    changed=False,  # Not changed since we're up-to-date
+                    output=[],
+                    markers=[],
+                    memento=None
+                )
+                
+                # Restore output from exec_data
+                output_data = exec_data.get("output", {})
+                
+                # Build output list - we need to reconstruct from passthrough + local outputs
+                output = []
+                dep_m = {}
+                dep_m[self.name] = list(need.name for need,_ in self.needs)
+                
+                # Handle passthrough
+                if isinstance(self.passthrough, list):
+                    pass  # Not yet supported
+                elif self.passthrough == PassthroughE.All:
+                    for need,block in self.needs:
+                        if not block:
+                            for out in need.output.output:
+                                if getattr(out, "type", None) != "std.Env":
+                                    output.append(out)
+                elif self.passthrough == PassthroughE.Unused:
+                    if self.consumes == ConsumesE.No or (isinstance(self.consumes, list) and len(self.consumes) == 0):
+                        for need,block in self.needs:
+                            if not block:
+                                for out in need.output.output:
+                                    if getattr(out, "type", None) != "std.Env":
+                                        output.append(out)
+                    elif isinstance(self.consumes, list):
+                        for need,block in self.needs:
+                            if not block:
+                                for out in need.output.output:
+                                    if getattr(out, "type", None) != "std.Env" and not self._matches(out, self.consumes):
+                                        output.append(out)
+                
+                # Restore local outputs from saved data using mkDataItem
+                saved_output = output_data.get("output", [])
+                for i, out_data in enumerate(saved_output):
+                    if out_data.get("src") == self.name:
+                        # This is a local output, need to reconstruct the data item
+                        # Exclude fields that are set separately or may not be in the type schema
+                        excluded_fields = ("type", "src", "seq", "name", "params")
+                        try:
+                            item = runner.mkDataItem(out_data.get("type", "std.FileSet"), **{
+                                k: v for k, v in out_data.items() 
+                                if k not in excluded_fields
+                            })
+                            item.src = self.name
+                            item.seq = out_data.get("seq", i)
+                            output.append(item)
+                        except Exception as e:
+                            self._log.warning("Failed to restore output item: %s" % e)
+                            # If we can't restore, we need to re-run
+                            return await self._run_task(runner, rundir, inputs, changed, memento)
+                
+                self.output = TaskDataOutput(
+                    changed=False,
+                    dep_m=dep_m,
+                    output=output
+                )
+                
+                self._log.debug("<-- do_run (up-to-date): %s" % self.name)
+                return self.result
+
+        return await self._run_task(runner, rundir, inputs, changed, memento)
+
+    async def _run_task(self, runner, rundir, inputs, changed, memento):
+        """Actually execute the task"""
         input = TaskDataInput(
             name=self.name,
             changed=changed,
@@ -157,6 +241,7 @@ class TaskNodeLeaf(TaskNode):
 
         # Pass-through all dependencies
         # Add an entry for ourselves
+        dep_m = {}
         dep_m[self.name] = list(need.name for need,_ in self.needs)
 
         if isinstance(self.passthrough, list):
@@ -250,8 +335,77 @@ class TaskNodeLeaf(TaskNode):
         if need not in in_task_s:
             in_params.extend(need.output.output)
         
-
-
+    async def _check_uptodate(self, rundir: str, inputs: List[Any], changed: bool) -> Tuple[bool, Optional[dict]]:
+        """
+        Check if this task is up-to-date.
+        Returns (is_uptodate, exec_data) tuple.
+        exec_data is loaded from exec.json if uptodate, None otherwise.
+        """
+        # If uptodate is explicitly False, always run
+        if self.uptodate is False:
+            self._log.debug("Task %s: uptodate=False, forcing run" % self.name)
+            return (False, None)
+        
+        # If any input has changed, we're not up-to-date
+        if changed:
+            self._log.debug("Task %s: inputs changed, not up-to-date" % self.name)
+            return (False, None)
+        
+        # Check if exec_data file exists
+        exec_file = os.path.join(rundir, "%s.exec_data.json" % self.name)
+        if not os.path.exists(exec_file):
+            self._log.debug("Task %s: no exec_data file, not up-to-date" % self.name)
+            return (False, None)
+        
+        # Load the exec_data
+        try:
+            with open(exec_file, 'r') as f:
+                exec_data = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            self._log.debug("Task %s: failed to load exec_data: %s" % (self.name, e))
+            return (False, None)
+        
+        # Compare parameters
+        saved_params = exec_data.get("params", {})
+        current_params = self.params.model_dump() if hasattr(self.params, 'model_dump') else {}
+        if saved_params != current_params:
+            self._log.debug("Task %s: parameters changed, not up-to-date" % self.name)
+            return (False, None)
+        
+        # Compare inputs signature
+        saved_signature = exec_data.get("inputs_signature", [])
+        current_signature = [
+            {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
+            for item in inputs
+        ]
+        if saved_signature != current_signature:
+            self._log.debug("Task %s: inputs signature changed, not up-to-date" % self.name)
+            return (False, None)
+        
+        # If there's a custom uptodate method, call it
+        if isinstance(self.uptodate, str) and self.uptodate:
+            from .uptodate_callable import UpToDateCallable
+            from .uptodate_ctxt import UpToDateCtxt
+            
+            ctxt = UpToDateCtxt(
+                rundir=rundir,
+                params=self.params,
+                inputs=inputs,
+                exec_data=exec_data
+            )
+            
+            callable = UpToDateCallable(body=self.uptodate, srcdir=self.srcdir)
+            try:
+                is_uptodate = await callable(ctxt)
+                if not is_uptodate:
+                    self._log.debug("Task %s: custom uptodate check returned False" % self.name)
+                    return (False, None)
+            except Exception as e:
+                self._log.error("Task %s: uptodate check failed: %s" % (self.name, e))
+                return (False, None)
+        
+        self._log.debug("Task %s: up-to-date" % self.name)
+        return (True, exec_data)
 
     def __hash__(self):
         return id(self)
