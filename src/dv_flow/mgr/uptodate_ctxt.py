@@ -22,15 +22,17 @@
 import asyncio
 import dataclasses as dc
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 @dc.dataclass
 class UpToDateCtxt:
     """Context passed to custom up-to-date check methods"""
     rundir: str
+    srcdir: str
     params: Any
     inputs: List[Any]
     exec_data: dict  # Previous exec.json contents
+    memento: Optional[Any] = None  # Previous memento from task result
 
     async def exec(self, 
                    cmd: List[str],

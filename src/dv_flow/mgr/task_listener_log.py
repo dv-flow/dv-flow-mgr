@@ -63,7 +63,16 @@ class TaskListenerLog(object):
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
             self.level += 1
-            if not self.quiet:
+            # In verbose mode, show immediately; in non-verbose mode, defer until we know if it runs
+            if self.verbose and not self.quiet:
+                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
+        elif reason == 'uptodate':
+            # Task is up-to-date - in non-verbose mode, don't show it
+            # In verbose mode, it was already shown in 'enter'
+            pass
+        elif reason == 'run':
+            # Task will actually run - show it now in non-verbose mode
+            if not self.verbose and not self.quiet:
                 self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
         elif reason == 'leave':
             # Check if task was up-to-date (not changed)

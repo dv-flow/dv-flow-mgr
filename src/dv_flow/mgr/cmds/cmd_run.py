@@ -22,6 +22,7 @@
 import asyncio
 import os
 import logging
+import shutil
 import sys
 from typing import ClassVar
 from ..ext_rgy import ExtRgy
@@ -133,7 +134,7 @@ class CmdRun(object):
         if args.clean:
             print("Note: Cleaning rundir %s" % rundir)
             if os.path.exists(rundir):
-                os.rmdir(rundir)
+                shutil.rmtree(rundir)
             os.makedirs(rundir)
 
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)

@@ -177,3 +177,92 @@ async def SetEnv(ctxt : TaskRunCtxt, input : TaskDataInput) -> TaskDataResult:
         output=[env],
         memento=memento
     )
+
+
+async def SetEnvUpToDate(ctxt) -> bool:
+    """
+    Up-to-date check for SetEnv task.
+    
+    Re-evaluates glob patterns and compares with the saved memento to detect
+    filesystem changes (new files matching glob patterns, etc.)
+    """
+    _log.debug("--> SetEnvUpToDate")
+    
+    # If no memento, not up-to-date
+    if ctxt.memento is None:
+        _log.debug("SetEnvUpToDate: no memento, not up-to-date")
+        return False
+    
+    try:
+        ex_memento = SetEnvMemento(**ctxt.memento)
+    except Exception as e:
+        _log.debug("SetEnvUpToDate: failed to load memento: %s" % e)
+        return False
+    
+    # Get parameters
+    params = ctxt.params
+    if params is None:
+        _log.debug("SetEnvUpToDate: no params, not up-to-date")
+        return False
+    
+    # Helper to resolve a single map
+    def resolve_map(params_obj, srcdir):
+        if params_obj is None:
+            return {}
+        if isinstance(params_obj, dict):
+            params_map = {}
+            for k, v in params_obj.items():
+                if hasattr(v, "value"):
+                    params_map[k] = getattr(v, "value")
+                else:
+                    params_map[k] = v
+        else:
+            params_map = {}
+        
+        resolved = {}
+        for k, v in params_map.items():
+            if isinstance(v, str) and _is_glob_pattern(v):
+                pattern = v if os.path.isabs(v) else os.path.join(srcdir, v)
+                matches = glob.glob(pattern)
+                if matches:
+                    matches = sorted(map(lambda p: os.path.abspath(p), matches))
+                    if len(matches) == 1:
+                        resolved_v = matches[0]
+                    else:
+                        resolved_v = os.pathsep.join(matches)
+                else:
+                    resolved_v = v
+            else:
+                resolved_v = v
+            resolved[k] = resolved_v
+        return resolved
+    
+    # Re-resolve all maps
+    setenv_obj = getattr(params, "setenv", None)
+    append_obj = getattr(params, "append_path", None)
+    prepend_obj = getattr(params, "prepend_path", None)
+    
+    current_vals = resolve_map(setenv_obj, ctxt.srcdir)
+    current_append = resolve_map(append_obj, ctxt.srcdir)
+    current_prepend = resolve_map(prepend_obj, ctxt.srcdir)
+    
+    # Build current memento for comparison
+    current_memento = SetEnvMemento(
+        vals=sorted(current_vals.items(), key=lambda x: x[0]),
+        append_path=sorted(current_append.items(), key=lambda x: x[0]),
+        prepend_path=sorted(current_prepend.items(), key=lambda x: x[0]),
+    )
+    
+    # Compare with saved memento
+    if ex_memento.vals != current_memento.vals:
+        _log.debug("SetEnvUpToDate: vals changed")
+        return False
+    if ex_memento.append_path != current_memento.append_path:
+        _log.debug("SetEnvUpToDate: append_path changed")
+        return False
+    if ex_memento.prepend_path != current_memento.prepend_path:
+        _log.debug("SetEnvUpToDate: prepend_path changed")
+        return False
+    
+    _log.debug("<-- SetEnvUpToDate: up-to-date")
+    return True

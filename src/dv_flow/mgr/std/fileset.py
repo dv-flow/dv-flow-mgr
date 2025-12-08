@@ -85,11 +85,15 @@ async def FileSet(runner, input) -> TaskDataResult:
                 basedir=glob_root)
 
         if not isinstance(input.params.include, list):
-            input.params.include = [input.params.include]
+            input.params.include = [input.params.include] if input.params.include else []
+        
+        if not isinstance(input.params.exclude, list):
+            input.params.exclude = [input.params.exclude] if input.params.exclude else []
 
         included_files = []
         for pattern in input.params.include:
-            included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
+            if pattern:  # Skip empty patterns
+                included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
 
         _log.debug("included_files: %s" % str(included_files))
 
@@ -135,3 +139,93 @@ async def FileSet(runner, input) -> TaskDataResult:
         changed=changed,
         output=[fs]
     )
+
+
+async def FileSetUpToDate(ctxt) -> bool:
+    """
+    Up-to-date check for FileSet task.
+    
+    Efficiently checks whether the glob patterns would result in different files
+    by comparing the current glob results with the saved memento.
+    """
+    _log.debug("--> FileSetUpToDate")
+    
+    # If no memento, not up-to-date
+    if ctxt.memento is None:
+        _log.debug("FileSetUpToDate: no memento, not up-to-date")
+        return False
+    
+    try:
+        ex_memento = TaskFileSetMemento(**ctxt.memento)
+    except Exception as e:
+        _log.debug("FileSetUpToDate: failed to load memento: %s" % e)
+        return False
+    
+    # Get parameters
+    params = ctxt.params
+    if params is None:
+        _log.debug("FileSetUpToDate: no params, not up-to-date")
+        return False
+    
+    base = params.base.strip() if params.base else ""
+    
+    # Check for glob pattern in base
+    is_glob = any(c in base for c in ['*', '?', '['])
+    if os.path.isabs(base):
+        base_candidates = glob.glob(base, recursive=True) if is_glob else [base]
+    else:
+        base_path = os.path.join(ctxt.srcdir, base)
+        base_candidates = glob.glob(base_path, recursive=True) if is_glob else [base_path]
+    
+    if is_glob:
+        if len(base_candidates) == 0 or len(base_candidates) > 1:
+            # Different number of base candidates than before
+            _log.debug("FileSetUpToDate: base glob changed, not up-to-date")
+            return False
+        glob_root = base_candidates[0]
+    else:
+        glob_root = base_candidates[0]
+    
+    if glob_root and (glob_root[-1] == '/' or glob_root[-1] == '\\'):
+        glob_root = glob_root[:-1]
+    
+    # Normalize include/exclude to lists
+    include = params.include if isinstance(params.include, list) else ([params.include] if params.include else [])
+    exclude = params.exclude if isinstance(params.exclude, list) else ([params.exclude] if params.exclude else [])
+    
+    # Evaluate glob patterns to get current files
+    included_files = []
+    for pattern in include:
+        if pattern:
+            included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
+    
+    # Build current memento
+    current_files = []
+    for file in included_files:
+        if not any(fnmatch.fnmatch(file, os.path.join(glob_root, pattern)) for pattern in exclude if pattern):
+            try:
+                mtime = os.path.getmtime(file)
+                current_files.append((file, mtime))
+            except OSError:
+                # File doesn't exist anymore
+                _log.debug("FileSetUpToDate: file %s no longer exists" % file)
+                return False
+    
+    # Compare with saved memento
+    ex_files = sorted(ex_memento.files, key=lambda x: x[0])
+    current_files = sorted(current_files, key=lambda x: x[0])
+    
+    if len(ex_files) != len(current_files):
+        _log.debug("FileSetUpToDate: file count changed (%d -> %d)" % (len(ex_files), len(current_files)))
+        return False
+    
+    for (ex_file, ex_mtime), (cur_file, cur_mtime) in zip(ex_files, current_files):
+        if ex_file != cur_file:
+            _log.debug("FileSetUpToDate: file list changed")
+            return False
+        if ex_mtime != cur_mtime:
+            _log.debug("FileSetUpToDate: file %s mtime changed" % cur_file)
+            return False
+    
+    _log.debug("<-- FileSetUpToDate: up-to-date")
+    return True

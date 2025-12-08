@@ -6,8 +6,12 @@
 #* Displays a live list of tasks with a spinner while running
 #* and a final status code when complete:
 #*   D - done (success, no errors or warnings)
+#*   U - up-to-date (task was skipped because it was already current)
 #*   W - completed with warnings (no errors)
 #*   E - completed with errors
+#*
+#* When not in verbose mode, up-to-date tasks are hidden and only
+#* tasks that are actually evaluated are displayed.
 #*
 #* Any markers produced by the task are displayed indented
 #* directly below the task entry when the task completes.
@@ -29,6 +33,7 @@ class TaskListenerProgress(object):
     console : Optional[Console] = dc.field(default=None)
     quiet : bool = False
     json : bool = False
+    verbose : bool = False
     has_severity : Dict[SeverityE, int] = dc.field(default_factory=dict)
 
     # Internal state
@@ -87,9 +92,23 @@ class TaskListenerProgress(object):
         if not self._running:
             self.enter()
         if reason == 'enter':
-            # Add task row
+            # In verbose mode, add task row immediately with spinner
+            # In non-verbose mode, defer until we know if it will run
+            if self.verbose:
+                if task not in self._task_row_map and self._progress is not None:
+                    tid = self._progress.add_task(
+                        "", total=1, completed=0,
+                        status="[cyan]…", name=task.name, elapsed=""
+                    )
+                    self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
+                    self._order.append(task)
+        elif reason == 'uptodate':
+            # Task is up-to-date - in non-verbose mode, don't show it at all
+            # In verbose mode, task was already added in 'enter', will show 'U' on leave
+            pass
+        elif reason == 'run':
+            # Task will actually run - add to display if not already added
             if task not in self._task_row_map and self._progress is not None:
-                # Create a task in Progress with a fixed total so we can mark complete to stop spinner
                 tid = self._progress.add_task(
                     "", total=1, completed=0,
                     status="[cyan]…", name=task.name, elapsed=""
@@ -99,7 +118,12 @@ class TaskListenerProgress(object):
         elif reason == 'leave':
             info = self._task_row_map.get(task)
             if info is None:
+                # Task wasn't displayed (up-to-date in non-verbose mode)
                 return
+            
+            # Check if task was up-to-date (not changed)
+            is_uptodate = not task.result.changed if task.result else False
+            
             # Determine status code
             err_ct = sum(1 for m in task.result.markers if m.severity == SeverityE.Error)
             warn_ct = sum(1 for m in task.result.markers if m.severity == SeverityE.Warning)
@@ -107,6 +131,8 @@ class TaskListenerProgress(object):
                 status_code = '[red]E[/red]'
             elif warn_ct > 0:
                 status_code = '[yellow]W[/yellow]'
+            elif is_uptodate:
+                status_code = '[blue]U[/blue]'
             else:
                 status_code = '[green]D[/green]'
             # Compute elapsed time

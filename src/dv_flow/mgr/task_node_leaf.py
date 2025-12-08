@@ -38,7 +38,7 @@ class TaskNodeLeaf(TaskNode):
         self._log.debug("--> do_run: %s" % self.name)
         changed = False
         for dep,_ in self.needs:
-            changed |= dep.changed
+            changed |= dep.output.changed
 
         self.rundir = rundir
 
@@ -121,6 +121,8 @@ class TaskNodeLeaf(TaskNode):
         force_run = getattr(runner, 'force_run', False)
         if not force_run:
             is_uptodate, exec_data = await self._check_uptodate(rundir, inputs, changed)
+            # Notify listeners of up-to-date status
+            runner._notify(self, "uptodate" if is_uptodate else "run")
             if is_uptodate and exec_data is not None:
                 # Task is up-to-date, load previous results
                 self._log.debug("Task %s is up-to-date, loading previous results" % self.name)
@@ -194,6 +196,14 @@ class TaskNodeLeaf(TaskNode):
                 
                 self._log.debug("<-- do_run (up-to-date): %s" % self.name)
                 return self.result
+        else:
+            # Force run - notify that we're running
+            runner._notify(self, "run")
+
+        # If uptodate is explicitly False, mark as changed to ensure task runs
+        # and downstream tasks also re-run
+        if self.uptodate is False:
+            changed = True
 
         return await self._run_task(runner, rundir, inputs, changed, memento)
 
@@ -365,6 +375,13 @@ class TaskNodeLeaf(TaskNode):
             self._log.debug("Task %s: failed to load exec_data: %s" % (self.name, e))
             return (False, None)
         
+        # If previous run failed, we're not up-to-date (always re-run failed tasks)
+        result_data = exec_data.get("result", {})
+        if result_data.get("status", 0) != 0:
+            self._log.debug("Task %s: previous run failed (status=%s), not up-to-date" % (
+                self.name, result_data.get("status")))
+            return (False, None)
+        
         # Compare parameters
         saved_params = exec_data.get("params", {})
         current_params = self.params.model_dump() if hasattr(self.params, 'model_dump') else {}
@@ -387,11 +404,19 @@ class TaskNodeLeaf(TaskNode):
             from .uptodate_callable import UpToDateCallable
             from .uptodate_ctxt import UpToDateCtxt
             
+            # Extract memento from exec_data if available
+            memento = None
+            result_data = exec_data.get("result", {})
+            if result_data.get("memento"):
+                memento = result_data["memento"]
+            
             ctxt = UpToDateCtxt(
                 rundir=rundir,
+                srcdir=self.srcdir,
                 params=self.params,
                 inputs=inputs,
-                exec_data=exec_data
+                exec_data=exec_data,
+                memento=memento
             )
             
             callable = UpToDateCallable(body=self.uptodate, srcdir=self.srcdir)

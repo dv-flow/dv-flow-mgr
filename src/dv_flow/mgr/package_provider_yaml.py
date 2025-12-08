@@ -906,12 +906,12 @@ class PackageProviderYaml(PackageProvider):
 
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
         
-        passthrough, consumes, rundir = self._getPTConsumesRundir(taskdef, task.uses)
+        passthrough, consumes, rundir, uptodate = self._getPTConsumesRundirUptodate(taskdef, task.uses)
 
         task.passthrough = passthrough
         task.consumes = consumes
         task.rundir = rundir
-        task.uptodate = taskdef.uptodate
+        task.uptodate = uptodate
 
         task.paramT = self._getParamT(
             loader,
@@ -1050,11 +1050,12 @@ class PackageProviderYaml(PackageProvider):
                         loader.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % uses_name)
 
-            passthrough, consumes, rundir = self._getPTConsumesRundir(td, st.uses)
+            passthrough, consumes, rundir, uptodate = self._getPTConsumesRundirUptodate(td, st.uses)
 
             st.passthrough = passthrough
             st.consumes = consumes
             st.rundir = rundir
+            st.uptodate = uptodate
 
             for need in td.needs:
                 nn = None
@@ -1151,11 +1152,12 @@ class PackageProviderYaml(PackageProvider):
     def _getScopeFullname(self, leaf=None):
         return self._pkg_s[-1].getScopeFullname(leaf)
 
-    def _getPTConsumesRundir(self, taskdef : TaskDef, base_t : Union[Task,Type]):
-        self._log.debug("_getPTConsumesRundir %s" % taskdef.name)
+    def _getPTConsumesRundirUptodate(self, taskdef : TaskDef, base_t : Union[Task,Type]):
+        self._log.debug("_getPTConsumesRundirUptodate %s" % taskdef.name)
         passthrough = taskdef.passthrough
         consumes = taskdef.consumes.copy() if isinstance(taskdef.consumes, list) else taskdef.consumes
         rundir = taskdef.rundir
+        uptodate = taskdef.uptodate
 #        needs = [] if task.needs is None else task.needs.copy()
 
         if base_t is not None and isinstance(base_t, Task):
@@ -1165,6 +1167,8 @@ class PackageProviderYaml(PackageProvider):
                 consumes = base_t.consumes
             if rundir is None:
                 rundir = base_t.rundir
+            if uptodate is None:
+                uptodate = base_t.uptodate
 
         if passthrough is None:
             passthrough = PassthroughE.Unused
@@ -1172,4 +1176,4 @@ class PackageProviderYaml(PackageProvider):
             consumes = ConsumesE.All
 
 
-        return (passthrough, consumes, rundir)
+        return (passthrough, consumes, rundir, uptodate)

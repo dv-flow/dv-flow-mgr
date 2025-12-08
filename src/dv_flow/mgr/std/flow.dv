@@ -39,6 +39,7 @@ package:
       Creates a fileset from a list of files or glob patterns
     shell: pytask
     run: dv_flow.mgr.std.fileset.FileSet
+    uptodate: dv_flow.mgr.std.fileset.FileSetUpToDate
     passthrough: all
     consumes: none
     with:
@@ -61,11 +62,11 @@ package:
       include:
         doc: |
           Specifies a list of files or a glob pattern for the files to include
-        type: str
-        value: ""
+        type: list
+        value: []
       exclude:
-        type: str
-        value: ""
+        type: list
+        value: []
   - name: CreateFile
     shell: pytask
     run: dv_flow.mgr.std.create_file.CreateFile
@@ -91,6 +92,7 @@ package:
     desc: Sets environment variables for use by other tasks
     shell: pytask
     run: dv_flow.mgr.std.setenv.SetEnv
+    uptodate: dv_flow.mgr.std.setenv.SetEnvUpToDate
     with:
       setenv:
         type: map
