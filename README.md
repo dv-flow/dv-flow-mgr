@@ -31,7 +31,7 @@ package:
 
   tasks:
     - name: greet
-      type: std.Message
+      uses: std.Message
       with:
         msg: "Hello World"
 ```
