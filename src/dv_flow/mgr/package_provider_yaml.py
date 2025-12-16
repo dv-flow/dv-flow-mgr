@@ -1,5 +1,6 @@
 
 import dataclasses as dc
+import difflib
 import logging
 import os
 import pydantic
@@ -21,6 +22,33 @@ from .task_def import TaskDef, ConsumesE, RundirE, PassthroughE, StrategyDef
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
+
+def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
+    """Suggest similar valid field names using similarity matching"""
+    if not hasattr(model_class, 'model_fields'):
+        return ""
+    
+    valid_fields = list(model_class.model_fields.keys())
+    
+    # Special cases where the semantic meaning suggests a specific field
+    semantic_map = {
+        'type': 'uses',  # 'type' usually means task/type reference
+    }
+    
+    if invalid_field in semantic_map:
+        suggested = semantic_map[invalid_field]
+        if suggested in valid_fields:
+            return f". Did you mean '{suggested}'?"
+    
+    # Try fuzzy matching with lower cutoff for better suggestions
+    matches = difflib.get_close_matches(invalid_field, valid_fields, n=3, cutoff=0.5)
+    
+    if matches:
+        if len(matches) == 1:
+            return f". Did you mean '{matches[0]}'?"
+        else:
+            return f". Did you mean one of: {', '.join(repr(m) for m in matches)}?"
+    return ""
 
 @dc.dataclass
 class PackageProviderYaml(PackageProvider):
@@ -110,8 +138,18 @@ class PackageProviderYaml(PackageProvider):
                     obj = doc["package"]
                     loc = None
                     print("Errors: %s" % str(ee))
-                    for el in ee['loc']:
-#                        print("el: %s" % str(el))
+                    
+                    # Extract parent object and model class for similarity matching
+                    parent_obj = None
+                    model_class = None
+                    # Check context path to determine which model we're validating
+                    loc_list = list(ee['loc'])
+                    if 'tasks' in loc_list:
+                        model_class = TaskDef
+                    
+                    for i, el in enumerate(ee['loc']):
+                        if i == len(ee['loc']) - 1:
+                            parent_obj = obj
                         if loc_s != "":
                             loc_s += "." + str(el)
                         else:
@@ -123,6 +161,14 @@ class PackageProviderYaml(PackageProvider):
                                 pass
                         if type(obj) == dict and 'srcinfo' in obj.keys():
                             loc = obj['srcinfo']
+                    
+                    # Enhance error message for extra_forbidden errors
+                    error_msg = ee['msg']
+                    if ee['type'] == 'extra_forbidden' and model_class is not None:
+                        invalid_field = str(ee['loc'][-1])
+                        suggestion = _suggest_similar_field(invalid_field, model_class)
+                        error_msg = f"{error_msg}{suggestion}"
+                    
                     if loc is not None:
                         marker_loc = TaskMarkerLoc(path=loc['file'])
                         if 'lineno' in loc.keys():
@@ -131,13 +177,13 @@ class PackageProviderYaml(PackageProvider):
                             marker_loc.pos = loc['linepos']
 
                         marker = TaskMarker(
-                            msg=("%s (in %s)" % (ee['msg'], str(ee['loc'][-1]))),
+                            msg=("%s (in %s)" % (error_msg, str(ee['loc'][-1]))),
                             severity=SeverityE.Error,
                             loc=marker_loc)
                     else:
                         marker_loc = TaskMarkerLoc(path=root)   
                         marker = TaskMarker(
-                            msg=("%s (at '%s')" % (ee['msg'], loc_s)),
+                            msg=("%s (at '%s')" % (error_msg, loc_s)),
                             severity=SeverityE.Error,
                             loc=marker_loc)
                     loader.marker(marker)
@@ -621,11 +667,28 @@ class PackageProviderYaml(PackageProvider):
 #                    print("  Error: %s" % str(ee))
                         obj = doc["fragment"]
                         loc = None
-                        for el in ee['loc']:
+                        parent_obj = None
+                        model_class = None
+                        # Check context path to determine which model we're validating
+                        loc_list = list(ee['loc'])
+                        if 'tasks' in loc_list:
+                            model_class = TaskDef
+                        
+                        for i, el in enumerate(ee['loc']):
+                            if i == len(ee['loc']) - 1:
+                                parent_obj = obj
                             print("el: %s" % str(el))
                             obj = obj[el]
                             if type(obj) == dict and 'srcinfo' in obj.keys():
                                 loc = obj['srcinfo']
+                        
+                        # Enhance error message for extra_forbidden errors
+                        error_msg = ee['msg']
+                        if ee['type'] == 'extra_forbidden' and model_class is not None:
+                            invalid_field = str(ee['loc'][-1])
+                            suggestion = _suggest_similar_field(invalid_field, model_class)
+                            error_msg = f"{error_msg}{suggestion}"
+                        
                         if loc is not None:
                             marker_loc = TaskMarkerLoc(path=loc['file'])
                             if 'lineno' in loc.keys():
@@ -634,12 +697,12 @@ class PackageProviderYaml(PackageProvider):
                                 marker_loc.pos = loc['linepos']
 
                             marker = TaskMarker(
-                                msg=("%s (in %s)" % (ee['msg'], str(ee['loc'][-1]))),
+                                msg=("%s (in %s)" % (error_msg, str(ee['loc'][-1]))),
                                 severity=SeverityE.Error,
                                 loc=marker_loc)
                         else:
                             marker = TaskMarker(
-                                msg=ee['msg'], 
+                                msg=error_msg, 
                                 severity=SeverityE.Error,
                                 loc=TaskMarkerLoc(path=file))
                         self.marker(marker)

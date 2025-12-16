@@ -350,7 +350,7 @@ package:
       - name: t4
         needs: [t3]
     - name: t4
-      need: [foo2.t5]
+      needs: [foo2.t5]
 
 """
 
@@ -407,7 +407,7 @@ package:
       - name: t4
         needs: [t3]
     - name: t4
-      need: [foo2.t5]
+      needs: [foo2.t5]
 
 """
 
