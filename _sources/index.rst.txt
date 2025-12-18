@@ -16,6 +16,7 @@ efficient avoidance of redundant work.
    :caption: Contents:
 
    quickstart
+   incremental
    userguide/index
    reference/index
    cmdref

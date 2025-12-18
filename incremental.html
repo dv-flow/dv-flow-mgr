@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Incremental Builds &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="User Guide" href="userguide/index.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="incremental-builds">
+<h1>Incremental Builds<a class="headerlink" href="#incremental-builds" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager supports incremental builds by tracking task execution
+state and skipping tasks that are already up-to-date. This can significantly
+reduce build times when only a subset of inputs have changed.</p>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">¶</a></h2>
+<p>Tasks record their inputs, outputs, and parameters in an <code class="docutils literal notranslate"><span class="pre">exec.json</span></code> file
+in their run directory. On subsequent runs, DV Flow Manager checks:</p>
+<ol class="arabic simple">
+<li><p><strong>Exec record existence</strong>: If no <code class="docutils literal notranslate"><span class="pre">exec.json</span></code> exists, the task must run.</p></li>
+<li><p><strong>Parameter values</strong>: If recorded parameters differ from current values, re-run.</p></li>
+<li><p><strong>Input data</strong>: If any input dataset is marked as ‘changed’, re-run.</p></li>
+<li><p><strong>Input structure</strong>: If the number, position, or elements of inputs differ, re-run.</p></li>
+<li><p><strong>Custom up-to-date check</strong>: If provided, invoke the custom method for final confirmation.</p></li>
+</ol>
+</section>
+<section id="cli-options">
+<h2>CLI Options<a class="headerlink" href="#cli-options" title="Link to this heading">¶</a></h2>
+<p>The following CLI options control incremental build behavior:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--force</span></code></dt><dd><p>Force all tasks to run, ignoring up-to-date status. Useful when you
+want to rebuild everything regardless of what has changed.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>my_task<span class="w"> </span>--force
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show all tasks including up-to-date ones. By default, tasks that are
+determined to be up-to-date are not displayed in the output. Use this
+option to see all tasks that were evaluated.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>my_task<span class="w"> </span>--verbose
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="custom-up-to-date-methods">
+<h2>Custom Up-to-Date Methods<a class="headerlink" href="#custom-up-to-date-methods" title="Link to this heading">¶</a></h2>
+<p>For tasks that reference files not explicitly listed in a fileset, you can
+provide a custom up-to-date check method. The <code class="docutils literal notranslate"><span class="pre">uptodate</span></code> field in a task
+definition accepts one of three values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">false</span></code>: Always run the task (never consider it up-to-date)</p></li>
+<li><p>A non-empty string: Python method to evaluate</p></li>
+<li><p>Empty/null: Use the default up-to-date check</p></li>
+</ul>
+<section id="yaml-configuration">
+<h3>YAML Configuration<a class="headerlink" href="#yaml-configuration" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile_sources</span>
+<span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">  </span><span class="c1"># Always recompile</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_dependencies</span>
+<span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mymodule.check_deps_uptodate</span><span class="w">  </span><span class="c1"># Custom check method</span>
+</pre></div>
+</div>
+</section>
+<section id="implementing-a-custom-check">
+<h3>Implementing a Custom Check<a class="headerlink" href="#implementing-a-custom-check" title="Link to this heading">¶</a></h3>
+<p>A custom up-to-date method is an async Python function that receives an
+<code class="docutils literal notranslate"><span class="pre">UpToDateCtxt</span></code> object and returns a boolean indicating whether the task
+is up-to-date:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">check_deps_uptodate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Custom up-to-date check that verifies external dependencies.</span>
+
+<span class="sd">    Returns True if task is up-to-date, False if it needs to run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">os</span>
+
+    <span class="c1"># Check if a specific file has been modified since last run</span>
+    <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;external_dep.txt&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Compare timestamps, checksums, etc.</span>
+    <span class="c1"># ...</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="pytask_api.html"><span class="doc">Python Task API</span></a> for complete documentation of the <code class="docutils literal notranslate"><span class="pre">UpToDateCtxt</span></code> class.</p>
+</section>
+</section>
+<section id="task-output">
+<h2>Task Output<a class="headerlink" href="#task-output" title="Link to this heading">¶</a></h2>
+<p>When a task is determined to be up-to-date, it is marked as such in the
+output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&lt;&lt; [1] Task mypackage.compile (up-to-date) 0.05ms
+</pre></div>
+</div>
+<p>The previous output data is loaded from the task’s <code class="docutils literal notranslate"><span class="pre">exec.json</span></code> file,
+allowing downstream tasks to use cached results without re-executing.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Incremental Builds</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It Works</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli-options">CLI Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-up-to-date-methods">Custom Up-to-Date Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#task-output">Task Output</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="quickstart.html" title="previous chapter">Quickstart</a></li>
+      <li>Next: <a href="userguide/index.html" title="next chapter">User Guide</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/incremental.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
