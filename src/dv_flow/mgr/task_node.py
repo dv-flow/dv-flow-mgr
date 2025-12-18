@@ -151,10 +151,18 @@ class TaskNode(object):
     
     def _save_exec_data(self, rundir, ctxt : TaskRunCtxt, input : TaskDataInput):
         """Saves execution data to the rundir"""
+        # Build inputs signature for up-to-date checking
+        inputs_signature = [
+            {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
+            for item in input.inputs
+        ]
+
         data = {
             "name": self.name,
             "srcdir": self.srcdir,
             "rundir": rundir,
+            "params": self.params.model_dump() if hasattr(self.params, 'model_dump') else {},
+            "inputs_signature": inputs_signature,
             "input": input.model_dump(warnings=False),
             "needs": [need[0].name for need in self.needs],
             "commands": [cmd.model_dump() for cmd in ctxt._exec_info],

@@ -80,6 +80,7 @@ class TaskSetRunner(TaskRunner):
     builder : 'TaskGraphBuilder' = None
     nproc : int = -1
     status : int = 0
+    force_run : bool = False
 
     _anon_tid : int = 1
 

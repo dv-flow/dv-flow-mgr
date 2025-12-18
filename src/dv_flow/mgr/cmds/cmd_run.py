@@ -22,6 +22,7 @@
 import asyncio
 import os
 import logging
+import shutil
 import sys
 from typing import ClassVar
 from ..ext_rgy import ExtRgy
@@ -133,7 +134,7 @@ class CmdRun(object):
         if args.clean:
             print("Note: Cleaning rundir %s" % rundir)
             if os.path.exists(rundir):
-                os.rmdir(rundir)
+                shutil.rmtree(rundir)
             os.makedirs(rundir)
 
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
@@ -141,12 +142,19 @@ class CmdRun(object):
 
         if args.j != -1:
             runner.nproc = int(args.j)
+        
+        # Wire up force_run from CLI
+        if getattr(args, 'force', False):
+            runner.force_run = True
 
         if not os.path.isdir(os.path.join(rundir, "log")):
             os.makedirs(os.path.join(rundir, "log"))
         
         fp = open(os.path.join(rundir, "log", "%s.trace.json" % pkg.name), "w")
         trace = TaskListenerTrace(fp)
+
+        # Pass verbose flag to listener
+        listener.verbose = getattr(args, 'verbose', False)
 
         runner.add_listener(listener.event)
         runner.add_listener(trace.event)
