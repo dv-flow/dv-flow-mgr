@@ -38,6 +38,7 @@ class Task(object):
     consumes : Union[ConsumesE, List[Dict[str, Any]]] = dc.field(default=None)
     passthrough : Union[PassthroughE, List[Dict[str, Any]]] = dc.field(default=None)
     rundir : RundirE = None
+    uptodate : Union[bool, str, None] = None
     # TODO: strategy / matrix
     subtasks : List['Task'] = dc.field(default_factory=list)
     strategy : Strategy = dc.field(default=None)

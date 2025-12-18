@@ -1,10 +1,12 @@
 import os
 import asyncio
+import pytest
 from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner
 
 def _run_task(flow_path, rundir, task_name):
-    pkg_def = PackageLoader().load(flow_path)
-    builder = TaskGraphBuilder(root_pkg=pkg_def, rundir=rundir)
+    loader = PackageLoader()
+    pkg_def = loader.load(flow_path)
+    builder = TaskGraphBuilder(root_pkg=pkg_def, rundir=rundir, loader=loader)
     runner = TaskSetRunner(rundir=rundir, builder=builder)
     task = builder.mkTaskNode(task_name)
     return asyncio.run(runner.run(task)), runner

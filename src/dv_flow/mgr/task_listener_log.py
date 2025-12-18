@@ -31,6 +31,7 @@ class TaskListenerLog(object):
     level : int = 0
     quiet : bool = False
     json : bool = False
+    verbose : bool = False
     has_severity : Dict[SeverityE, int] = dc.field(default_factory=dict)
 
     sev_pref_m : ClassVar = {
@@ -62,9 +63,26 @@ class TaskListenerLog(object):
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
             self.level += 1
-            if not self.quiet:
+            # In verbose mode, show immediately; in non-verbose mode, defer until we know if it runs
+            if self.verbose and not self.quiet:
+                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
+        elif reason == 'uptodate':
+            # Task is up-to-date - in non-verbose mode, don't show it
+            # In verbose mode, it was already shown in 'enter'
+            pass
+        elif reason == 'run':
+            # Task will actually run - show it now in non-verbose mode
+            if not self.verbose and not self.quiet:
                 self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
         elif reason == 'leave':
+            # Check if task was up-to-date (not changed)
+            is_uptodate = not task.result.changed if task.result else False
+            
+            # Skip display of up-to-date tasks unless verbose mode
+            if is_uptodate and not self.verbose and not self.quiet:
+                self.level -= 1
+                return
+            
             if self.quiet:
                 if task.result.changed:
                     self.console.print("[green]Done:[/green] %s" % (task.name,))

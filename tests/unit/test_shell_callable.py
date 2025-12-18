@@ -231,8 +231,9 @@ package:
     rundir = os.path.join(tmpdir, "rundir")
     def marker(marker):
         raise Exception("Marker: %s" % marker)
-    pkg = PackageLoader(marker_listeners=[marker]).load(flow_path)
-    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+    loader = PackageLoader(marker_listeners=[marker])
+    pkg = loader.load(flow_path)
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
     runner = TaskSetRunner(rundir, builder=builder)
     entry = builder.mkTaskNode("p1.sh1")
     output = asyncio.run(runner.run(entry))
@@ -274,8 +275,9 @@ package:
     rundir = os.path.join(tmpdir, "rundir")
     def marker(marker):
         raise Exception("Marker: %s" % marker)
-    pkg = PackageLoader(marker_listeners=[marker]).load(flow_path)
-    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir)
+    loader = PackageLoader(marker_listeners=[marker])
+    pkg = loader.load(flow_path)
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
     runner = TaskSetRunner(rundir, builder=builder)
     entry = builder.mkTaskNode("p1.sh1")
     output = asyncio.run(runner.run(entry))
