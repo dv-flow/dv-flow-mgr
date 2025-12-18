@@ -9,6 +9,7 @@ from .loader_scope import LoaderScope
 from .marker_listener import MarkerListener
 from .name_resolution import NameResolutionContext
 from .package import Package
+from .package_def import PackageDef
 from .package_loader_p import PackageLoaderP
 from .package_provider import PackageProvider
 from .package_scope import PackageScope
@@ -77,18 +78,19 @@ class PackageLoader(PackageLoaderP):
         self._log.debug("<-- load %s" % root)
         return ret
     
-    # def load_rgy(self, name) -> Package:
-    #     self._log.debug("--> load_rgy %s" % name)
-    #     pkg = Package(PackageDef(name="anonymous"))
-    #     pkg.paramT = EmptyParams
+    def load_rgy(self, name) -> Package:
+        self._log.debug("--> load_rgy %s" % name)
+        pkg = Package(name="anonymous")
+        pkg.pkg_def = PackageDef(name="anonymous")
+        pkg.paramT = EmptyParams
 
-    #     name = name if isinstance(name, list) else [name]
+        name = name if isinstance(name, list) else [name]
 
-    #     for nn in name:
-    #         pp_n : Package = self.getPackage(nn, self)
-    #         pkg.pkg_m[pp_n.name] = pp_n
-    #     self._log.debug("<-- load_rgy %s" % name)
-    #     return pkg
+        for nn in name:
+            pp_n : Package = self.getPackage(nn)
+            pkg.pkg_m[pp_n.name] = pp_n
+        self._log.debug("<-- load_rgy %s" % name)
+        return pkg
     
     def getPackageNames(self):
         names = []
