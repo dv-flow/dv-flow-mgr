@@ -171,6 +171,7 @@ package:
     output = asyncio.run(runner.run(t1))
 
 def test_uses_leaf(tmpdir):
+    """Test that using a leaf task with subtasks raises an error"""
     flow_dv = """
 package:
     name: foo
@@ -201,18 +202,11 @@ package:
     builder = TaskGraphBuilder(
         root_pkg=pkg_def,
         rundir=os.path.join(rundir, "rundir"))
-    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
 
-    t1 = builder.mkTaskNode("foo.entry", name="t1")
-
-    TaskGraphDotWriter().write(
-        t1, 
-        os.path.join(rundir, "graph.dot"))
-
-    output = asyncio.run(runner.run(t1))
-
-    assert runner.status == 0
-    assert output is not None
+    # Should raise an exception because we're trying to use a leaf task
+    # (std.CreateFile) and also add subtasks
+    with pytest.raises(Exception, match="is not compound"):
+        t1 = builder.mkTaskNode("foo.entry", name="t1")
 
 def test_name_resolution_pkg(tmpdir):
     flow_dv = """

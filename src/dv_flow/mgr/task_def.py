@@ -22,7 +22,7 @@
 import pydantic
 import pydantic.dataclasses as dc
 import enum
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
@@ -93,6 +93,7 @@ class Tasks(BaseModel):
 
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
+    model_config = ConfigDict(extra='forbid')
     name : Union[str, None] = dc.Field(
         title="Task Name",
         description="The name of the task",
@@ -105,8 +106,9 @@ class TaskDef(BaseModel):
         default=None,
         title="Base type",
         description="Task from which this task is derived")
-    body: List['TaskDef'] = dc.Field(
+    body: List['TaskDef'] = Field(
         default_factory=list,
+        validation_alias=AliasChoices('body', 'tasks'),
         description="Sub-tasks")
     iff : Union[str, bool, Any] = dc.Field(
         default=None,

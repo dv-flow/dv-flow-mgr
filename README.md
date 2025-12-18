@@ -1,60 +1,45 @@
-# dv-flow-mgr
-Flow manager for design and verification projects
+# DV Flow Manager
 
-DV Flow Manager (dvfm) is a flow manager that focuses on the unique requirements
-of hardware design and verification flows. 
+DV Flow Manager (dfm) is a flow manager designed for hardware design and verification projects. 
+It orchestrates tasks connected by data objects, managing dependencies between filesets to 
+enable proper ordering and intelligent partitioning.
 
-# Key Concepts
+## Features
 
-A flow is composed of tasks connected by data objects. Data objects can contain
-arbitrary parameters (key/value pairs) and a list of filesets. The dependency 
-tree of filesets is maintained, such that consumers can create a flat list
-of files in proper order or do something more intelligent by partitioning 
-the tree.
+- **Package-based organization** - Projects are encapsulated as packages with public and private flows
+- **Type inheritance** - Packages, flows, and subflows support inheritance and extension
+- **Fileset dependency tracking** - Maintains dependency trees for proper file ordering
+- **Flexible UI** - Progress spinner or log-based output modes
 
-Projects and other units of functionality are encapsulated as "packages". A 
-package has a public persona, defined by:
-- Exported flows intended for use by higher-level packages
-- Flows intended for use while developing the package, and not visible to higher-level packages
-  (ie are private to the package)
-- Subflows that are only visible within the package (ie are private to the package)
+## Quick Start
 
-Packages, Flows, and SubFlows are considered to be types, and support inheritance
-and extension relationships.
+### Installation
 
-There are two levels of schema definition for a .flow file:
-- The .flow file has a schema, which defines the key elements in the file
-- Types (package, flow, subflow) define schemas for their respective 
-  bodies that define what content is permitted.
+Install via pip:
 
-## Running Flows
-
-Use the `dfm run` command to execute one or more tasks. You can now select the console UI style with `-u/--ui`:
-
-```
-dfm run -u progress <tasks>
-dfm run -u log <tasks>
+```bash
+% pip install dv-flow-mgr
 ```
 
-UI styles:
-- `progress` (default when stdout is a TTY): Shows each running task with a spinner; on completion shows D (success), W (warnings), or E (errors). Markers (warnings/errors) appear indented beneath the task and the final list remains visible.
-- `log` (default when stdout is redirected): Traditional line-oriented logging of task start/finish and markers.
+### Example Flow
 
-If `-u/--ui` is not specified the tool auto-selects `progress` when writing to a terminal and `log` otherwise.
+Create a `flow.yaml` file:
 
-# Package
-- Packages support inheritance relationships
-- Packages can define parameters that are specified when the package is referenced
-- Each parameterization  
+```yaml
+package:
+  name: hello
 
-# Flow
-- Flows are top-level elements within packages. They can 
+  tasks:
+    - name: greet
+      uses: std.Message
+      with:
+        msg: "Hello World"
+```
 
-# Subflow
-- Files that define subflows must be imported from within the scope of a package. 
-  In other words, subflows 
-- Subflows have 0+ inputs and produce 1+ outputs
-  - Inputs are specified by '
+### Running Flows
 
+Run the flow using the `dfm run` command:
 
-
+```bash
+% dfm run greet
+```
