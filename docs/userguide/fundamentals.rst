@@ -132,3 +132,107 @@ above, for example, it's natural to think of the simulation image 'needing'
 to have required source files. In cases where the parameter sets represent
 controls over tools in the flow, the production is explicit.
 
+
+Types
+#####
+
+DV Flow Manager supports custom data types that can be used to structure
+the data passed between tasks. Types are defined in packages and can inherit
+from other types, enabling reuse and extension of data structures.
+
+.. code-block:: YAML
+
+    package:
+      name: my_types
+      
+      types:
+      - name: CompilerOptions
+        with:
+          optimization:
+            type: str
+            value: "-O2"
+          warnings:
+            type: list
+            value: []
+      
+      - name: DebugOptions
+        uses: CompilerOptions
+        with:
+          debug_level:
+            type: int
+            value: 0
+
+Types can be used as the base for tasks (see DataItem tasks in the Using Tasks
+guide) or as structured parameters. When a type inherits from another using
+``uses:``, it includes all parameters from the base type and can add or 
+override parameters.
+
+
+Expression System
+#################
+
+DV Flow Manager supports dynamic parameter evaluation using the ``${{ }}``
+expression syntax. This allows parameters to reference other parameters,
+perform calculations, and make decisions based on configuration values.
+
+.. code-block:: YAML
+
+    package:
+      name: my_pkg
+      with:
+        debug:
+          type: bool
+          value: false
+        optimization:
+          type: str
+          value: "O2"
+      
+      tasks:
+      - name: compile
+        uses: std.Message
+        with:
+          msg: "Compiling with -${{ optimization }} debug=${{ debug }}"
+
+Expressions can access:
+
+* **Package parameters**: ``${{ param_name }}``
+* **Task parameters**: From containing compound tasks
+* **Matrix variables**: When using matrix strategy
+* **Arithmetic**: ``${{ value * 2 }}``
+* **Comparisons**: ``${{ debug_level > 0 }}``
+* **String operations**: Concatenation and formatting
+
+The expression evaluator provides a safe subset of Python expressions,
+ensuring that flow specifications remain declarative and predictable.
+
+
+Task Dependencies: needs and feeds
+###################################
+
+Tasks express dependencies using the ``needs`` field, which specifies
+which tasks must complete before this task can run. DV Flow also supports
+the ``feeds`` field, which is the inverse relationship - it declares which
+tasks depend on this task.
+
+.. code-block:: YAML
+
+    package:
+      name: example
+      
+      tasks:
+      - name: sources
+        uses: std.FileSet
+        feeds: [compile]  # Inverse of 'needs'
+      
+      - name: compile
+        uses: hdlsim.vlt.SimImage
+        needs: [sources]  # Explicit dependency
+
+The ``feeds`` field can be useful for defining dependencies from the producer's
+perspective, particularly when organizing large flows where it's clearer to
+declare what a task provides rather than what consumes it.
+
+Both ``needs`` and ``feeds`` establish the same scheduling dependencies and
+dataflow relationships - they are simply two ways to express the same graph
+structure.
+

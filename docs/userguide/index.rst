@@ -10,6 +10,8 @@ User Guide
    tasks_using
    tasks_developing
    configuration
+   expressions
+   advanced_features
    stdlib
 
 DV Flow input specification builds on three key concepts:

@@ -65,7 +65,8 @@ class TaskBodyDef(BaseModel):
     model_config = ConfigDict(extra='forbid')
     pytask : Union[str, None] = dc.Field(
         default=None,
-        description="Python method to execute to implement this task")
+        description="Python method to execute to implement this task",
+        )
     tasks: Union[List['TaskDef'],None] = dc.Field(
         default_factory=list,
         description="Sub-tasks")
