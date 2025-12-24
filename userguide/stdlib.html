@@ -15,7 +15,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Flow-Spec Reference" href="../reference/index.html" />
-    <link rel="prev" title="Parameters and Configuration" href="configuration.html" />
+    <link rel="prev" title="Advanced Features" href="advanced_features.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -85,7 +85,7 @@ tools.</p>
     <span class="o">-</span> <span class="n">name</span><span class="p">:</span> <span class="n">rtlsrc</span>
         <span class="n">uses</span><span class="p">:</span> <span class="n">std</span><span class="o">.</span><span class="n">FileSet</span>
         <span class="k">with</span><span class="p">:</span>
-          <span class="n">includes</span><span class="p">:</span> <span class="s1">&#39;*.v&#39;</span>
+          <span class="n">include</span><span class="p">:</span> <span class="s1">&#39;*.v&#39;</span>
           <span class="n">base</span><span class="p">:</span> <span class="s1">&#39;src/rtl&#39;</span>
           <span class="nb">type</span><span class="p">:</span> <span class="s1">&#39;verilogSource&#39;</span>
 </pre></div>
@@ -96,6 +96,7 @@ parameter set having the filetype of <cite>verilogSource</cite>.</p>
 </section>
 <section id="id2">
 <h3>Consumes<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>None by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">none</span></code>)</p>
 </section>
 <section id="id3">
 <h3>Produces<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
@@ -110,7 +111,242 @@ parameter set having the filetype of <cite>verilogSource</cite>.</p>
 <li><p><strong>exclude</strong> - [Optional] Set of file patterns to exclude from the fileset. Glob patterns may be used</p></li>
 <li><p><strong>incdirs</strong> - [Optional] Set of include directories that consumers of the fileset must use</p></li>
 <li><p><strong>defines</strong> - [Optional] Set of pre-processor defines that consumers of the fileset must use</p></li>
+<li><p><strong>attributes</strong> - [Optional] Set of attributes to tag the fileset with (e.g., [‘uvm’, ‘testbench’])</p></li>
 </ul>
+</section>
+</section>
+<section id="std-exec">
+<h2>std.Exec<a class="headerlink" href="#std-exec" title="Link to this heading">¶</a></h2>
+<p>Executes a shell command as part of the task flow. This is useful for
+running external tools, scripts, or commands that don’t have dedicated
+task implementations.</p>
+<section id="id5">
+<h3>Example<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">exec.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_script</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Exec</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;./scripts/process_data.sh&quot;</span>
+<span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">        </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">changed</span>
+</pre></div>
+</div>
+</section>
+<section id="id6">
+<h3>Consumes<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
+</section>
+<section id="id7">
+<h3>Produces<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<p>Passes through all inputs to output. Does not produce additional data items.</p>
+</section>
+<section id="id8">
+<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>command</strong> - [Required] The shell command to execute</p></li>
+<li><p><strong>shell</strong> - [Optional] Shell to use for execution (default: “bash”)</p></li>
+<li><p><strong>when</strong> - [Optional] Controls when the command runs:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;always&quot;</span></code> - Always run the command (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;changed&quot;</span></code> - Only run if upstream tasks changed</p></li>
+</ul>
+</li>
+<li><p><strong>timestamp</strong> - [Optional] Path to a timestamp file to check for changes</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> parameter allows incremental execution based on file
+timestamps. If specified, the task compares the timestamp of the file
+against the previous execution to determine if output changed.</p>
+</section>
+</section>
+<section id="std-setenv">
+<h2>std.SetEnv<a class="headerlink" href="#std-setenv" title="Link to this heading">¶</a></h2>
+<p>Sets environment variables for use by downstream tasks. Supports glob
+pattern expansion for paths, making it easy to configure tool paths
+and directories.</p>
+<section id="id9">
+<h3>Example<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">setenv.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tool_env</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.SetEnv</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">setenv</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">TOOL_HOME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/tools/my_tool</span>
+<span class="w">          </span><span class="nt">PYTHONPATH</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;lib/python/site-packages&quot;</span>
+<span class="w">        </span><span class="nt">append_path</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">PATH</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/tools/my_tool/bin</span>
+<span class="w">        </span><span class="nt">prepend_path</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">LD_LIBRARY_PATH</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/tools/my_tool/lib</span>
+</pre></div>
+</div>
+</section>
+<section id="glob-expansion">
+<h3>Glob Expansion<a class="headerlink" href="#glob-expansion" title="Link to this heading">¶</a></h3>
+<p>Values containing glob patterns (<code class="docutils literal notranslate"><span class="pre">*</span></code>, <code class="docutils literal notranslate"><span class="pre">?</span></code>, <code class="docutils literal notranslate"><span class="pre">[...]</span></code>) are expanded
+relative to the task’s source directory:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib_paths</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.SetEnv</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">setenv</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">MY_LIBS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;libs/*/lib&quot;</span><span class="w">  </span><span class="c1"># Expands to all lib dirs</span>
+</pre></div>
+</div>
+<p>If multiple paths match, they are joined with the platform path separator
+(<cite>:</cite> on Unix, <cite>;</cite> on Windows).</p>
+</section>
+<section id="id10">
+<h3>Consumes<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
+</section>
+<section id="id11">
+<h3>Produces<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<p>Produces a <code class="docutils literal notranslate"><span class="pre">std.Env</span></code> data item containing the environment variable mappings.</p>
+</section>
+<section id="id12">
+<h3>Parameters<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>setenv</strong> - [Optional] Map of environment variable names to values</p></li>
+<li><p><strong>append_path</strong> - [Optional] Map of environment variables to values that should be appended</p></li>
+<li><p><strong>prepend_path</strong> - [Optional] Map of environment variables to values that should be prepended</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">append_path</span></code> and <code class="docutils literal notranslate"><span class="pre">prepend_path</span></code> parameters automatically handle
+path separator logic for PATH-like environment variables.</p>
+</section>
+</section>
+<section id="std-setfiletype">
+<h2>std.SetFileType<a class="headerlink" href="#std-setfiletype" title="Link to this heading">¶</a></h2>
+<p>Modifies the file type of input filesets. This is useful when you need
+to reinterpret files with a different type for different tools.</p>
+<section id="id13">
+<h3>Example<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">setfiletype.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog_files</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.v&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilogSource</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reinterpret</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.SetFileType</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">verilog_files</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+</pre></div>
+</div>
+</section>
+<section id="id14">
+<h3>Consumes<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<p>Only <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">[{type:</span> <span class="pre">std.FileSet}]</span></code>)</p>
+</section>
+<section id="id15">
+<h3>Produces<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<p>Produces new <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items with the updated file type.</p>
+</section>
+<section id="id16">
+<h3>Parameters<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>filetype</strong> - [Required] The new file type to assign to all consumed filesets</p></li>
+</ul>
+</section>
+</section>
+<section id="std-incdirs">
+<h2>std.IncDirs<a class="headerlink" href="#std-incdirs" title="Link to this heading">¶</a></h2>
+<p>Extracts include directories from input filesets and produces them as
+a structured list. This is useful for passing include paths to compilation
+tools.</p>
+<section id="id17">
+<h3>Example<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incdirs.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl_files</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+<span class="w">        </span><span class="nt">incdirs</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl/include</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extract_dirs</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.IncDirs</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl_files</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="id18">
+<h3>Consumes<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items</p>
+</section>
+<section id="id19">
+<h3>Produces<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
+<p>Produces a data item containing the collected include directories.</p>
+</section>
+<section id="id20">
+<h3>Parameters<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
+<p>None. The task operates entirely on input filesets.</p>
+</section>
+</section>
+<section id="std-message">
+<h2>std.Message<a class="headerlink" href="#std-message" title="Link to this heading">¶</a></h2>
+<p>Displays a message during task execution. Useful for logging, debugging,
+and providing user feedback during flow execution.</p>
+<section id="id21">
+<h3>Example<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hello</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">World!&quot;</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Build</span><span class="nv"> </span><span class="s">completed</span><span class="nv"> </span><span class="s">successfully&quot;</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">build</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="id22">
+<h3>Consumes<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
+</section>
+<section id="id23">
+<h3>Produces<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
+<p>Passes through all inputs. Does not produce additional data items.</p>
+</section>
+<section id="id24">
+<h3>Parameters<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>msg</strong> - [Optional] The message to display (default: empty string)</p></li>
+</ul>
+<p>Messages support expression syntax for dynamic content:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">version_msg</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
 </section>
 </section>
 </section>
@@ -151,11 +387,14 @@ parameter set having the filetype of <cite>verilogSource</cite>.</p>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
@@ -166,7 +405,7 @@ parameter set having the filetype of <cite>verilogSource</cite>.</p>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
-      <li>Previous: <a href="configuration.html" title="previous chapter">Parameters and Configuration</a></li>
+      <li>Previous: <a href="advanced_features.html" title="previous chapter">Advanced Features</a></li>
       <li>Next: <a href="../reference/index.html" title="next chapter">Flow-Spec Reference</a></li>
   </ul></li>
   </ul></li>

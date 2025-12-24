@@ -113,6 +113,13 @@ and run the resulting image. Not too bad for 20-odd lines of build specification
 </div>
 <p>DV Flow Manager views the world as a series of <em>packages</em> that reference each
 other and contain <em>tasks</em> to operate on sources within the <em>packages</em>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Task Type Specification</strong>: In this quickstart, we use <code class="docutils literal notranslate"><span class="pre">type:</span></code> to specify
+the task type. This is equivalent to using <code class="docutils literal notranslate"><span class="pre">uses:</span></code> - both specify which
+task implementation to use. <code class="docutils literal notranslate"><span class="pre">type:</span></code> is more concise for simple cases,
+while <code class="docutils literal notranslate"><span class="pre">uses:</span></code> is preferred in formal documentation for clarity.</p>
+</div>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
 
@@ -127,6 +134,13 @@ other and contain <em>tasks</em> to operate on sources within the <em>packages</
 <p>Our first task is to specify the sources we want to process. This is done
 by specifying a <cite>FileSet</cite> task. The parameters of this task specify where
 the task should look for sources and which sources it should include.</p>
+<p>Note that the <code class="docutils literal notranslate"><span class="pre">type</span></code> field appears twice here with different meanings:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">std.FileSet</span></code> (line 6) - Specifies which task to use</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">type:</span> <span class="pre">&quot;systemVerilogSource&quot;</span></code> (line 8) - A parameter specifying the file type</p></li>
+</ul>
+<p>To avoid this ambiguity, you can use <code class="docutils literal notranslate"><span class="pre">uses:</span> <span class="pre">std.FileSet</span></code> instead, which is
+equivalent but clearer.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_design</span>
 
@@ -195,6 +209,7 @@ compiled simulation image and produce the “Hello, World!” output.</p>
 <li class="toctree-l1"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>

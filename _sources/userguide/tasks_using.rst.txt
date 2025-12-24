@@ -248,3 +248,173 @@ sends the `--trace-fst` option to the simulator. Otherwise, no additional argume
 provided.
 
 
+Task Override
+=============
+
+Tasks can override other tasks using the ``override`` field. This allows you to
+replace the implementation or parameters of a task defined elsewhere in the flow,
+typically to customize behavior for a specific configuration or environment.
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+      
+      tasks:
+      - name: sim
+        uses: hdlsim.vlt.SimImage
+        with:
+          top: [my_top]
+      
+      # Override the sim task for debug builds
+      - name: sim_debug
+        override: sim
+        with:
+          top: [my_top]
+          debug: true
+
+When a task is overridden, the overriding task replaces the original task
+throughout the flow. Any task that depends on ``sim`` will now receive the
+implementation from ``sim_debug`` instead.
+
+Task override is particularly useful for:
+
+* **Configuration-specific customization**: Different build modes (debug, release, etc.)
+* **Tool-specific variants**: Swapping between different tool implementations
+* **Testing and debugging**: Temporarily replacing a task without modifying the original
+
+Note that task override operates at the package level - an override only affects
+references within the package where it's defined, not across package boundaries.
+
+
+Dataflow Control: Consumes and Passthrough
+===========================================
+
+Tasks have fine-grained control over dataflow using the ``consumes`` and 
+``passthrough`` parameters. These control what input data reaches the task
+implementation and what inputs are forwarded to the output.
+
+Consumes Patterns
+-----------------
+
+The ``consumes`` parameter can specify patterns to selectively consume inputs:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: compile
+      uses: hdlsim.vlt.SimImage
+      consumes:
+      - type: std.FileSet
+        filetype: systemVerilogSource
+
+This task will only consume FileSet inputs with ``filetype`` equal to 
+``systemVerilogSource``. Other inputs will be passed through to the output.
+
+The ``consumes`` parameter accepts:
+
+* **all**: Consume all inputs (default for tasks with implementations)
+* **none**: Consume no inputs (default for DataItem tasks)
+* **Pattern list**: List of dictionaries specifying matching criteria
+
+Passthrough Patterns
+--------------------
+
+The ``passthrough`` parameter controls which inputs are forwarded to output:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: process
+      uses: my_tool.Processor
+      passthrough:
+      - type: std.FileSet
+        filetype: verilogSource
+
+This forwards only Verilog source filesets to the output, filtering out
+other input types.
+
+The ``passthrough`` parameter accepts:
+
+* **all**: Pass all inputs to output
+* **none**: Pass no inputs to output
+* **unused**: Pass only inputs not consumed by the task (default)
+* **Pattern list**: List of dictionaries specifying matching criteria
+
+Pattern Matching
+----------------
+
+Patterns match data items by their fields. Multiple fields create an AND
+condition - all must match:
+
+.. code-block:: yaml
+
+    consumes:
+    - type: std.FileSet
+      filetype: systemVerilogSource
+      attributes: [uvm]
+
+This matches FileSet items that are SystemVerilog sources AND have the
+'uvm' attribute.
+
+
+Run Directory Modes
+===================
+
+Tasks can control how run directories are created using the ``rundir`` parameter.
+This affects where the task executes and how it organizes its outputs.
+
+.. code-block:: yaml
+
+    tasks:
+    - name: parent_task
+      rundir: unique
+      body:
+      - name: child_task
+        rundir: inherit
+
+Run directory modes:
+
+* **unique**: Create a dedicated directory for this task (default)
+
+  * Each task gets its own isolated workspace
+  * Outputs are cleanly separated
+  * Best for tasks that produce files
+
+* **inherit**: Use the parent task's directory
+
+  * Shares workspace with parent
+  * Useful for organizing sub-tasks
+  * Required when sub-tasks need to access each other's files
+
+The ``inherit`` mode is particularly useful for compound tasks that create
+multiple files which need to be processed together:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: CreateTestFiles
+      rundir: inherit  # Share directory across all subtasks
+      body:
+      - name: create_file1
+        uses: std.CreateFile
+        with:
+          filename: test1.sv
+          content: "module test1; endmodule"
+      
+      - name: create_file2
+        uses: std.CreateFile
+        with:
+          filename: test2.sv
+          content: "module test2; endmodule"
+      
+      - name: gather
+        uses: std.FileSet
+        needs: [create_file1, create_file2]
+        with:
+          include: "*.sv"
+
+All three subtasks share the same directory, so the ``gather`` task can
+find both created files.
+
+

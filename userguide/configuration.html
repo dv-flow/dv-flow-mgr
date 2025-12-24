@@ -14,7 +14,7 @@
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Standard Library" href="stdlib.html" />
+    <link rel="next" title="Expressions" href="expressions.html" />
     <link rel="prev" title="Developing Tasks" href="tasks_developing.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -101,37 +101,9 @@ and call also refer to package-level parameters.</p>
 </section>
 <section id="overrides">
 <h2>Overrides<a class="headerlink" href="#overrides" title="Link to this heading">¶</a></h2>
-<p>Overrides provide the ability to manipulate the value of parameters and
-the target of package references. For the most part, overrides control
-features that are outside the declaration scope of the override.</p>
-<section id="package-overrides">
-<h3>Package Overrides<a class="headerlink" href="#package-overrides" title="Link to this heading">¶</a></h3>
-<p>The DV Flow <cite>hdlsim</cite> library provides tasks for building HDL simulation
-images using a variety of toolchains. The key operations supported by
-these tools are sufficiently common that a core set of tasks is defined
-to be implemented by each toolchain.</p>
-<p>Overrides provide a mechanism by which the user can dynamically select
-the appropriate toolchain to use without modifying the flow specification.</p>
-<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
-<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">sim</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
-<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vlt</span>
-
-<span class="w">  </span><span class="nt">overrides</span><span class="p">:</span>
-<span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim</span>
-<span class="w">     </span><span class="nt">use</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.${{ sim }}</span>
-
-<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.SimImage</span>
-<span class="w">    </span><span class="c1"># ...</span>
-</pre></div>
-</div>
-<p>The override directive changes how the package name <cite>hdlsim</cite> is
-resolved. Within the scope of package <cite>proj</cite>, any reference
-to package <cite>hdlsim</cite> will, instead, resolve to the package <cite>hdlsim.vlt</cite>.</p>
-</section>
+<p>Overrides provide the ability to manipulate the value of parameters.
+For the most part, overrides control features that are outside the
+declaration scope of the override.</p>
 <section id="parameter-overrides">
 <h3>Parameter Overrides<a class="headerlink" href="#parameter-overrides" title="Link to this heading">¶</a></h3>
 <p>Each task within a DV Flow specification has a unique name that is
@@ -215,11 +187,14 @@ such that “outer” specifications take precedence over “inner” specificat
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
@@ -231,7 +206,7 @@ such that “outer” specifications take precedence over “inner” specificat
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
       <li>Previous: <a href="tasks_developing.html" title="previous chapter">Developing Tasks</a></li>
-      <li>Next: <a href="stdlib.html" title="next chapter">Standard Library</a></li>
+      <li>Next: <a href="expressions.html" title="next chapter">Expressions</a></li>
   </ul></li>
   </ul></li>
 </ul>

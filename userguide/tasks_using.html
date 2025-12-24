@@ -263,6 +263,157 @@ When the <cite>debug_level</cite> parameter’s value is greater than 0, the <ci
 sends the <cite>–trace-fst</cite> option to the simulator. Otherwise, no additional arguments are
 provided.</p>
 </section>
+<section id="task-override">
+<h2>Task Override<a class="headerlink" href="#task-override" title="Link to this heading">¶</a></h2>
+<p>Tasks can override other tasks using the <code class="docutils literal notranslate"><span class="pre">override</span></code> field. This allows you to
+replace the implementation or parameters of a task defined elsewhere in the flow,
+typically to customize behavior for a specific configuration or environment.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_top</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="c1"># Override the sim task for debug builds</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_debug</span>
+<span class="w">    </span><span class="nt">override</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_top</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>When a task is overridden, the overriding task replaces the original task
+throughout the flow. Any task that depends on <code class="docutils literal notranslate"><span class="pre">sim</span></code> will now receive the
+implementation from <code class="docutils literal notranslate"><span class="pre">sim_debug</span></code> instead.</p>
+<p>Task override is particularly useful for:</p>
+<ul class="simple">
+<li><p><strong>Configuration-specific customization</strong>: Different build modes (debug, release, etc.)</p></li>
+<li><p><strong>Tool-specific variants</strong>: Swapping between different tool implementations</p></li>
+<li><p><strong>Testing and debugging</strong>: Temporarily replacing a task without modifying the original</p></li>
+</ul>
+<p>Note that task override operates at the package level - an override only affects
+references within the package where it’s defined, not across package boundaries.</p>
+</section>
+<section id="dataflow-control-consumes-and-passthrough">
+<h2>Dataflow Control: Consumes and Passthrough<a class="headerlink" href="#dataflow-control-consumes-and-passthrough" title="Link to this heading">¶</a></h2>
+<p>Tasks have fine-grained control over dataflow using the <code class="docutils literal notranslate"><span class="pre">consumes</span></code> and
+<code class="docutils literal notranslate"><span class="pre">passthrough</span></code> parameters. These control what input data reaches the task
+implementation and what inputs are forwarded to the output.</p>
+<section id="consumes-patterns">
+<h3>Consumes Patterns<a class="headerlink" href="#consumes-patterns" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">consumes</span></code> parameter can specify patterns to selectively consume inputs:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">  </span><span class="nt">consumes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+</pre></div>
+</div>
+<p>This task will only consume FileSet inputs with <code class="docutils literal notranslate"><span class="pre">filetype</span></code> equal to
+<code class="docutils literal notranslate"><span class="pre">systemVerilogSource</span></code>. Other inputs will be passed through to the output.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">consumes</span></code> parameter accepts:</p>
+<ul class="simple">
+<li><p><strong>all</strong>: Consume all inputs (default for tasks with implementations)</p></li>
+<li><p><strong>none</strong>: Consume no inputs (default for DataItem tasks)</p></li>
+<li><p><strong>Pattern list</strong>: List of dictionaries specifying matching criteria</p></li>
+</ul>
+</section>
+<section id="passthrough-patterns">
+<h3>Passthrough Patterns<a class="headerlink" href="#passthrough-patterns" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">passthrough</span></code> parameter controls which inputs are forwarded to output:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_tool.Processor</span>
+<span class="w">  </span><span class="nt">passthrough</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilogSource</span>
+</pre></div>
+</div>
+<p>This forwards only Verilog source filesets to the output, filtering out
+other input types.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">passthrough</span></code> parameter accepts:</p>
+<ul class="simple">
+<li><p><strong>all</strong>: Pass all inputs to output</p></li>
+<li><p><strong>none</strong>: Pass no inputs to output</p></li>
+<li><p><strong>unused</strong>: Pass only inputs not consumed by the task (default)</p></li>
+<li><p><strong>Pattern list</strong>: List of dictionaries specifying matching criteria</p></li>
+</ul>
+</section>
+<section id="pattern-matching">
+<h3>Pattern Matching<a class="headerlink" href="#pattern-matching" title="Link to this heading">¶</a></h3>
+<p>Patterns match data items by their fields. Multiple fields create an AND
+condition - all must match:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">consumes</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">  </span><span class="nt">attributes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">uvm</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>This matches FileSet items that are SystemVerilog sources AND have the
+‘uvm’ attribute.</p>
+</section>
+</section>
+<section id="run-directory-modes">
+<h2>Run Directory Modes<a class="headerlink" href="#run-directory-modes" title="Link to this heading">¶</a></h2>
+<p>Tasks can control how run directories are created using the <code class="docutils literal notranslate"><span class="pre">rundir</span></code> parameter.
+This affects where the task executes and how it organizes its outputs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parent_task</span>
+<span class="w">  </span><span class="nt">rundir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unique</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">child_task</span>
+<span class="w">    </span><span class="nt">rundir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inherit</span>
+</pre></div>
+</div>
+<p>Run directory modes:</p>
+<ul class="simple">
+<li><p><strong>unique</strong>: Create a dedicated directory for this task (default)</p>
+<ul>
+<li><p>Each task gets its own isolated workspace</p></li>
+<li><p>Outputs are cleanly separated</p></li>
+<li><p>Best for tasks that produce files</p></li>
+</ul>
+</li>
+<li><p><strong>inherit</strong>: Use the parent task’s directory</p>
+<ul>
+<li><p>Shares workspace with parent</p></li>
+<li><p>Useful for organizing sub-tasks</p></li>
+<li><p>Required when sub-tasks need to access each other’s files</p></li>
+</ul>
+</li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">inherit</span></code> mode is particularly useful for compound tasks that create
+multiple files which need to be processed together:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CreateTestFiles</span>
+<span class="w">  </span><span class="nt">rundir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inherit</span><span class="w">  </span><span class="c1"># Share directory across all subtasks</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create_file1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.CreateFile</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test1.sv</span>
+<span class="w">      </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;module</span><span class="nv"> </span><span class="s">test1;</span><span class="nv"> </span><span class="s">endmodule&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create_file2</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.CreateFile</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test2.sv</span>
+<span class="w">      </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;module</span><span class="nv"> </span><span class="s">test2;</span><span class="nv"> </span><span class="s">endmodule&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gather</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">create_file1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">create_file2</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+</pre></div>
+</div>
+<p>All three subtasks share the same directory, so the <code class="docutils literal notranslate"><span class="pre">gather</span></code> task can
+find both created files.</p>
+</section>
 </section>
 
 
@@ -301,11 +452,14 @@ provided.</p>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>

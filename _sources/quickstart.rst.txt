@@ -104,6 +104,12 @@ Let's break this down just a bit:
 DV Flow Manager views the world as a series of *packages* that reference each
 other and contain *tasks* to operate on sources within the *packages*.
 
+.. note::
+   **Task Type Specification**: In this quickstart, we use ``type:`` to specify
+   the task type. This is equivalent to using ``uses:`` - both specify which
+   task implementation to use. ``type:`` is more concise for simple cases,
+   while ``uses:`` is preferred in formal documentation for clarity.
+
 .. code-block:: yaml
     :emphasize-lines: 8,12
 
@@ -120,6 +126,14 @@ other and contain *tasks* to operate on sources within the *packages*.
 Our first task is to specify the sources we want to process. This is done
 by specifying a `FileSet` task. The parameters of this task specify where
 the task should look for sources and which sources it should include.
+
+Note that the ``type`` field appears twice here with different meanings:
+
+* ``type: std.FileSet`` (line 6) - Specifies which task to use
+* ``type: "systemVerilogSource"`` (line 8) - A parameter specifying the file type
+
+To avoid this ambiguity, you can use ``uses: std.FileSet`` instead, which is
+equivalent but clearer.
 
 .. code-block:: yaml
     :emphasize-lines: 5,6

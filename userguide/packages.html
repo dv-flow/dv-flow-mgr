@@ -299,6 +299,158 @@ same package.</p>
 <li><p>Use consistent naming conventions across related packages</p></li>
 </ul>
 </section>
+<section id="package-configurations">
+<h2>Package Configurations<a class="headerlink" href="#package-configurations" title="Link to this heading">¶</a></h2>
+<p>Packages can define multiple configurations that customize behavior for
+different scenarios (debug builds, different tools, deployment targets, etc.).
+Configurations provide a way to organize variations without duplicating
+the core package definition.</p>
+<section id="defining-configurations">
+<h3>Defining Configurations<a class="headerlink" href="#defining-configurations" title="Link to this heading">¶</a></h3>
+<p>Configurations are defined in the package using the <code class="docutils literal notranslate"><span class="pre">configs</span></code> field:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">default</span><span class="nv"> </span><span class="s">mode&quot;</span>
+
+<span class="w">  </span><span class="nt">configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">override</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">debug</span><span class="nv"> </span><span class="s">mode&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="w">    </span><span class="nt">overrides</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">override</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.xcelium</span>
+</pre></div>
+</div>
+<p>A configuration can specify:</p>
+<ul class="simple">
+<li><p><strong>with</strong>: Parameter values for this configuration</p></li>
+<li><p><strong>uses</strong>: Base configuration to inherit from</p></li>
+<li><p><strong>overrides</strong>: Package/parameter overrides</p></li>
+<li><p><strong>extensions</strong>: Task extensions (see below)</p></li>
+<li><p><strong>tasks</strong>: Additional or overriding tasks</p></li>
+<li><p><strong>types</strong>: Additional or overriding types</p></li>
+<li><p><strong>imports</strong>: Additional imports for this configuration</p></li>
+<li><p><strong>fragments</strong>: Additional fragments for this configuration</p></li>
+</ul>
+</section>
+<section id="selecting-a-configuration">
+<h3>Selecting a Configuration<a class="headerlink" href="#selecting-a-configuration" title="Link to this heading">¶</a></h3>
+<p>Configurations are selected via the command line:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>debug
+</pre></div>
+</div>
+<p>When a configuration is selected:</p>
+<ol class="arabic simple">
+<li><p>Base package is loaded</p></li>
+<li><p>Configuration parameters override package parameters</p></li>
+<li><p>Configuration overrides are applied</p></li>
+<li><p>Configuration tasks/types/imports/fragments are merged</p></li>
+<li><p>Task graph is built using the merged definition</p></li>
+</ol>
+<p>Configurations enable:</p>
+<ul class="simple">
+<li><p><strong>Build variants</strong>: debug, release, profiling builds</p></li>
+<li><p><strong>Tool selection</strong>: Switch between different tool vendors</p></li>
+<li><p><strong>Target platforms</strong>: Customize for different deployment targets</p></li>
+<li><p><strong>Test modes</strong>: Normal vs. regression vs. continuous integration</p></li>
+</ul>
+</section>
+</section>
+<section id="package-extensions">
+<h2>Package Extensions<a class="headerlink" href="#package-extensions" title="Link to this heading">¶</a></h2>
+<p>Extensions allow you to modify existing tasks by adding parameters, dependencies,
+or other attributes without replacing the entire task. This is useful for
+augmenting tasks from imported packages.</p>
+<section id="defining-extensions">
+<h3>Defining Extensions<a class="headerlink" href="#defining-extensions" title="Link to this heading">¶</a></h3>
+<p>Extensions are typically defined in configurations:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt</span>
+
+<span class="w">  </span><span class="nt">configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage</span>
+<span class="w">    </span><span class="nt">extensions</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">coverage</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage_setup</span>
+</pre></div>
+</div>
+<p>The extension above adds a <code class="docutils literal notranslate"><span class="pre">coverage</span></code> parameter and an additional dependency
+to the <code class="docutils literal notranslate"><span class="pre">hdlsim.vlt.SimImage</span></code> task.</p>
+</section>
+<section id="extension-capabilities">
+<h3>Extension Capabilities<a class="headerlink" href="#extension-capabilities" title="Link to this heading">¶</a></h3>
+<p>Extensions can modify tasks by:</p>
+<ul class="simple">
+<li><p><strong>Adding parameters</strong>: Introduce new configuration options</p></li>
+<li><p><strong>Adding dependencies</strong>: Include additional <code class="docutils literal notranslate"><span class="pre">needs</span></code></p></li>
+<li><p><strong>Changing base</strong>: Specify a different <code class="docutils literal notranslate"><span class="pre">uses</span></code> base task</p></li>
+</ul>
+<p>Extensions are particularly useful when:</p>
+<ul class="simple">
+<li><p>Working with third-party packages that need customization</p></li>
+<li><p>Adding instrumentation or monitoring to existing tasks</p></li>
+<li><p>Implementing cross-cutting concerns (logging, metrics, etc.)</p></li>
+</ul>
+</section>
+<section id="extension-inheritance">
+<h3>Extension Inheritance<a class="headerlink" href="#extension-inheritance" title="Link to this heading">¶</a></h3>
+<p>Extensions can inherit from other extensions using <code class="docutils literal notranslate"><span class="pre">uses</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">configs</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base_instrumentation</span>
+<span class="w">  </span><span class="nt">extensions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_tool.Compile</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">verbose</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug_instrumentation</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base_instrumentation</span>
+<span class="w">  </span><span class="nt">extensions</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_tool.Compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">base_instrumentation.my_tool.Compile</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">verbose</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">trace</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>This allows building up complex configurations incrementally.</p>
+</section>
+</section>
 </section>
 
 
@@ -337,11 +489,14 @@ same package.</p>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>

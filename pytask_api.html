@@ -333,6 +333,235 @@ dependency checking:</p>
 </div>
 </section>
 </section>
+<section id="pytask-class-api-reference">
+<h2>PyTask Class API Reference<a class="headerlink" href="#pytask-class-api-reference" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">PyTask</span></code> class provides a class-based interface for implementing tasks
+in Python. This approach offers better organization, type safety, and
+reusability compared to function-based tasks.</p>
+<section id="pytask-base-class">
+<h3>PyTask Base Class<a class="headerlink" href="#pytask-base-class" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.PyTask">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">PyTask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">desc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">doc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shell</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pytask'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_ctxt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskRunCtxt" title="dv_flow.mgr.task_run_ctxt.TaskRunCtxt"><span class="pre">dv_flow.mgr.task_run_ctxt.TaskRunCtxt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_input</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskDataInput" title="dv_flow.mgr.task_data.TaskDataInput"><span class="pre">dv_flow.mgr.task_data.TaskDataInput</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dv_flow.mgr.PyTask.Params" title="dv_flow.mgr.PyTask.Params"><span class="pre">PyTask.Params</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.PyTask" title="Link to this definition">¶</a></dt>
+<dd><dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.PyTask.Params">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Params</span></span><a class="headerlink" href="#dv_flow.mgr.PyTask.Params" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<section id="class-attributes">
+<h4>Class Attributes<a class="headerlink" href="#class-attributes" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>desc</strong> (str): Short description of the task</p></li>
+<li><p><strong>doc</strong> (str): Full documentation for the task</p></li>
+<li><p><strong>shell</strong> (str): Shell to use for execution (default: “pytask”)</p></li>
+</ul>
+</section>
+<section id="instance-attributes">
+<h4>Instance Attributes<a class="headerlink" href="#instance-attributes" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>_ctxt</strong> (TaskRunCtxt): Task execution context (set by runtime)</p></li>
+<li><p><strong>_input</strong> (TaskDataInput): Task input data (set by runtime)</p></li>
+</ul>
+</section>
+<section id="properties">
+<h4>Properties<a class="headerlink" href="#properties" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>params</strong>: Typed access to task parameters (returns instance of nested Params class)</p></li>
+</ul>
+</section>
+</section>
+<section id="defining-a-pytask">
+<h3>Defining a PyTask<a class="headerlink" href="#defining-a-pytask" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr</span> <span class="kn">import</span> <span class="n">PyTask</span>
+<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">MyTask</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="n">desc</span> <span class="o">=</span> <span class="s2">&quot;Brief description&quot;</span>
+    <span class="n">doc</span> <span class="o">=</span> <span class="s2">&quot;Detailed documentation...&quot;</span>
+
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">input_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="c1"># Access parameters</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">input_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Access context</span>
+        <span class="n">rundir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ctxt</span><span class="o">.</span><span class="n">rundir</span>
+
+        <span class="c1"># Execute commands</span>
+        <span class="n">status</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ctxt</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="p">[</span><span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">input_file</span><span class="p">],</span>
+            <span class="n">logfile</span><span class="o">=</span><span class="s2">&quot;process.log&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Return None for direct execution</span>
+        <span class="c1"># Or return a command string to execute</span>
+        <span class="k">return</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<section id="using-pytask">
+<h4>Using PyTask<a class="headerlink" href="#using-pytask" title="Link to this heading">¶</a></h4>
+<p>Reference the PyTask class in YAML:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_task</span>
+<span class="w">  </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytask</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_module.MyTask</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">input_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data.txt</span>
+<span class="w">    </span><span class="nt">output_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result.txt</span>
+<span class="w">    </span><span class="nt">verbose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="pypkg-class-api-reference">
+<h2>PyPkg Class API Reference<a class="headerlink" href="#pypkg-class-api-reference" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">PyPkg</span></code> class enables defining entire packages in Python, providing
+programmatic control over package structure and task registration.</p>
+<section id="pypkg-base-class">
+<h3>PyPkg Base Class<a class="headerlink" href="#pypkg-base-class" title="Link to this heading">¶</a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.PyPkg">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">PyPkg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">_tasks:</span> <span class="pre">Dict</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.PyPkg" title="Link to this definition">¶</a></dt>
+<dd><dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.PyPkg.Params">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Params</span></span><a class="headerlink" href="#dv_flow.mgr.PyPkg.Params" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<section id="id1">
+<h4>Class Attributes<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>name</strong> (str): Package name (optional, defaults to class name)</p></li>
+</ul>
+</section>
+<section id="methods">
+<h4>Methods<a class="headerlink" href="#methods" title="Link to this heading">¶</a></h4>
+<ul class="simple">
+<li><p><strong>registerTask(cls, T)</strong>: Register a task class with this package</p></li>
+</ul>
+</section>
+</section>
+<section id="defining-a-pypkg">
+<h3>Defining a PyPkg<a class="headerlink" href="#defining-a-pypkg" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr</span> <span class="kn">import</span> <span class="n">PyPkg</span><span class="p">,</span> <span class="n">pypkg</span><span class="p">,</span> <span class="n">PyTask</span>
+<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">MyToolPkg</span><span class="p">(</span><span class="n">PyPkg</span><span class="p">):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;mytool&quot;</span>
+
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1.0&quot;</span>
+        <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<section id="registering-tasks">
+<h4>Registering Tasks<a class="headerlink" href="#registering-tasks" title="Link to this heading">¶</a></h4>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">&#64;pypkg</span></code> decorator to register tasks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@pypkg</span><span class="p">(</span><span class="n">MyToolPkg</span><span class="p">)</span>
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">Compile</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">dc</span><span class="o">.</span><span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Implementation</span>
+        <span class="k">pass</span>
+</pre></div>
+</div>
+<p>Tasks are automatically registered with the package and become available
+as <code class="docutils literal notranslate"><span class="pre">mytool.Compile</span></code> in flow definitions.</p>
+</section>
+</section>
+</section>
+<section id="additional-api-details">
+<h2>Additional API Details<a class="headerlink" href="#additional-api-details" title="Link to this heading">¶</a></h2>
+<section id="taskrunctxt-extended-api">
+<h3>TaskRunCtxt Extended API<a class="headerlink" href="#taskrunctxt-extended-api" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">TaskRunCtxt</span></code> class provides additional methods for task implementations:</p>
+<dl>
+<dt><strong>mkDataItem(type, **kwargs)</strong></dt><dd><p>Create a data item of the specified type. Returns a configured data item
+instance that can be added to task outputs.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fileset</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkDataItem</span><span class="p">(</span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">)</span>
+<span class="n">fileset</span><span class="o">.</span><span class="n">filetype</span> <span class="o">=</span> <span class="s2">&quot;verilogSource&quot;</span>
+<span class="n">fileset</span><span class="o">.</span><span class="n">files</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;file1.v&quot;</span><span class="p">,</span> <span class="s2">&quot;file2.v&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>exec(cmd, logfile=None, logfilter=None, cwd=None, env=None)</strong></dt><dd><p>Execute a command and capture output. Returns the command’s exit status.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">status</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;gcc&quot;</span><span class="p">,</span> <span class="s2">&quot;-o&quot;</span><span class="p">,</span> <span class="s2">&quot;output&quot;</span><span class="p">,</span> <span class="s2">&quot;input.c&quot;</span><span class="p">],</span>
+    <span class="n">logfile</span><span class="o">=</span><span class="s2">&quot;compile.log&quot;</span><span class="p">,</span>
+    <span class="n">cwd</span><span class="o">=</span><span class="s2">&quot;/tmp/build&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>error(msg), warning(msg), info(msg)</strong></dt><dd><p>Add markers to the task output for user notification.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ctxt</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Compilation failed&quot;</span><span class="p">)</span>
+<span class="n">ctxt</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Deprecated option used&quot;</span><span class="p">)</span>
+<span class="n">ctxt</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Processing 100 files&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>Properties:</strong></dt><dd><ul class="simple">
+<li><p><strong>rundir</strong>: Task’s run directory path</p></li>
+<li><p><strong>root_pkgdir</strong>: Root package directory</p></li>
+<li><p><strong>root_rundir</strong>: Root run directory</p></li>
+<li><p><strong>env</strong>: Environment variables (dict)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="taskgenctxt-extended-api">
+<h3>TaskGenCtxt Extended API<a class="headerlink" href="#taskgenctxt-extended-api" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">TaskGenCtxt</span></code> class provides methods for programmatic task graph generation:</p>
+<dl>
+<dt><strong>mkTaskNode(type_t, name=None, srcdir=None, needs=None, **kwargs)</strong></dt><dd><p>Create a new task node in the graph.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">node</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkTaskNode</span><span class="p">(</span>
+    <span class="s2">&quot;std.Message&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;hello&quot;</span><span class="p">,</span>
+    <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;Hello, World!&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>mkName(name)</strong></dt><dd><p>Generate a qualified task name relative to the containing compound task.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inside compound task &quot;parent&quot;</span>
+<span class="n">name</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkName</span><span class="p">(</span><span class="s2">&quot;child&quot;</span><span class="p">)</span>  <span class="c1"># Returns &quot;parent.child&quot;</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>addTask(task)</strong></dt><dd><p>Add a task node to the generated graph.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5</span><span class="p">):</span>
+    <span class="n">task</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkTaskNode</span><span class="p">(</span><span class="s2">&quot;std.Message&quot;</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Task </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">ctxt</span><span class="o">.</span><span class="n">addTask</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>Properties:</strong></dt><dd><ul class="simple">
+<li><p><strong>rundir</strong>: Task’s run directory path</p></li>
+<li><p><strong>srcdir</strong>: Source directory path</p></li>
+<li><p><strong>basename</strong>: Base name for generated tasks</p></li>
+<li><p><strong>input</strong>: Input task node</p></li>
+<li><p><strong>builder</strong>: Task graph builder instance</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</section>
 </section>
 
 
@@ -367,11 +596,15 @@ dependency checking:</p>
 <li class="toctree-l1"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#leaf-task-implementation-api">Leaf-Task Implementation API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#task-graph-generation-api">Task-Graph Generation API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#custom-up-to-date-check-api">Custom Up-to-Date Check API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pytask-class-api-reference">PyTask Class API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pypkg-class-api-reference">PyPkg Class API Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#additional-api-details">Additional API Details</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>

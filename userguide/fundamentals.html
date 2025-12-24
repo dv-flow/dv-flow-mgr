@@ -143,6 +143,97 @@ above, for example, it’s natural to think of the simulation image ‘needing�
 to have required source files. In cases where the parameter sets represent
 controls over tools in the flow, the production is explicit.</p>
 </section>
+<section id="types">
+<h2>Types<a class="headerlink" href="#types" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager supports custom data types that can be used to structure
+the data passed between tasks. Types are defined in packages and can inherit
+from other types, enabling reuse and extension of data structures.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_types</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O2&quot;</span>
+<span class="w">      </span><span class="nt">warnings</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DebugOptions</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">debug_level</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+</pre></div>
+</div>
+<p>Types can be used as the base for tasks (see DataItem tasks in the Using Tasks
+guide) or as structured parameters. When a type inherits from another using
+<code class="docutils literal notranslate"><span class="pre">uses:</span></code>, it includes all parameters from the base type and can add or
+override parameters.</p>
+</section>
+<section id="expression-system">
+<h2>Expression System<a class="headerlink" href="#expression-system" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager supports dynamic parameter evaluation using the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code>
+expression syntax. This allows parameters to reference other parameters,
+perform calculations, and make decisions based on configuration values.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;O2&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Compiling</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">-${{</span><span class="nv"> </span><span class="s">optimization</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">debug=${{</span><span class="nv"> </span><span class="s">debug</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Expressions can access:</p>
+<ul class="simple">
+<li><p><strong>Package parameters</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">param_name</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>Task parameters</strong>: From containing compound tasks</p></li>
+<li><p><strong>Matrix variables</strong>: When using matrix strategy</p></li>
+<li><p><strong>Arithmetic</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">value</span> <span class="pre">*</span> <span class="pre">2</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>Comparisons</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">debug_level</span> <span class="pre">&gt;</span> <span class="pre">0</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>String operations</strong>: Concatenation and formatting</p></li>
+</ul>
+<p>The expression evaluator provides a safe subset of Python expressions,
+ensuring that flow specifications remain declarative and predictable.</p>
+</section>
+<section id="task-dependencies-needs-and-feeds">
+<h2>Task Dependencies: needs and feeds<a class="headerlink" href="#task-dependencies-needs-and-feeds" title="Link to this heading">¶</a></h2>
+<p>Tasks express dependencies using the <code class="docutils literal notranslate"><span class="pre">needs</span></code> field, which specifies
+which tasks must complete before this task can run. DV Flow also supports
+the <code class="docutils literal notranslate"><span class="pre">feeds</span></code> field, which is the inverse relationship - it declares which
+tasks depend on this task.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sources</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">feeds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">compile</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Inverse of &#39;needs&#39;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sources</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Explicit dependency</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">feeds</span></code> field can be useful for defining dependencies from the producer’s
+perspective, particularly when organizing large flows where it’s clearer to
+declare what a task provides rather than what consumes it.</p>
+<p>Both <code class="docutils literal notranslate"><span class="pre">needs</span></code> and <code class="docutils literal notranslate"><span class="pre">feeds</span></code> establish the same scheduling dependencies and
+dataflow relationships - they are simply two ways to express the same graph
+structure.</p>
+</section>
 </section>
 
 
@@ -181,11 +272,14 @@ controls over tools in the flow, the production is explicit.</p>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>

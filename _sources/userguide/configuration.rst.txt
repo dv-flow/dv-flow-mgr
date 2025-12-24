@@ -74,41 +74,9 @@ The following parameter types are supported:
 Overrides
 =========
 
-Overrides provide the ability to manipulate the value of parameters and
-the target of package references. For the most part, overrides control
-features that are outside the declaration scope of the override.
-
-Package Overrides
------------------
-
-The DV Flow `hdlsim` library provides tasks for building HDL simulation
-images using a variety of toolchains. The key operations supported by
-these tools are sufficiently common that a core set of tasks is defined
-to be implemented by each toolchain.
-
-Overrides provide a mechanism by which the user can dynamically select
-the appropriate toolchain to use without modifying the flow specification.
-
-.. code-block:: YAML
-
-    package:
-      name: proj
-      with:
-        sim:
-          type: str
-          value: vlt
-
-      overrides:
-       - for: hdlsim
-         use: hdlsim.${{ sim }}
-
-      tasks:
-      - name: hdlsim.SimImage
-        # ...
-
-The override directive changes how the package name `hdlsim` is
-resolved. Within the scope of package `proj`, any reference 
-to package `hdlsim` will, instead, resolve to the package `hdlsim.vlt`.
+Overrides provide the ability to manipulate the value of parameters.
+For the most part, overrides control features that are outside the 
+declaration scope of the override.
 
 Parameter Overrides
 -------------------

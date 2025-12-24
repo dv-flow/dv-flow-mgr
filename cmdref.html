@@ -15,7 +15,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Python Task API" href="pytask_api.html" />
-    <link rel="prev" title="Flow-Spec Reference" href="reference/index.html" />
+    <link rel="prev" title="Type System API" href="reference/types_api.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -200,6 +200,277 @@
 </section>
 </section>
 </section>
+<section id="commands-overview">
+<h2>Commands Overview<a class="headerlink" href="#commands-overview" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager provides several commands for working with flows:</p>
+<ul class="simple">
+<li><p><strong>run</strong>: Execute tasks in a flow</p></li>
+<li><p><strong>show</strong>: Display information about tasks</p></li>
+<li><p><strong>graph</strong>: Generate visual task dependency graphs</p></li>
+<li><p><strong>util</strong>: Internal utility commands</p></li>
+</ul>
+</section>
+<section id="common-options">
+<h2>Common Options<a class="headerlink" href="#common-options" title="Link to this heading">¶</a></h2>
+<p>These options are available across multiple commands:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-D</span> <span class="pre">NAME=VALUE</span></code></dt><dd><p>Override parameter values from the command line. Can be specified multiple
+times to override multiple parameters.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-D<span class="w"> </span><span class="nv">debug</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span>-D<span class="w"> </span><span class="nv">optimization</span><span class="o">=</span>O3
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-c,</span> <span class="pre">--config</span> <span class="pre">NAME</span></code></dt><dd><p>Select a package configuration to use. Configurations allow switching between
+different build modes, tool chains, or deployment targets.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>debug
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--root</span> <span class="pre">PATH</span></code></dt><dd><p>Specify the root directory for the flow. By default, dfm searches upward
+from the current directory for a flow.dv or flow.yaml file.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>--root<span class="w"> </span>/path/to/project
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="run-command">
+<h2>Run Command<a class="headerlink" href="#run-command" title="Link to this heading">¶</a></h2>
+<p>Execute one or more tasks in a flow.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASKS...<span class="o">]</span>
+</pre></div>
+</div>
+<p>If no tasks are specified, dfm lists available tasks in the package.</p>
+<section id="run-options">
+<h3>Run Options<a class="headerlink" href="#run-options" title="Link to this heading">¶</a></h3>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-j</span> <span class="pre">N</span></code></dt><dd><p>Set the degree of parallelism (number of concurrent tasks). Default is to
+use all available CPU cores. Use <code class="docutils literal notranslate"><span class="pre">-j</span> <span class="pre">1</span></code> for sequential execution.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-j<span class="w"> </span><span class="m">4</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--clean</span></code></dt><dd><p>Remove the rundir directory before starting the build. Forces a complete
+rebuild of all tasks.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>--clean
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--force</span></code></dt><dd><p>Force all tasks to run, ignoring up-to-date checks. Unlike <code class="docutils literal notranslate"><span class="pre">--clean</span></code>,
+this preserves the rundir but marks all tasks as needing execution.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-f
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show all tasks including those that are up-to-date. By default, only tasks
+that execute are shown.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-v
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-u,</span> <span class="pre">--ui</span> <span class="pre">{log,progress,tui}</span></code></dt><dd><p>Select the console user interface style:</p>
+<ul class="simple">
+<li><p><strong>log</strong>: Plain text output (default for non-terminals)</p></li>
+<li><p><strong>progress</strong>: Progress bars and live updates (default for terminals)</p></li>
+<li><p><strong>tui</strong>: Full-screen text user interface</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-u<span class="w"> </span>tui
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="run-examples">
+<h3>Run Examples<a class="headerlink" href="#run-examples" title="Link to this heading">¶</a></h3>
+<p><strong>Build a single task:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>sim-image
+</pre></div>
+</div>
+<p><strong>Build multiple tasks:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>compile<span class="w"> </span><span class="nb">test</span><span class="w"> </span>lint
+</pre></div>
+</div>
+<p><strong>Force rebuild with 4 parallel jobs:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>all<span class="w"> </span>--clean<span class="w"> </span>-j<span class="w"> </span><span class="m">4</span>
+</pre></div>
+</div>
+<p><strong>Run with debug configuration:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>debug<span class="w"> </span>-D<span class="w"> </span><span class="nv">trace</span><span class="o">=</span><span class="nb">true</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="show-command">
+<h2>Show Command<a class="headerlink" href="#show-command" title="Link to this heading">¶</a></h2>
+<p>Display information about tasks without executing them.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASK<span class="o">]</span>
+</pre></div>
+</div>
+<p>If no task is specified, shows a list of available tasks.</p>
+<section id="show-options">
+<h3>Show Options<a class="headerlink" href="#show-options" title="Link to this heading">¶</a></h3>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-a,</span> <span class="pre">--all</span></code></dt><dd><p>Show all tasks required for the specified task to run, including dependencies.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>build<span class="w"> </span>-a
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show additional detailed information about tasks, including parameters
+and dependency relationships.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>build<span class="w"> </span>-v
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="show-examples">
+<h3>Show Examples<a class="headerlink" href="#show-examples" title="Link to this heading">¶</a></h3>
+<p><strong>List all available tasks:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show
+</pre></div>
+</div>
+<p><strong>Show information about a specific task:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>sim-image
+</pre></div>
+</div>
+<p><strong>Show full dependency tree:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>sim-image<span class="w"> </span>-a
+</pre></div>
+</div>
+</section>
+</section>
+<section id="graph-command">
+<h2>Graph Command<a class="headerlink" href="#graph-command" title="Link to this heading">¶</a></h2>
+<p>Generate a visual representation of task dependencies.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASK<span class="o">]</span>
+</pre></div>
+</div>
+<p>The graph command creates a dependency graph in various output formats.</p>
+<section id="graph-options">
+<h3>Graph Options<a class="headerlink" href="#graph-options" title="Link to this heading">¶</a></h3>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--format</span> <span class="pre">{dot}</span></code></dt><dd><p>Specify the output format. Currently supports:</p>
+<ul class="simple">
+<li><p><strong>dot</strong>: GraphViz DOT format (default)</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>dot
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-o,</span> <span class="pre">--output</span> <span class="pre">FILE</span></code></dt><dd><p>Specify the output file. Use <code class="docutils literal notranslate"><span class="pre">-</span></code> for stdout (default).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>build_graph.dot
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="graph-examples">
+<h3>Graph Examples<a class="headerlink" href="#graph-examples" title="Link to this heading">¶</a></h3>
+<p><strong>Generate a graph and visualize with GraphViz:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>build<span class="w"> </span>-o<span class="w"> </span>build.dot
+dot<span class="w"> </span>-Tpng<span class="w"> </span>build.dot<span class="w"> </span>-o<span class="w"> </span>build.png
+</pre></div>
+</div>
+<p><strong>Generate and display in one command:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>build<span class="w"> </span><span class="p">|</span><span class="w"> </span>dot<span class="w"> </span>-Tpng<span class="w"> </span><span class="p">|</span><span class="w"> </span>display
+</pre></div>
+</div>
+</section>
+</section>
+<section id="ui-modes">
+<h2>UI Modes<a class="headerlink" href="#ui-modes" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager provides three different console UI modes for the run command:</p>
+<section id="log-mode">
+<h3>Log Mode<a class="headerlink" href="#log-mode" title="Link to this heading">¶</a></h3>
+<p>Plain text output showing task execution. Best for:</p>
+<ul class="simple">
+<li><p>Non-interactive environments (CI/CD)</p></li>
+<li><p>Log file capture</p></li>
+<li><p>Debugging with verbose logging enabled</p></li>
+</ul>
+<p>Output format:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&gt;&gt; [1] Task my_pkg.compile
+Compiling 10 files...
+&lt;&lt; [1] Task my_pkg.compile (success) 2.45s
+</pre></div>
+</div>
+</section>
+<section id="progress-mode">
+<h3>Progress Mode<a class="headerlink" href="#progress-mode" title="Link to this heading">¶</a></h3>
+<p>Live updating progress display with progress bars. Best for:</p>
+<ul class="simple">
+<li><p>Interactive terminal sessions</p></li>
+<li><p>Monitoring long-running builds</p></li>
+<li><p>Parallel task visualization</p></li>
+</ul>
+<p>Shows:</p>
+<ul class="simple">
+<li><p>Active tasks with progress bars</p></li>
+<li><p>Completed task count</p></li>
+<li><p>Estimated time remaining</p></li>
+<li><p>Real-time task status updates</p></li>
+</ul>
+</section>
+<section id="tui-mode">
+<h3>TUI Mode<a class="headerlink" href="#tui-mode" title="Link to this heading">¶</a></h3>
+<p>Full-screen text user interface. Best for:</p>
+<ul class="simple">
+<li><p>Complex flows with many tasks</p></li>
+<li><p>Detailed monitoring of parallel execution</p></li>
+<li><p>Interactive navigation of task output</p></li>
+</ul>
+<p>Features:</p>
+<ul class="simple">
+<li><p>Scrollable task list</p></li>
+<li><p>Task filtering and search</p></li>
+<li><p>Log viewing per task</p></li>
+<li><p>Status summaries</p></li>
+</ul>
+<p>Select UI mode with the <code class="docutils literal notranslate"><span class="pre">-u</span></code> flag or let dfm auto-select based on terminal
+capabilities.</p>
+</section>
+</section>
+<section id="trace-output">
+<h2>Trace Output<a class="headerlink" href="#trace-output" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager generates execution traces in Google Event Trace Format,
+compatible with the Perfetto trace viewer and Chrome’s <a class="reference external" href="about:tracing">about:tracing</a>.</p>
+<p>Trace files are automatically created in the log directory as:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>log/&lt;root_task&gt;.trace.json
+</pre></div>
+</div>
+<section id="viewing-traces">
+<h3>Viewing Traces<a class="headerlink" href="#viewing-traces" title="Link to this heading">¶</a></h3>
+<p><strong>Using Perfetto UI</strong> (recommended):</p>
+<ol class="arabic simple">
+<li><p>Visit <a class="reference external" href="https://ui.perfetto.dev/">https://ui.perfetto.dev/</a></p></li>
+<li><p>Click “Open trace file”</p></li>
+<li><p>Load the .trace.json file</p></li>
+</ol>
+<p><strong>Using Chrome:</strong></p>
+<ol class="arabic simple">
+<li><p>Navigate to chrome://tracing</p></li>
+<li><p>Click “Load” and select the trace file</p></li>
+</ol>
+</section>
+<section id="trace-information">
+<h3>Trace Information<a class="headerlink" href="#trace-information" title="Link to this heading">¶</a></h3>
+<p>Traces include:</p>
+<ul class="simple">
+<li><p>Task execution timeline</p></li>
+<li><p>Parallel execution visualization</p></li>
+<li><p>Task duration and scheduling</p></li>
+<li><p>Dependencies and dataflow</p></li>
+<li><p>Execution status and results</p></li>
+</ul>
+<p>Use traces to:</p>
+<ul class="simple">
+<li><p>Identify bottlenecks</p></li>
+<li><p>Optimize parallelism</p></li>
+<li><p>Debug scheduling issues</p></li>
+<li><p>Understand execution patterns</p></li>
+</ul>
+</section>
+</section>
 <section id="output-directory-structure">
 <h2>Output Directory Structure<a class="headerlink" href="#output-directory-structure" title="Link to this heading">¶</a></h2>
 <p>DV Flow Manager creates an output directory structure that mirrors
@@ -227,6 +498,39 @@ and can be processed by tools from the <a class="reference external" href="https
 about how tasks executed with respect to each other, data about individual
 tasks can be seen.</p>
 <img alt="_images/perfetto_trace_view.png" src="_images/perfetto_trace_view.png" />
+</section>
+<section id="common-patterns">
+<h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading">¶</a></h2>
+<p>Here are some common command patterns for typical workflows:</p>
+<p><strong>Quick incremental build:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run
+</pre></div>
+</div>
+<p><strong>Clean build for release:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>all<span class="w"> </span>--clean<span class="w"> </span>-c<span class="w"> </span>release
+</pre></div>
+</div>
+<p><strong>Debug single task:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>problematic_task<span class="w"> </span>-f<span class="w"> </span>-j<span class="w"> </span><span class="m">1</span><span class="w"> </span>-u<span class="w"> </span>log
+</pre></div>
+</div>
+<p><strong>Monitor long build:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>all<span class="w"> </span>-u<span class="w"> </span>tui
+</pre></div>
+</div>
+<p><strong>Check what would run:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>target_task<span class="w"> </span>-a
+</pre></div>
+</div>
+<p><strong>Override parameters for testing:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-D<span class="w"> </span><span class="nv">test_name</span><span class="o">=</span>smoke<span class="w"> </span>-D<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
+</pre></div>
+</div>
+<p><strong>Generate documentation graph:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>all<span class="w"> </span>-o<span class="w"> </span>project.dot
+dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="w"> </span>-o<span class="w"> </span>project.svg
+</pre></div>
+</div>
 </section>
 </section>
 
@@ -262,11 +566,20 @@ tasks can be seen.</p>
 <li class="toctree-l1"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Command reference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#dv_flow.mgr.__main__-get_parser-named-arguments">Named Arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Sub-commands">Sub-commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#commands-overview">Commands Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-options">Common Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#run-command">Run Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#show-command">Show Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#graph-command">Graph Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ui-modes">UI Modes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#trace-output">Trace Output</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#output-directory-structure">Output Directory Structure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#viewing-task-execution-data">Viewing Task Execution Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#common-patterns">Common Patterns</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
@@ -277,7 +590,7 @@ tasks can be seen.</p>
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="reference/index.html" title="previous chapter">Flow-Spec Reference</a></li>
+      <li>Previous: <a href="reference/types_api.html" title="previous chapter">Type System API</a></li>
       <li>Next: <a href="pytask_api.html" title="next chapter">Python Task API</a></li>
   </ul></li>
 </ul>

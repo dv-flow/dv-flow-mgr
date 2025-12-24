@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Type System API &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Command reference" href="../cmdref.html" />
+    <link rel="prev" title="Flow-Spec Reference" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="type-system-api">
+<h1>Type System API<a class="headerlink" href="#type-system-api" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager provides a type system for defining structured data that
+flows between tasks. Types can be defined in packages, inherit from other
+types, and be used as the basis for tasks and parameters.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>The type system enables:</p>
+<ul class="simple">
+<li><p><strong>Structured Data</strong>: Define complex data structures with typed fields</p></li>
+<li><p><strong>Inheritance</strong>: Build on existing types to create specialized variants</p></li>
+<li><p><strong>Type Safety</strong>: Ensure data consistency across task boundaries</p></li>
+<li><p><strong>Documentation</strong>: Self-documenting data contracts between tasks</p></li>
+</ul>
+</section>
+<section id="type-definition">
+<h2>Type Definition<a class="headerlink" href="#type-definition" title="Link to this heading">¶</a></h2>
+<p>Types are defined in packages using the <code class="docutils literal notranslate"><span class="pre">types</span></code> section:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_types</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BaseOptions</span>
+<span class="w">    </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Common compiler options</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O2&quot;</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Optimization level</span>
+<span class="w">      </span><span class="nt">warnings</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Warning flags to enable</span>
+</pre></div>
+</div>
+</section>
+<section id="type-inheritance">
+<h2>Type Inheritance<a class="headerlink" href="#type-inheritance" title="Link to this heading">¶</a></h2>
+<p>Types can inherit from other types using the <code class="docutils literal notranslate"><span class="pre">uses</span></code> field:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BaseOptions</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O2&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DebugOptions</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BaseOptions</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug_symbols</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O0&quot;</span><span class="w">  </span><span class="c1"># Override parent value</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">DebugOptions</span></code> type inherits all parameters from <code class="docutils literal notranslate"><span class="pre">BaseOptions</span></code> and:</p>
+<ul class="simple">
+<li><p>Adds a new <code class="docutils literal notranslate"><span class="pre">debug_symbols</span></code> parameter</p></li>
+<li><p>Overrides the <code class="docutils literal notranslate"><span class="pre">optimization</span></code> parameter’s default value</p></li>
+</ul>
+</section>
+<section id="using-types-as-task-bases">
+<h2>Using Types as Task Bases<a class="headerlink" href="#using-types-as-task-bases" title="Link to this heading">¶</a></h2>
+<p>Types can be used as the base for tasks, creating “DataItem” tasks that
+produce data without executing code:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">trace</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">seed</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default_sim_opts</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">trace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+</pre></div>
+</div>
+<p>This task produces a <code class="docutils literal notranslate"><span class="pre">SimOptions</span></code> data item with the specified values.
+Tasks depending on <code class="docutils literal notranslate"><span class="pre">default_sim_opts</span></code> receive this structured data.</p>
+</section>
+<section id="type-schema">
+<h2>Type Schema<a class="headerlink" href="#type-schema" title="Link to this heading">¶</a></h2>
+<section id="typedef-structure">
+<h3>TypeDef Structure<a class="headerlink" href="#typedef-structure" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">TypeDef</span></code> class defines the YAML schema for types:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">TypeDef</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>              <span class="c1"># Type name</span>
+    <span class="n">uses</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>       <span class="c1"># Base type to inherit from</span>
+    <span class="n">doc</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>        <span class="c1"># Documentation</span>
+    <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span>           <span class="c1"># Field definitions (alias: &quot;with&quot;)</span>
+    <span class="n">srcinfo</span><span class="p">:</span> <span class="n">SrcInfo</span>       <span class="c1"># Source location</span>
+</pre></div>
+</div>
+</section>
+<section id="field-definition">
+<h3>Field Definition<a class="headerlink" href="#field-definition" title="Link to this heading">¶</a></h3>
+<p>Each field in a type’s <code class="docutils literal notranslate"><span class="pre">with</span></code> section can be:</p>
+<p><strong>Simple value</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Simple</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">field1</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value&quot;</span>
+<span class="w">    </span><span class="nt">field2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
+</pre></div>
+</div>
+<p><strong>ParamDef with metadata</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Documented</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">field1</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;default&quot;</span>
+<span class="w">      </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Field</span><span class="nv"> </span><span class="s">documentation&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="field-types">
+<h3>Field Types<a class="headerlink" href="#field-types" title="Link to this heading">¶</a></h3>
+<p>Supported field types:</p>
+<ul class="simple">
+<li><p><strong>str</strong>: String values</p></li>
+<li><p><strong>int</strong>: Integer values</p></li>
+<li><p><strong>bool</strong>: Boolean values (true/false)</p></li>
+<li><p><strong>list</strong>: List of values</p></li>
+<li><p><strong>map</strong>: Dictionary of key-value pairs</p></li>
+</ul>
+<p>Complex types can nest:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Complex</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">settings</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">key1</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value1&quot;</span>
+<span class="w">        </span><span class="nt">key2</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value2&quot;</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">list</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">item</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="runtime-type-system">
+<h2>Runtime Type System<a class="headerlink" href="#runtime-type-system" title="Link to this heading">¶</a></h2>
+<section id="type-class">
+<h3>Type Class<a class="headerlink" href="#type-class" title="Link to this heading">¶</a></h3>
+<p>At runtime, types are represented by the <code class="docutils literal notranslate"><span class="pre">Type</span></code> class:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Type</span><span class="p">:</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                           <span class="c1"># Qualified type name</span>
+    <span class="n">doc</span><span class="p">:</span> <span class="nb">str</span>                            <span class="c1"># Documentation</span>
+    <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">TypeField</span><span class="p">]</span>        <span class="c1"># Field definitions</span>
+    <span class="n">paramT</span><span class="p">:</span> <span class="n">Any</span>                         <span class="c1"># Parameter class</span>
+    <span class="n">uses</span><span class="p">:</span> <span class="n">Type</span>                          <span class="c1"># Base type</span>
+    <span class="n">srcinfo</span><span class="p">:</span> <span class="n">SrcInfo</span>                    <span class="c1"># Source location</span>
+    <span class="n">typedef</span><span class="p">:</span> <span class="n">TypeDef</span>                    <span class="c1"># Original definition</span>
+</pre></div>
+</div>
+</section>
+<section id="typefield-class">
+<h3>TypeField Class<a class="headerlink" href="#typefield-class" title="Link to this heading">¶</a></h3>
+<p>Individual fields are represented by <code class="docutils literal notranslate"><span class="pre">TypeField</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">TypeField</span><span class="p">:</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>           <span class="c1"># Field name</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="n">Any</span>           <span class="c1"># Field type</span>
+    <span class="n">doc</span><span class="p">:</span> <span class="nb">str</span>            <span class="c1"># Documentation</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">str</span>          <span class="c1"># Default value</span>
+    <span class="n">append</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span>   <span class="c1"># Values to append (for list types)</span>
+    <span class="n">srcinfo</span><span class="p">:</span> <span class="n">SrcInfo</span>    <span class="c1"># Source location</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="creating-type-instances">
+<h2>Creating Type Instances<a class="headerlink" href="#creating-type-instances" title="Link to this heading">¶</a></h2>
+<p>Types are instantiated when creating data items:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># In a task implementation</span>
+<span class="k">async</span> <span class="k">def</span> <span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+    <span class="c1"># Create a data item of a custom type</span>
+    <span class="n">item</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkDataItem</span><span class="p">(</span><span class="s2">&quot;my_pkg.SimOptions&quot;</span><span class="p">)</span>
+    <span class="n">item</span><span class="o">.</span><span class="n">trace</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="n">item</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="mi">42</span>
+
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span>
+        <span class="n">output</span><span class="o">=</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>The runtime ensures that the data item conforms to the type definition.</p>
+</section>
+<section id="standard-library-types">
+<h2>Standard Library Types<a class="headerlink" href="#standard-library-types" title="Link to this heading">¶</a></h2>
+<section id="std-dataitem">
+<h3>std.DataItem<a class="headerlink" href="#std-dataitem" title="Link to this heading">¶</a></h3>
+<p>The base type for all data items:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DataItem</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+</pre></div>
+</div>
+<p>All custom types should ultimately derive from <code class="docutils literal notranslate"><span class="pre">std.DataItem</span></code> (directly
+or indirectly).</p>
+</section>
+<section id="std-fileset">
+<h3>std.FileSet<a class="headerlink" href="#std-fileset" title="Link to this heading">¶</a></h3>
+<p>Structured file collection with metadata:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FileSet</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.DataItem</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span><span class="w">         </span><span class="c1"># File type (e.g., &quot;verilogSource&quot;)</span>
+<span class="w">    </span><span class="nt">basedir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span><span class="w">          </span><span class="c1"># Base directory</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span><span class="w">           </span><span class="c1"># List of file paths</span>
+<span class="w">    </span><span class="nt">incdirs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span><span class="w">         </span><span class="c1"># Include directories</span>
+<span class="w">    </span><span class="nt">defines</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span><span class="w">         </span><span class="c1"># Preprocessor defines</span>
+<span class="w">    </span><span class="nt">attributes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span><span class="w">      </span><span class="c1"># Tags/attributes</span>
+</pre></div>
+</div>
+</section>
+<section id="std-env">
+<h3>std.Env<a class="headerlink" href="#std-env" title="Link to this heading">¶</a></h3>
+<p>Environment variable mappings:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">types</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Env</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">vals</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span><span class="w">             </span><span class="c1"># Environment variable values</span>
+<span class="w">    </span><span class="nt">append_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span><span class="w">      </span><span class="c1"># Paths to append</span>
+<span class="w">    </span><span class="nt">prepend_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span><span class="w">     </span><span class="c1"># Paths to prepend</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<section id="type-naming">
+<h3>Type Naming<a class="headerlink" href="#type-naming" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Use PascalCase for type names (<code class="docutils literal notranslate"><span class="pre">SimOptions</span></code>, <code class="docutils literal notranslate"><span class="pre">CompilerFlags</span></code>)</p></li>
+<li><p>Choose descriptive names that indicate the data’s purpose</p></li>
+<li><p>Prefix with package name for clarity in large projects</p></li>
+</ul>
+</section>
+<section id="type-organization">
+<h3>Type Organization<a class="headerlink" href="#type-organization" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Define common types in a dedicated types package</p></li>
+<li><p>Import type packages where needed</p></li>
+<li><p>Use inheritance to avoid duplication</p></li>
+</ul>
+</section>
+<section id="type-documentation">
+<h3>Type Documentation<a class="headerlink" href="#type-documentation" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Document each type’s purpose in the <code class="docutils literal notranslate"><span class="pre">doc</span></code> field</p></li>
+<li><p>Document each field’s meaning and valid values</p></li>
+<li><p>Include examples in the documentation</p></li>
+</ul>
+</section>
+</section>
+<section id="example-complete-type-definition">
+<h2>Example: Complete Type Definition<a class="headerlink" href="#example-complete-type-definition" title="Link to this heading">¶</a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl_types</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">Common options for HDL compilation tools.</span>
+<span class="w">      </span><span class="no">Used to configure simulators, synthesizers, and linters.</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O2&quot;</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Optimization level (-O0, -O1, -O2, -O3)</span>
+<span class="w">      </span><span class="nt">warnings</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">List of warning flags to enable</span>
+<span class="w">      </span><span class="nt">defines</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Preprocessor defines as key-value pairs</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimulatorOptions</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Simulator-specific options extending compiler options</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">trace</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Enable waveform tracing</span>
+<span class="w">      </span><span class="nt">coverage</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Enable coverage collection</span>
+<span class="w">      </span><span class="nt">seed</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">        </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Random seed (0 = random)</span>
+</pre></div>
+</div>
+<p>This defines a type hierarchy for tool configuration that can be extended
+and customized throughout a project.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../incremental.html">Incremental Builds</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../userguide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Type System API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#type-definition">Type Definition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#type-inheritance">Type Inheritance</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#using-types-as-task-bases">Using Types as Task Bases</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#type-schema">Type Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#runtime-type-system">Runtime Type System</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-type-instances">Creating Type Instances</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#standard-library-types">Standard Library Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#best-practices">Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-complete-type-definition">Example: Complete Type Definition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Flow-Spec Reference</a></li>
+      <li>Next: <a href="../cmdref.html" title="next chapter">Command reference</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/reference/types_api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

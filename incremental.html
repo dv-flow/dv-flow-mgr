@@ -128,6 +128,262 @@ output:</p>
 <p>The previous output data is loaded from the task’s <code class="docutils literal notranslate"><span class="pre">exec.json</span></code> file,
 allowing downstream tasks to use cached results without re-executing.</p>
 </section>
+<section id="the-memento-system">
+<h2>The Memento System<a class="headerlink" href="#the-memento-system" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager uses a memento pattern to store task execution state for
+incremental builds. Each task can save arbitrary data that describes its
+execution, which is used to determine if re-execution is needed.</p>
+<section id="how-mementos-work">
+<h3>How Mementos Work<a class="headerlink" href="#how-mementos-work" title="Link to this heading">¶</a></h3>
+<p>When a task executes:</p>
+<ol class="arabic simple">
+<li><p>Task runs and produces outputs</p></li>
+<li><p>Task optionally creates a memento (dictionary of state data)</p></li>
+<li><p>Memento is saved to the task’s exec.json file</p></li>
+<li><p>On next run, memento is passed to up-to-date check</p></li>
+</ol>
+<p>Mementos typically store:</p>
+<ul class="simple">
+<li><p>File timestamps</p></li>
+<li><p>Content hashes</p></li>
+<li><p>Configuration values</p></li>
+<li><p>Dependency versions</p></li>
+<li><p>Any data needed to detect changes</p></li>
+</ul>
+</section>
+<section id="creating-mementos">
+<h3>Creating Mementos<a class="headerlink" href="#creating-mementos" title="Link to this heading">¶</a></h3>
+<p>Task implementations return mementos in the TaskDataResult:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TaskDataResult</span><span class="p">:</span>
+    <span class="c1"># Perform work</span>
+    <span class="n">result_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.txt&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">result_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;result data&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create memento with file timestamp</span>
+    <span class="n">memento</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;result_file&quot;</span><span class="p">:</span> <span class="n">result_file</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">result_file</span><span class="p">),</span>
+        <span class="s2">&quot;parameters&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;param1&quot;</span><span class="p">:</span> <span class="nb">input</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">param1</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span>
+        <span class="n">changed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">memento</span><span class="o">=</span><span class="n">memento</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>On the next run, this memento is available in <code class="docutils literal notranslate"><span class="pre">input.memento</span></code> for
+comparison with current state.</p>
+</section>
+<section id="accessing-mementos">
+<h3>Accessing Mementos<a class="headerlink" href="#accessing-mementos" title="Link to this heading">¶</a></h3>
+<p>In up-to-date checks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">CheckUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># No previous execution</span>
+
+    <span class="c1"># Access saved memento data</span>
+    <span class="n">prev_timestamp</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+    <span class="n">prev_params</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="c1"># Compare with current state</span>
+    <span class="n">current_timestamp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="p">[</span><span class="s2">&quot;result_file&quot;</span><span class="p">])</span>
+    <span class="n">current_params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;param1&quot;</span><span class="p">:</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">param1</span><span class="p">}</span>
+
+    <span class="c1"># Up-to-date if nothing changed</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">prev_timestamp</span> <span class="o">==</span> <span class="n">current_timestamp</span> <span class="ow">and</span>
+            <span class="n">prev_params</span> <span class="o">==</span> <span class="n">current_params</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="memento-best-practices">
+<h3>Memento Best Practices<a class="headerlink" href="#memento-best-practices" title="Link to this heading">¶</a></h3>
+<p><strong>Keep mementos small</strong>: Only store data needed for change detection</p>
+<p><strong>Use structured data</strong>: Store dictionaries and lists that serialize to JSON</p>
+<p><strong>Include version info</strong>: Store schema versions if memento format might change</p>
+<p><strong>Handle missing data</strong>: Check for None and missing keys gracefully</p>
+<p><strong>Be deterministic</strong>: Ensure memento generation is consistent</p>
+</section>
+</section>
+<section id="exec-json-structure">
+<h2>Exec.json Structure<a class="headerlink" href="#exec-json-structure" title="Link to this heading">¶</a></h2>
+<p>Each task’s execution data is stored in a JSON file with the following
+structure:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_pkg.my_task&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;param1&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;value1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;param2&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;inputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verilogSource&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;file1.v&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file2.v&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;simImage&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sim_image.so&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;memento&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1703456789.123</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;checksum&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123def456&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Unused signal detected&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;location&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;src/module.v&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;line&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;column&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;exec_info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;cmd&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;verilator&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file.v&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;start_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-12-24T10:30:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-12-24T10:30:05Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;duration_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5432</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<section id="fields">
+<h3>Fields<a class="headerlink" href="#fields" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>name</strong>: Fully-qualified task name</p></li>
+<li><p><strong>status</strong>: Exit status (0 = success, non-zero = failure)</p></li>
+<li><p><strong>changed</strong>: Whether the task’s output changed from previous execution</p></li>
+<li><p><strong>params</strong>: Task parameters used for this execution</p></li>
+<li><p><strong>inputs</strong>: List of input data items received from dependencies</p></li>
+<li><p><strong>outputs</strong>: List of output data items produced</p></li>
+<li><p><strong>memento</strong>: Custom state data for incremental builds</p></li>
+<li><p><strong>markers</strong>: Warnings, errors, and info messages</p></li>
+<li><p><strong>exec_info</strong>: Commands executed and their results</p></li>
+<li><p><strong>start_time, end_time, duration_ms</strong>: Timing information</p></li>
+</ul>
+</section>
+<section id="using-exec-data">
+<h3>Using Exec Data<a class="headerlink" href="#using-exec-data" title="Link to this heading">¶</a></h3>
+<p>Exec data files can be used for:</p>
+<ul class="simple">
+<li><p><strong>Debugging</strong>: Inspect what inputs a task received</p></li>
+<li><p><strong>Analysis</strong>: Review parameters and execution time</p></li>
+<li><p><strong>Documentation</strong>: Generate reports on build process</p></li>
+<li><p><strong>Testing</strong>: Verify task behavior and outputs</p></li>
+</ul>
+<p>Example: Reading exec data:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">json</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;rundir/my_task/my_task.exec_data.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task took </span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;duration_ms&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">ms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;exec_info&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> commands&quot;</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;markers&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">marker</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">marker</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="advanced-incremental-build-patterns">
+<h2>Advanced Incremental Build Patterns<a class="headerlink" href="#advanced-incremental-build-patterns" title="Link to this heading">¶</a></h2>
+<section id="content-based-detection">
+<h3>Content-Based Detection<a class="headerlink" href="#content-based-detection" title="Link to this heading">¶</a></h3>
+<p>Instead of timestamps, use content hashes for more reliable detection:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">hashlib</span>
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">ComputeHash</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="n">hasher</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="nb">iter</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">),</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+<span class="k">async</span> <span class="k">def</span> <span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+    <span class="c1"># Process files</span>
+    <span class="n">output_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.dat&quot;</span><span class="p">)</span>
+    <span class="c1"># ... create output ...</span>
+
+    <span class="c1"># Store content hash</span>
+    <span class="n">file_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ComputeHash</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span>
+        <span class="n">memento</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;output_hash&quot;</span><span class="p">:</span> <span class="n">file_hash</span><span class="p">}</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dependency-tracking">
+<h3>Dependency Tracking<a class="headerlink" href="#dependency-tracking" title="Link to this heading">¶</a></h3>
+<p>Track external dependencies explicitly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">TrackDependencies</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="c1"># Read dependency file</span>
+    <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">srcdir</span><span class="p">,</span> <span class="s2">&quot;dependencies.txt&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dep_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">current_deps</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+
+    <span class="c1"># Compare with saved dependencies</span>
+    <span class="n">saved_deps</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dependencies&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="c1"># Check if list changed</span>
+    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">current_deps</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_deps</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Check if any dependency file changed</span>
+    <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">current_deps</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">dep</span><span class="p">)</span>
+        <span class="n">saved_time</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dep_time_</span><span class="si">{</span><span class="n">dep</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">saved_time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">current_time</span> <span class="o">!=</span> <span class="n">saved_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+</section>
+<section id="multi-stage-checking">
+<h3>Multi-Stage Checking<a class="headerlink" href="#multi-stage-checking" title="Link to this heading">¶</a></h3>
+<p>Combine multiple checks for accuracy:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">ComplexUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="c1"># Quick check: parameters changed?</span>
+    <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;params&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">model_dump</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Medium check: timestamps changed?</span>
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;time_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Expensive check: content hashes changed?</span>
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;critical_files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">current_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ComputeHash</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">current_hash</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;hash_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+</section>
+</section>
 </section>
 
 
@@ -164,10 +420,14 @@ allowing downstream tasks to use cached results without re-executing.</p>
 <li class="toctree-l2"><a class="reference internal" href="#cli-options">CLI Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#custom-up-to-date-methods">Custom Up-to-Date Methods</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#task-output">Task Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-memento-system">The Memento System</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#exec-json-structure">Exec.json Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-incremental-build-patterns">Advanced Incremental Build Patterns</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="userguide/index.html">User Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/types_api.html">Type System API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cmdref.html">Command reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
