@@ -207,3 +207,236 @@ dependency checking:
         status = await ctxt.exec(["git", "diff", "--quiet", "HEAD"])
         
         return status == 0  # Up-to-date if no changes
+
+
+PyTask Class API Reference
+===========================
+
+The ``PyTask`` class provides a class-based interface for implementing tasks
+in Python. This approach offers better organization, type safety, and
+reusability compared to function-based tasks.
+
+PyTask Base Class
+-----------------
+
+.. autoclass:: dv_flow.mgr.PyTask
+    :members:
+    :exclude-members: model_config
+
+Class Attributes
+~~~~~~~~~~~~~~~~
+
+* **desc** (str): Short description of the task
+* **doc** (str): Full documentation for the task  
+* **shell** (str): Shell to use for execution (default: "pytask")
+
+Instance Attributes
+~~~~~~~~~~~~~~~~~~~
+
+* **_ctxt** (TaskRunCtxt): Task execution context (set by runtime)
+* **_input** (TaskDataInput): Task input data (set by runtime)
+
+Properties
+~~~~~~~~~~
+
+* **params**: Typed access to task parameters (returns instance of nested Params class)
+
+Defining a PyTask
+-----------------
+
+.. code-block:: python
+
+    from dv_flow.mgr import PyTask
+    import dataclasses as dc
+    
+    @dc.dataclass
+    class MyTask(PyTask):
+        desc = "Brief description"
+        doc = "Detailed documentation..."
+        
+        @dc.dataclass
+        class Params:
+            input_file: str = ""
+            output_file: str = ""
+            verbose: bool = False
+        
+        async def __call__(self) -> Union[str, None]:
+            # Access parameters
+            print(f"Processing {self.params.input_file}")
+            
+            # Access context
+            rundir = self._ctxt.rundir
+            
+            # Execute commands
+            status = await self._ctxt.exec(
+                ["process", self.params.input_file],
+                logfile="process.log"
+            )
+            
+            # Return None for direct execution
+            # Or return a command string to execute
+            return None
+
+Using PyTask
+~~~~~~~~~~~~
+
+Reference the PyTask class in YAML:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: my_task
+      shell: pytask
+      run: my_module.MyTask
+      with:
+        input_file: data.txt
+        output_file: result.txt
+        verbose: true
+
+
+PyPkg Class API Reference
+==========================
+
+The ``PyPkg`` class enables defining entire packages in Python, providing
+programmatic control over package structure and task registration.
+
+PyPkg Base Class
+----------------
+
+.. autoclass:: dv_flow.mgr.PyPkg
+    :members:
+    :exclude-members: model_config
+
+Class Attributes
+~~~~~~~~~~~~~~~~
+
+* **name** (str): Package name (optional, defaults to class name)
+
+Methods
+~~~~~~~
+
+* **registerTask(cls, T)**: Register a task class with this package
+
+Defining a PyPkg
+----------------
+
+.. code-block:: python
+
+    from dv_flow.mgr import PyPkg, pypkg, PyTask
+    import dataclasses as dc
+    
+    @dc.dataclass
+    class MyToolPkg(PyPkg):
+        name = "mytool"
+        
+        @dc.dataclass
+        class Params:
+            version: str = "1.0"
+            debug: bool = False
+
+Registering Tasks
+~~~~~~~~~~~~~~~~~
+
+Use the ``@pypkg`` decorator to register tasks:
+
+.. code-block:: python
+
+    @pypkg(MyToolPkg)
+    @dc.dataclass
+    class Compile(PyTask):
+        @dc.dataclass
+        class Params:
+            sources: list = dc.field(default_factory=list)
+        
+        async def __call__(self):
+            # Implementation
+            pass
+
+Tasks are automatically registered with the package and become available
+as ``mytool.Compile`` in flow definitions.
+
+
+Additional API Details
+======================
+
+TaskRunCtxt Extended API
+------------------------
+
+The ``TaskRunCtxt`` class provides additional methods for task implementations:
+
+**mkDataItem(type, \*\*kwargs)**
+    Create a data item of the specified type. Returns a configured data item
+    instance that can be added to task outputs.
+    
+    .. code-block:: python
+    
+        fileset = ctxt.mkDataItem("std.FileSet")
+        fileset.filetype = "verilogSource"
+        fileset.files = ["file1.v", "file2.v"]
+
+**exec(cmd, logfile=None, logfilter=None, cwd=None, env=None)**
+    Execute a command and capture output. Returns the command's exit status.
+    
+    .. code-block:: python
+    
+        status = await ctxt.exec(
+            ["gcc", "-o", "output", "input.c"],
+            logfile="compile.log",
+            cwd="/tmp/build"
+        )
+
+**error(msg), warning(msg), info(msg)**
+    Add markers to the task output for user notification.
+    
+    .. code-block:: python
+    
+        ctxt.error("Compilation failed")
+        ctxt.warning("Deprecated option used")
+        ctxt.info("Processing 100 files")
+
+**Properties:**
+    * **rundir**: Task's run directory path
+    * **root_pkgdir**: Root package directory  
+    * **root_rundir**: Root run directory
+    * **env**: Environment variables (dict)
+
+
+TaskGenCtxt Extended API
+------------------------
+
+The ``TaskGenCtxt`` class provides methods for programmatic task graph generation:
+
+**mkTaskNode(type_t, name=None, srcdir=None, needs=None, \*\*kwargs)**
+    Create a new task node in the graph.
+    
+    .. code-block:: python
+    
+        node = ctxt.mkTaskNode(
+            "std.Message",
+            name="hello",
+            msg="Hello, World!"
+        )
+
+**mkName(name)**
+    Generate a qualified task name relative to the containing compound task.
+    
+    .. code-block:: python
+    
+        # Inside compound task "parent"
+        name = ctxt.mkName("child")  # Returns "parent.child"
+
+**addTask(task)**
+    Add a task node to the generated graph.
+    
+    .. code-block:: python
+    
+        for i in range(5):
+            task = ctxt.mkTaskNode("std.Message", msg=f"Task {i}")
+            ctxt.addTask(task)
+
+**Properties:**
+    * **rundir**: Task's run directory path
+    * **srcdir**: Source directory path
+    * **basename**: Base name for generated tasks
+    * **input**: Input task node
+    * **builder**: Task graph builder instance

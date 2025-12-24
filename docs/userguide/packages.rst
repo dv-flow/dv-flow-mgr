@@ -299,3 +299,169 @@ Best Practices
 * Use descriptive task names that indicate their purpose
 * Avoid generic names like ``task1``, ``task2``
 * Use consistent naming conventions across related packages
+
+
+Package Configurations
+======================
+
+Packages can define multiple configurations that customize behavior for
+different scenarios (debug builds, different tools, deployment targets, etc.).
+Configurations provide a way to organize variations without duplicating
+the core package definition.
+
+Defining Configurations
+-----------------------
+
+Configurations are defined in the package using the ``configs`` field:
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+      
+      with:
+        debug:
+          type: bool
+          value: false
+      
+      tasks:
+      - name: build
+        uses: std.Message
+        with:
+          msg: "Building in default mode"
+      
+      configs:
+      - name: debug
+        with:
+          debug:
+            value: true
+        
+        tasks:
+        - name: build
+          override: build
+          with:
+            msg: "Building in debug mode"
+      
+      - name: release
+        with:
+          debug:
+            value: false
+        
+        overrides:
+        - override: hdlsim
+          with: hdlsim.xcelium
+
+A configuration can specify:
+
+* **with**: Parameter values for this configuration
+* **uses**: Base configuration to inherit from
+* **overrides**: Package/parameter overrides
+* **extensions**: Task extensions (see below)
+* **tasks**: Additional or overriding tasks
+* **types**: Additional or overriding types
+* **imports**: Additional imports for this configuration
+* **fragments**: Additional fragments for this configuration
+
+Selecting a Configuration
+--------------------------
+
+Configurations are selected via the command line:
+
+.. code-block:: bash
+
+    dfm run build -c debug
+
+When a configuration is selected:
+
+1. Base package is loaded
+2. Configuration parameters override package parameters
+3. Configuration overrides are applied
+4. Configuration tasks/types/imports/fragments are merged
+5. Task graph is built using the merged definition
+
+Configurations enable:
+
+* **Build variants**: debug, release, profiling builds
+* **Tool selection**: Switch between different tool vendors
+* **Target platforms**: Customize for different deployment targets
+* **Test modes**: Normal vs. regression vs. continuous integration
+
+
+Package Extensions
+==================
+
+Extensions allow you to modify existing tasks by adding parameters, dependencies,
+or other attributes without replacing the entire task. This is useful for
+augmenting tasks from imported packages.
+
+Defining Extensions
+-------------------
+
+Extensions are typically defined in configurations:
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+      
+      imports:
+      - hdlsim.vlt
+      
+      configs:
+      - name: coverage
+        extensions:
+        - task: hdlsim.vlt.SimImage
+          with:
+            coverage:
+              type: bool
+              value: true
+          needs:
+          - coverage_setup
+
+The extension above adds a ``coverage`` parameter and an additional dependency
+to the ``hdlsim.vlt.SimImage`` task.
+
+Extension Capabilities
+----------------------
+
+Extensions can modify tasks by:
+
+* **Adding parameters**: Introduce new configuration options
+* **Adding dependencies**: Include additional ``needs``
+* **Changing base**: Specify a different ``uses`` base task
+
+Extensions are particularly useful when:
+
+* Working with third-party packages that need customization
+* Adding instrumentation or monitoring to existing tasks
+* Implementing cross-cutting concerns (logging, metrics, etc.)
+
+Extension Inheritance
+---------------------
+
+Extensions can inherit from other extensions using ``uses``:
+
+.. code-block:: yaml
+
+    configs:
+    - name: base_instrumentation
+      extensions:
+      - task: my_tool.Compile
+        with:
+          verbose:
+            type: bool
+            value: false
+    
+    - name: debug_instrumentation
+      uses: base_instrumentation
+      extensions:
+      - task: my_tool.Compile
+        uses: base_instrumentation.my_tool.Compile
+        with:
+          verbose:
+            value: true
+          trace:
+            type: bool
+            value: true
+
+This allows building up complex configurations incrementally.

@@ -19,6 +19,7 @@ efficient avoidance of redundant work.
    incremental
    userguide/index
    reference/index
+   reference/types_api
    cmdref
    pytask_api
    task_runners
