@@ -424,7 +424,7 @@ is provided by a Python method named <cite>my_package.my_module.MyTask</cite>.</
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Message: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">input</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>See the <a class="reference external" href="https://dv-flow.github.io/dv-flow-mgr">DV Flow Manager</a> documentation
+<p>See the <a class="reference internal" href="../pytask_api.html"><span class="doc">Python Task API</span></a> documentation
 for more information about the Python API available to task implementations.</p>
 <p>This “external” implementation makes the most sense when the task implementation
 is moderately complex or lengthy.</p>
@@ -523,8 +523,160 @@ be specified externally in a Python module or inline.</p>
             <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;Hello World</span><span class="si">% %</span><span class="s2">d!&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
 </pre></div>
 </div>
-<p>See the <a class="reference external" href="https://dv-flow.github.io/dv-flow-mgr">DV Flow Manager</a> documentation
+<p>See the <a class="reference internal" href="../pytask_api.html"><span class="doc">Python Task API</span></a> documentation
 for more information about the Python task-graph generation API.</p>
+</section>
+<section id="pytask-class-based-api">
+<h2>PyTask Class-Based API<a class="headerlink" href="#pytask-class-based-api" title="Link to this heading">¶</a></h2>
+<p>For more complex tasks, DV Flow Manager provides a class-based API using the
+<code class="docutils literal notranslate"><span class="pre">PyTask</span></code> base class. This approach provides better organization for tasks
+with substantial logic or state.</p>
+<section id="defining-a-pytask">
+<h3>Defining a PyTask<a class="headerlink" href="#defining-a-pytask" title="Link to this heading">¶</a></h3>
+<p>A PyTask is defined as a dataclass that inherits from <code class="docutils literal notranslate"><span class="pre">dv_flow.mgr.PyTask</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr</span> <span class="kn">import</span> <span class="n">PyTask</span>
+<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">MyCompiler</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="n">desc</span> <span class="o">=</span> <span class="s2">&quot;Compiles HDL sources&quot;</span>
+    <span class="n">doc</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    This task compiles HDL sources using a configurable compiler.</span>
+<span class="s2">    Supports multiple file types and optimization levels.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">dc</span><span class="o">.</span><span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">optimization</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;O2&quot;</span>
+        <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="c1"># Access parameters via self.params</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Compiling </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">sources</span><span class="p">)</span><span class="si">}</span><span class="s2"> files&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Optimization: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">optimization</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Access context via self._ctxt</span>
+        <span class="n">rundir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ctxt</span><span class="o">.</span><span class="n">rundir</span>
+
+        <span class="c1"># Perform compilation work here</span>
+        <span class="c1"># ...</span>
+
+        <span class="c1"># Return None for pytask execution, or a string for shell execution</span>
+        <span class="k">return</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">__call__</span></code> method is the main entry point and receives the task
+context automatically through the <code class="docutils literal notranslate"><span class="pre">_ctxt</span></code> and <code class="docutils literal notranslate"><span class="pre">_input</span></code> fields.</p>
+</section>
+<section id="using-pytask-in-yaml">
+<h3>Using PyTask in YAML<a class="headerlink" href="#using-pytask-in-yaml" title="Link to this heading">¶</a></h3>
+<p>Reference a PyTask class in your flow definition:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_tools</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytask</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_package.my_module.MyCompiler</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">sources</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/file1.v</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/file2.v</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;O3&quot;</span>
+<span class="w">      </span><span class="nt">debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>The PyTask class provides several advantages:</p>
+<ul class="simple">
+<li><p><strong>Type safety</strong>: Parameters are defined with Python type hints</p></li>
+<li><p><strong>Documentation</strong>: Docstrings become part of the task documentation</p></li>
+<li><p><strong>Organization</strong>: Related logic stays together in a class</p></li>
+<li><p><strong>Reusability</strong>: Classes can inherit from other classes</p></li>
+<li><p><strong>Testing</strong>: Easier to unit test than inline code</p></li>
+</ul>
+</section>
+<section id="returning-commands">
+<h3>Returning Commands<a class="headerlink" href="#returning-commands" title="Link to this heading">¶</a></h3>
+<p>A PyTask can return a shell command instead of executing directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">MyTool</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">input_file</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="n">output_file</span><span class="p">:</span> <span class="nb">str</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="c1"># Generate command string</span>
+        <span class="n">cmd</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;my_tool -i </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">input_file</span><span class="si">}</span><span class="s2"> -o </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">output_file</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">cmd</span>
+</pre></div>
+</div>
+<p>When a string is returned, DV Flow executes it as a shell command using
+the configured shell (default: pytask for Python execution).</p>
+</section>
+</section>
+<section id="pypkg-package-factory">
+<h2>PyPkg Package Factory<a class="headerlink" href="#pypkg-package-factory" title="Link to this heading">¶</a></h2>
+<p>For advanced use cases, DV Flow supports defining packages entirely in Python
+using the <code class="docutils literal notranslate"><span class="pre">PyPkg</span></code> class. This enables dynamic package construction and
+programmatic task registration.</p>
+<section id="defining-a-pypkg">
+<h3>Defining a PyPkg<a class="headerlink" href="#defining-a-pypkg" title="Link to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr</span> <span class="kn">import</span> <span class="n">PyPkg</span><span class="p">,</span> <span class="n">pypkg</span>
+<span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
+
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">MyToolPackage</span><span class="p">(</span><span class="n">PyPkg</span><span class="p">):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;mytool&quot;</span>
+
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;1.0&quot;</span>
+        <span class="n">enable_debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">&#64;pypkg</span></code> decorator registers tasks with the package:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@pypkg</span><span class="p">(</span><span class="n">MyToolPackage</span><span class="p">)</span>
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">Compile</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">sources</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">dc</span><span class="o">.</span><span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Task implementation</span>
+        <span class="k">pass</span>
+
+<span class="nd">@pypkg</span><span class="p">(</span><span class="n">MyToolPackage</span><span class="p">)</span>
+<span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+<span class="k">class</span> <span class="nc">Link</span><span class="p">(</span><span class="n">PyTask</span><span class="p">):</span>
+    <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
+    <span class="k">class</span> <span class="nc">Params</span><span class="p">:</span>
+        <span class="n">objects</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">dc</span><span class="o">.</span><span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="k">async</span> <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Task implementation</span>
+        <span class="k">pass</span>
+</pre></div>
+</div>
+</section>
+<section id="pypkg-benefits">
+<h3>PyPkg Benefits<a class="headerlink" href="#pypkg-benefits" title="Link to this heading">¶</a></h3>
+<p>Using PyPkg provides several advantages:</p>
+<ul class="simple">
+<li><p><strong>Code reuse</strong>: Share common Python code across tasks</p></li>
+<li><p><strong>Dynamic generation</strong>: Programmatically create task definitions</p></li>
+<li><p><strong>Type checking</strong>: Full Python type checking for package definitions</p></li>
+<li><p><strong>Version control</strong>: Package and task versions managed together</p></li>
+<li><p><strong>Testing</strong>: Unit test entire packages in Python</p></li>
+</ul>
+<p>PyPkg packages can be distributed as Python packages and installed via pip,
+making them easy to share and version.</p>
+<p>Note: PyPkg is an advanced feature. For most use cases, YAML-based package
+definitions with PyTask implementations provide the right balance of
+simplicity and power.</p>
+</section>
 </section>
 </section>
 
