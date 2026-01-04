@@ -5,7 +5,7 @@ import pydantic.dataclasses as pdc
 import os
 import logging
 from typing import Dict, List, TYPE_CHECKING, Union
-from .task_data import TaskMarker, SeverityE, TaskMarkerLoc
+from .task_data import TaskMarker, SeverityE, TaskMarkerLoc, TaskDataOutput
 from .task_node_ctxt import TaskNodeCtxt
 
 class ExecInfo(BaseModel):
@@ -14,6 +14,7 @@ class ExecInfo(BaseModel):
 
 if TYPE_CHECKING:
     from .task_runner import TaskRunner
+    from .task_node import TaskNode
 
 @dc.dataclass
 class TaskRunCtxt(object):
@@ -24,6 +25,8 @@ class TaskRunCtxt(object):
     _markers : List[TaskMarker] = dc.field(default_factory=list)
     _exec_info : List[ExecInfo] = dc.field(default_factory=list)
     _log : logging.Logger = dc.field(default_factory=lambda: logging.getLogger("TaskRunCtxt"))
+    _exec_start_callback : callable = dc.field(default=None)
+    _exec_end_callback : callable = dc.field(default=None)
 
     @property
     def root_pkgdir(self):
@@ -98,30 +101,48 @@ class TaskRunCtxt(object):
         except Exception:
             pass
 
-        fp = open(os.path.join(self.rundir, logfile), "w")
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=fp,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd=(cwd if cwd is not None else self.rundir),
-            env=env)
-        fp.close()
+        # Acquire exec semaphore if available (gates on actual process execution)
+        semaphore = getattr(self.runner, '_exec_semaphore', None)
+        if semaphore is not None:
+            await semaphore.acquire()
         
-        status = await proc.wait()
+        # Notify exec start
+        if self._exec_start_callback is not None:
+            self._exec_start_callback()
+        
+        try:
+            fp = open(os.path.join(self.rundir, logfile), "w")
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=fp,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=(cwd if cwd is not None else self.rundir),
+                env=env)
+            fp.close()
+            
+            status = await proc.wait()
 
-        self._exec_info.append(ExecInfo(cmd=cmd, status=status))
+            self._exec_info.append(ExecInfo(cmd=cmd, status=status))
 
-        if status != 0:
-            self.error("Command failed: %s" % " ".join(cmd))
+            if status != 0:
+                self.error("Command failed: %s" % " ".join(cmd))
 
-        if logfilter is not None:
-            with open(os.path.join(self.rundir, logfile), "r") as fp:
-                for line in fp.readlines():
-                    if logfilter(line):
-                        self.info(line.strip())
-                logfilter("")
+            if logfilter is not None:
+                with open(os.path.join(self.rundir, logfile), "r") as fp:
+                    for line in fp.readlines():
+                        if logfilter(line):
+                            self.info(line.strip())
+                    logfilter("")
 
-        return status
+            return status
+        finally:
+            # Notify exec end
+            if self._exec_end_callback is not None:
+                self._exec_end_callback()
+            
+            # Release exec semaphore
+            if semaphore is not None:
+                semaphore.release()
 
     def create(self, path, content):
         """Create a file in the task's rundir"""
@@ -151,3 +172,62 @@ class TaskRunCtxt(object):
     def info(self, msg : str, loc : TaskMarkerLoc=None):
         """Add an error marker related to the task's execution"""
         self.marker(msg=msg, severity=SeverityE.Info, loc=loc)
+    
+    async def run_subgraph(
+        self, 
+        tasks: Union['TaskNode', List['TaskNode']],
+        name: str = None,
+        timeout: float = None
+    ) -> Union[TaskDataOutput, List[TaskDataOutput]]:
+        """
+        Execute a sub-graph of tasks dynamically during task execution.
+        
+        This schedules the tasks into the current execution schedule,
+        respecting dependencies and resource constraints. The call
+        blocks until all tasks complete.
+        
+        Args:
+            tasks: TaskNode or list of TaskNodes to execute
+            name: Optional name prefix for sub-tasks (for debugging)
+            timeout: Optional timeout in seconds (None = no timeout)
+            
+        Returns:
+            TaskDataOutput or list of TaskDataOutput from terminal tasks
+            
+        Raises:
+            asyncio.TimeoutError: If timeout is exceeded
+            Exception: If sub-graph execution fails
+            
+        Example:
+            
+            .. code-block:: python
+            
+                async def run(ctxt, input):
+                    # Create dynamic tasks
+                    task1 = ctxt.mkTaskNode("type1", name="task1")
+                    task2 = ctxt.mkTaskNode("type2", name="task2", needs=[task1])
+                    
+                    # Execute dynamically with timeout
+                    results = await ctxt.run_subgraph([task1, task2], timeout=30.0)
+                    
+                    return TaskDataResult(status=0, output=results)
+        """
+        # Check if runner supports dynamic scheduling
+        if hasattr(self.runner, 'schedule_subgraph'):
+            try:
+                return await self.runner.schedule_subgraph(tasks, name, timeout)
+            except RuntimeError as e:
+                # Fall through to fallback
+                self._log.debug("Dynamic scheduling not available: %s" % str(e))
+        
+        # Fallback to nested runner for backward compatibility
+        self._log.info("Using nested runner for sub-graph execution")
+        from .task_runner import TaskSetRunner
+        
+        runner = TaskSetRunner(
+            rundir=self.rundir,
+            nproc=1,
+            env=self.env
+        )
+        
+        return await runner.run(tasks)
