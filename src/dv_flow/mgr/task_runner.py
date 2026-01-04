@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import asyncio
+import enum
 import json
 import os
 import re
@@ -30,6 +31,16 @@ from toposort import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Set, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node import TaskNode, RundirE
+from .dynamic_scheduler import DynamicScheduler
+
+class TaskState(enum.Enum):
+    """State of a task in the execution pipeline"""
+    NOT_STARTED = enum.auto()   # Task exists but not yet ready
+    READY = enum.auto()          # Dependencies met, ready to launch
+    SCHEDULED = enum.auto()      # Queued for execution
+    RUNNING = enum.auto()        # Currently executing
+    COMPLETED = enum.auto()      # Finished (success or failure)
+    SKIPPED = enum.auto()        # Skipped due to dependency failure
 
 @dc.dataclass
 class TaskRunner(object):
@@ -76,13 +87,19 @@ class TaskRunner(object):
         pass
 
 @dc.dataclass
-class TaskSetRunner(TaskRunner):
+class TaskSetRunner(TaskRunner, DynamicScheduler):
     builder : 'TaskGraphBuilder' = None
     nproc : int = -1
     status : int = 0
     force_run : bool = False
 
     _anon_tid : int = 1
+    _exec_semaphore : asyncio.Semaphore = dc.field(default=None, init=False)
+    
+    # State tracking
+    _task_state : Dict[TaskNode, TaskState] = dc.field(default_factory=dict, init=False)
+    _ready_queue : asyncio.Queue = dc.field(default=None, init=False)
+    _dep_map : Dict[TaskNode, Set[TaskNode]] = dc.field(default_factory=dict, init=False)
 
     _log : ClassVar = logging.getLogger("TaskSetRunner")
 
@@ -90,6 +107,15 @@ class TaskSetRunner(TaskRunner):
         super().__post_init__()
         if self.nproc == -1:
             self.nproc = os.cpu_count()
+        
+        # Initialize exec semaphore to gate process execution
+        self._exec_semaphore = asyncio.Semaphore(self.nproc)
+        
+        # Initialize ready queue
+        self._ready_queue = asyncio.Queue()
+        
+        # Initialize dynamic scheduler
+        self._init_dynamic_scheduler()
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
@@ -101,6 +127,14 @@ class TaskSetRunner(TaskRunner):
         if not os.path.isdir(os.path.join(self.rundir, "cache")):
             os.makedirs(os.path.join(self.rundir, "cache"))
 
+        # Enable dynamic scheduling
+        self._dynamic_enabled = True
+        
+        # Initialize state tracking
+        self._task_state.clear()
+        self._pending_tasks.clear()
+        self._task_completion_events.clear()
+        
         src_memento = None
         dst_memento = {}
         if os.path.isfile(os.path.join(self.rundir, "cache", "mementos.json")):
@@ -112,103 +146,44 @@ class TaskSetRunner(TaskRunner):
         else:
             src_memento = {}
 
-
-        # First, build a depedency map
-        dep_m = self.buildDepMap(task)
+        # Build dependency map
+        self._dep_map = self.buildDepMap(task)
 
         if self._log.isEnabledFor(logging.DEBUG):
             self._log.debug("Deps:")
-            for t,value in dep_m.items():
+            for t,value in self._dep_map.items():
                 self._log.debug("  Task: %s", str(t.name))
                 for v in value:
                     self._log.debug("  - %s", str(v.name))
 
-        order = list(toposort(dep_m))
+        # Initialize state for all tasks
+        for t in self._dep_map.keys():
+            self._task_state[t] = TaskState.NOT_STARTED
+            self._task_completion_events[t.name] = asyncio.Event()
+            self._pending_tasks[t.name] = t
 
-        if self._log.isEnabledFor(logging.DEBUG):
-            self._log.debug("Order:")
-            for active_s in order:
-                self._log.debug("- {%s}", ",".join(str(t.name) for t in active_s))
+        # Find initial ready tasks (no dependencies)
+        for t, deps in self._dep_map.items():
+            if not deps:  # No dependencies
+                self._task_state[t] = TaskState.READY
+                await self._ready_queue.put(t)
+                self._log.debug("Initial ready task: %s" % t.name)
 
         active_task_l = []
         done_task_s = set()
         self.status = 0
-        for active_s in order:
-            done = True
-            for t in active_s:
-                while len(active_task_l) >= self.nproc and t not in done_task_s:
-                    # Wait for at least one job to complete
-                    done, pending = await asyncio.wait(
-                        [at[1] for at in active_task_l],
-                        return_when=asyncio.FIRST_COMPLETED)
-                    self._completeTasks(active_task_l, done_task_s, done, dst_memento)
-
-                if self.status == 0 and t not in done_task_s:
-                    memento = src_memento.get(t.name, None)
-#                    dirname = t.name
-                    invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
-
-                    # TaskNode rundir is a list of path elements relative
-                    # to the root rundir
-                    rundir_split = t.rundir
-                    if not isinstance(t.rundir, list):
-                        rundir_split = t.rundir.split('/')
-#                        raise Exception("Task %s doesn't have an array rundir" % t.name)
-
-                    # Determine base rundir: absolute first segment or anchor to self.rundir
-                    if len(rundir_split) > 0 and os.path.isabs(rundir_split[0]):
-                        rundir = rundir_split[0]
-                        segs = rundir_split[1:]
-                    else:
-                        rundir = self.rundir
-                        segs = rundir_split
-
-                    for rundir_e in segs:
-                        rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
-                        rundir = os.path.join(rundir, rundir_e)
-
-                    # if t.rundir_t == RundirE.Unique:
-                    #     # Replace invalid characters with the replacement string.
-                    #     dirname = re.sub(invalid_chars_pattern, '_', dirname)
-
-                    #     rundir = os.path.join(self.rundir, dirname)
-                    # else:
-                    #     rundir = self.rundir
-
-                    if not os.path.isdir(rundir):
-                        try:
-                            os.makedirs(rundir, exist_ok=True)
-                        except Exception as e:
-                            print("Failed to create rundir %s: %s" % (rundir, str(e)), flush=True)
-                            raise e
-
-                    self._log.debug("start task %s" % t.name)
-                    self._notify(t, "enter")
-                    t.start = datetime.now()
-                    # Track current task for logging context
-                    setattr(self, '_current_task', t)
-                    coro = asyncio.Task(t.do_run(
-                        self,
-                        rundir,
-                        memento)) 
-                    active_task_l.append((t, coro))
-
-                if self.status != 0:
-                    self._log.debug("Exiting due to status: %d", self.status)
-                    break
-               
-            # All pending tasks in the task-group have been launched
-            # Wait for them to all complete
-            while len(active_task_l):
-                # TODO: Shouldn't gather here -- reach to each completion
-                done, pending = await asyncio.wait(
-                    [at[1] for at in active_task_l],
-                    return_when=asyncio.FIRST_COMPLETED)
-                self._completeTasks(active_task_l, done_task_s, done, dst_memento)
-            
-            if self.status != 0:
-                self._log.debug("Exiting due to status: %d", self.status)
-                break
+        
+        # Start unified task processor
+        processor_task = asyncio.create_task(
+            self._process_ready_and_dynamic_tasks(active_task_l, done_task_s, src_memento, dst_memento))
+        
+        try:
+            # Wait for processor to finish
+            await processor_task
+                    
+        finally:
+            # Disable dynamic scheduling
+            self._dynamic_enabled = False
 
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
@@ -232,28 +207,308 @@ class TaskSetRunner(TaskRunner):
         if self.builder is None:
             raise Exception("TaskSetRunner.mkDataItem() requires a builder")
         return self.builder.mkDataItem(type, **kwargs)
+    
+    async def _launch_task(
+        self,
+        t: TaskNode,
+        active_task_l: List,
+        src_memento: dict,
+        dst_memento: dict
+    ):
+        """Launch a single task with proper setup and dependency waiting"""
         
-    def _completeTasks(self, active_task_l, done_task_s, done_l, dst_memento):
+    async def _launch_task(
+        self,
+        t: TaskNode,
+        active_task_l: List,
+        src_memento: dict,
+        dst_memento: dict
+    ):
+        """Launch a single task with proper setup"""
+        
+        # Update state to running
+        self._task_state[t] = TaskState.RUNNING
+        
+        # Dependencies should already be satisfied (checked before enqueuing)
+        # But double-check for safety
+        for dep, _ in t.needs:
+            if dep.name in self._task_completion_events:
+                event = self._task_completion_events[dep.name]
+                if not event.is_set():
+                    self._log.warning("Task %s launched but dependency %s not complete!" % (t.name, dep.name))
+                    await event.wait()
+        
+        memento = src_memento.get(t.name, None)
+        invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
+
+        # TaskNode rundir is a list of path elements relative
+        # to the root rundir
+        rundir_split = t.rundir
+        if not isinstance(t.rundir, list):
+            rundir_split = t.rundir.split('/')
+
+        # Determine base rundir: absolute first segment or anchor to self.rundir
+        if len(rundir_split) > 0 and os.path.isabs(rundir_split[0]):
+            rundir = rundir_split[0]
+            segs = rundir_split[1:]
+        else:
+            rundir = self.rundir
+            segs = rundir_split
+
+        for rundir_e in segs:
+            rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
+            rundir = os.path.join(rundir, rundir_e)
+
+        if not os.path.isdir(rundir):
+            try:
+                os.makedirs(rundir, exist_ok=True)
+            except Exception as e:
+                print("Failed to create rundir %s: %s" % (rundir, str(e)), flush=True)
+                raise e
+
+        self._log.debug("Launching task %s" % t.name)
+        self._notify(t, "enter")
+        t.start = datetime.now()
+        # Track current task for logging context
+        setattr(self, '_current_task', t)
+        coro = asyncio.Task(t.do_run(
+            self,
+            rundir,
+            memento)) 
+        active_task_l.append((t, coro))
+    
+    def _skip_task(self, task: TaskNode, done_task_s: Set[TaskNode]):
+        """Mark a task as skipped (not executed due to failure)"""
+        self._log.debug("Skipping task %s" % task.name)
+        
+        # Mark as skipped
+        done_task_s.add(task)
+        self._task_state[task] = TaskState.SKIPPED
+        
+        # Create dummy result
+        task.result = TaskDataResult(status=1, output=[], changed=False)
+        task.output = TaskDataOutput(changed=False, dep_m={}, output=[])
+        
+        # Signal completion event so dependent tasks can proceed
+        if task.name in self._task_completion_events:
+            self._task_completion_events[task.name].set()
+            if task.name in self._pending_tasks:
+                del self._pending_tasks[task.name]
+        
+        # Check if this completes any sub-graphs
+        for sg_id in list(self._active_subgraphs.keys()):
+            self._complete_subgraph(sg_id, done_task_s)
+    
+    async def _process_ready_and_dynamic_tasks(
+        self,
+        active_task_l: List,
+        done_task_s: Set[TaskNode],
+        src_memento: dict,
+        dst_memento: dict
+    ):
+        """
+        Unified processor for ready tasks and dynamic tasks.
+        
+        Continuously:
+        1. Check for completed tasks -> mark complete -> check dependents
+        2. Pull ready tasks from queue -> launch them
+        3. Pull dynamic tasks from queue -> add to dep_map -> check if ready
+        """
+        self._log.debug("Task processor started")
+        
+        iteration = 0
+        last_log_time = 0
+        
+        while True:
+            iteration += 1
+            
+            # Periodic status logging every 100 iterations
+            import time
+            if iteration % 100 == 0:
+                current_time = time.time()
+                if current_time - last_log_time > 2:  # Log every 2 seconds max
+                    self._log.warning("Task processor: iteration %d, active=%d, ready=%d, total_tasks=%d" % (
+                        iteration, len(active_task_l), self._ready_queue.qsize(), len(self._task_state)))
+                    last_log_time = current_time
+            
+            # Safety: timeout after 10000 iterations
+            if iteration > 10000:
+                self._log.error("Task processor: exceeded 10000 iterations, forcing exit")
+                break
+            
+            # Check exit condition: all tasks done and no more work
+            all_done = all(
+                state in (TaskState.COMPLETED, TaskState.SKIPPED) 
+                for state in self._task_state.values()
+            )
+            
+            if all_done and len(active_task_l) == 0 and self._ready_queue.empty():
+                self._log.debug("Task processor: all tasks done, exiting")
+                break
+            
+            # Deadlock detection: no active tasks, nothing ready, but tasks still pending
+            if len(active_task_l) == 0 and self._ready_queue.empty() and not all_done:
+                # Check if we have tasks stuck in NOT_STARTED
+                stuck_tasks = [task.name for task, state in self._task_state.items() 
+                              if state == TaskState.NOT_STARTED]
+                if stuck_tasks:
+                    self._log.error("Deadlock detected: %d tasks stuck in NOT_STARTED state" % len(stuck_tasks))
+                    self._log.error("Stuck tasks: %s" % ", ".join(stuck_tasks))
+                    # Mark them as skipped and continue
+                    for task, state in list(self._task_state.items()):
+                        if state == TaskState.NOT_STARTED:
+                            self._skip_task(task, done_task_s)
+                    continue
+                else:
+                    # No tasks stuck, but not all done - might be waiting for something?
+                    self._log.error("Deadlock: no active tasks, queue empty, but not all done. States:")
+                    for task, state in self._task_state.items():
+                        self._log.error("  %s: %s" % (task.name, state))
+                    break
+                    
+            try:
+                # 1. Check for task completions
+                if len(active_task_l) > 0:
+                    done, pending = await asyncio.wait(
+                        [at[1] for at in active_task_l],
+                        timeout=0.05,
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    if done:
+                        self._handle_completions(active_task_l, done_task_s, done, dst_memento)
+                
+                # 2. Check ready queue for tasks to launch
+                try:
+                    ready_task = self._ready_queue.get_nowait()
+                    
+                    # Double-check state
+                    if self._task_state.get(ready_task) != TaskState.READY:
+                        self._log.warning("Task %s in ready queue but state is %s" % 
+                                         (ready_task.name, self._task_state.get(ready_task)))
+                        continue
+                    
+                    # Launch if status is OK
+                    if self.status == 0:
+                        self._task_state[ready_task] = TaskState.SCHEDULED
+                        await self._launch_task(ready_task, active_task_l, src_memento, dst_memento)
+                    else:
+                        # Skip due to previous failure
+                        self._skip_task(ready_task, done_task_s)
+                        
+                except asyncio.QueueEmpty:
+                    pass
+                
+                # 3. Check dynamic task queue
+                try:
+                    item = self._dynamic_task_queue.get_nowait()
+                    
+                    if item is None:  # Sentinel
+                        continue
+                    
+                    subgraph_id = item['id']
+                    self._dynamic_log.debug("Processing sub-graph %d from queue" % subgraph_id)
+                    
+                    # Add tasks to dependency map and initialize state
+                    for task, deps in item['dep_map'].items():
+                        if task not in self._task_state:
+                            self._dep_map[task] = deps
+                            self._task_state[task] = TaskState.NOT_STARTED
+                            self._pending_tasks[task.name] = task
+                            self._task_completion_events[task.name] = asyncio.Event()
+                            self._dynamic_log.debug("  Added dynamic task %s" % task.name)
+                            
+                            # Check if ready immediately
+                            if self._is_task_ready(task):
+                                self._task_state[task] = TaskState.READY
+                                await self._ready_queue.put(task)
+                                self._dynamic_log.debug("  Task %s is immediately ready" % task.name)
+                    
+                except asyncio.QueueEmpty:
+                    pass
+                    
+            except asyncio.TimeoutError:
+                # No completions, continue loop
+                pass
+            except Exception as e:
+                self._log.error("Error in task processor: %s" % e)
+                import traceback
+                import sys
+                traceback.print_exc(file=sys.stdout)
+                # Don't break - continue processing
+        
+        self._log.debug("Task processor stopped")
+    
+    def _is_task_ready(self, task: TaskNode) -> bool:
+        """Check if all dependencies of a task are completed"""
+        for dep, _ in task.needs:
+            dep_state = self._task_state.get(dep, TaskState.NOT_STARTED)
+            if dep_state != TaskState.COMPLETED:
+                return False
+        return True
+    
+    def _handle_completions(self, active_task_l, done_task_s, done_l, dst_memento):
+        """
+        Handle completed tasks and check if any dependents become ready.
+        This replaces the old _completeTasks but adds dependent checking.
+        """
         for d in done_l:
             for i in range(len(active_task_l)):
                 if active_task_l[i][1] == d:
-                    tt = active_task_l[i][0]
-                    tt.end = datetime.now()
-                    self._log.debug("complete task %s" % tt.name)
-                    if tt.result is None:
-                        raise Exception("Task %s did not produce a result" % tt.name)
-                    if tt.result.memento is not None:
-                        dst_memento[tt.name] = tt.result.memento.model_dump()
+                    completed_task = active_task_l[i][0]
+                    completed_task.end = datetime.now()
+                    
+                    # Mark as completed
+                    done_task_s.add(completed_task)
+                    self._task_state[completed_task] = TaskState.COMPLETED
+                    
+                    # Signal completion event
+                    if completed_task.name in self._task_completion_events:
+                        self._task_completion_events[completed_task.name].set()
+                        self._pending_tasks.pop(completed_task.name, None)  # Use pop to avoid KeyError
+                        self._log.debug("Completed: %s" % completed_task.name)
+                    
+                    # Check sub-graphs
+                    for sg_id in list(self._active_subgraphs.keys()):
+                        self._complete_subgraph(sg_id, done_task_s)
+                    
+                    # Handle result
+                    if completed_task.result is None:
+                        raise Exception("Task %s did not produce a result" % completed_task.name)
+                    if completed_task.result.memento is not None:
+                        dst_memento[completed_task.name] = completed_task.result.memento.model_dump()
                     else:
-                        dst_memento[tt.name] = None
-                    self.status |= tt.result.status 
+                        dst_memento[completed_task.name] = None
+                    self.status |= completed_task.result.status 
                     if self.status:
-                        self._log.debug("Task %s failed with status %d" % (tt.name, tt.result.status))
-                    self._notify(tt, "leave")
-                    done_task_s.add(tt)
+                        self._log.debug("Task %s failed with status %d" % (completed_task.name, completed_task.result.status))
+                    self._notify(completed_task, "leave")
                     active_task_l.pop(i)
+                    
+                    # KEY: Check all tasks that depend on this one
+                    self._check_and_enqueue_dependents(completed_task)
                     break
-    pass
+    
+    def _check_and_enqueue_dependents(self, completed_task: TaskNode):
+        """
+        Check all tasks in dep_map that depend on completed_task.
+        If a dependent is now ready (all deps complete), enqueue it.
+        """
+        for task, deps in self._dep_map.items():
+            # Skip if not dependent on completed_task
+            if completed_task not in deps:
+                continue
+            
+            # Skip if not in NOT_STARTED state
+            if self._task_state.get(task) != TaskState.NOT_STARTED:
+                continue
+            
+            # Check if all dependencies are now complete
+            if self._is_task_ready(task):
+                self._task_state[task] = TaskState.READY
+                self._ready_queue.put_nowait(task)
+                self._log.debug("Task %s now ready (dep %s completed)" % (task.name, completed_task.name))
+    
+    
         
     def buildDepMap(self, task : Union[TaskNode, List[TaskNode]]) -> Dict[TaskNode, Set[TaskNode]]:
         tasks = task if isinstance(task, list) else [task]
