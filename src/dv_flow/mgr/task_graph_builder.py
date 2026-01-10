@@ -28,6 +28,7 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader_p import PackageLoaderP
 from .param_ref_eval import ParamRefEval
+from .param_builder import ParamBuilder
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
@@ -97,6 +98,11 @@ class TaskGraphBuilder(object):
             self.env = os.environ.copy()
 
         self._eval.set("env", self.env)
+        
+        # Preserve runtime-only variables (expanded at task execution time)
+        self._eval.set("inputs", "${{ inputs }}")
+        self._eval.set("name", "${{ name }}")
+        self._eval.set("result_file", "${{ result_file }}")
 
 
 
@@ -113,14 +119,17 @@ class TaskGraphBuilder(object):
                 "dir": self.root_pkg.basedir
             })
 
-            params = self.root_pkg.paramT()
-
-            self._expandParams(params, self._eval)
-
-            for key in self.root_pkg.paramT.model_fields.keys():
-                self._eval.set(key, getattr(params, key))
-
-            self._pkg_params_m[self.root_pkg.name] = params
+            # Build package paramT if needed
+            if self.root_pkg.paramT:
+                params = self.root_pkg.paramT()
+                self._expandParams(params, self._eval)
+                for key in self.root_pkg.paramT.model_fields.keys():
+                    self._eval.set(key, getattr(params, key))
+                self._pkg_params_m[self.root_pkg.name] = params
+            else:
+                # No parameters
+                params = None
+                self._pkg_params_m[self.root_pkg.name] = None
 
             self._addPackageTasks(self.root_pkg, pkg_s)
         else:
@@ -137,6 +146,9 @@ class TaskGraphBuilder(object):
         if self.root_pkg is None:
             raise Exception("No root package")
         params = self._pkg_params_m[self.root_pkg.name]
+        
+        if params is None:
+            raise Exception("Package %s has no parameters" % self.root_pkg.name)
 
         if not hasattr(params, name):
             raise Exception("Package %s does not have parameter %s" % (self.root_pkg.name, name))
@@ -147,10 +159,14 @@ class TaskGraphBuilder(object):
         self._pkg_m[pkg.name] = pkg
 
         # Build out the package parameters
-        params = pkg.paramT()
-        self._expandParams(params, self._eval)
-        self._pkg_params_m[pkg.name] = params
-        self._eval.set(pkg.name, params)
+        if pkg.paramT:
+            params = pkg.paramT()
+            self._expandParams(params, self._eval)
+            self._pkg_params_m[pkg.name] = params
+            self._eval.set(pkg.name, params)
+        else:
+            params = None
+            self._pkg_params_m[pkg.name] = None
 
         if pkg not in pkg_s:
             pkg_s.add(pkg)
@@ -515,9 +531,15 @@ class TaskGraphBuilder(object):
                 name = task.name
             
             if params is None:
-                params = task.paramT()
+                # Build paramT lazily
+                if task.paramT is None:
+                    if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                        param_builder = ParamBuilder(eval or self._eval)
+                        task.paramT = param_builder.build_param_type(task)
+                params = task.paramT() if task.paramT else None
 
-            self._expandParams(params, eval)
+            if params:
+                self._expandParams(params, eval)
 
             if srcdir is None:
                 srcdir = os.path.dirname(task.srcinfo.file)
@@ -550,7 +572,12 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
 
         if params is None:
-            params = task.paramT()
+            # Build paramT lazily
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
 
         ret = TaskNodeCompound(
             name=name,
@@ -677,6 +704,23 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
         
         if params is None:
+            # NEW: Build paramT lazily if not already built
+            if task.paramT is None:
+                if task.param_defs is not None:
+                    self._log.debug(f"Building paramT for {task.name} from param_defs")
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+                elif task.uses and (task.uses.paramT or task.uses.param_defs):
+                    # Task has no param_defs but uses another task with params
+                    # Build paramT from the uses chain
+                    self._log.debug(f"Building paramT for {task.name} from uses chain")
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+                else:
+                    self._log.warning(f"Task {task.name} has no paramT or param_defs")
+                    # Create empty paramT
+                    task.paramT = pydantic.create_model(f"Task{task.name}Params")
+            
             params = task.paramT()
 
         # Create and push task scope for parameter resolution
@@ -695,6 +739,8 @@ class TaskGraphBuilder(object):
         self.task_scope().variables["rundir"] = "/".join([str(e) for e in self.get_rundir()])
         
         # Now expand parameters in the scope context
+        # Note: Most evaluation now happens in ParamBuilder, but we still
+        # need to handle runtime-only variables like 'rundir'
         self._expandParams(params, eval)
 
 
@@ -766,10 +812,16 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
 
         if params is None:
-            params = task.paramT()
+            # Build paramT lazily
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
 
-        # expand any variable references
-        self._expandParams(params, eval)
+        # expand any variable references (runtime-only variables like rundir)
+        if params:
+            self._expandParams(params, eval)
 
         # Create a new task scope for this compound task
         node = TaskNodeCompound(

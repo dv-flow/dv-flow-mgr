@@ -67,7 +67,7 @@ class TaskListenerProgress(object):
             TextColumn("{task.fields[name]}") ,
             TextColumn("{task.fields[elapsed]}")
         )
-        self._live = Live(self._render_group(), console=self.console, refresh_per_second=10)
+        self._live = Live(self._render_group(), console=self.console, refresh_per_second=20)
         self._live.__enter__()
         self._running = True
 
@@ -102,6 +102,9 @@ class TaskListenerProgress(object):
                     )
                     self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
                     self._order.append(task)
+                    # Trigger a manual refresh
+                    if self._live:
+                        self._live.update(self._render_group())
         elif reason == 'uptodate':
             # Task is up-to-date - in non-verbose mode, don't show it at all
             # In verbose mode, task was already added in 'enter', will show 'U' on leave
@@ -115,6 +118,9 @@ class TaskListenerProgress(object):
                 )
                 self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
                 self._order.append(task)
+                # Trigger a manual refresh
+                if self._live:
+                    self._live.update(self._render_group())
         elif reason == 'leave':
             info = self._task_row_map.get(task)
             if info is None:
@@ -177,7 +183,7 @@ class TaskListenerProgress(object):
                 if info.get('markers'):
                     for m in info['markers']:
                         table.add_row("  " + self._format_marker_line(m, t.name))
-        return Group(self._progress if (self._live and self._live.is_started) else self._final_panel())
+        return Group(self._progress if self._running else self._final_panel())
 
     def _final_panel(self):
         # Create a static panel summarizing all tasks with final statuses + markers

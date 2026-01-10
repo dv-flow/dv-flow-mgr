@@ -146,6 +146,53 @@ package:
           Optional timestamp file to determine if running 
           the command changed the output
 
+  - name: Prompt
+    desc: |
+      Executes an AI assistant with a specified prompt and collects 
+      structured results. The assistant MUST create a valid JSON result
+      file or the task will fail.
+      
+      Supported assistants: GitHub Copilot, Claude, OpenAI
+    shell: pytask
+    run: dv_flow.mgr.std.prompt.Prompt
+    with:
+      system_prompt:
+        type: str
+        doc: |
+          System prompt template. Can include variable references:
+          - ${{ inputs }} - JSON of input data (runtime expansion)
+          - ${{ name }} - Task name (runtime expansion)
+          - ${{ result_file }} - Expected result filename (runtime expansion)
+          Note: These use DV Flow's ${{ }} syntax but are expanded at runtime
+          If empty, uses default template.
+        value: ""
+      user_prompt:
+        type: str
+        value: ""
+        doc: |
+          User's prompt content. Combined with system_prompt.
+      result_file:
+        type: str
+        value: ""
+        doc: |
+          Name of JSON result file (default: {name}.result.json).
+          Assistant MUST write valid JSON to this file or task fails.
+      assistant:
+        type: str
+        value: ""
+        doc: |
+          Override default AI assistant. Options: copilot, openai, claude
+      model:
+        type: str
+        value: ""
+        doc: |
+          Specify the model to use (e.g., gpt-4, claude-3-opus). 
+          If empty, uses the assistant's default model.
+      assistant_config:
+        type: map
+        doc: |
+          Assistant-specific configuration (e.g., API keys, model settings)
+
   types:
   - name: DataItem
     with:

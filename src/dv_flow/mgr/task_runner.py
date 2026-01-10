@@ -327,7 +327,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             if iteration % 100 == 0:
                 current_time = time.time()
                 if current_time - last_log_time > 2:  # Log every 2 seconds max
-                    self._log.warning("Task processor: iteration %d, active=%d, ready=%d, total_tasks=%d" % (
+                    self._log.info("Task processor: iteration %d, active=%d, ready=%d, total_tasks=%d" % (
                         iteration, len(active_task_l), self._ready_queue.qsize(), len(self._task_state)))
                     last_log_time = current_time
             
