@@ -349,6 +349,167 @@ and providing user feedback during flow execution.</p>
 </div>
 </section>
 </section>
+<section id="std-prompt">
+<h2>std.Prompt<a class="headerlink" href="#std-prompt" title="Link to this heading">¶</a></h2>
+<p>Executes an AI assistant with a specified prompt and collects structured
+results. The AI assistant must create a valid JSON result file or the task
+will fail with an error.</p>
+<p>This task enables AI-assisted workflows for code generation, documentation,
+test creation, and other automated tasks that benefit from large language
+model capabilities.</p>
+<section id="id25">
+<h3>Example<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<p>Basic usage:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generate_code</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Prompt</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">user_prompt</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Generate</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">Python</span><span class="nv"> </span><span class="s">function</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">parse</span><span class="nv"> </span><span class="s">CSV</span><span class="nv"> </span><span class="s">files&quot;</span>
+<span class="w">        </span><span class="nt">assistant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">copilot</span>
+</pre></div>
+</div>
+<p>Custom system prompt:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt.custom</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generate_test</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Prompt</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">system_prompt</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no">You are a test generation assistant.</span>
+<span class="w">          </span><span class="no">Input data: ${{ inputs }}</span>
+
+<span class="w">          </span><span class="no">Generate unit tests for the code and write results to ${{ result_file }}</span>
+<span class="w">          </span><span class="no">in JSON format with the following structure:</span>
+<span class="w">          </span><span class="no">{</span>
+<span class="w">            </span><span class="no">&quot;status&quot;: 0,</span>
+<span class="w">            </span><span class="no">&quot;changed&quot;: true,</span>
+<span class="w">            </span><span class="no">&quot;output&quot;: [],</span>
+<span class="w">            </span><span class="no">&quot;markers&quot;: []</span>
+<span class="w">          </span><span class="no">}</span>
+<span class="w">        </span><span class="nt">user_prompt</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Create</span><span class="nv"> </span><span class="s">comprehensive</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">tests&quot;</span>
+<span class="w">        </span><span class="nt">result_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tests.result.json&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="id26">
+<h3>Consumes<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>). Input data is available in the
+prompt via the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">}}</span></code> variable.</p>
+</section>
+<section id="id27">
+<h3>Produces<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<p>Outputs are determined by the AI assistant’s result JSON file. Typically
+produces <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> items for generated files, but can produce any
+data type specified in the result.</p>
+</section>
+<section id="id28">
+<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<ul>
+<li><p><strong>system_prompt</strong> - [Optional] System prompt template. Can include variable references:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">}}</span></code> - JSON of input data from upstream tasks</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">name</span> <span class="pre">}}</span></code> - Current task name</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">result_file</span> <span class="pre">}}</span></code> - Expected result filename</p></li>
+</ul>
+<p>If empty, uses a default template that describes the expected JSON result format.</p>
+</li>
+<li><p><strong>user_prompt</strong> - [Optional] User’s prompt content. This is appended to the
+system prompt with a “User Request:” header.</p></li>
+<li><p><strong>result_file</strong> - [Optional] Name of the JSON result file the AI must create
+(default: <code class="docutils literal notranslate"><span class="pre">{name}.result.json</span></code>). The task fails if this file is missing or
+contains invalid JSON.</p></li>
+<li><p><strong>assistant</strong> - [Optional] AI assistant to use. Options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">copilot</span></code> - GitHub Copilot CLI (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">openai</span></code> - OpenAI API (not yet implemented)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">claude</span></code> - Claude API (not yet implemented)</p></li>
+</ul>
+</li>
+<li><p><strong>assistant_config</strong> - [Optional] Map of assistant-specific configuration
+(e.g., API keys, model settings)</p></li>
+</ul>
+</section>
+<section id="required-result-format">
+<h3>Required Result Format<a class="headerlink" href="#required-result-format" title="Link to this heading">¶</a></h3>
+<p>The AI assistant must create a JSON file with the following structure:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pythonSource&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;basedir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;generated.py&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;msg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Generated 1 file&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;info&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Fields:</p>
+<ul class="simple">
+<li><p><strong>status</strong> - Exit code (0 = success, non-zero = failure)</p></li>
+<li><p><strong>changed</strong> - Whether the task produced new/modified outputs</p></li>
+<li><p><strong>output</strong> - Array of output data items (e.g., FileSets)</p></li>
+<li><p><strong>markers</strong> - Array of diagnostic messages with severity levels</p></li>
+</ul>
+</section>
+<section id="error-handling">
+<h3>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h3>
+<p>The Prompt task uses strict validation:</p>
+<ul class="simple">
+<li><p><strong>Missing result file</strong> → Task fails with status=1</p></li>
+<li><p><strong>Invalid JSON syntax</strong> → Task fails with status=1</p></li>
+<li><p><strong>Result is not a JSON object</strong> → Task fails with status=1</p></li>
+<li><p><strong>Assistant not available</strong> → Task fails with status=1</p></li>
+<li><p><strong>Assistant execution fails</strong> → Task fails with assistant’s exit code</p></li>
+</ul>
+</section>
+<section id="debugging">
+<h3>Debugging<a class="headerlink" href="#debugging" title="Link to this heading">¶</a></h3>
+<p>When the Prompt task runs, it creates several files in the task’s run directory:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">{name}.prompt.txt</span></code> - The complete prompt sent to the AI assistant</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">{name}.result.json</span></code> - The structured result from the AI (if created)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">assistant.stdout.log</span></code> - Standard output from the AI assistant</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">assistant.stderr.log</span></code> - Standard error from the AI assistant</p></li>
+</ul>
+<p>These files are invaluable for debugging when the AI assistant doesn’t produce
+the expected result or when result parsing fails.</p>
+</section>
+<section id="setup-requirements">
+<h3>Setup Requirements<a class="headerlink" href="#setup-requirements" title="Link to this heading">¶</a></h3>
+<p><strong>GitHub Copilot CLI</strong></p>
+<p>To use the default <code class="docutils literal notranslate"><span class="pre">copilot</span></code> assistant:</p>
+<ol class="arabic">
+<li><p>Install GitHub CLI: <a class="reference external" href="https://cli.github.com/">https://cli.github.com/</a></p></li>
+<li><p>Install Copilot extension:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gh<span class="w"> </span>extension<span class="w"> </span>install<span class="w"> </span>github/gh-copilot
+</pre></div>
+</div>
+</li>
+<li><p>Authenticate:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gh<span class="w"> </span>auth<span class="w"> </span>login
+</pre></div>
+</div>
+</li>
+</ol>
+<p><strong>Other Assistants</strong></p>
+<p>OpenAI and Claude assistants are placeholders for future implementation.
+Contributions are welcome!</p>
+</section>
+</section>
 </section>
 
 

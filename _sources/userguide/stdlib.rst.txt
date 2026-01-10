@@ -335,3 +335,179 @@ Messages support expression syntax for dynamic content:
         with:
           msg: "Building version ${{ version }}"
 
+
+std.Prompt
+==========
+
+Executes an AI assistant with a specified prompt and collects structured 
+results. The AI assistant must create a valid JSON result file or the task 
+will fail with an error.
+
+This task enables AI-assisted workflows for code generation, documentation, 
+test creation, and other automated tasks that benefit from large language 
+model capabilities.
+
+Example
+-------
+
+Basic usage:
+
+.. code-block:: yaml
+
+    package:
+        name: prompt.example
+    
+        tasks:
+        - name: generate_code
+          uses: std.Prompt
+          with:
+            user_prompt: "Generate a Python function to parse CSV files"
+            assistant: copilot
+
+Custom system prompt:
+
+.. code-block:: yaml
+
+    package:
+        name: prompt.custom
+    
+        tasks:
+        - name: generate_test
+          uses: std.Prompt
+          with:
+            system_prompt: |
+              You are a test generation assistant.
+              Input data: ${{ inputs }}
+              
+              Generate unit tests for the code and write results to ${{ result_file }}
+              in JSON format with the following structure:
+              {
+                "status": 0,
+                "changed": true,
+                "output": [],
+                "markers": []
+              }
+            user_prompt: "Create comprehensive unit tests"
+            result_file: "tests.result.json"
+
+Consumes
+--------
+All inputs by default (``consumes: all``). Input data is available in the 
+prompt via the ``${{ inputs }}`` variable.
+
+Produces
+--------
+Outputs are determined by the AI assistant's result JSON file. Typically 
+produces ``std.FileSet`` items for generated files, but can produce any 
+data type specified in the result.
+
+Parameters
+----------
+
+* **system_prompt** - [Optional] System prompt template. Can include variable references:
+
+  * ``${{ inputs }}`` - JSON of input data from upstream tasks
+  * ``${{ name }}`` - Current task name
+  * ``${{ result_file }}`` - Expected result filename
+  
+  If empty, uses a default template that describes the expected JSON result format.
+
+* **user_prompt** - [Optional] User's prompt content. This is appended to the 
+  system prompt with a "User Request:" header.
+
+* **result_file** - [Optional] Name of the JSON result file the AI must create 
+  (default: ``{name}.result.json``). The task fails if this file is missing or 
+  contains invalid JSON.
+
+* **assistant** - [Optional] AI assistant to use. Options:
+
+  * ``copilot`` - GitHub Copilot CLI (default)
+  * ``openai`` - OpenAI API (not yet implemented)
+  * ``claude`` - Claude API (not yet implemented)
+
+* **assistant_config** - [Optional] Map of assistant-specific configuration 
+  (e.g., API keys, model settings)
+
+Required Result Format
+----------------------
+
+The AI assistant must create a JSON file with the following structure:
+
+.. code-block:: json
+
+    {
+      "status": 0,
+      "changed": true,
+      "output": [
+        {
+          "type": "std.FileSet",
+          "filetype": "pythonSource",
+          "basedir": ".",
+          "files": ["generated.py"]
+        }
+      ],
+      "markers": [
+        {
+          "msg": "Generated 1 file",
+          "severity": "info"
+        }
+      ]
+    }
+
+Fields:
+
+* **status** - Exit code (0 = success, non-zero = failure)
+* **changed** - Whether the task produced new/modified outputs
+* **output** - Array of output data items (e.g., FileSets)
+* **markers** - Array of diagnostic messages with severity levels
+
+Error Handling
+--------------
+
+The Prompt task uses strict validation:
+
+* **Missing result file** → Task fails with status=1
+* **Invalid JSON syntax** → Task fails with status=1
+* **Result is not a JSON object** → Task fails with status=1
+* **Assistant not available** → Task fails with status=1
+* **Assistant execution fails** → Task fails with assistant's exit code
+
+Debugging
+---------
+
+When the Prompt task runs, it creates several files in the task's run directory:
+
+* ``{name}.prompt.txt`` - The complete prompt sent to the AI assistant
+* ``{name}.result.json`` - The structured result from the AI (if created)
+* ``assistant.stdout.log`` - Standard output from the AI assistant
+* ``assistant.stderr.log`` - Standard error from the AI assistant
+
+These files are invaluable for debugging when the AI assistant doesn't produce 
+the expected result or when result parsing fails.
+
+Setup Requirements
+------------------
+
+**GitHub Copilot CLI**
+
+To use the default ``copilot`` assistant:
+
+1. Install GitHub CLI: https://cli.github.com/
+2. Install Copilot extension:
+
+   .. code-block:: bash
+
+       gh extension install github/gh-copilot
+
+3. Authenticate:
+
+   .. code-block:: bash
+
+       gh auth login
+
+**Other Assistants**
+
+OpenAI and Claude assistants are placeholders for future implementation. 
+Contributions are welcome!
+
+
