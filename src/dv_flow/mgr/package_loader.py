@@ -52,6 +52,10 @@ class PackageLoader(PackageLoaderP):
         self._eval.set("env", self.env)
         # Preserve rundir for expansion during task execution
         self._eval.set("rundir", "${{ rundir }}")
+        # Preserve runtime-only variables for Prompt task
+        self._eval.set("inputs", "${{ inputs }}")
+        self._eval.set("name", "${{ name }}")
+        self._eval.set("result_file", "${{ result_file }}")
 
         self._eval.set_name_resolution(self)
 

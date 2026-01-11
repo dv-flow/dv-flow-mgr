@@ -4,6 +4,7 @@ import difflib
 import logging
 import os
 import pydantic
+import re
 import yaml
 from typing import ClassVar, Dict, List, Optional, Union
 from .fragment_def import FragmentDef
@@ -15,6 +16,7 @@ from .package_def import PackageDef
 from .package_provider import PackageProvider
 from .package_scope import PackageScope
 from .param_def import ComplexType, ParamDef
+from .param_def_collection import ParamDefCollection
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
 from .task import Task, Strategy, StrategyGenerate
@@ -945,6 +947,119 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("<-- _getParamT %s" % taskdef.name)
         return params_t
     
+    def _collectParamDefs(self, 
+                          loader,
+                          taskdef,
+                          base_task: Optional[Union[Task, Type]]) -> ParamDefCollection:
+        """
+        Collect parameter definitions WITHOUT evaluating template expressions.
+        This enables lazy evaluation during task graph building.
+        """
+        self._log.debug("--> _collectParamDefs %s (%s)" % (taskdef.name, str(taskdef.params)))
+        
+        collection = ParamDefCollection(srcinfo=taskdef.srcinfo)
+        
+        ptype_m = {
+            "str" : str,
+            "int" : int,
+            "float" : float,
+            "bool" : bool,
+            "list" : List,
+            "map" : Dict
+        }
+        pdflt_m = {
+            "str" : "",
+            "int" : 0,
+            "float" : 0.0,
+            "bool" : False,
+            "list" : [],
+            "map" : {}
+        }
+        
+        for p in taskdef.params.keys():
+            param = taskdef.params[p]
+            self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
+            
+            # Convert dict to ParamDef if needed
+            if isinstance(param, dict) and "type" in param.keys():
+                try:
+                    param = ParamDef(**param)
+                except Exception as e:
+                    self._log.error("Failed to convert param-def %s to ParamDef" % str(param))
+                    raise e
+            
+            if hasattr(param, "type") and param.type is not None:
+                # Parameter declaration with type
+                self._log.debug("  is being defined")
+                
+                if isinstance(param.type, ComplexType):
+                    if param.type.list is not None:
+                        ptype = List
+                        pdflt = []
+                    elif param.type.map is not None:
+                        ptype = Dict
+                        pdflt = {}
+                    else:
+                        raise Exception("Complex type %s not supported" % str(param.type))
+                else:
+                    ptype_s = param.type
+                    if ptype_s not in ptype_m.keys():
+                        raise Exception("Unknown type %s" % ptype_s)
+                    ptype = ptype_m[ptype_s]
+                    pdflt = pdflt_m[ptype_s]
+                
+                if collection.has_param(p):
+                    raise Exception("Duplicate field %s" % p)
+                
+                # Store raw value - DON'T evaluate template expressions
+                val = param.value if param.value is not None else pdflt
+                collection.add_param(p, ParamDef(value=val), ptype)
+                self._log.debug("  Added param %s: type=%s, raw_value=%s" % (p, ptype, val))
+                
+            else:
+                # Parameter override/assignment
+                self._log.debug("  is being overridden")
+                
+                # Get the parameter value
+                if hasattr(param, "copy"):
+                    value = param.copy()
+                elif isinstance(param, ParamDef):
+                    value = param.value
+                else:
+                    value = param
+                
+                # Try to get type from base task or existing collection
+                ptype = None
+                if collection.has_param(p):
+                    ptype = collection.get_type(p)
+                elif base_task and hasattr(base_task, 'param_defs') and base_task.param_defs and base_task.param_defs.has_param(p):
+                    ptype = base_task.param_defs.get_type(p)
+                elif base_task and hasattr(base_task, 'paramT') and base_task.paramT:
+                    # Base task has paramT (old-style eager evaluation or Type), get type from there
+                    if hasattr(base_task.paramT, 'model_fields') and p in base_task.paramT.model_fields:
+                        ptype = base_task.paramT.model_fields[p].annotation
+                
+                # Check if parameter exists in base
+                param_exists_in_base = False
+                if base_task:
+                    if hasattr(base_task, 'param_defs') and base_task.param_defs and base_task.param_defs.has_param(p):
+                        param_exists_in_base = True
+                    elif hasattr(base_task, 'paramT') and base_task.paramT and hasattr(base_task.paramT, 'model_fields') and p in base_task.paramT.model_fields:
+                        param_exists_in_base = True
+                
+                if ptype is None and base_task and not param_exists_in_base:
+                    # Parameter not found in base
+                    loader.error("Parameter %s not found in base task %s" % (p, base_task.name), 
+                               taskdef.srcinfo)
+                    continue
+                
+                # Store raw value - DON'T evaluate template expressions
+                collection.add_param(p, ParamDef(value=value), ptype)
+                self._log.debug("  Overriding param %s: type=%s, raw_value=%s" % (p, ptype, value))
+        
+        self._log.debug("<-- _collectParamDefs %s: %d params" % (taskdef.name, len(collection.definitions)))
+        return collection
+    
     def _elabTask(self, 
                   task,
                   loader : PackageLoaderP):
@@ -976,18 +1091,14 @@ class PackageProviderYaml(PackageProvider):
         task.rundir = rundir
         task.uptodate = uptodate
 
-        task.paramT = self._getParamT(
+        # NEW: Collect parameter definitions without evaluating
+        task.param_defs = self._collectParamDefs(
             loader,
             taskdef, 
-            task.uses.paramT if task.uses is not None else None)
-        # Expose current task parameters to expression evaluation via 'this'
-        try:
-            this_vars = {}
-            for pname, finfo in task.paramT.model_fields.items():
-                this_vars[pname] = finfo.default
-            loader._eval.set("this", this_vars)
-        except Exception:
-            pass
+            task.uses if task.uses is not None else None)
+        
+        # NOTE: paramT will be built lazily during task graph construction
+        # For now, we don't set 'this' in eval context since params aren't evaluated yet
 
         for need in taskdef.needs:
             nt = None
@@ -1021,14 +1132,23 @@ class PackageProviderYaml(PackageProvider):
 
         if taskdef.strategy is not None:
             self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
+            task.strategy = Strategy()
             if taskdef.strategy.generate is not None:
                 shell = taskdef.strategy.generate.shell
                 if shell is None:
                     shell = "pytask"
-                task.strategy = Strategy(
-                    generate=StrategyGenerate(
-                        shell=shell,
-                        run=taskdef.strategy.generate.run))
+                task.strategy.generate = StrategyGenerate(
+                    shell=shell,
+                    run=taskdef.strategy.generate.run)
+            if taskdef.strategy.matrix is not None:
+                task.strategy.matrix = taskdef.strategy.matrix
+            
+            # Handle body tasks for matrix strategy
+            if taskdef.strategy.body and len(taskdef.strategy.body) > 0:
+                # Create a temporary taskdef with the body for processing
+                temp_taskdef = taskdef.model_copy()
+                temp_taskdef.body = taskdef.strategy.body
+                self._mkTaskBody(task, loader, temp_taskdef)
 
         # Determine how to implement this task
         if taskdef.body is not None and len(taskdef.body) > 0:
@@ -1138,42 +1258,56 @@ class PackageProviderYaml(PackageProvider):
                 
                 st.needs.append(nn)
 
-            # Seed 'this' with parent task parameters so subtask param expressions can reference parent
-            try:
-                parent_this = {}
-                for pname, finfo in task.paramT.model_fields.items():
-                    parent_this[pname] = finfo.default
-                loader._eval.set("this", parent_this)
-            except Exception:
-                pass
-            # Build parameter type first so expressions in 'run' can reference parameters
-            st.paramT = self._getParamT(
+            # Build parameter definitions (lazy evaluation)
+            st.param_defs = self._collectParamDefs(
                 loader,
                 td, 
-                st.uses.paramT if st.uses is not None else None)
-            # Expose subtask parameters as top-level vars for run-time expansion; do not expose 'this'
-            try:
-                for pname, finfo in st.paramT.model_fields.items():
-                    loader._eval.set(pname, finfo.default)
-            except Exception:
-                pass
+                st.uses if st.uses is not None else None)
+            
+            # Build 'this' context from param_defs for run command evaluation
+            # Include both parent task params and subtask params
+            this_vars = {}
+            
+            # Add parent task parameters to 'this' (evaluate them first)
+            if task.param_defs:
+                for pname, param_def in task.param_defs.definitions.items():
+                    value = param_def.value
+                    # Evaluate if it has template expressions
+                    if isinstance(value, str) and "${{" in value:
+                        try:
+                            value = loader.evalExpr(value)
+                        except:
+                            pass  # Keep original if evaluation fails
+                    this_vars[pname] = value
+                    # Also make available as top-level variable
+                    loader._eval.set(pname, value)
+            
+            # Set up 'this' so subtask params can reference parent params
+            loader._eval.set("this", this_vars)
+            
+            # Now evaluate subtask parameters (they can use this.xxx)
+            subtask_vars = {}
+            if st.param_defs:
+                for pname, param_def in st.param_defs.definitions.items():
+                    value = param_def.value
+                    # Evaluate if it has template expressions
+                    if isinstance(value, str) and "${{" in value:
+                        try:
+                            value = loader.evalExpr(value)
+                        except:
+                            pass  # Keep original if evaluation fails
+                    subtask_vars[pname] = value
+                    # Make available as top-level variable for run command
+                    loader._eval.set(pname, value)
+                    # Also add to this
+                    this_vars[pname] = value
+            
+            # Update 'this' with subtask params
+            loader._eval.set("this", this_vars)
 
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)
             elif td.run is not None:
-                # Ensure 'this' is visible during run expansion based on parent and subtask params
-                try:
-                    merged = {}
-                    # Parent params
-                    if hasattr(task, 'paramT') and task.paramT is not None:
-                        for pname, finfo in task.paramT.model_fields.items():
-                            merged[pname] = finfo.default
-                    # Subtask params
-                    for pname, finfo in st.paramT.model_fields.items():
-                        merged[pname] = finfo.default
-                    loader._eval.set("this", merged)
-                except Exception:
-                    pass
                 loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
                 _expanded = loader.evalExpr(td.run)
                 st.run = _expanded

@@ -28,6 +28,7 @@ from .package import Package
 from .package_def import PackageDef, PackageSpec
 from .package_loader_p import PackageLoaderP
 from .param_ref_eval import ParamRefEval
+from .param_builder import ParamBuilder
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
@@ -97,6 +98,11 @@ class TaskGraphBuilder(object):
             self.env = os.environ.copy()
 
         self._eval.set("env", self.env)
+        
+        # Preserve runtime-only variables (expanded at task execution time)
+        self._eval.set("inputs", "${{ inputs }}")
+        self._eval.set("name", "${{ name }}")
+        self._eval.set("result_file", "${{ result_file }}")
 
 
 
@@ -113,14 +119,17 @@ class TaskGraphBuilder(object):
                 "dir": self.root_pkg.basedir
             })
 
-            params = self.root_pkg.paramT()
-
-            self._expandParams(params, self._eval)
-
-            for key in self.root_pkg.paramT.model_fields.keys():
-                self._eval.set(key, getattr(params, key))
-
-            self._pkg_params_m[self.root_pkg.name] = params
+            # Build package paramT if needed
+            if self.root_pkg.paramT:
+                params = self.root_pkg.paramT()
+                self._expandParams(params, self._eval)
+                for key in self.root_pkg.paramT.model_fields.keys():
+                    self._eval.set(key, getattr(params, key))
+                self._pkg_params_m[self.root_pkg.name] = params
+            else:
+                # No parameters
+                params = None
+                self._pkg_params_m[self.root_pkg.name] = None
 
             self._addPackageTasks(self.root_pkg, pkg_s)
         else:
@@ -137,6 +146,9 @@ class TaskGraphBuilder(object):
         if self.root_pkg is None:
             raise Exception("No root package")
         params = self._pkg_params_m[self.root_pkg.name]
+        
+        if params is None:
+            raise Exception("Package %s has no parameters" % self.root_pkg.name)
 
         if not hasattr(params, name):
             raise Exception("Package %s does not have parameter %s" % (self.root_pkg.name, name))
@@ -147,10 +159,14 @@ class TaskGraphBuilder(object):
         self._pkg_m[pkg.name] = pkg
 
         # Build out the package parameters
-        params = pkg.paramT()
-        self._expandParams(params, self._eval)
-        self._pkg_params_m[pkg.name] = params
-        self._eval.set(pkg.name, params)
+        if pkg.paramT:
+            params = pkg.paramT()
+            self._expandParams(params, self._eval)
+            self._pkg_params_m[pkg.name] = params
+            self._eval.set(pkg.name, params)
+        else:
+            params = None
+            self._pkg_params_m[pkg.name] = None
 
         if pkg not in pkg_s:
             pkg_s.add(pkg)
@@ -515,9 +531,15 @@ class TaskGraphBuilder(object):
                 name = task.name
             
             if params is None:
-                params = task.paramT()
+                # Build paramT lazily
+                if task.paramT is None:
+                    if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                        param_builder = ParamBuilder(eval or self._eval)
+                        task.paramT = param_builder.build_param_type(task)
+                params = task.paramT() if task.paramT else None
 
-            self._expandParams(params, eval)
+            if params:
+                self._expandParams(params, eval)
 
             if srcdir is None:
                 srcdir = os.path.dirname(task.srcinfo.file)
@@ -550,7 +572,12 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
 
         if params is None:
-            params = task.paramT()
+            # Build paramT lazily
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
 
         ret = TaskNodeCompound(
             name=name,
@@ -588,8 +615,7 @@ class TaskGraphBuilder(object):
                 matrix[k] = None
                 matrix_items.append((k, task.strategy.matrix[k]))
 
-            res = self._applyStrategyMatrix(task.tasks, matrix_items, 0)
-            
+            res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name)
             pass
 
 
@@ -603,6 +629,11 @@ class TaskGraphBuilder(object):
                 tasks.extend(res)
             else:
                 tasks.append(res)
+
+        # Add generated tasks to ret.tasks so they appear in the compound node's subgraph
+        for tn in tasks:
+            if tn not in ret.tasks:
+                ret.tasks.append(tn)
 
         # Finish hooking this up...
         for tn in tasks:
@@ -642,8 +673,86 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _applyStrategy %s" % task.name)
         return ret
     
-    def _applyStrategyMatrix(self, tasks, matrix_items, idx):
-        raise Exception("_applyStrategyMatrix not implemented")
+    def _applyStrategyMatrix(self, subtasks, matrix_items, idx, parent_name=None):
+        """
+        Expand matrix combinations and create task nodes.
+        
+        Args:
+            subtasks: List of Task objects from the body
+            matrix_items: List of (key, values) tuples for matrix variables
+            idx: Unused, kept for compatibility
+            parent_name: Name of parent task to prefix generated task names
+            
+        Returns:
+            List of TaskNode objects, one for each matrix combination
+        """
+        import itertools
+        from .param_builder import ParamBuilder
+        from .param_ref_eval import ParamRefEval
+        
+        if not matrix_items:
+            return []
+        
+        # Extract keys and value lists
+        keys = [item[0] for item in matrix_items]
+        value_lists = [item[1] for item in matrix_items]
+        
+        # Generate all combinations using cartesian product
+        result = []
+        for combo_values in itertools.product(*value_lists):
+            # Build matrix dict for this combination
+            matrix_dict = dict(zip(keys, combo_values))
+            
+            # Calculate indices for this combination
+            indices = []
+            for value, value_list in zip(combo_values, value_lists):
+                indices.append(value_list.index(value))
+            
+            # Create task nodes for all subtasks with this matrix combination
+            for subtask in subtasks:
+                # Create fresh eval context for each task node
+                eval_ctx = ParamRefEval()
+                
+                # Copy variables from current context
+                if hasattr(self, '_eval') and self._eval:
+                    # Deep copy to avoid mutation
+                    import copy
+                    eval_ctx.expr_eval.variables = copy.deepcopy(self._eval.expr_eval.variables)
+                    if self._eval.expr_eval.name_resolution:
+                        eval_ctx.set_name_resolution(self._eval.expr_eval.name_resolution)
+                
+                # Add matrix variables to 'this' scope
+                this_vars = eval_ctx.expr_eval.variables.get('this', {})
+                if not isinstance(this_vars, dict):
+                    this_vars = {}
+                # Create a fresh copy and update
+                this_vars = dict(this_vars)
+                this_vars.update(matrix_dict)
+                eval_ctx.expr_eval.variables['this'] = this_vars
+                
+                # Build params with matrix-specific eval context
+                param_builder = ParamBuilder(eval_ctx)
+                paramT = param_builder.build_param_type(subtask)
+                params = paramT()
+                
+                # Generate unique name using indices
+                suffix = "_".join(str(idx) for idx in indices)
+                if parent_name:
+                    name = f"{parent_name}.{subtask.leafname}_{suffix}"
+                else:
+                    name = f"{subtask.leafname}_{suffix}"
+                
+                # Build the task node with matrix-specific params
+                node = self._mkTaskNode(
+                    subtask,
+                    name=name,
+                    params=params,
+                    hierarchical=True,
+                    eval=eval_ctx
+                )
+                result.append(node)
+        
+        return result
 
     
     def _isCompound(self, task):
@@ -677,6 +786,23 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
         
         if params is None:
+            # NEW: Build paramT lazily if not already built
+            if task.paramT is None:
+                if task.param_defs is not None:
+                    self._log.debug(f"Building paramT for {task.name} from param_defs")
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+                elif task.uses and (task.uses.paramT or task.uses.param_defs):
+                    # Task has no param_defs but uses another task with params
+                    # Build paramT from the uses chain
+                    self._log.debug(f"Building paramT for {task.name} from uses chain")
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+                else:
+                    self._log.warning(f"Task {task.name} has no paramT or param_defs")
+                    # Create empty paramT
+                    task.paramT = pydantic.create_model(f"Task{task.name}Params")
+            
             params = task.paramT()
 
         # Create and push task scope for parameter resolution
@@ -695,6 +821,8 @@ class TaskGraphBuilder(object):
         self.task_scope().variables["rundir"] = "/".join([str(e) for e in self.get_rundir()])
         
         # Now expand parameters in the scope context
+        # Note: Most evaluation now happens in ParamBuilder, but we still
+        # need to handle runtime-only variables like 'rundir'
         self._expandParams(params, eval)
 
 
@@ -766,10 +894,16 @@ class TaskGraphBuilder(object):
             srcdir = os.path.dirname(task.srcinfo.file)
 
         if params is None:
-            params = task.paramT()
+            # Build paramT lazily
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
 
-        # expand any variable references
-        self._expandParams(params, eval)
+        # expand any variable references (runtime-only variables like rundir)
+        if params:
+            self._expandParams(params, eval)
 
         # Create a new task scope for this compound task
         node = TaskNodeCompound(

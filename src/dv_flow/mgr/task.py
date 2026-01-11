@@ -1,7 +1,10 @@
 import dataclasses as dc
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union, TYPE_CHECKING
 from .srcinfo import SrcInfo
 from .task_def import TaskDef, RundirE, PassthroughE, ConsumesE
+
+if TYPE_CHECKING:
+    from .param_def_collection import ParamDefCollection
 
 @dc.dataclass
 class Need(object):
@@ -31,6 +34,7 @@ class Task(object):
     desc: str = ""
     doc : str = ""
     paramT : Any = None
+    param_defs : 'ParamDefCollection' = None  # NEW: Unevaluated param definitions
     uses : 'Task' = None
     package : 'Package' = None
     iff : str = None

@@ -1,0 +1,11 @@
+# Test flow for Prompt task
+
+package:
+  name: prompt_test
+
+  tasks:
+    - name: simple_prompt
+      uses: std.Prompt
+      with:
+        user_prompt: "Generate a simple hello world message"
+        assistant: "copilot"

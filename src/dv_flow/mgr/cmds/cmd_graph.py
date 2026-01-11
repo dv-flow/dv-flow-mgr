@@ -84,9 +84,13 @@ class CmdGraph(object):
 
             t = builder.mkTaskNode(task.name)
 
-            TaskGraphDotWriter().write(
+            output = getattr(args, "output", "-")
+            if output is None:
+                output = "-"
+
+            TaskGraphDotWriter(show_params=getattr(args, "show_params", False)).write(
                 t,
-                "-"
+                output
             )
 
         return 0

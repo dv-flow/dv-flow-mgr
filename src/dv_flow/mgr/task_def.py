@@ -60,6 +60,9 @@ class StrategyDef(BaseModel):
     matrix : Union[Dict[str,List[Any]],None] = dc.Field(
         default=None,
         description="Matrix of parameter values to explore")
+    body: List['TaskDef'] = dc.Field(
+        default_factory=list,
+        description="Body tasks for matrix strategy")
 
 class TaskBodyDef(BaseModel):
     model_config = ConfigDict(extra='forbid')

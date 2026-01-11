@@ -67,6 +67,9 @@ def get_parser():
                         default=[],
                         metavar="NAME=VALUE",
                         help="Parameter override; may be used multiple times")
+    graph_parser.add_argument("--show-params",
+                        action="store_true",
+                        help="Show parameter values in node labels")
     graph_parser.set_defaults(func=CmdGraph())
 
     run_parser = subparsers.add_parser('run', help='run a flow')

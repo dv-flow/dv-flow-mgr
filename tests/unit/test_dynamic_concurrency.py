@@ -127,32 +127,37 @@ def test_timeout_on_long_running_task(tmpdir):
     assert runner.status == 0
 
 def test_concurrent_subgraphs_share_nproc(tmpdir):
-    """Test that multiple concurrent sub-graphs share nproc limit"""
+    """Test that multiple concurrent sub-graphs share nproc limit via exec"""
     tmpdir = str(tmpdir)
     rundir = os.path.join(tmpdir, "rundir")
     os.makedirs(rundir)
     
     import threading
-    active_count = 0
+    exec_count = 0
     max_concurrent = 0
     lock = threading.Lock()
     
+    def on_exec_start():
+        nonlocal exec_count, max_concurrent
+        with lock:
+            exec_count += 1
+            if exec_count > max_concurrent:
+                max_concurrent = exec_count
+    
+    def on_exec_end():
+        nonlocal exec_count
+        with lock:
+            exec_count -= 1
+    
     async def parent_task_1(ctxt, input):
-        """First parent creates sub-tasks"""
+        """First parent creates sub-tasks that call exec"""
+        ctxt._exec_start_callback = on_exec_start
+        ctxt._exec_end_callback = on_exec_end
         
-        async def slow_task(ctxt, input):
-            nonlocal active_count, max_concurrent
-            
-            with lock:
-                active_count += 1
-                if active_count > max_concurrent:
-                    max_concurrent = active_count
-            
-            await asyncio.sleep(0.1)
-            
-            with lock:
-                active_count -= 1
-            
+        async def exec_task(ctxt, input):
+            ctxt._exec_start_callback = on_exec_start
+            ctxt._exec_end_callback = on_exec_end
+            await ctxt.exec(['sleep', '0.1'])
             return TaskDataResult(status=0, output=[])
         
         tasks = []
@@ -162,7 +167,7 @@ def test_concurrent_subgraphs_share_nproc(tmpdir):
                 srcdir=tmpdir,
                 params=EmptyParams(),
                 ctxt=ctxt.ctxt,
-                task=slow_task
+                task=exec_task
             )
             tasks.append(task)
         
@@ -170,21 +175,14 @@ def test_concurrent_subgraphs_share_nproc(tmpdir):
         return TaskDataResult(status=0, output=[])
     
     async def parent_task_2(ctxt, input):
-        """Second parent creates sub-tasks"""
+        """Second parent creates sub-tasks that call exec"""
+        ctxt._exec_start_callback = on_exec_start
+        ctxt._exec_end_callback = on_exec_end
         
-        async def slow_task(ctxt, input):
-            nonlocal active_count, max_concurrent
-            
-            with lock:
-                active_count += 1
-                if active_count > max_concurrent:
-                    max_concurrent = active_count
-            
-            await asyncio.sleep(0.1)
-            
-            with lock:
-                active_count -= 1
-            
+        async def exec_task(ctxt, input):
+            ctxt._exec_start_callback = on_exec_start
+            ctxt._exec_end_callback = on_exec_end
+            await ctxt.exec(['sleep', '0.1'])
             return TaskDataResult(status=0, output=[])
         
         tasks = []
@@ -194,7 +192,7 @@ def test_concurrent_subgraphs_share_nproc(tmpdir):
                 srcdir=tmpdir,
                 params=EmptyParams(),
                 ctxt=ctxt.ctxt,
-                task=slow_task
+                task=exec_task
             )
             tasks.append(task)
         
@@ -227,8 +225,8 @@ def test_concurrent_subgraphs_share_nproc(tmpdir):
     runner = TaskSetRunner(rundir=rundir, nproc=3)
     asyncio.run(runner.run([parent1, parent2]))
     
-    # Max concurrent should not exceed nproc (3)
-    # Even though each parent wants to run 3 tasks
+    # Max concurrent exec calls should not exceed nproc (3)
+    # Even though each parent wants to run 3 tasks (6 total)
     assert max_concurrent <= 3
     assert runner.status == 0
 
