@@ -168,6 +168,7 @@ async def Prompt(runner, input) -> TaskDataResult:
     - assistant: Override default assistant (optional)
     - model: Specify the model to use (optional)
     - assistant_config: Assistant-specific configuration (optional)
+    - max_retries: Maximum number of retry attempts on failure (default: 10)
     
     Returns TaskDataResult with status=1 if result file is missing or invalid.
     """
@@ -182,6 +183,7 @@ async def Prompt(runner, input) -> TaskDataResult:
     assistant_name = input.params.assistant if input.params.assistant else "copilot"
     model = input.params.model if hasattr(input.params, 'model') and input.params.model else ""
     assistant_config = input.params.assistant_config if hasattr(input.params, 'assistant_config') else {}
+    max_retries = input.params.max_retries if hasattr(input.params, 'max_retries') and input.params.max_retries else 10
     
     try:
         assistant = get_assistant(assistant_name)
@@ -224,45 +226,98 @@ async def Prompt(runner, input) -> TaskDataResult:
             severity=SeverityE.Warning
         ))
     
-    # Step 5: Execute the assistant
-    _log.info(f"Executing AI assistant: {assistant_name}")
-    try:
-        exec_status, stdout, stderr = await assistant.execute(
-            full_prompt, runner, model, assistant_config
-        )
-        
-        # Write stdout/stderr to log files
-        if stdout:
-            stdout_file = os.path.join(input.rundir, "assistant.stdout.log")
-            with open(stdout_file, "w") as f:
-                f.write(stdout)
-            _log.debug(f"Assistant stdout written to {stdout_file}")
+    # Step 5: Execute the assistant with retry logic
+    _log.info(f"Executing AI assistant: {assistant_name} (max_retries={max_retries})")
+    
+    exec_status = 1
+    stdout = ""
+    stderr = ""
+    attempt = 0
+    
+    while attempt <= max_retries:
+        try:
+            if attempt > 0:
+                _log.info(f"Retry attempt {attempt}/{max_retries}")
             
-        if stderr:
-            stderr_file = os.path.join(input.rundir, "assistant.stderr.log")
-            with open(stderr_file, "w") as f:
-                f.write(stderr)
-            _log.debug(f"Assistant stderr written to {stderr_file}")
-        
-        if exec_status != 0:
-            markers.append(TaskMarker(
-                msg=f"AI assistant exited with status {exec_status}",
-                severity=SeverityE.Error
-            ))
+            exec_status, stdout, stderr = await assistant.execute(
+                full_prompt, runner, model, assistant_config
+            )
+            
+            # Write stdout/stderr to log files
+            if stdout:
+                stdout_file = os.path.join(input.rundir, f"assistant.stdout.log.{attempt}" if attempt > 0 else "assistant.stdout.log")
+                with open(stdout_file, "w") as f:
+                    f.write(stdout)
+                _log.debug(f"Assistant stdout written to {stdout_file}")
+                
             if stderr:
+                stderr_file = os.path.join(input.rundir, f"assistant.stderr.log.{attempt}" if attempt > 0 else "assistant.stderr.log")
+                with open(stderr_file, "w") as f:
+                    f.write(stderr)
+                _log.debug(f"Assistant stderr written to {stderr_file}")
+            
+            if exec_status != 0:
+                _log.warning(f"AI assistant exited with status {exec_status} on attempt {attempt}")
+                if attempt < max_retries:
+                    attempt += 1
+                    continue
+                else:
+                    markers.append(TaskMarker(
+                        msg=f"AI assistant failed after {attempt + 1} attempts with status {exec_status}",
+                        severity=SeverityE.Error
+                    ))
+                    if stderr:
+                        markers.append(TaskMarker(
+                            msg=f"Assistant error: {stderr[:200]}",
+                            severity=SeverityE.Error
+                        ))
+                    status = exec_status
+                    break
+            else:
+                # Status is 0, but check if result was actually produced
+                # Check if result file exists and output log is not empty
+                result_file = input.params.result_file or f"{input.name}.result.json"
+                result_path = os.path.join(input.rundir, result_file)
+                
+                # Check copilot_output.log for emptiness
+                output_log_path = os.path.join(input.rundir, 'copilot_output.log')
+                output_log_empty = True
+                if os.path.exists(output_log_path):
+                    with open(output_log_path, 'r') as f:
+                        content = f.read().strip()
+                        output_log_empty = len(content) == 0
+                
+                # If status=0 but no result file AND empty output log, treat as retry scenario
+                if not os.path.exists(result_path) and output_log_empty:
+                    _log.warning(f"AI assistant exited with status 0 but produced no result file and empty output log on attempt {attempt}")
+                    if attempt < max_retries:
+                        attempt += 1
+                        continue
+                    else:
+                        markers.append(TaskMarker(
+                            msg=f"AI assistant exited with status 0 but produced no result after {attempt + 1} attempts (empty output log)",
+                            severity=SeverityE.Error
+                        ))
+                        status = 1
+                        break
+                
+                # Success - either result exists or there's output to process
+                if attempt > 0:
+                    _log.info(f"AI assistant succeeded on attempt {attempt}")
+                break
+                
+        except Exception as e:
+            _log.warning(f"Assistant execution failed on attempt {attempt}: {str(e)}")
+            if attempt < max_retries:
+                attempt += 1
+                continue
+            else:
                 markers.append(TaskMarker(
-                    msg=f"Assistant error: {stderr[:200]}",
+                    msg=f"Failed to execute assistant after {attempt + 1} attempts: {str(e)}",
                     severity=SeverityE.Error
                 ))
-            status = exec_status
-            
-    except Exception as e:
-        markers.append(TaskMarker(
-            msg=f"Failed to execute assistant: {str(e)}",
-            severity=SeverityE.Error
-        ))
-        _log.exception("Assistant execution failed")
-        return TaskDataResult(status=1, markers=markers, changed=False)
+                _log.exception("Assistant execution failed")
+                return TaskDataResult(status=1, markers=markers, changed=False)
     
     # Step 6: Parse result file (REQUIRED - failure if missing/invalid)
     result_file = input.params.result_file or f"{input.name}.result.json"

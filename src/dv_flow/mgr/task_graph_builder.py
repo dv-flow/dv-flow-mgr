@@ -615,8 +615,7 @@ class TaskGraphBuilder(object):
                 matrix[k] = None
                 matrix_items.append((k, task.strategy.matrix[k]))
 
-            res = self._applyStrategyMatrix(task.tasks, matrix_items, 0)
-            
+            res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name)
             pass
 
 
@@ -630,6 +629,11 @@ class TaskGraphBuilder(object):
                 tasks.extend(res)
             else:
                 tasks.append(res)
+
+        # Add generated tasks to ret.tasks so they appear in the compound node's subgraph
+        for tn in tasks:
+            if tn not in ret.tasks:
+                ret.tasks.append(tn)
 
         # Finish hooking this up...
         for tn in tasks:
@@ -669,8 +673,86 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _applyStrategy %s" % task.name)
         return ret
     
-    def _applyStrategyMatrix(self, tasks, matrix_items, idx):
-        raise Exception("_applyStrategyMatrix not implemented")
+    def _applyStrategyMatrix(self, subtasks, matrix_items, idx, parent_name=None):
+        """
+        Expand matrix combinations and create task nodes.
+        
+        Args:
+            subtasks: List of Task objects from the body
+            matrix_items: List of (key, values) tuples for matrix variables
+            idx: Unused, kept for compatibility
+            parent_name: Name of parent task to prefix generated task names
+            
+        Returns:
+            List of TaskNode objects, one for each matrix combination
+        """
+        import itertools
+        from .param_builder import ParamBuilder
+        from .param_ref_eval import ParamRefEval
+        
+        if not matrix_items:
+            return []
+        
+        # Extract keys and value lists
+        keys = [item[0] for item in matrix_items]
+        value_lists = [item[1] for item in matrix_items]
+        
+        # Generate all combinations using cartesian product
+        result = []
+        for combo_values in itertools.product(*value_lists):
+            # Build matrix dict for this combination
+            matrix_dict = dict(zip(keys, combo_values))
+            
+            # Calculate indices for this combination
+            indices = []
+            for value, value_list in zip(combo_values, value_lists):
+                indices.append(value_list.index(value))
+            
+            # Create task nodes for all subtasks with this matrix combination
+            for subtask in subtasks:
+                # Create fresh eval context for each task node
+                eval_ctx = ParamRefEval()
+                
+                # Copy variables from current context
+                if hasattr(self, '_eval') and self._eval:
+                    # Deep copy to avoid mutation
+                    import copy
+                    eval_ctx.expr_eval.variables = copy.deepcopy(self._eval.expr_eval.variables)
+                    if self._eval.expr_eval.name_resolution:
+                        eval_ctx.set_name_resolution(self._eval.expr_eval.name_resolution)
+                
+                # Add matrix variables to 'this' scope
+                this_vars = eval_ctx.expr_eval.variables.get('this', {})
+                if not isinstance(this_vars, dict):
+                    this_vars = {}
+                # Create a fresh copy and update
+                this_vars = dict(this_vars)
+                this_vars.update(matrix_dict)
+                eval_ctx.expr_eval.variables['this'] = this_vars
+                
+                # Build params with matrix-specific eval context
+                param_builder = ParamBuilder(eval_ctx)
+                paramT = param_builder.build_param_type(subtask)
+                params = paramT()
+                
+                # Generate unique name using indices
+                suffix = "_".join(str(idx) for idx in indices)
+                if parent_name:
+                    name = f"{parent_name}.{subtask.leafname}_{suffix}"
+                else:
+                    name = f"{subtask.leafname}_{suffix}"
+                
+                # Build the task node with matrix-specific params
+                node = self._mkTaskNode(
+                    subtask,
+                    name=name,
+                    params=params,
+                    hierarchical=True,
+                    eval=eval_ctx
+                )
+                result.append(node)
+        
+        return result
 
     
     def _isCompound(self, task):

@@ -309,33 +309,18 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         """
         Unified processor for ready tasks and dynamic tasks.
         
-        Continuously:
-        1. Check for completed tasks -> mark complete -> check dependents
-        2. Pull ready tasks from queue -> launch them
-        3. Pull dynamic tasks from queue -> add to dep_map -> check if ready
+        Event-driven loop that waits for:
+        1. Task completions -> mark complete -> check dependents
+        2. Ready tasks from queue -> launch them
+        3. Dynamic tasks from queue -> add to dep_map -> check if ready
         """
         self._log.debug("Task processor started")
         
-        iteration = 0
-        last_log_time = 0
+        # Persistent queue waiters (reused to avoid recreating)
+        ready_queue_waiter = None
+        dynamic_queue_waiter = None
         
         while True:
-            iteration += 1
-            
-            # Periodic status logging every 100 iterations
-            import time
-            if iteration % 100 == 0:
-                current_time = time.time()
-                if current_time - last_log_time > 2:  # Log every 2 seconds max
-                    self._log.info("Task processor: iteration %d, active=%d, ready=%d, total_tasks=%d" % (
-                        iteration, len(active_task_l), self._ready_queue.qsize(), len(self._task_state)))
-                    last_log_time = current_time
-            
-            # Safety: timeout after 10000 iterations
-            if iteration > 10000:
-                self._log.error("Task processor: exceeded 10000 iterations, forcing exit")
-                break
-            
             # Check exit condition: all tasks done and no more work
             all_done = all(
                 state in (TaskState.COMPLETED, TaskState.SKIPPED) 
@@ -348,93 +333,118 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             
             # Deadlock detection: no active tasks, nothing ready, but tasks still pending
             if len(active_task_l) == 0 and self._ready_queue.empty() and not all_done:
-                # Check if we have tasks stuck in NOT_STARTED
                 stuck_tasks = [task.name for task, state in self._task_state.items() 
                               if state == TaskState.NOT_STARTED]
                 if stuck_tasks:
                     self._log.error("Deadlock detected: %d tasks stuck in NOT_STARTED state" % len(stuck_tasks))
                     self._log.error("Stuck tasks: %s" % ", ".join(stuck_tasks))
-                    # Mark them as skipped and continue
                     for task, state in list(self._task_state.items()):
                         if state == TaskState.NOT_STARTED:
                             self._skip_task(task, done_task_s)
                     continue
                 else:
-                    # No tasks stuck, but not all done - might be waiting for something?
                     self._log.error("Deadlock: no active tasks, queue empty, but not all done. States:")
                     for task, state in self._task_state.items():
                         self._log.error("  %s: %s" % (task.name, state))
                     break
-                    
+            
             try:
-                # 1. Check for task completions
-                if len(active_task_l) > 0:
-                    done, pending = await asyncio.wait(
-                        [at[1] for at in active_task_l],
-                        timeout=0.05,
-                        return_when=asyncio.FIRST_COMPLETED
-                    )
-                    if done:
-                        self._handle_completions(active_task_l, done_task_s, done, dst_memento)
+                # Build wait set for all possible events
+                wait_tasks = []
                 
-                # 2. Check ready queue for tasks to launch
-                try:
-                    ready_task = self._ready_queue.get_nowait()
+                # 1. Active task completions
+                if active_task_l:
+                    wait_tasks.extend([at[1] for at in active_task_l])
+                
+                # 2. Ready queue - create waiter if needed
+                if ready_queue_waiter is None or ready_queue_waiter.done():
+                    ready_queue_waiter = asyncio.create_task(self._ready_queue.get())
+                wait_tasks.append(ready_queue_waiter)
+                
+                # 3. Dynamic queue - create waiter if needed
+                if dynamic_queue_waiter is None or dynamic_queue_waiter.done():
+                    dynamic_queue_waiter = asyncio.create_task(self._dynamic_task_queue.get())
+                wait_tasks.append(dynamic_queue_waiter)
+                
+                # Wait for ANY event to complete
+                done, pending = await asyncio.wait(
+                    wait_tasks,
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                # Process completed events - but prioritize task completions over queue events
+                # to avoid launching too many tasks at once
+                task_completions = []
+                has_ready_task = False
+                has_dynamic_task = False
+                
+                for completed in done:
+                    # Check if it's a task completion
+                    is_task_completion = False
+                    for at in active_task_l:
+                        if at[1] == completed:
+                            is_task_completion = True
+                            task_completions.append(completed)
+                            break
                     
-                    # Double-check state
+                    if not is_task_completion:
+                        if completed == ready_queue_waiter:
+                            has_ready_task = True
+                        elif completed == dynamic_queue_waiter:
+                            has_dynamic_task = True
+                
+                # Handle all task completions first
+                if task_completions:
+                    self._handle_completions(active_task_l, done_task_s, task_completions, dst_memento)
+                
+                # Then handle ONE ready task (to avoid launching too many at once)
+                if has_ready_task:
+                    ready_task = ready_queue_waiter.result()
+                    ready_queue_waiter = None  # Will be recreated next iteration
+                    
                     if self._task_state.get(ready_task) != TaskState.READY:
                         self._log.warning("Task %s in ready queue but state is %s" % 
                                          (ready_task.name, self._task_state.get(ready_task)))
-                        continue
-                    
-                    # Launch if status is OK
-                    if self.status == 0:
-                        self._task_state[ready_task] = TaskState.SCHEDULED
-                        await self._launch_task(ready_task, active_task_l, src_memento, dst_memento)
                     else:
-                        # Skip due to previous failure
-                        self._skip_task(ready_task, done_task_s)
-                        
-                except asyncio.QueueEmpty:
-                    pass
+                        if self.status == 0:
+                            self._task_state[ready_task] = TaskState.SCHEDULED
+                            await self._launch_task(ready_task, active_task_l, src_memento, dst_memento)
+                        else:
+                            self._skip_task(ready_task, done_task_s)
                 
-                # 3. Check dynamic task queue
-                try:
-                    item = self._dynamic_task_queue.get_nowait()
+                # Then handle ONE dynamic task
+                if has_dynamic_task:
+                    item = dynamic_queue_waiter.result()
+                    dynamic_queue_waiter = None  # Will be recreated next iteration
                     
-                    if item is None:  # Sentinel
-                        continue
+                    if item is not None:  # Not a sentinel
+                        subgraph_id = item['id']
+                        self._dynamic_log.debug("Processing sub-graph %d from queue" % subgraph_id)
+                        
+                        for task, deps in item['dep_map'].items():
+                            if task not in self._task_state:
+                                self._dep_map[task] = deps
+                                self._task_state[task] = TaskState.NOT_STARTED
+                                self._pending_tasks[task.name] = task
+                                self._task_completion_events[task.name] = asyncio.Event()
+                                self._dynamic_log.debug("  Added dynamic task %s" % task.name)
+                                
+                                if self._is_task_ready(task):
+                                    self._task_state[task] = TaskState.READY
+                                    await self._ready_queue.put(task)
+                                    self._dynamic_log.debug("  Task %s is immediately ready" % task.name)
                     
-                    subgraph_id = item['id']
-                    self._dynamic_log.debug("Processing sub-graph %d from queue" % subgraph_id)
-                    
-                    # Add tasks to dependency map and initialize state
-                    for task, deps in item['dep_map'].items():
-                        if task not in self._task_state:
-                            self._dep_map[task] = deps
-                            self._task_state[task] = TaskState.NOT_STARTED
-                            self._pending_tasks[task.name] = task
-                            self._task_completion_events[task.name] = asyncio.Event()
-                            self._dynamic_log.debug("  Added dynamic task %s" % task.name)
-                            
-                            # Check if ready immediately
-                            if self._is_task_ready(task):
-                                self._task_state[task] = TaskState.READY
-                                await self._ready_queue.put(task)
-                                self._dynamic_log.debug("  Task %s is immediately ready" % task.name)
-                    
-                except asyncio.QueueEmpty:
-                    pass
-                    
-            except asyncio.TimeoutError:
-                # No completions, continue loop
-                pass
             except Exception as e:
                 self._log.error("Error in task processor: %s" % e)
                 import traceback
                 import sys
                 traceback.print_exc(file=sys.stdout)
-                # Don't break - continue processing
+        
+        # Clean up any pending waiters
+        if ready_queue_waiter and not ready_queue_waiter.done():
+            ready_queue_waiter.cancel()
+        if dynamic_queue_waiter and not dynamic_queue_waiter.done():
+            dynamic_queue_waiter.cancel()
         
         self._log.debug("Task processor stopped")
     

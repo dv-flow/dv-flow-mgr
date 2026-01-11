@@ -8,6 +8,7 @@ from .task_node_compound import TaskNodeCompound
 @dc.dataclass
 class TaskGraphDotWriter(object):
     fp : TextIO = dc.field(default=None)
+    show_params : bool = False
     _ind : str = ""
     _node_id_m : Dict[TaskNode, str] = dc.field(default_factory=dict)
     _processed_needs : Set[TaskNode] = dc.field(default_factory=set)
@@ -48,11 +49,81 @@ class TaskGraphDotWriter(object):
             self._node_id += 1
             node_name = "n%d" % node_id
             self._node_id_m[node] = node_name
-            self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
-                node_name, 
-                node.name,
-                self._genLeafTooltip(node)))
+            
+            if self.show_params and type(node.params).model_fields:
+                label = self._genLeafLabel(node)
+                # Use record shape for parameter display
+                self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"];" % (
+                    node_name, 
+                    label,
+                    self._genLeafTooltip(node)))
+            else:
+                label = node.name
+                self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
+                    node_name, 
+                    label,
+                    self._genLeafTooltip(node)))
         self._log.debug("<-- build_node %s (%d)" % (node.name, len(node.needs),))
+
+    def _genLeafLabel(self, node):
+        """Generate a label for a leaf node that includes parameters"""
+        params = type(node.params).model_fields
+        if not params:
+            return node.name
+        
+        # Use a simpler format with shape=record for better compatibility
+        # Format: "name | param1: value1 | param2: value2"
+        label_parts = [self._escapeDotRecord(node.name)]
+        
+        for k in type(node.params).model_fields.keys():
+            v = getattr(node.params, k)
+            v_str = self._formatParamValue(v)
+            label_parts.append("%s: %s" % (self._escapeDotRecord(k), self._escapeDotRecord(v_str)))
+        
+        return "{%s}" % "|".join(label_parts)
+
+    def _escapeDotRecord(self, s):
+        """Escape special characters for record-based node shapes"""
+        s = str(s)
+        # For record-based labels, we need to escape |, {, }, <, >
+        s = s.replace("\\", "\\\\")
+        s = s.replace("|", "\\|")
+        s = s.replace("{", "\\{")
+        s = s.replace("}", "\\}")
+        s = s.replace("<", "\\<")
+        s = s.replace(">", "\\>")
+        s = s.replace("\"", "\\\"")
+        # Replace newlines with space
+        s = s.replace("\n", " ")
+        return s
+
+    def _escapeHtml(self, s):
+        """Escape special characters for HTML-like labels"""
+        s = str(s)
+        s = s.replace("&", "&amp;")
+        s = s.replace("<", "&lt;")
+        s = s.replace(">", "&gt;")
+        s = s.replace("\"", "&quot;")
+        return s
+
+    def _formatParamValue(self, v):
+        """Format a parameter value for display"""
+        if isinstance(v, str):
+            # Truncate long strings
+            if len(v) > 40:
+                return "%s..." % v[:37]
+            return v
+        elif isinstance(v, list):
+            if len(v) > 3:
+                return "[%s, ...]" % ", ".join([str(x) for x in v[:3]])
+            return "[%s]" % ", ".join([str(x) for x in v])
+        elif isinstance(v, dict):
+            items = list(v.items())
+            if len(items) > 2:
+                return "{%s, ...}" % ", ".join(["%s: %s" % (str(k), str(v)) for k,v in items[:2]])
+            return "{%s}" % ", ".join(["%s: %s" % (str(k), str(v)) for k,v in items])
+        else:
+            return str(v)
 
     def _genLeafTooltip(self, node):
         params = type(node.params).model_fields
@@ -128,10 +199,11 @@ class TaskGraphDotWriter(object):
         task_node_id = self._node_id
         self._node_id += 1
         task_node_name = "n%d" % task_node_id
-        self.println("%s[label=\"%s\", tooltip=\"%s\"];" % (
+        
+        # Final node for compound task - make it a small point
+        self.println("%s[shape=point,label=\"\",width=0.2,height=0.2,tooltip=\"%s\"];" % (
             task_node_name, 
-            node.name,
-            self._genLeafTooltip(node)))
+            node.name))
         self._node_id_m[node] = task_node_name
 
         for n in node.tasks:
@@ -145,10 +217,26 @@ class TaskGraphDotWriter(object):
                 node_name = "n%d" % node_id
                 self._node_id_m[n] = node_name
                 leaf_name = n.name[n.name.rfind(".") + 1:]
-                self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
-                    node_name, 
-                    leaf_name,
-                    self._genLeafTooltip(n)))
+                
+                # Check if this is the 'in' node
+                if leaf_name == "in":
+                    # Make initial node a small point
+                    self.println("%s[shape=point,label=\"\",width=0.2,height=0.2,tooltip=\"%s\"];" % (
+                        node_name,
+                        n.name))
+                elif self.show_params and type(n.params).model_fields:
+                    label = self._genLeafLabel(n)
+                    # Use record shape for parameter display
+                    self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"];" % (
+                        node_name, 
+                        label,
+                        self._genLeafTooltip(n)))
+                else:
+                    label = leaf_name
+                    self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
+                        node_name, 
+                        label,
+                        self._genLeafTooltip(n)))
         self.dec_ind()
         self.println("}")
 

@@ -232,3 +232,182 @@ async def test_prompt_build_failure(tmp_path):
     
     assert result.status == 1
     assert any("Failed to build prompt" in m.msg for m in result.markers)
+
+
+@pytest.mark.asyncio
+async def test_prompt_retry_logic(tmp_path):
+    """Test retry logic when assistant fails and then succeeds"""
+    from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
+    from typing import Tuple
+    
+    class FlakeyAssistant(AIAssistantBase):
+        def __init__(self):
+            self.call_count = 0
+            
+        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+            self.call_count += 1
+            # Fail first 2 attempts, succeed on 3rd
+            if self.call_count < 3:
+                return 1, f"Attempt {self.call_count} failed", "Error occurred"
+            else:
+                # Create result file on success
+                result_file = os.path.join(runner.rundir, "result.json")
+                result_data = {
+                    "status": 0,
+                    "changed": True,
+                    "output": [],
+                    "markers": []
+                }
+                with open(result_file, "w") as f:
+                    json.dump(result_data, f)
+                return 0, f"Success on attempt {self.call_count}", ""
+        
+        def check_available(self) -> Tuple[bool, str]:
+            return True, ""
+    
+    # Register test assistant
+    ASSISTANT_REGISTRY["flakey"] = FlakeyAssistant
+    
+    input = MockInput()
+    input.rundir = str(tmp_path)
+    input.params.assistant = "flakey"
+    input.params.max_retries = 5
+    
+    result = await Prompt(input, input)
+    
+    # Should succeed after retries
+    assert result.status == 0
+    assert result.changed is True
+    
+    # Cleanup
+    del ASSISTANT_REGISTRY["flakey"]
+
+
+@pytest.mark.asyncio
+async def test_prompt_max_retries_exceeded(tmp_path):
+    """Test that assistant fails after max retries exceeded"""
+    from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
+    from typing import Tuple
+    
+    class AlwaysFailAssistant(AIAssistantBase):
+        def __init__(self):
+            self.call_count = 0
+            
+        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+            self.call_count += 1
+            return 1, f"Attempt {self.call_count} failed", "Always fails"
+        
+        def check_available(self) -> Tuple[bool, str]:
+            return True, ""
+    
+    # Register test assistant
+    ASSISTANT_REGISTRY["always_fail"] = AlwaysFailAssistant
+    
+    input = MockInput()
+    input.rundir = str(tmp_path)
+    input.params.assistant = "always_fail"
+    input.params.max_retries = 3
+    
+    result = await Prompt(input, input)
+    
+    # Should fail after max retries
+    assert result.status == 1
+    assert any("failed after" in m.msg for m in result.markers)
+    
+    # Cleanup
+    del ASSISTANT_REGISTRY["always_fail"]
+
+
+@pytest.mark.asyncio
+async def test_prompt_retry_on_empty_output_with_status_zero(tmp_path):
+    """Test that assistant retries when status=0 but no result and empty output log"""
+    from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
+    from typing import Tuple
+    
+    class EmptyOutputAssistant(AIAssistantBase):
+        def __init__(self):
+            self.call_count = 0
+            
+        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+            self.call_count += 1
+            
+            # Create empty copilot_output.log file
+            output_log = os.path.join(runner.rundir, 'copilot_output.log')
+            with open(output_log, 'w') as f:
+                f.write("")  # Empty file
+            
+            # First two attempts: status=0 but no result file (should trigger retry)
+            if self.call_count <= 2:
+                return 0, "", ""  # status=0, no result file, empty output log
+            
+            # Third attempt: succeed with result file (using correct filename)
+            result_file = os.path.join(runner.rundir, "result.json")
+            result_data = {
+                "changed": True,
+                "output": [{"type": "std.FileSet", "files": ["test.txt"]}]
+            }
+            with open(result_file, "w") as f:
+                json.dump(result_data, f)
+            return 0, f"Success on attempt {self.call_count}", ""
+        
+        def check_available(self) -> Tuple[bool, str]:
+            return True, ""
+    
+    # Register test assistant
+    ASSISTANT_REGISTRY["empty_output"] = EmptyOutputAssistant
+    
+    input = MockInput()
+    input.rundir = str(tmp_path)
+    input.params.assistant = "empty_output"
+    input.params.max_retries = 5
+    
+    result = await Prompt(input, input)
+    
+    # Should succeed after retries
+    assert result.status == 0
+    assert result.changed is True
+    
+    # Cleanup
+    del ASSISTANT_REGISTRY["empty_output"]
+
+
+@pytest.mark.asyncio
+async def test_prompt_fail_on_empty_output_after_max_retries(tmp_path):
+    """Test that assistant fails when status=0, no result, and empty output log persist"""
+    from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
+    from typing import Tuple
+    
+    class AlwaysEmptyAssistant(AIAssistantBase):
+        def __init__(self):
+            self.call_count = 0
+            
+        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+            self.call_count += 1
+            
+            # Create empty copilot_output.log file
+            output_log = os.path.join(runner.rundir, 'copilot_output.log')
+            with open(output_log, 'w') as f:
+                f.write("")  # Empty file
+            
+            # Always return status=0 but no result (should fail after max retries)
+            return 0, "", ""
+        
+        def check_available(self) -> Tuple[bool, str]:
+            return True, ""
+    
+    # Register test assistant
+    ASSISTANT_REGISTRY["always_empty"] = AlwaysEmptyAssistant
+    
+    input = MockInput()
+    input.rundir = str(tmp_path)
+    input.params.assistant = "always_empty"
+    input.params.max_retries = 3
+    
+    result = await Prompt(input, input)
+    
+    # Should fail after max retries
+    assert result.status == 1
+    assert any("empty output log" in m.msg for m in result.markers)
+    
+    # Cleanup
+    del ASSISTANT_REGISTRY["always_empty"]

@@ -1132,14 +1132,23 @@ class PackageProviderYaml(PackageProvider):
 
         if taskdef.strategy is not None:
             self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
+            task.strategy = Strategy()
             if taskdef.strategy.generate is not None:
                 shell = taskdef.strategy.generate.shell
                 if shell is None:
                     shell = "pytask"
-                task.strategy = Strategy(
-                    generate=StrategyGenerate(
-                        shell=shell,
-                        run=taskdef.strategy.generate.run))
+                task.strategy.generate = StrategyGenerate(
+                    shell=shell,
+                    run=taskdef.strategy.generate.run)
+            if taskdef.strategy.matrix is not None:
+                task.strategy.matrix = taskdef.strategy.matrix
+            
+            # Handle body tasks for matrix strategy
+            if taskdef.strategy.body and len(taskdef.strategy.body) > 0:
+                # Create a temporary taskdef with the body for processing
+                temp_taskdef = taskdef.model_copy()
+                temp_taskdef.body = taskdef.strategy.body
+                self._mkTaskBody(task, loader, temp_taskdef)
 
         # Determine how to implement this task
         if taskdef.body is not None and len(taskdef.body) > 0:
