@@ -60,7 +60,7 @@
 <h3>graph<a class="headerlink" href="#graph" title="Link to this heading">¶</a></h3>
 <p>Generates the graph of a task</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">graph</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span> <span class="n">FORMAT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">o</span> <span class="n">OUTPUT</span><span class="p">]</span>
-          <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+          <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">show</span><span class="o">-</span><span class="n">params</span><span class="p">]</span>
           <span class="p">[</span><span class="n">task</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -92,6 +92,10 @@
 <dt><kbd>-D</kbd></dt>
 <dd><p>Parameter override; may be used multiple times</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>--show-params</kbd></dt>
+<dd><p>Show parameter values in node labels</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
 </dd>
 </dl>
 </section>
