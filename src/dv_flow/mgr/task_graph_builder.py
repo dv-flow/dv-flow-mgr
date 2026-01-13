@@ -115,9 +115,14 @@ class TaskGraphBuilder(object):
                 root_rundir=self.rundir,
                 env=self.env)
 
-            self._eval.set("root", {
-                "dir": self.root_pkg.basedir
-            })
+            # Set built-in directory variables for task graph building
+            # root: full path to the package file
+            # rootdir: directory containing the package file
+            # srcdir: directory containing the package file (same as rootdir for root package)
+            pkg_file = self.root_pkg.srcinfo.file
+            self._eval.set("root", pkg_file)
+            self._eval.set("rootdir", self.root_pkg.basedir)
+            self._eval.set("srcdir", self.root_pkg.basedir)
 
             # Build package paramT if needed
             if self.root_pkg.paramT:
