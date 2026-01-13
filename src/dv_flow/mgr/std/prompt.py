@@ -26,7 +26,7 @@ import hashlib
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional, Tuple
 from dv_flow.mgr import TaskDataResult, TaskMarker, SeverityE
-from .ai_assistant import get_assistant
+from .ai_assistant import get_assistant, get_available_assistant_name
 
 _log = logging.getLogger("Prompt")
 
@@ -180,9 +180,31 @@ async def Prompt(runner, input) -> TaskDataResult:
     output = []
     
     # Step 1: Determine which assistant to use
-    assistant_name = input.params.assistant if input.params.assistant else "copilot"
+    assistant_name = input.params.assistant if input.params.assistant else None
+    
+    # Auto-probe for available assistant if none specified
+    if not assistant_name:
+        assistant_name = get_available_assistant_name()
+        if assistant_name:
+            _log.info(f"Auto-detected AI assistant: {assistant_name}")
+        else:
+            markers.append(TaskMarker(
+                msg="No AI assistant available. Install copilot or codex CLI.",
+                severity=SeverityE.Error
+            ))
+            return TaskDataResult(status=1, markers=markers, changed=False)
+    
     model = input.params.model if hasattr(input.params, 'model') and input.params.model else ""
-    assistant_config = input.params.assistant_config if hasattr(input.params, 'assistant_config') else {}
+    
+    # Build assistant config, merging sandbox_mode and approval_mode if specified
+    assistant_config = dict(input.params.assistant_config) if hasattr(input.params, 'assistant_config') and input.params.assistant_config else {}
+    
+    # Add sandbox_mode and approval_mode to config for codex
+    if hasattr(input.params, 'sandbox_mode') and input.params.sandbox_mode:
+        assistant_config['sandbox_mode'] = input.params.sandbox_mode
+    if hasattr(input.params, 'approval_mode') and input.params.approval_mode:
+        assistant_config['approval_mode'] = input.params.approval_mode
+    
     max_retries = input.params.max_retries if hasattr(input.params, 'max_retries') and input.params.max_retries else 10
     
     try:

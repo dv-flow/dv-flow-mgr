@@ -1,6 +1,7 @@
 import pytest
 import json
 import os
+import asyncio
 from pathlib import Path
 from dv_flow.mgr.std.prompt import (
     Prompt,
@@ -198,22 +199,20 @@ def test_parse_result_with_markers(tmp_path):
     assert parsed["markers"][0]["msg"] == "Test message"
 
 
-@pytest.mark.asyncio
-async def test_prompt_missing_assistant(tmp_path):
+def test_prompt_missing_assistant(tmp_path):
     """Test handling of missing assistant"""
     input = MockInput()
     input.params.assistant = "nonexistent"
     input.rundir = str(tmp_path)
     
-    result = await Prompt(None, input)
+    result = asyncio.run(Prompt(None, input))
     
     assert result.status == 1
     assert len(result.markers) > 0
     assert "Unknown AI assistant" in result.markers[0].msg
 
 
-@pytest.mark.asyncio
-async def test_prompt_build_failure(tmp_path):
+def test_prompt_build_failure(tmp_path):
     """Test handling of prompt build failure"""
     input = MockInput()
     input.rundir = str(tmp_path)
@@ -228,14 +227,13 @@ async def test_prompt_build_failure(tmp_path):
     
     input.inputs = [BadInput()]
     
-    result = await Prompt(None, input)
+    result = asyncio.run(Prompt(None, input))
     
     assert result.status == 1
     assert any("Failed to build prompt" in m.msg for m in result.markers)
 
 
-@pytest.mark.asyncio
-async def test_prompt_retry_logic(tmp_path):
+def test_prompt_retry_logic(tmp_path):
     """Test retry logic when assistant fails and then succeeds"""
     from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
     from typing import Tuple
@@ -273,7 +271,7 @@ async def test_prompt_retry_logic(tmp_path):
     input.params.assistant = "flakey"
     input.params.max_retries = 5
     
-    result = await Prompt(input, input)
+    result = asyncio.run(Prompt(input, input))
     
     # Should succeed after retries
     assert result.status == 0
@@ -283,8 +281,7 @@ async def test_prompt_retry_logic(tmp_path):
     del ASSISTANT_REGISTRY["flakey"]
 
 
-@pytest.mark.asyncio
-async def test_prompt_max_retries_exceeded(tmp_path):
+def test_prompt_max_retries_exceeded(tmp_path):
     """Test that assistant fails after max retries exceeded"""
     from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
     from typing import Tuple
@@ -308,7 +305,7 @@ async def test_prompt_max_retries_exceeded(tmp_path):
     input.params.assistant = "always_fail"
     input.params.max_retries = 3
     
-    result = await Prompt(input, input)
+    result = asyncio.run(Prompt(input, input))
     
     # Should fail after max retries
     assert result.status == 1
@@ -318,8 +315,7 @@ async def test_prompt_max_retries_exceeded(tmp_path):
     del ASSISTANT_REGISTRY["always_fail"]
 
 
-@pytest.mark.asyncio
-async def test_prompt_retry_on_empty_output_with_status_zero(tmp_path):
+def test_prompt_retry_on_empty_output_with_status_zero(tmp_path):
     """Test that assistant retries when status=0 but no result and empty output log"""
     from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
     from typing import Tuple
@@ -361,7 +357,7 @@ async def test_prompt_retry_on_empty_output_with_status_zero(tmp_path):
     input.params.assistant = "empty_output"
     input.params.max_retries = 5
     
-    result = await Prompt(input, input)
+    result = asyncio.run(Prompt(input, input))
     
     # Should succeed after retries
     assert result.status == 0
@@ -371,8 +367,7 @@ async def test_prompt_retry_on_empty_output_with_status_zero(tmp_path):
     del ASSISTANT_REGISTRY["empty_output"]
 
 
-@pytest.mark.asyncio
-async def test_prompt_fail_on_empty_output_after_max_retries(tmp_path):
+def test_prompt_fail_on_empty_output_after_max_retries(tmp_path):
     """Test that assistant fails when status=0, no result, and empty output log persist"""
     from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
     from typing import Tuple
@@ -403,7 +398,7 @@ async def test_prompt_fail_on_empty_output_after_max_retries(tmp_path):
     input.params.assistant = "always_empty"
     input.params.max_retries = 3
     
-    result = await Prompt(input, input)
+    result = asyncio.run(Prompt(input, input))
     
     # Should fail after max retries
     assert result.status == 1

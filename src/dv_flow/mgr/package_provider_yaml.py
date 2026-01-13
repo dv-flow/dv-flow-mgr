@@ -6,7 +6,7 @@ import os
 import pydantic
 import re
 import yaml
-from typing import ClassVar, Dict, List, Optional, Union
+from typing import Any, ClassVar, Dict, List, Optional, Union
 from .fragment_def import FragmentDef
 from .loader_scope import LoaderScope
 from .marker_listener import MarkerListener
@@ -1028,27 +1028,19 @@ class PackageProviderYaml(PackageProvider):
                 else:
                     value = param
                 
-                # Try to get type from base task or existing collection
+                # Try to get type from base task inheritance chain
                 ptype = None
                 if collection.has_param(p):
                     ptype = collection.get_type(p)
-                elif base_task and hasattr(base_task, 'param_defs') and base_task.param_defs and base_task.param_defs.has_param(p):
-                    ptype = base_task.param_defs.get_type(p)
-                elif base_task and hasattr(base_task, 'paramT') and base_task.paramT:
-                    # Base task has paramT (old-style eager evaluation or Type), get type from there
-                    if hasattr(base_task.paramT, 'model_fields') and p in base_task.paramT.model_fields:
-                        ptype = base_task.paramT.model_fields[p].annotation
+                else:
+                    # Search the full inheritance chain for this parameter
+                    ptype = self._find_param_type_in_chain(p, base_task)
                 
-                # Check if parameter exists in base
-                param_exists_in_base = False
-                if base_task:
-                    if hasattr(base_task, 'param_defs') and base_task.param_defs and base_task.param_defs.has_param(p):
-                        param_exists_in_base = True
-                    elif hasattr(base_task, 'paramT') and base_task.paramT and hasattr(base_task.paramT, 'model_fields') and p in base_task.paramT.model_fields:
-                        param_exists_in_base = True
+                # Check if parameter exists in base chain
+                param_exists_in_base = (ptype is not None)
                 
-                if ptype is None and base_task and not param_exists_in_base:
-                    # Parameter not found in base
+                if not param_exists_in_base and base_task:
+                    # Parameter not found in base inheritance chain
                     loader.error("Parameter %s not found in base task %s" % (p, base_task.name), 
                                taskdef.srcinfo)
                     continue
@@ -1059,6 +1051,66 @@ class PackageProviderYaml(PackageProvider):
         
         self._log.debug("<-- _collectParamDefs %s: %d params" % (taskdef.name, len(collection.definitions)))
         return collection
+    
+    def _find_param_type_in_chain(self, param_name: str, base_task: Optional[Union[Task, Type]]) -> Optional[type]:
+        """
+        Search the inheritance chain for a parameter type declaration.
+        Walks up the 'uses' chain until finding a parameter with a type declaration.
+        """
+        current = base_task
+        visited = set()
+        
+        while current is not None:
+            if id(current) in visited:
+                break
+            visited.add(id(current))
+            
+            # Check param_defs
+            if hasattr(current, 'param_defs') and current.param_defs and current.param_defs.has_param(param_name):
+                return current.param_defs.get_type(param_name)
+            
+            # Check paramT (old-style)
+            if hasattr(current, 'paramT') and current.paramT:
+                if hasattr(current.paramT, 'model_fields') and param_name in current.paramT.model_fields:
+                    return current.paramT.model_fields[param_name].annotation
+            
+            # Move up the inheritance chain
+            current = getattr(current, 'uses', None)
+        
+        return None
+    
+    def _collect_inherited_param_defaults(self, task: Union[Task, Type]) -> Dict[str, Any]:
+        """
+        Walk the inheritance chain and collect parameter default values.
+        This is used to make parameters available during eager evaluation of 'run' expressions.
+        Returns a dict of {param_name: default_value}
+        """
+        params = {}
+        current = task
+        visited = set()
+        
+        # Walk inheritance chain from root to derived (reverse order for correct override behavior)
+        chain = []
+        while current is not None:
+            if id(current) in visited:
+                break
+            visited.add(id(current))
+            chain.append(current)
+            current = getattr(current, 'uses', None)
+        
+        # Process in reverse order (root first) so derived overrides base
+        for task_in_chain in reversed(chain):
+            # Get params from param_defs
+            if hasattr(task_in_chain, 'param_defs') and task_in_chain.param_defs:
+                for param_name, param_def in task_in_chain.param_defs.definitions.items():
+                    params[param_name] = param_def.value
+            # Fallback to paramT for old-style tasks
+            elif hasattr(task_in_chain, 'paramT') and task_in_chain.paramT:
+                if hasattr(task_in_chain.paramT, 'model_fields'):
+                    for param_name, field_info in task_in_chain.paramT.model_fields.items():
+                        params[param_name] = field_info.default
+        
+        return params
     
     def _elabTask(self, 
                   task,
@@ -1154,7 +1206,12 @@ class PackageProviderYaml(PackageProvider):
         if taskdef.body is not None and len(taskdef.body) > 0:
             self._mkTaskBody(task, loader, taskdef)
         elif taskdef.run is not None:
+            # Add inherited parameters to eval scope before evaluating 'run'
+            # This allows base task parameters to be referenced in 'run' expressions
+            inherited_params = self._collect_inherited_param_defaults(task)
+            loader.pushEvalScope(inherited_params)
             task.run = loader.evalExpr(taskdef.run)
+            loader.popEvalScope()
             self._log.debug("Task %s run: %s (%s)" % (task.name, str(task.run), str(taskdef.run)))
             if taskdef.shell is not None:
                 task.shell = taskdef.shell

@@ -24,12 +24,15 @@ import os
 import subprocess
 import logging
 from abc import ABC, abstractmethod
-from typing import Tuple, Dict, TYPE_CHECKING
+from typing import Tuple, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..task_run_ctxt import TaskRunCtxt
 
 _log = logging.getLogger("AIAssistant")
+
+# Priority order for auto-detection of AI assistants
+ASSISTANT_PRIORITY = ["copilot", "codex"]
 
 class AIAssistantBase(ABC):
     """Base class for AI assistant implementations"""
@@ -184,6 +187,10 @@ class MockAssistant(AIAssistantBase):
 class CopilotAssistant(AIAssistantBase):
     """GitHub Copilot CLI implementation"""
     
+    @classmethod
+    def name(cls) -> str:
+        return "copilot"
+    
     async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
                      model: str, config: dict) -> Tuple[int, str, str]:
         """
@@ -267,6 +274,109 @@ class CopilotAssistant(AIAssistantBase):
             return False, f"Error checking GitHub Copilot CLI: {str(e)}"
 
 
+class CodexAssistant(AIAssistantBase):
+    """OpenAI Codex CLI implementation"""
+    
+    @classmethod
+    def name(cls) -> str:
+        return "codex"
+    
+    async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
+                     model: str, config: dict) -> Tuple[int, str, str]:
+        """
+        Execute OpenAI Codex CLI with prompt in non-interactive mode
+        
+        Config options:
+            sandbox_mode: off | read-only | network-disabled | full (default: off)
+            approval_mode: suggest | auto-edit | full-auto (default: full-auto)
+        """
+        _log.debug("Executing OpenAI Codex CLI")
+        
+        try:
+            # Write prompt to a file for reference
+            prompt_input_file = os.path.join(runner.rundir, "codex_input.txt")
+            with open(prompt_input_file, 'w') as f:
+                f.write(prompt)
+            
+            # Build command with non-interactive options
+            cmd = ['codex', '-q']  # -q for quiet/non-interactive mode
+            
+            # Add prompt as positional argument
+            cmd.append(prompt)
+            
+            # Add model parameter if specified
+            if model:
+                cmd.extend(['--model', model])
+            
+            # Get sandbox mode from config (default: off for workflow execution)
+            sandbox_mode = config.get('sandbox_mode', 'off') if config else 'off'
+            cmd.extend(['--sandbox', sandbox_mode])
+            
+            # Get approval mode from config (default: full-auto for workflow execution)
+            approval_mode = config.get('approval_mode', 'full-auto') if config else 'full-auto'
+            cmd.extend(['--approval-mode', approval_mode])
+            
+            # Add writable root for the run directory
+            cmd.extend(['--writable-root', runner.root_rundir])
+            
+            # Execute codex in non-interactive mode
+            status = await runner.exec(
+                cmd,
+                logfile='codex_output.log'
+            )
+            
+            # Read stdout from log file
+            stdout_path = os.path.join(runner.rundir, 'codex_output.log')
+            stdout = ""
+            stderr = ""
+            
+            if os.path.exists(stdout_path):
+                with open(stdout_path, 'r') as f:
+                    stdout = f.read()
+            
+            _log.debug(f"Codex execution complete: status={status}")
+            
+            return status, stdout, stderr
+            
+        except Exception as e:
+            _log.error(f"Failed to execute codex: {e}")
+            raise
+    
+    def check_available(self) -> Tuple[bool, str]:
+        """Check if OpenAI Codex CLI is available"""
+        try:
+            # Check if 'codex' command exists
+            result = subprocess.run(
+                ['which', 'codex'], 
+                capture_output=True, 
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode != 0:
+                return False, "OpenAI Codex CLI (codex) not found in PATH"
+            
+            # Verify codex responds to --version
+            result = subprocess.run(
+                ['codex', '--version'], 
+                capture_output=True, 
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode != 0:
+                return False, "OpenAI Codex CLI found but not responding correctly"
+            
+            return True, ""
+            
+        except subprocess.TimeoutExpired:
+            return False, "Command timed out while checking OpenAI Codex CLI"
+        except FileNotFoundError:
+            return False, "OpenAI Codex CLI (codex) not found in PATH"
+        except Exception as e:
+            return False, f"Error checking OpenAI Codex CLI: {str(e)}"
+
+
 class OpenAIAssistant(AIAssistantBase):
     """OpenAI API implementation (placeholder for future)"""
     
@@ -305,6 +415,7 @@ class ClaudeAssistant(AIAssistantBase):
 ASSISTANT_REGISTRY = {
     "mock": MockAssistant,
     "copilot": CopilotAssistant,
+    "codex": CodexAssistant,
     "openai": OpenAIAssistant,
     "claude": ClaudeAssistant,
 }
@@ -328,3 +439,44 @@ def get_assistant(name: str) -> AIAssistantBase:
         raise ValueError(f"Unknown AI assistant: '{name}'. Available: {available}")
     
     return ASSISTANT_REGISTRY[name]()
+
+
+def probe_available_assistant() -> Optional[AIAssistantBase]:
+    """
+    Probe for available AI assistants in priority order.
+    
+    Priority order: copilot, codex
+    
+    Returns:
+        Instance of the first available assistant, or None if none available
+    """
+    for name in ASSISTANT_PRIORITY:
+        if name in ASSISTANT_REGISTRY:
+            assistant = ASSISTANT_REGISTRY[name]()
+            is_available, error_msg = assistant.check_available()
+            if is_available:
+                _log.info(f"Auto-detected AI assistant: {name}")
+                return assistant
+            else:
+                _log.debug(f"Assistant '{name}' not available: {error_msg}")
+    
+    _log.warning("No AI assistant available in environment")
+    return None
+
+
+def get_available_assistant_name() -> Optional[str]:
+    """
+    Get the name of the first available AI assistant.
+    
+    Priority order: copilot, codex
+    
+    Returns:
+        Name of available assistant, or None if none available
+    """
+    for name in ASSISTANT_PRIORITY:
+        if name in ASSISTANT_REGISTRY:
+            assistant = ASSISTANT_REGISTRY[name]()
+            is_available, _ = assistant.check_available()
+            if is_available:
+                return name
+    return None
