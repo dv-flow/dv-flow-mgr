@@ -746,6 +746,14 @@ class PackageProviderYaml(PackageProvider):
             if taskdef.iff is not None:
                 task.iff = taskdef.iff
 
+            # Process visibility scope
+            if taskdef.scope is not None:
+                scope_list = taskdef.scope if isinstance(taskdef.scope, list) else [taskdef.scope]
+                task.is_root = 'root' in scope_list
+                task.is_export = 'export' in scope_list
+                task.is_local = 'local' in scope_list
+            # If no scope specified, task is visible within the package (default)
+
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
             self._pkg_s[-1].add(task, taskdef.name)
@@ -1184,6 +1192,14 @@ class PackageProviderYaml(PackageProvider):
             
                 if nt is None:
                     loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                else:
+                    # Check visibility: warn if referencing non-export task from another package
+                    if nt.package != task.package and not nt.is_export:
+                        from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
+                        loader.marker(TaskMarker(
+                            msg=f"Task '{task.name}' references task '{nt.name}' in package '{nt.package.name}' that is not marked 'export'",
+                            severity=SeverityE.Warning,
+                            loc=TaskMarkerLoc(path=taskdef.srcinfo.file, line=taskdef.srcinfo.lineno, pos=taskdef.srcinfo.linepos)))
                 task.needs.append(nt)
 
         if taskdef.strategy is not None:
@@ -1285,6 +1301,14 @@ class PackageProviderYaml(PackageProvider):
 
             if td.iff is not None:
                 st.iff = td.iff
+
+            # Process visibility scope for subtasks
+            if td.scope is not None:
+                scope_list = td.scope if isinstance(td.scope, list) else [td.scope]
+                st.is_root = 'root' in scope_list
+                st.is_export = 'export' in scope_list
+                st.is_local = 'local' in scope_list
+            # If no scope specified, task is visible within the package (default)
 
             subtasks.append((td, st))
             task.subtasks.append(st)

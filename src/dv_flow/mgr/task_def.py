@@ -110,6 +110,10 @@ class TaskDef(BaseModel):
         default=None,
         title="Base type",
         description="Task from which this task is derived")
+    scope : Union[str, List[str], None] = dc.Field(
+        default=None,
+        title="Task visibility scope",
+        description="Visibility scope: 'root' (executable), 'export' (visible outside package), 'local' (fragment-only)")
     body: List['TaskDef'] = Field(
         default_factory=list,
         validation_alias=AliasChoices('body', 'tasks'),

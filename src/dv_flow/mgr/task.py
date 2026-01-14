@@ -45,6 +45,9 @@ class Task(object):
     uptodate : Union[bool, str, None] = None
     # TODO: strategy / matrix
     subtasks : List['Task'] = dc.field(default_factory=list)
+    is_root : bool = False
+    is_export : bool = False
+    is_local : bool = False
     strategy : Strategy = dc.field(default=None)
     run : str = None
     shell : str = "bash"
