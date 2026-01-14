@@ -79,65 +79,101 @@ to also define a task named <cite>rtl</cite>.</p>
 <table class="docutils align-default">
 <tbody>
 <tr class="row-odd"><td><p>type</p></td>
-<td colspan="4"><p><em>object</em></p></td>
+<td colspan="5"><p><em>object</em></p></td>
 </tr>
-<tr class="row-even"><td colspan="5"><p>properties</p></td>
+<tr class="row-even"><td colspan="6"><p>properties</p></td>
 </tr>
 <tr class="row-odd"><td><ul class="simple">
 <li><p>name</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td colspan="3"><p><em>string</em></p></td>
+<td colspan="4"><p><em>string</em></p></td>
 </tr>
 <tr class="row-even"><td rowspan="3"><ul class="simple">
 <li><p>imports</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td colspan="3"><p><em>array</em></p></td>
+<td colspan="4"><p><em>array</em></p></td>
 </tr>
 <tr class="row-odd"><td rowspan="2"><p>items</p></td>
 <td rowspan="2"><p>anyOf</p></td>
-<td colspan="2"><p><a class="reference internal" href="#import-definition"><span class="std std-ref">Import Definition</span></a></p></td>
+<td colspan="3"><p><a class="reference internal" href="#import-definition"><span class="std std-ref">Import Definition</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p>type</p></td>
-<td><p><em>string</em></p></td>
+<td colspan="2"><p><em>string</em></p></td>
 </tr>
 <tr class="row-odd"><td rowspan="3"><ul class="simple">
 <li><p>with</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td colspan="3"><p><em>array</em></p></td>
+<td colspan="4"><p><em>array</em></p></td>
 </tr>
 <tr class="row-even"><td rowspan="2"><p>items</p></td>
 <td rowspan="2"><p>anyOf</p></td>
-<td colspan="2"><p><a class="reference internal" href="#parameter-definition"><span class="std std-ref">Parameter Definition</span></a></p></td>
+<td colspan="3"><p><a class="reference internal" href="#parameter-definition"><span class="std std-ref">Parameter Definition</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>type</p></td>
-<td><p><em>string</em></p></td>
+<td colspan="2"><p><em>string</em></p></td>
 </tr>
 <tr class="row-even"><td rowspan="2"><ul class="simple">
 <li><p>tasks</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td colspan="3"><p><em>array</em></p></td>
+<td colspan="4"><p><em>array</em></p></td>
 </tr>
 <tr class="row-odd"><td><p>items</p></td>
-<td colspan="3"><p><a class="reference internal" href="#task-definition"><span class="std std-ref">Task Definition</span></a></p></td>
+<td colspan="4"><p><a class="reference internal" href="#task-definition"><span class="std std-ref">Task Definition</span></a></p></td>
 </tr>
 <tr class="row-even"><td rowspan="2"><ul class="simple">
 <li><p>fragments</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td colspan="3"><p><em>array</em></p></td>
+<td colspan="4"><p><em>array</em></p></td>
 </tr>
 <tr class="row-odd"><td><p>items</p></td>
 <td><p>type</p></td>
+<td colspan="3"><p><em>string</em></p></td>
+</tr>
+<tr class="row-even"><td rowspan="10"><ul class="simple">
+<li><p>tags</p></li>
+</ul>
+</td>
+<td colspan="5"><p>Tags as type references with optional parameter overrides</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td colspan="4"><p><em>array</em></p></td>
+</tr>
+<tr class="row-even"><td rowspan="8"><p>items</p></td>
+<td rowspan="8"><p>oneOf</p></td>
+<td colspan="3"><p>Type reference (e.g., ‘mypkg.Tag’)</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
 <td colspan="2"><p><em>string</em></p></td>
+</tr>
+<tr class="row-even"><td colspan="3"><p>Type reference with inline parameter overrides</p></td>
+</tr>
+<tr class="row-odd"><td><p>type</p></td>
+<td colspan="2"><p><em>object</em></p></td>
+</tr>
+<tr class="row-even"><td colspan="3"><p>patternProperties</p></td>
+</tr>
+<tr class="row-odd"><td><ul class="simple">
+<li><p>.*</p></li>
+</ul>
+</td>
+<td><p>type</p></td>
+<td><p><em>object</em></p></td>
+</tr>
+<tr class="row-even"><td><p>maxProperties</p></td>
+<td colspan="2"><p>1</p></td>
+</tr>
+<tr class="row-odd"><td><p>minProperties</p></td>
+<td colspan="2"><p>1</p></td>
 </tr>
 </tbody>
 </table>
@@ -200,25 +236,25 @@ to also define a task named <cite>rtl</cite>.</p>
 <table class="docutils align-default">
 <tbody>
 <tr class="row-odd"><td><p>type</p></td>
-<td colspan="2"><p><em>object</em></p></td>
+<td colspan="5"><p><em>object</em></p></td>
 </tr>
-<tr class="row-even"><td colspan="3"><p>properties</p></td>
+<tr class="row-even"><td colspan="6"><p>properties</p></td>
 </tr>
 <tr class="row-odd"><td><ul class="simple">
 <li><p>name</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td><p><em>string</em></p></td>
+<td colspan="4"><p><em>string</em></p></td>
 </tr>
 <tr class="row-even"><td><ul class="simple">
 <li><p>type</p></li>
 </ul>
 </td>
 <td><p>type</p></td>
-<td><p><em>string</em></p></td>
+<td colspan="4"><p><em>string</em></p></td>
 </tr>
-<tr class="row-odd"><td colspan="3"><ul class="simple">
+<tr class="row-odd"><td colspan="6"><ul class="simple">
 <li><p>with</p></li>
 </ul>
 </td>
@@ -227,7 +263,43 @@ to also define a task named <cite>rtl</cite>.</p>
 <li><p>oneOf</p></li>
 </ul>
 </td>
-<td colspan="2"><p>[OrderedDict({‘needs’: OrderedDict({‘type’: ‘array’, ‘items’: OrderedDict({‘$ref’: ‘#/defs/task-dep’})})}), OrderedDict({‘needs’: OrderedDict({‘type’: ‘array’, ‘items’: OrderedDict({‘type’: ‘string’})})})]</p></td>
+<td colspan="5"><p>[OrderedDict({‘needs’: OrderedDict({‘type’: ‘array’, ‘items’: OrderedDict({‘$ref’: ‘#/defs/task-dep’})})}), OrderedDict({‘needs’: OrderedDict({‘type’: ‘array’, ‘items’: OrderedDict({‘type’: ‘string’})})})]</p></td>
+</tr>
+<tr class="row-odd"><td rowspan="10"><ul class="simple">
+<li><p>tags</p></li>
+</ul>
+</td>
+<td colspan="5"><p>Tags as type references with optional parameter overrides</p></td>
+</tr>
+<tr class="row-even"><td><p>type</p></td>
+<td colspan="4"><p><em>array</em></p></td>
+</tr>
+<tr class="row-odd"><td rowspan="8"><p>items</p></td>
+<td rowspan="8"><p>oneOf</p></td>
+<td colspan="3"><p>Type reference (e.g., ‘mypkg.Tag’)</p></td>
+</tr>
+<tr class="row-even"><td><p>type</p></td>
+<td colspan="2"><p><em>string</em></p></td>
+</tr>
+<tr class="row-odd"><td colspan="3"><p>Type reference with inline parameter overrides</p></td>
+</tr>
+<tr class="row-even"><td><p>type</p></td>
+<td colspan="2"><p><em>object</em></p></td>
+</tr>
+<tr class="row-odd"><td colspan="3"><p>patternProperties</p></td>
+</tr>
+<tr class="row-even"><td><ul class="simple">
+<li><p>.*</p></li>
+</ul>
+</td>
+<td><p>type</p></td>
+<td><p><em>object</em></p></td>
+</tr>
+<tr class="row-odd"><td><p>maxProperties</p></td>
+<td colspan="2"><p>1</p></td>
+</tr>
+<tr class="row-even"><td><p>minProperties</p></td>
+<td colspan="2"><p>1</p></td>
 </tr>
 </tbody>
 </table>
