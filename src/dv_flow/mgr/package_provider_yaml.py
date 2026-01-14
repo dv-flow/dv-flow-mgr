@@ -350,6 +350,8 @@ class PackageProviderYaml(PackageProvider):
                     pkg.task_m[alias.name] = alias
             self._loadTypes(pkg, loader, typedefs)
             self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
+            # Resolve tags after types and tasks are loaded
+            self._resolveTags(pkg, pkg_def.tags, loader)
             # Remap needs of tasks in root namespace to overridden names
             if base_pkg is not None:
                 override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
@@ -759,6 +761,8 @@ class PackageProviderYaml(PackageProvider):
         for taskdef, task in tasks:
             task.taskdef = taskdef
             self._elabTask(task, loader)
+            # Resolve tags for this task after elaboration
+            self._resolveTags(task, taskdef.tags, loader)
             # Allow error markers to be reported without raising here
 
         self._log.debug("<-- _loadTasks %s" % pkg.name)
@@ -1234,6 +1238,14 @@ class PackageProviderYaml(PackageProvider):
             tt.uses = self._findType(loader, td.uses)
             if tt.uses is None:
                 raise Exception("Failed to find type %s" % td.uses)
+        
+        # Collect parameter definitions (like tasks) for deferred evaluation
+        tt.param_defs = self._collectParamDefs(
+            loader,
+            td,
+            tt.uses if tt.uses is not None else None)
+        
+        # Also build paramT for backward compatibility
         tt.paramT = self._getParamT(
             loader,
             td, 
@@ -1431,3 +1443,124 @@ class PackageProviderYaml(PackageProvider):
 
 
         return (passthrough, consumes, rundir, uptodate)
+
+    def _resolveTags(self, target, tag_defs, loader):
+        """Resolve tag type references and instantiate Type objects."""
+        self._log.debug("--> _resolveTags for %s" % (target.name if hasattr(target, 'name') else str(target)))
+        
+        if not tag_defs:
+            return
+        
+        for tag_def in tag_defs:
+            if isinstance(tag_def, str):
+                type_name = tag_def
+                param_overrides = {}
+            elif isinstance(tag_def, dict):
+                if len(tag_def) != 1:
+                    loader.error(f"Tag definition must have exactly one key (type reference), got {len(tag_def)}", 
+                               getattr(target, 'srcinfo', None))
+                    continue
+                type_name = list(tag_def.keys())[0]
+                param_overrides = tag_def[type_name]
+                if not isinstance(param_overrides, dict):
+                    loader.error(f"Tag parameter overrides must be a dict, got {type(param_overrides)}", 
+                               getattr(target, 'srcinfo', None))
+                    continue
+            else:
+                loader.error(f"Invalid tag definition type: {type(tag_def)}", 
+                           getattr(target, 'srcinfo', None))
+                continue
+            
+            tag_type = self._findType(loader, type_name)
+            
+            if tag_type is None:
+                similar = loader.getSimilarNamesError(type_name)
+                loader.error(f"Failed to resolve tag type {type_name}.{similar}", 
+                           getattr(target, 'srcinfo', None))
+                continue
+            
+            if not self._isTagType(tag_type):
+                loader.error(f"Type {type_name} is not derived from std.Tag", 
+                           getattr(target, 'srcinfo', None))
+                continue
+            
+            tag_instance = self._instantiateTag(tag_type, param_overrides, loader)
+            target.tags.append(tag_instance)
+        
+        self._log.debug("<-- _resolveTags for %s: %d tags" % (
+            target.name if hasattr(target, 'name') else str(target), 
+            len(target.tags)))
+    
+    def _isTagType(self, typ):
+        """Check if a type is derived from std.Tag"""
+        if typ.name == "std.Tag":
+            return True
+        if typ.uses is not None:
+            return self._isTagType(typ.uses)
+        return False
+    
+    def _instantiateTag(self, tag_type, param_overrides, loader):
+        """Instantiate a tag Type with parameter overrides merged with defaults."""
+        from .type import Type
+        from .param_def import ParamDef
+        from .param_def_collection import ParamDefCollection
+        import copy
+        
+        tag_instance = Type(
+            name=tag_type.name,
+            doc=tag_type.doc,
+            srcinfo=tag_type.srcinfo
+        )
+        
+        param_defs = ParamDefCollection(srcinfo=tag_type.srcinfo)
+        
+        # Walk inheritance chain to collect all parameters
+        inheritance_chain = []
+        current = tag_type
+        visited = set()
+        while current is not None:
+            if id(current) in visited:
+                break
+            visited.add(id(current))
+            inheritance_chain.append(current)
+            current = getattr(current, 'uses', None)
+        
+        # Process in reverse order (base first) so derived overrides base
+        for typ in reversed(inheritance_chain):
+            if typ.param_defs:
+                for pname, param_def in typ.param_defs.definitions.items():
+                    ptype = typ.param_defs.get_type(pname)
+                    value = copy.deepcopy(param_def.value) if param_def else None
+                    param_defs.add_param(pname, ParamDef(value=value), ptype)
+        
+        # Apply overrides from tag usage
+        for key, value in param_overrides.items():
+            if param_defs.has_param(key):
+                ptype = param_defs.get_type(key)
+                if isinstance(value, str) and "${{" in value:
+                    value = loader.evalExpr(value)
+                param_defs.add_param(key, ParamDef(value=value), ptype)
+            else:
+                loader.error(f"Parameter {key} not found in tag type {tag_type.name}", None)
+        
+        tag_instance.param_defs = param_defs
+        
+        # Build paramT for eager access
+        if tag_instance.param_defs:
+            field_m = {}
+            for pname, param_def in tag_instance.param_defs.definitions.items():
+                ptype = tag_instance.param_defs.get_type(pname)
+                value = param_def.value
+                if isinstance(value, str) and "${{" in value:
+                    try:
+                        value = loader.evalExpr(value)
+                    except:
+                        pass
+                field_m[pname] = (ptype, value)
+            
+            if field_m:
+                import pydantic
+                typename = f"Tag{tag_type.name}Params"
+                tag_instance.paramT = pydantic.create_model(typename, **field_m)()
+        
+        return tag_instance

@@ -48,6 +48,7 @@ class Task(object):
     strategy : Strategy = dc.field(default=None)
     run : str = None
     shell : str = "bash"
+    tags : List['Type'] = dc.field(default_factory=list)
     srcinfo : SrcInfo = None
     taskdef : 'TaskDef' = None
 

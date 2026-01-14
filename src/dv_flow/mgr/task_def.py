@@ -159,6 +159,9 @@ class TaskDef(BaseModel):
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")
+    tags : List[Union[str, Dict[str, Any]]] = dc.Field(
+        default_factory=list,
+        description="Tags as type references with optional parameter overrides")
     srcinfo : SrcInfo = dc.Field(default=None)
     
 

@@ -271,6 +271,17 @@ package:
           For codex: sandbox_mode and approval_mode can also be set here.
 
   types:
+  - name: Tag
+    doc: |
+      Base type for all tags. Tags are used to categorize and filter tasks and packages.
+    with:
+      category:
+        type: str
+        value: ""
+      value:
+        type: str
+        value: ""
+
   - name: DataItem
     with:
       type:
