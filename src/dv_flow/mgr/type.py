@@ -1,6 +1,9 @@
 import dataclasses as dc
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 from .srcinfo import SrcInfo
+
+if TYPE_CHECKING:
+    from .param_def_collection import ParamDefCollection
 
 @dc.dataclass
 class TypeField(object):
@@ -17,6 +20,7 @@ class Type(object):
     doc : str = None
     params : Dict[str, TypeField] = dc.field(default_factory=dict)
     paramT : Any = None
+    param_defs : 'ParamDefCollection' = None
     uses : 'Type' = None
     srcinfo : SrcInfo = None
     typedef : 'TypeDef' = None

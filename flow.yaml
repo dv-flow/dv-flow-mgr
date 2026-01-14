@@ -1,0 +1,14 @@
+
+package:
+  name: try
+
+  with:
+    greeting:
+      type: str
+      value: "Hello, World!"
+
+  tasks:
+  - name: print_message
+    uses: std.Message
+    with:
+      msg: "${{ greeting }}"

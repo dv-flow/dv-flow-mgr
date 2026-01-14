@@ -68,6 +68,9 @@ class PackageDef(BaseModel):
     configs : List[ConfigDef] = Field(
         default_factory=list,
         description="List of package configurations")
+    tags : List[Union[str, Dict[str, Any]]] = Field(
+        default_factory=list,
+        description="Tags as type references with optional parameter overrides")
     srcinfo : SrcInfo = Field(default=None)
 
 #     @pydantic.model_validator(mode='before')
