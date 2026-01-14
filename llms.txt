@@ -1,0 +1,100 @@
+# Wavedrom Format Reference (llms.txt)
+
+## Overview
+Wavedrom is a JSON-based format for describing digital timing diagrams. Each diagram is defined by a `signal` array, where each entry describes a waveform lane.
+
+## Basic Structure
+
+```json
+{
+  "signal": [
+    { "name": "Alfa", "wave": "01.zx=ud.23.456789" }
+  ]
+}
+```
+
+- `name`: Label for the signal lane.
+- `wave`: String encoding the waveform (one character per time unit).
+- `data`: (optional) Array of labels for multi-bit values.
+- `period`, `phase`: (optional) Adjust timing for the lane.
+- `node`: (optional) Node markers for arrows.
+- `config`: (optional, at root) Diagram rendering options.
+- `head`, `foot`: (optional, at root) Add captions, ticks, etc.
+
+## Wave String Characters
+
+| Char | Meaning         | Char | Meaning         |
+|------|----------------|------|----------------|
+| 0    | Low            | 1    | High           |
+| x    | Unknown (X)    | z    | High-Z         |
+| =    | Data value     | .    | Extend prev    |
+| 2-9  | Data value     |      |                |
+| p    | posedge clk    | n    | negedge clk    |
+| P    | posedge (wide) | N    | negedge (wide) |
+| h    | half-high      | l    | half-low       |
+| H    | high (wide)    | L    | low (wide)     |
+| |    | Spacer/gap     |      |                |
+
+## Example: Simple Signal
+
+```json
+{
+  "signal": [
+    { "name": "Alfa", "wave": "01.zx=ud.23.456789" }
+  ]
+}
+```
+
+## Example: Clock and Signals
+
+```json
+{
+  "signal": [
+    { "name": "clk",  "wave": "P......" },
+    { "name": "bus",  "wave": "x.==.=x", "data": ["head", "body", "tail", "data"] },
+    { "name": "wire", "wave": "0.1..0." }
+  ]
+}
+```
+
+## Example: Spacers and Gaps
+
+```json
+{
+  "signal": [
+    { "name": "clk",         "wave": "p.....|..." },
+    { "name": "Data",        "wave": "x.345x|=.x", "data": ["head", "body", "tail", "data"] },
+    { "name": "Request",     "wave": "0.1..0|1.0" },
+    {},
+    { "name": "Acknowledge", "wave": "1.....|01." }
+  ]
+}
+```
+
+## Groups
+
+Signals can be grouped and nested:
+
+```json
+{
+  "signal": [
+    { "name": "clk", "wave": "p..Pp..P" },
+    ["Master",
+      ["ctrl",
+        { "name": "write", "wave": "01.0...." },
+        { "name": "read",  "wave": "0...1..0" }
+      ],
+      { "name": "addr",  "wave": "x3.x4..x", "data": "A1 A2" },
+      { "name": "wdata", "wave": "x3.x....", "data": "D1" }
+    ],
+    {},
+    ["Slave",
+      ["ctrl",
+        { "name": "ack", "wave": "x01x0.1x" }
+      ],
+      { "name": "rdata", "wave": "x.....4x", "data": "Q2" }
+    ]
+  ]
+}
+```
+
