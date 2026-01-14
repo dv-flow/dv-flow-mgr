@@ -4,7 +4,7 @@ import pytest
 from dv_flow.mgr import TaskGraphBuilder, PackageLoader
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
-from tests.unit.task_listener_test import TaskListenerTest
+from .task_listener_test import TaskListenerTest
 
 
 def test_uptodate_first_run(tmpdir):
