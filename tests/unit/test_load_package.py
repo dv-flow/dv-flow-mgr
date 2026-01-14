@@ -359,6 +359,7 @@ package:
     name: foo2
     tasks:
     - name: t5
+      scope: export
 """
 
     rundir = os.path.join(tmpdir)
@@ -416,6 +417,7 @@ package:
     name: foo2
     tasks:
     - name: t5
+      scope: export
 """
 
     foo3_dv = """

@@ -110,6 +110,10 @@ class TaskDef(BaseModel):
         default=None,
         title="Base type",
         description="Task from which this task is derived")
+    scope : Union[str, List[str], None] = dc.Field(
+        default=None,
+        title="Task visibility scope",
+        description="Visibility scope: 'root' (executable), 'export' (visible outside package), 'local' (fragment-only)")
     body: List['TaskDef'] = Field(
         default_factory=list,
         validation_alias=AliasChoices('body', 'tasks'),
@@ -159,6 +163,9 @@ class TaskDef(BaseModel):
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")
+    tags : List[Union[str, Dict[str, Any]]] = dc.Field(
+        default_factory=list,
+        description="Tags as type references with optional parameter overrides")
     srcinfo : SrcInfo = dc.Field(default=None)
     
 

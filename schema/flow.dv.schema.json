@@ -60,6 +60,29 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "tags": {
+                    "type": "array",
+                    "description": "Tags as type references with optional parameter overrides",
+                    "items": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "description": "Type reference (e.g., 'mypkg.Tag')"
+                            },
+                            {
+                                "type": "object",
+                                "description": "Type reference with inline parameter overrides",
+                                "patternProperties": {
+                                    ".*": {
+                                        "type": "object"
+                                    }
+                                },
+                                "maxProperties": 1,
+                                "minProperties": 1
+                            }
+                        ]
+                    }
                 }
             }
         },
@@ -179,7 +202,30 @@
                             }
                         }
                     }
-                ]
+                ],
+                "tags": {
+                    "type": "array",
+                    "description": "Tags as type references with optional parameter overrides",
+                    "items": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "description": "Type reference (e.g., 'mypkg.Tag')"
+                            },
+                            {
+                                "type": "object",
+                                "description": "Type reference with inline parameter overrides",
+                                "patternProperties": {
+                                    ".*": {
+                                        "type": "object"
+                                    }
+                                },
+                                "maxProperties": 1,
+                                "minProperties": 1
+                            }
+                        ]
+                    }
+                }
             }
         }
     }
