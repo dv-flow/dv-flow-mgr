@@ -24,6 +24,10 @@ DV Flow Manager is a YAML-based build system and execution engine designed for s
 
 **Types**: Custom data structures for task parameters, supporting inheritance and reuse.
 
+**Tags**: Type-based metadata system for annotating tasks and packages. Tags derive from std.Tag and support parameter customization for structured metadata (priority, ownership, categories).
+
+**Visibility**: Task scope control with `root` (executable entry points), `export` (visible across packages), and `local` (fragment-only) scopes for API boundaries.
+
 **Expressions**: Dynamic parameter evaluation using `${{ }}` syntax for referencing parameters, calculations, and conditional logic.
 
 ## Flow Definition Format
@@ -62,6 +66,8 @@ package:
 
 - **Incremental execution**: Tracks task dependencies and mementos to avoid redundant work
 - **Parallel execution**: Concurrent task execution with configurable parallelism (-j flag)
+- **Task visibility**: Control task exposure with scope attributes (root, export, local)
+- **Type-based tags**: Annotate tasks/packages with structured metadata for categorization
 - **Fileset tracking**: Maintains dependency trees for proper file ordering in HDL compilation
 - **Conditional execution**: Tasks can run conditionally via `iff` expressions
 - **Task override**: Replace task implementations for different configurations
@@ -80,6 +86,9 @@ dfm show [task] [-a] [-v]
 
 # Generate dependency graph
 dfm graph [task] [-o file] [-f dot]
+
+# Display LLM context (this command)
+dfm llms
 ```
 
 ## Common Use Cases
@@ -139,6 +148,9 @@ Installation: `pip install dv-flow-mgr`
 - **docs/userguide/tasks_using.rst**: Task usage patterns and examples
 - **docs/userguide/packages.rst**: Package organization and plugin system
 - **docs/userguide/stdlib.rst**: Standard library task reference
+- **docs/tags.md**: Type-based tagging system for task/package metadata
+- **docs/visibility.md**: Task visibility and scope control (root, export, local)
+- **docs/visibility_example.md**: Practical visibility examples
 - **docs/cmdref.rst**: Command line interface reference
 - **docs/incremental.rst**: Incremental execution and caching
 - **src/dv_flow/mgr/**: Python implementation
