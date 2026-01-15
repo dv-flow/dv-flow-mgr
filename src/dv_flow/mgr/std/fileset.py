@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from typing import ClassVar, List, Tuple
 from dv_flow.mgr import TaskDataResult
 from dv_flow.mgr import FileSet as _FileSet
+from dv_flow.mgr.task_data import TaskMarker, SeverityE
 
 class TaskFileSetMemento(BaseModel):
     files : List[Tuple[str,float]] = dc.Field(default_factory=list)
@@ -43,7 +44,9 @@ async def FileSet(runner, input) -> TaskDataResult:
 
 
     changed = False
-    # 
+    status = 0
+    markers = []
+    
     try:
         ex_memento = TaskFileSetMemento(**input.memento) if input.memento is not None else None
     except Exception as e:
@@ -93,7 +96,16 @@ async def FileSet(runner, input) -> TaskDataResult:
         included_files = []
         for pattern in input.params.include:
             if pattern:  # Skip empty patterns
-                included_files.extend(glob.glob(os.path.join(glob_root, pattern), recursive=False))
+                matched_files = glob.glob(os.path.join(glob_root, pattern), recursive=False)
+                if not matched_files:
+                    error_msg = "Include pattern '%s' did not match any files in '%s'" % (pattern, glob_root)
+                    _log.error(error_msg)
+                    markers.append(TaskMarker(
+                        msg=error_msg,
+                        severity=SeverityE.Error
+                    ))
+                    status = 1
+                included_files.extend(matched_files)
 
         _log.debug("included_files: %s" % str(included_files))
 
@@ -132,12 +144,14 @@ async def FileSet(runner, input) -> TaskDataResult:
     else:
         changed = True
 
-    _log.debug("<-- FileSet(%s) changed=%s" % (input.name, changed))
+    _log.debug("<-- FileSet(%s) changed=%s status=%d" % (input.name, changed, status))
 
     return TaskDataResult(
         memento=memento,
         changed=changed,
-        output=[fs]
+        output=[fs],
+        markers=markers,
+        status=status
     )
 
 
