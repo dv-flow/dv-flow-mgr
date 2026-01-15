@@ -22,7 +22,7 @@
 import pydantic
 import pydantic.dataclasses as dc
 import enum
-from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices, field_validator, model_validator
 from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
@@ -102,6 +102,18 @@ class TaskDef(BaseModel):
         title="Task Name",
         description="The name of the task",
         default=None)
+    root : Union[str, None] = dc.Field(
+        title="Root Task Name",
+        description="The name of the task (marked as root scope)",
+        default=None)
+    export : Union[str, None] = dc.Field(
+        title="Export Task Name",
+        description="The name of the task (marked as export scope)",
+        default=None)
+    local : Union[str, None] = dc.Field(
+        title="Local Task Name",
+        description="The name of the task (marked as local scope)",
+        default=None)
     override : Union[str, None] = dc.Field(
         title="Overide Name",
         description="The name of the task to override",
@@ -168,5 +180,46 @@ class TaskDef(BaseModel):
         description="Tags as type references with optional parameter overrides")
     srcinfo : SrcInfo = dc.Field(default=None)
     
+    @model_validator(mode='before')
+    @classmethod
+    def consolidate_name_and_scope(cls, data):
+        """Consolidate inline scope markers (root, export, local) into name and scope fields"""
+        if not isinstance(data, dict):
+            return data
+        
+        # Count how many name-defining fields are set in the input
+        name_fields = []
+        for field in ['name', 'root', 'export', 'local', 'override']:
+            if field in data and data[field] is not None:
+                name_fields.append((field, data[field]))
+        
+        if len(name_fields) == 0:
+            # No name specified - this is valid for some contexts
+            return data
+        
+        if len(name_fields) > 1:
+            field_names = ', '.join([f"'{field}'" for field, _ in name_fields])
+            raise ValueError(f"Only one of name/root/export/local/override can be specified, got: {field_names}")
+        
+        field, value = name_fields[0]
+        
+        # Set the name from whichever field was used
+        if field != 'override':
+            data['name'] = value
+        
+        # If inline scope marker was used, set the appropriate scope
+        if field in ['root', 'export', 'local']:
+            # Get existing scope
+            existing_scope = data.get('scope')
+            
+            if existing_scope is None:
+                data['scope'] = field
+            elif isinstance(existing_scope, list):
+                if field not in existing_scope:
+                    existing_scope.append(field)
+            elif existing_scope != field:
+                data['scope'] = [existing_scope, field]
+        
+        return data
 
 TaskDef.model_rebuild()
