@@ -113,6 +113,17 @@ class CmdRun(object):
             # De-duplicate and sort
             tasks = sorted({t.name: t for t in tasks}.values(), key=lambda x: x.name)
 
+            # Filter for 'root' visibility tasks
+            root_tasks = [t for t in tasks if getattr(t, 'is_root', False)]
+            
+            if root_tasks:
+                # Show only root tasks
+                tasks = root_tasks
+            else:
+                # Show warning and all tasks
+                print("Warning: No 'root' tasks found in the current package. Runnable tasks must be marked 'scope: root'.")
+                print()
+
             max_name_len = max((len(t.name) for t in tasks), default=0)
 
             print("No task specified. Available Tasks:")
