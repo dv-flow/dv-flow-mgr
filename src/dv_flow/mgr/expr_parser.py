@@ -172,7 +172,7 @@ class ExprParser(object):
     t_DIVIDE  = r'/'
     t_LPAREN  = r'\('
     t_RPAREN  = r'\)'
-    t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*(:-.+)?'
     t_DOT     = r'\.'
     t_PIPE    = r'\|'
     
@@ -188,6 +188,7 @@ class ExprParser(object):
     def t_STRING1(self, t):
         r'"([^"\\]*(\\.[^"\\]*)*)"'
         t.value = t.value[1:-1].replace(r'\"', '"').replace(r'\\', '\\')
+        return t
 
     def t_STRING2(self, t):
         r'\'([^\'\\]*(\\.[^\'\\]*)*)\''

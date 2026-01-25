@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Union, Tuple
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
 from .task_output import TaskOutput
+from .cache_provider import CompressionType
 
 @dc.dataclass
 class TaskSpec(object):
@@ -63,6 +64,22 @@ class StrategyDef(BaseModel):
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
         description="Body tasks for matrix strategy")
+
+class CacheDef(BaseModel):
+    """Cache configuration for a task"""
+    model_config = ConfigDict(extra='forbid')
+    
+    enabled: bool = dc.Field(
+        default=True,
+        description="Whether caching is enabled for this task")
+    
+    hash: List[str] = dc.Field(
+        default_factory=list,
+        description="Extra hash expressions to include in cache key")
+    
+    compression: CompressionType = dc.Field(
+        default=CompressionType.No,
+        description="Compression type for cached artifacts")
 
 class TaskBodyDef(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -175,6 +192,9 @@ class TaskDef(BaseModel):
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")
+    cache : Union[CacheDef, bool, None] = dc.Field(
+        default=None,
+        description="Cache configuration. True=enabled with defaults, False=disabled, CacheDef=custom config")
     tags : List[Union[str, Dict[str, Any]]] = dc.Field(
         default_factory=list,
         description="Tags as type references with optional parameter overrides")
@@ -186,6 +206,10 @@ class TaskDef(BaseModel):
         """Consolidate inline scope markers (root, export, local) into name and scope fields"""
         if not isinstance(data, dict):
             return data
+        
+        # Normalize cache field: convert bool to CacheDef
+        if 'cache' in data and isinstance(data['cache'], bool):
+            data['cache'] = {'enabled': data['cache']}
         
         # Count how many name-defining fields are set in the input
         name_fields = []

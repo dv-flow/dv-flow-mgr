@@ -70,16 +70,21 @@ class TaskListenerLog(object):
             # Task is up-to-date - in non-verbose mode, don't show it
             # In verbose mode, it was already shown in 'enter'
             pass
+        elif reason == 'cache_hit':
+            # Task is a cache hit - in non-verbose mode, don't show it
+            # In verbose mode, it was already shown in 'enter'
+            pass
         elif reason == 'run':
             # Task will actually run - show it now in non-verbose mode
             if not self.verbose and not self.quiet:
                 self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
         elif reason == 'leave':
-            # Check if task was up-to-date (not changed)
+            # Check if task was up-to-date (not changed) or cache hit
             is_uptodate = not task.result.changed if task.result else False
+            is_cache_hit = task.result.cache_hit if (task.result and hasattr(task.result, 'cache_hit')) else False
             
-            # Skip display of up-to-date tasks unless verbose mode
-            if is_uptodate and not self.verbose and not self.quiet:
+            # Skip display of up-to-date/cache-hit tasks unless verbose mode
+            if (is_uptodate or is_cache_hit) and not self.verbose and not self.quiet:
                 self.level -= 1
                 return
             
@@ -99,10 +104,17 @@ class TaskListenerLog(object):
                     self.show_marker(m, task.name, task.rundir)
 
                 if task.result.status == 0:
+                    # Determine status suffix
+                    status_suffix = ""
+                    if is_cache_hit:
+                        status_suffix = " (cache)"
+                    elif is_uptodate:
+                        status_suffix = " (up-to-date)"
+                    
                     self.console.print("[green]<< [%d][/green] Task %s%s%s" % (
                         self.level, 
                         task.name,
-                        ("" if task.result.changed else " (up-to-date)"),
+                        status_suffix,
                         (delta_s if delta_s is not None else "")))
                 else:
                     self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))

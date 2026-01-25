@@ -7,15 +7,17 @@
 #* and a final status code when complete:
 #*   D - done (success, no errors or warnings)
 #*   U - up-to-date (task was skipped because it was already current)
+#*   C - cache hit (task result restored from cache)
 #*   W - completed with warnings (no errors)
 #*   E - completed with errors
 #*
-#* When not in verbose mode, up-to-date tasks are hidden and only
-#* tasks that are actually evaluated are displayed.
+#* When not in verbose mode, up-to-date and cache hit tasks are hidden
+#* and only tasks that are actually evaluated are displayed.
 #*
 #* Any markers produced by the task are displayed indented
 #* directly below the task entry when the task completes.
-#* The final table remains visible after execution completes.
+#* The final table remains visible after execution completes and includes
+#* summary statistics (total tasks, up-to-date, cache hits/misses, etc.).
 #****************************************************************************
 import dataclasses as dc
 from typing import ClassVar, Dict, Any, Optional
@@ -42,6 +44,15 @@ class TaskListenerProgress(object):
     _task_row_map : Dict[Any, Dict[str, Any]] = dc.field(default_factory=dict)  # task -> info
     _order : list = dc.field(default_factory=list)  # maintain insertion/display order
     _running : bool = False
+    
+    # Statistics tracking
+    _total_tasks : int = 0
+    _uptodate_count : int = 0
+    _cache_hit_count : int = 0
+    _done_count : int = 0
+    _error_count : int = 0
+    _warning_count : int = 0
+    _cache_enabled : bool = False
 
     sev_pref_m : ClassVar = {
         "info": "[blue]I[/blue]",
@@ -84,6 +95,9 @@ class TaskListenerProgress(object):
     # Event interface used by runner
     def event(self, task: TaskNode, reason: str):
         if reason == 'start':
+            # task is actually the runner when reason is 'start'
+            if hasattr(task, 'cache_providers'):
+                self._cache_enabled = bool(task.cache_providers)
             self.enter()
             return
         if reason == 'end':
@@ -92,6 +106,7 @@ class TaskListenerProgress(object):
         if not self._running:
             self.enter()
         if reason == 'enter':
+            self._total_tasks += 1
             # In verbose mode, add task row immediately with spinner
             # In non-verbose mode, defer until we know if it will run
             if self.verbose:
@@ -100,7 +115,7 @@ class TaskListenerProgress(object):
                         "", total=1, completed=0,
                         status="[cyan]…", name=task.name, elapsed=""
                     )
-                    self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
+                    self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '', 'cache_hit': False }
                     self._order.append(task)
                     # Trigger a manual refresh
                     if self._live:
@@ -108,7 +123,13 @@ class TaskListenerProgress(object):
         elif reason == 'uptodate':
             # Task is up-to-date - in non-verbose mode, don't show it at all
             # In verbose mode, task was already added in 'enter', will show 'U' on leave
-            pass
+            self._uptodate_count += 1
+        elif reason == 'cache_hit':
+            # Track cache hits (even if not displayed)
+            self._cache_hit_count += 1
+            # Mark in task_row_map if it exists (verbose mode)
+            if task in self._task_row_map:
+                self._task_row_map[task]['cache_hit'] = True
         elif reason == 'run':
             # Task will actually run - add to display if not already added
             if task not in self._task_row_map and self._progress is not None:
@@ -116,7 +137,7 @@ class TaskListenerProgress(object):
                     "", total=1, completed=0,
                     status="[cyan]…", name=task.name, elapsed=""
                 )
-                self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '' }
+                self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '', 'cache_hit': False }
                 self._order.append(task)
                 # Trigger a manual refresh
                 if self._live:
@@ -127,20 +148,26 @@ class TaskListenerProgress(object):
                 # Task wasn't displayed (up-to-date in non-verbose mode)
                 return
             
-            # Check if task was up-to-date (not changed)
+            # Check if task was up-to-date (not changed) or cache hit
             is_uptodate = not task.result.changed if task.result else False
+            is_cache_hit = info.get('cache_hit', False)
             
             # Determine status code
             err_ct = sum(1 for m in task.result.markers if m.severity == SeverityE.Error)
             warn_ct = sum(1 for m in task.result.markers if m.severity == SeverityE.Warning)
             if task.result.status != 0 or err_ct > 0:
                 status_code = '[red]E[/red]'
+                self._error_count += 1
             elif warn_ct > 0:
                 status_code = '[yellow]W[/yellow]'
+                self._warning_count += 1
+            elif is_cache_hit:
+                status_code = '[magenta]C[/magenta]'  # C for cache hit
             elif is_uptodate:
                 status_code = '[blue]U[/blue]'
             else:
                 status_code = '[green]D[/green]'
+                self._done_count += 1
             # Compute elapsed time
             elapsed_s = ""
             if getattr(task, 'start', None) is not None and getattr(task, 'end', None) is not None:
@@ -197,7 +224,25 @@ class TaskListenerProgress(object):
                 if info.get('markers'):
                     for m in info['markers']:
                         table.add_row("  " + self._format_marker_line(m, t.name))
-        return Panel(table, title="Task Summary", border_style="blue")
+        
+        # Build summary statistics
+        summary_parts = [f"Total: {self._total_tasks}"]
+        if self._uptodate_count > 0:
+            summary_parts.append(f"Up-to-date: {self._uptodate_count}")
+        if self._cache_enabled:
+            cache_miss = self._done_count + self._error_count + self._warning_count
+            summary_parts.append(f"Cache: {self._cache_hit_count} hit / {cache_miss} miss")
+        if self._done_count > 0:
+            summary_parts.append(f"Done: {self._done_count}")
+        if self._error_count > 0:
+            summary_parts.append(f"[red]Errors: {self._error_count}[/red]")
+        if self._warning_count > 0:
+            summary_parts.append(f"[yellow]Warnings: {self._warning_count}[/yellow]")
+        
+        summary = " | ".join(summary_parts)
+        title = f"Task Summary ({summary})"
+        
+        return Panel(table, title=title, border_style="blue")
 
     # Marker formatting similar to log listener
     def show_marker(self, m, name=None, rundir=None):

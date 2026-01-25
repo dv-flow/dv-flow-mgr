@@ -32,6 +32,9 @@ from .package_provider_yaml import PackageProviderYaml
 from .package_provider import Package
 from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
+from .hash_provider import HashProvider
+from .hash_provider_default import DefaultHashProvider
+from .hash_provider_sv import SVHashProvider
 
 class ExtRgy(PackageProvider):
     _inst : ClassVar = None
@@ -42,6 +45,9 @@ class ExtRgy(PackageProvider):
         self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
         self._override_m : Dict[str,str] = {}
+        # Hash provider registry: List of (priority, provider) tuples
+        # Higher priority providers are checked first
+        self._hash_providers: List[Tuple[int, HashProvider]] = []
 
     def addOverride(self, key, value):
         self._override_m[key] = value
@@ -60,6 +66,31 @@ class ExtRgy(PackageProvider):
     def findShell(self, name) -> Optional[Callable]:
         if name in self._shell_m.keys():
             return self._shell_m[name]
+        return None
+    
+    def register_hash_provider(self, provider: HashProvider, priority: int = 0):
+        """Register a hash provider with the given priority.
+        
+        Args:
+            provider: The hash provider instance
+            priority: Priority (higher = checked first). Default provider has priority 0.
+        """
+        self._hash_providers.append((priority, provider))
+        # Sort by priority (descending)
+        self._hash_providers.sort(key=lambda x: x[0], reverse=True)
+    
+    def get_hash_provider(self, filetype: str) -> Optional[HashProvider]:
+        """Get the highest priority hash provider that supports the given filetype.
+        
+        Args:
+            filetype: The filetype string (e.g., 'systemVerilogSource')
+            
+        Returns:
+            The hash provider, or None if no provider supports this filetype
+        """
+        for priority, provider in self._hash_providers:
+            if provider.supports(filetype):
+                return provider
         return None
         
     def getPackageNames(self, loader : PackageLoaderP) -> List[str]:
@@ -122,6 +153,11 @@ class ExtRgy(PackageProvider):
         self._shell_m["csh"] = ShellCallable
         self._shell_m["tcsh"] = ShellCallable
         self._shell_m["pytask"] = ExecCallable
+        
+        # Register hash providers
+        # SV provider has higher priority than default
+        self.register_hash_provider(SVHashProvider(), priority=10)
+        self.register_hash_provider(DefaultHashProvider(), priority=0)
 
         if "DV_FLOW_PATH" in os.environ.keys() and os.environ["DV_FLOW_PATH"] != "":
             paths = os.environ["DV_FLOW_PATH"].split(':')
@@ -178,6 +214,7 @@ class ExtRgy(PackageProvider):
         ret = ExtRgy()
         ret._pkgpath = self._pkgpath.copy()
         ret._pkg_m = self._pkg_m.copy()
+        ret._hash_providers = self._hash_providers.copy()
         return ret
 
     @classmethod
