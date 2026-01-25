@@ -23,6 +23,10 @@
                 "name": {
                     "type": "string"
                 },
+                "desc": {
+                    "type": "string",
+                    "description": "Short description of the package"
+                },
                 "imports": {
                     "type": "array",
                     "items": {

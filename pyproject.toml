@@ -25,5 +25,5 @@ license = {file = "LICENSE" }
 dfm = "dv_flow.mgr.__main__:main"
 
 [tool.setuptools.package-data]
-"dv_flow.mgr" = ['share/*']
+"dv_flow.mgr" = ['share/*', 'share/references/*']
 

@@ -46,6 +46,9 @@ class Override(BaseModel):
 class PackageDef(BaseModel):
     name : str = Field(
         description="Name of the package")
+    desc : str = Field(
+        default=None,
+        description="Short description of the package")
     type : List[PackageSpec] = Field(default_factory=list)
     tasks : List[TaskDef] = Field(
         default_factory=list,

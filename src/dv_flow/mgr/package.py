@@ -36,6 +36,7 @@ class Override(object):
 @dc.dataclass
 class Package(object):
     name : str = "<unknown>"
+    desc : str = None
     basedir : str = None
     paramT : Any = None
     pkg_def : PackageDef = None  # Added to expose original PackageDef for tests

@@ -212,6 +212,7 @@ class PackageProviderYaml(PackageProvider):
             len(pkg_def.types)))
 
         pkg.name = pkg_def.name
+        pkg.desc = pkg_def.desc
         pkg.pkg_def = pkg_def  # expose original PackageDef for tests
         # Register package with loader for global lookup
         try:
@@ -785,6 +786,7 @@ class PackageProviderYaml(PackageProvider):
             tt = Type(
                 name=self._getScopeFullname(td.name),
                 doc=td.doc,
+                tags=td.tags if td.tags else [],
                 srcinfo=td.srcinfo,
                 typedef=td)
             pkg.type_m[tt.name] = tt
