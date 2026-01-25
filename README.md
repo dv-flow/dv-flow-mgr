@@ -1,8 +1,11 @@
 # DV Flow Manager
 
-DV Flow Manager (dfm) is a flow manager designed for hardware design and verification projects. 
-It orchestrates tasks connected by data objects, managing dependencies between filesets to 
-enable proper ordering and intelligent partitioning.
+DV Flow Manager (dfm) orchestrates data-driven, parameterizable workflows. 
+Tasks are connected by dataflow, enabling composable and reusable workflow definitions.
+
+Originally designed for silicon design and verification, DV Flow supports any 
+domain requiring complex task orchestration—including agentic AI workflows, 
+build automation, and CI/CD pipelines.
 
 ## Features
 
