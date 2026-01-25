@@ -25,6 +25,7 @@
 
 package:
   name: std
+  desc: Standard library providing core tasks, types, and utilities for DV Flow workflows
 
   tasks:
   - name: Message
@@ -282,6 +283,13 @@ package:
         type: str
         value: ""
 
+  - name: AgentSkillTag
+    uses: std.Tag
+    doc: |
+      Tag that marks datasets as useful agent skills. Agent skills are 
+      capabilities that can be discovered and utilized by AI agents to 
+      perform specialized tasks.
+
   - name: DataItem
     with:
       type:
@@ -341,3 +349,52 @@ package:
               type: str
             val:
               type: str
+
+  - name: AgentSkill
+    uses: std.DataItem
+    doc: |
+      Defines an agent skill dataset. Agent skills represent capabilities 
+      that AI agents can discover and utilize to perform specialized tasks.
+      
+      Packages should define an AgentSkill type tagged with std.AgentSkillTag
+      to expose their capabilities to LLM agents. The skill documentation
+      (skill_doc field) should include:
+      - Quick start examples
+      - Available tasks and their parameters
+      - Common usage patterns
+    tags:
+    - std.AgentSkillTag
+    with:
+      name:
+        doc: |
+          Unique skill name identifier (e.g., "hdl-simulation", "verilator-sim")
+        type: str
+        value: ""
+      desc:
+        doc: |
+          Short one-line description of the agent skill
+        type: str
+        value: ""
+      skill_doc:
+        doc: |
+          Full markdown documentation for the agent skill. Should include:
+          - Quick start examples
+          - Available tasks and parameters  
+          - Common usage patterns
+        type: str
+        value: ""
+      examples:
+        doc: |
+          List of YAML example snippets demonstrating skill usage
+        type: list
+        value: []
+      related_tasks:
+        doc: |
+          List of task names related to this skill
+        type: list
+        value: []
+      path:
+        doc: |
+          Optional path to a detailed skill documentation file
+        type: str
+        value: ""

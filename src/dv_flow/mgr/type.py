@@ -22,6 +22,7 @@ class Type(object):
     paramT : Any = None
     param_defs : 'ParamDefCollection' = None
     uses : 'Type' = None
+    tags : List[Any] = dc.field(default_factory=list)
     srcinfo : SrcInfo = None
     typedef : 'TypeDef' = None
 

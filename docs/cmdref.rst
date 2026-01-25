@@ -133,52 +133,194 @@ Run Examples
 Show Command
 ============
 
-Display information about tasks without executing them.
+The show command provides discovery and inspection of packages, tasks, types, and tags.
+It supports both human-readable and machine-parseable (JSON) output for Agent consumption.
 
 .. code-block:: bash
 
-    dfm show [OPTIONS] [TASK]
+    dfm show [SUBCOMMAND] [OPTIONS]
 
-If no task is specified, shows a list of available tasks.
-
-Show Options
+Sub-Commands
 ------------
 
-``-a, --all``
-    Show all tasks required for the specified task to run, including dependencies.
-    
-    .. code-block:: bash
-    
-        dfm show build -a
+The show command supports the following sub-commands:
+
+* **packages** - List and search available packages
+* **tasks** - List and search tasks across packages
+* **task <name>** - Display detailed information about a specific task
+* **types** - List data types and tags
+* **tags** - List tag types and their usage
+* **package <name>** - Display detailed information about a package
+* **project** - Display current project structure
+
+Common Options
+--------------
+
+These options are available across most show sub-commands:
+
+``--search KEYWORD``
+    Search by keyword in name, description, and documentation fields.
+    Case-insensitive substring matching.
+
+``--regex PATTERN``
+    Search by Python regex pattern in description and documentation.
+
+``--tag TAG``
+    Filter by tag. Format: ``TagType`` or ``TagType:field=value``.
+
+``--json``
+    Output in JSON format for programmatic consumption by Agents.
 
 ``-v, --verbose``
-    Show additional detailed information about tasks, including parameters
-    and dependency relationships.
-    
-    .. code-block:: bash
-    
-        dfm show build -v
+    Show additional details including full documentation and parameters.
 
-Show Examples
+Show Packages
 -------------
 
-**List all available tasks:**
+List and search available packages.
 
 .. code-block:: bash
 
+    dfm show packages [--search KEYWORD] [--json] [-v]
+
+Examples:
+
+.. code-block:: bash
+
+    # List all packages
+    dfm show packages
+    
+    # Search for verification packages
+    dfm show packages --search verification
+    
+    # JSON output for scripting
+    dfm show packages --json
+
+Show Tasks
+----------
+
+List and search tasks across all packages.
+
+.. code-block:: bash
+
+    dfm show tasks [--package PKG] [--scope SCOPE] [--search KEYWORD] [--json]
+
+Options:
+
+``--package PKG``
+    Filter tasks to a specific package.
+
+``--scope {root,export,local}``
+    Filter tasks by visibility scope.
+
+Examples:
+
+.. code-block:: bash
+
+    # List all tasks
+    dfm show tasks
+    
+    # Search for file-related tasks
+    dfm show tasks --search file
+    
+    # List tasks in std package
+    dfm show tasks --package std
+
+Show Task Detail
+----------------
+
+Display detailed information about a specific task.
+
+.. code-block:: bash
+
+    dfm show task <name> [--needs [DEPTH]] [--json] [-v]
+
+Options:
+
+``--needs [DEPTH]``
+    Show the needs (dependency) chain for this task. Optional DEPTH limits 
+    traversal levels (-1 or omitted for unlimited).
+
+Examples:
+
+.. code-block:: bash
+
+    # Show task details
+    dfm show task std.FileSet
+    
+    # Show task with full needs chain
+    dfm show task myproject.build --needs
+    
+    # Show needs chain limited to 2 levels
+    dfm show task myproject.build --needs 2
+    
+    # JSON output with full details
+    dfm show task std.FileSet --json
+
+Show Types
+----------
+
+List data types and tag types.
+
+.. code-block:: bash
+
+    dfm show types [--tags-only] [--data-items-only] [--search KEYWORD]
+
+Options:
+
+``--tags-only``
+    Show only tag types (types deriving from std.Tag).
+
+``--data-items-only``
+    Show only data item types (types deriving from std.DataItem).
+
+Show Tags
+---------
+
+List tag types and their usage counts.
+
+.. code-block:: bash
+
+    dfm show tags [--search KEYWORD] [--json]
+
+Show Package Detail
+-------------------
+
+Display detailed information about a specific package.
+
+.. code-block:: bash
+
+    dfm show package <name> [--json] [-v]
+
+Show Project
+------------
+
+Display information about the current project.
+
+.. code-block:: bash
+
+    dfm show project [--imports] [--configs] [--json] [-v]
+
+Options:
+
+``--imports``
+    Show detailed import information.
+
+``--configs``
+    Show available configurations.
+
+Legacy Mode
+-----------
+
+For backward compatibility, the following legacy invocations are supported:
+
+.. code-block:: bash
+
+    # List project tasks (equivalent to: dfm show tasks --package <project>)
     dfm show
-
-**Show information about a specific task:**
-
-.. code-block:: bash
-
-    dfm show sim-image
-
-**Show full dependency tree:**
-
-.. code-block:: bash
-
-    dfm show sim-image -a
+    
+    # Show task with dependency tree (legacy behavior)
+    dfm show <task> -a
 
 Graph Command
 =============

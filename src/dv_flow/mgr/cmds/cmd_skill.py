@@ -1,5 +1,5 @@
 #****************************************************************************
-#* type_def.py
+#* cmd_skill.py
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -19,17 +19,25 @@
 #*     Author: 
 #*
 #****************************************************************************
-from typing import Any, Dict, List, Union
-from pydantic import BaseModel, Field
-from .param_def import ParamDef
-from .srcinfo import SrcInfo
+import os
 
-class TypeDef(BaseModel):
-    name : str
-    uses : str = None
-    doc : str = None
-    params : Dict[str, Union[str, ParamDef]] = Field(alias="with", default_factory=dict)
-    tags : List[Union[str, Dict[str, Any]]] = Field(
-        default_factory=list,
-        description="Tags as type references with optional parameter overrides")
-    srcinfo : SrcInfo = None
+# Short description of DV Flow Manager for LLM consumption
+SKILL_DESCRIPTION = """\
+DV Flow Manager (dfm) is a YAML-based build system and execution engine \
+designed for silicon design and verification projects. It orchestrates tasks \
+through declarative workflows with dataflow-based dependency management.
+
+For detailed information, see the skill documentation at:
+{skill_path}
+"""
+
+class CmdSkill(object):
+
+    def __call__(self, args):
+        # Get the path to skill.md in the share directory
+        share_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "share")
+        skill_path = os.path.join(share_dir, "skill.md")
+        
+        print(SKILL_DESCRIPTION.format(skill_path=skill_path))
+        
+        return 0
