@@ -58,11 +58,11 @@ class TaskRunner(object):
 
     def enter(self):
         for l in self.listeners:
-            l[0](None, "start")
+            l[0](self, "start")
 
     def leave(self):
         for l in self.listeners:
-            l[0](None, "end")
+            l[0](self, "end")
 
     def add_listener(self, l, recursive=False):
         self.listeners.append((l, recursive))
@@ -92,6 +92,8 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     nproc : int = -1
     status : int = 0
     force_run : bool = False
+    cache_providers : List = dc.field(default_factory=list)
+    hash_registry : 'ExtRgy' = None
 
     _anon_tid : int = 1
     _exec_semaphore : asyncio.Semaphore = dc.field(default=None, init=False)

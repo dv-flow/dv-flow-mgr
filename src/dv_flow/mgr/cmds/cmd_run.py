@@ -34,6 +34,7 @@ from ..task_listener_log import TaskListenerLog
 from ..task_listener_tui import TaskListenerTui
 from ..task_listener_progress import TaskListenerProgress
 from ..task_listener_trace import TaskListenerTrace
+from ..cache_config import load_cache_providers
 from .util import get_rootdir
 
 
@@ -150,6 +151,13 @@ class CmdRun(object):
 
         builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
         runner = TaskSetRunner(rundir, builder=builder)
+
+        # Initialize cache providers from DV_FLOW_CACHE environment variable
+        runner.cache_providers = load_cache_providers()
+        runner.hash_registry = rgy
+        
+        if runner.cache_providers:
+            self._log.info(f"Cache enabled with {len(runner.cache_providers)} provider(s)")
 
         if args.j != -1:
             runner.nproc = int(args.j)

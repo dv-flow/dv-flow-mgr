@@ -43,5 +43,7 @@ package:
       src: pypi
     - name: setuptools-scm
       src: pypi
+    - name: dv-flow-libhdlsim
+      url: https://github.com/dv-flow/dv-flow-libhdlsim.git
 
 

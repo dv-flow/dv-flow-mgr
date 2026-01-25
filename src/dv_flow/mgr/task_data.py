@@ -78,12 +78,16 @@ class TaskDataResult(BaseModel):
     * memento - memento data to be passed to the next invocation of the task
     * markers - list of markers produced by the task
     * status - status code (0=success, non-zero=failure)
+    * cache_hit - indicates whether the task result came from cache
+    * cache_stored - indicates whether the task result was stored in cache
     """
     changed : bool = dc.Field(default=True)
     output : List[Any] = dc.Field(default_factory=list)
     memento : Any = dc.Field(default=None)
     markers : List[TaskMarker] = dc.Field(default_factory=list)
     status : int = dc.Field(default=0)
+    cache_hit : bool = dc.Field(default=False)
+    cache_stored : bool = dc.Field(default=False)
 
 class TaskDataOutput(BaseModel):
     changed : bool = True

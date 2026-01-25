@@ -26,6 +26,8 @@ from .cmds.cmd_graph import CmdGraph
 from .cmds.cmd_run import CmdRun
 from .cmds.cmd_show import CmdShow
 from .cmds.cmd_util import CmdUtil
+from .cmds.cmd_cache import CmdCache
+from .cmds.cache.cmd_init import CmdCacheInit
 from .ext_rgy import ExtRgy
 
 def get_parser():
@@ -120,6 +122,23 @@ def get_parser():
     show_parser.add_argument("-c", "--config",
                         help="Specifies the active configuration for the root package")
     show_parser.set_defaults(func=CmdShow())
+
+    # Cache management commands
+    cache_parser = subparsers.add_parser('cache',
+        help='Cache management commands')
+    cache_subparsers = cache_parser.add_subparsers(dest='cache_subcommand')
+    
+    # cache init subcommand
+    cache_init_parser = cache_subparsers.add_parser('init',
+        help='Initialize a cache directory')
+    cache_init_parser.add_argument('cache_dir',
+        help='Path to cache directory')
+    cache_init_parser.add_argument('--shared',
+        action='store_true',
+        help='Create a shared cache for team use with group permissions')
+    cache_init_parser.set_defaults(cache_func=CmdCacheInit())
+    
+    cache_parser.set_defaults(func=CmdCache())
 
     util_parser = subparsers.add_parser('util',
         help="Internal utility command")

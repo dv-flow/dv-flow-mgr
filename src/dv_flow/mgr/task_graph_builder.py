@@ -819,6 +819,7 @@ class TaskGraphBuilder(object):
             passthrough=task.passthrough,
             consumes=task.consumes,
             uptodate=task.uptodate,
+            taskdef=task,
             task=None)  # We'll set this later
             
         self.push_task_scope(node)

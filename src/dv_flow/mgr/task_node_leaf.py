@@ -12,11 +12,13 @@ from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
 from .param import Param
+from . import cache_util
 
 @dc.dataclass
 class TaskNodeLeaf(TaskNode):
     task : Callable[['TaskRunner','TaskDataInput'],'TaskDataResult'] = dc.field(default=None)
     uptodate : Union[bool, str, None] = dc.field(default=None)
+    taskdef : Any = dc.field(default=None)
 
     async def do_run(self, 
                   runner,
@@ -117,8 +119,120 @@ class TaskNodeLeaf(TaskNode):
                 if getattr(in_p, "type", None) == "std.Env":
                     inputs.append(in_p)
 
-        # Check if task is up-to-date (unless force_run is set)
+        # Check cache first (before uptodate check)
+        # Skip cache if uptodate is explicitly False
         force_run = getattr(runner, 'force_run', False)
+        if not force_run and self.uptodate is not False and hasattr(runner, 'cache_providers') and runner.cache_providers:
+            try:
+                cache_key = await cache_util.compute_cache_key(
+                self.name,
+                self.taskdef,  # Pass task definition for cache settings
+                self.params,
+                inputs,
+                rundir,
+                getattr(runner, 'hash_registry', None)
+            )
+            except Exception as e:
+                self._log.warning(f"Error computing cache key: {e}")
+                cache_key = None
+            
+            if cache_key:
+                self._log.debug(f"Checking cache for {cache_key}")
+                cache_entry = await cache_util.check_cache(cache_key, runner.cache_providers)
+                
+                if cache_entry:
+                    self._log.info(f"Cache hit for task {self.name}")
+                    runner._notify(self, "cache_hit")
+                    
+                    # Restore output from cache entry
+                    output_template = cache_entry.output_template
+                    output = []
+                    dep_m = {}
+                    dep_m[self.name] = list(need.name for need,_ in self.needs)
+                    
+                    # Handle passthrough (same as uptodate case)
+                    if isinstance(self.passthrough, list):
+                        pass  # Not yet supported
+                    elif self.passthrough == PassthroughE.All:
+                        for need,block in self.needs:
+                            if not block:
+                                for out in need.output.output:
+                                    if getattr(out, "type", None) != "std.Env":
+                                        output.append(out)
+                    elif self.passthrough == PassthroughE.Unused:
+                        if self.consumes == ConsumesE.No or (isinstance(self.consumes, list) and len(self.consumes) == 0):
+                            for need,block in self.needs:
+                                if not block:
+                                    for out in need.output.output:
+                                        if getattr(out, "type", None) != "std.Env":
+                                            output.append(out)
+                        elif isinstance(self.consumes, list):
+                            for need,block in self.needs:
+                                if not block:
+                                    for out in need.output.output:
+                                        if getattr(out, "type", None) != "std.Env" and not self._matches(out, self.consumes):
+                                            output.append(out)
+                    
+                    # Restore local outputs from cache template
+                    restoration_failed = False
+                    for out_data in output_template.get('output', []):
+                        if out_data.get("src") == self.name:
+                            # Replace ${{ rundir }} placeholders with actual rundir
+                            if 'basedir' in out_data and '${{ rundir }}' in out_data['basedir']:
+                                out_data['basedir'] = out_data['basedir'].replace('${{ rundir }}', rundir)
+                            
+                            excluded_fields = ("type", "src", "seq", "name", "params")
+                            try:
+                                item = runner.mkDataItem(out_data.get("type", "std.FileSet"), **{
+                                    k: v for k, v in out_data.items()
+                                    if k not in excluded_fields
+                                })
+                                item.src = self.name
+                                item.seq = out_data.get("seq", 0)
+                                output.append(item)
+                            except Exception as e:
+                                self._log.warning(f"Failed to restore cached output item: {e}")
+                                # If we can't restore, run task normally
+                                restoration_failed = True
+                                break
+                    
+                    if not restoration_failed:
+                        # Successfully restored all outputs
+                        # Extract artifacts if present
+                        if cache_entry.artifacts_path:
+                            from pathlib import Path
+                            for provider in runner.cache_providers:
+                                try:
+                                    await provider.extract_artifacts(
+                                        cache_entry,
+                                        Path(rundir),
+                                        use_symlinks=False
+                                    )
+                                    break
+                                except Exception as e:
+                                    self._log.warning(f"Failed to extract artifacts: {e}")
+                                    continue
+                        
+                        self.output = TaskDataOutput(
+                            changed=False,
+                            dep_m=dep_m,
+                            output=output
+                        )
+                        
+                        self.result = TaskDataResult(
+                            status=0,
+                            changed=False,
+                            output=[],
+                            markers=[],
+                            memento=None,
+                            cache_hit=True,
+                            cache_stored=False
+                        )
+                        
+                        self._log.debug(f"<-- do_run (cache hit): {self.name}")
+                        return self.result
+
+        # Check if task is up-to-date (unless force_run is set)
         if not force_run:
             is_uptodate, exec_data = await self._check_uptodate(rundir, inputs, changed)
             # Notify listeners of up-to-date status
@@ -323,6 +437,50 @@ class TaskNodeLeaf(TaskNode):
             changed=self.result.changed,
             dep_m=dep_m,
             output=output)
+        
+        # Store in cache if successful and caching is enabled
+        # Skip cache storage if uptodate is explicitly False
+        if (self.result.status == 0 and 
+            self.uptodate is not False and
+            hasattr(runner, 'cache_providers') and 
+            runner.cache_providers):
+            
+            try:
+                # Validate output paths are within rundir
+                from pathlib import Path
+                if cache_util.validate_output_paths(output, rundir):
+                    # Compute cache key (returns None if caching disabled)
+                    cache_key = await cache_util.compute_cache_key(
+                        self.name,
+                        None,  # taskdef not available in TaskNode
+                        self.params,
+                        inputs,
+                        rundir,
+                        getattr(runner, 'hash_registry', None)
+                    )
+                    
+                    if cache_key:
+                        # Convert output to template with ${{ rundir }} placeholders
+                        output_template = cache_util.convert_output_to_template(output, rundir)
+                        
+                        # Store in cache with no compression (default)
+                        from .cache_provider import CompressionType
+                        stored = await cache_util.store_in_cache(
+                            cache_key,
+                            output_template,
+                            Path(rundir) if Path(rundir).exists() else None,
+                            runner.cache_providers,
+                            CompressionType.No,
+                            metadata={'task': self.name}
+                        )
+                        
+                        if stored:
+                            self._log.info(f"Stored task {self.name} in cache")
+                            self.result.cache_stored = True
+                else:
+                    self._log.warning(f"Task {self.name} outputs reference paths outside rundir, not cacheable")
+            except Exception as e:
+                self._log.warning(f"Failed to store task in cache: {e}")
         
         if self.save_exec_data:
             self._save_exec_data(rundir, ctxt, input)
