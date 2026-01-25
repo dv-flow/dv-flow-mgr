@@ -21,5 +21,6 @@ efficient avoidance of redundant work.
    reference/index
    reference/types_api
    cmdref
+   llms
    pytask_api
    task_runners

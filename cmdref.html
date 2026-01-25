@@ -14,7 +14,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Python Task API" href="pytask_api.html" />
+    <link rel="next" title="LLM Agent Integration" href="llms.html" />
     <link rel="prev" title="Type System API" href="reference/types_api.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -35,10 +35,10 @@
             
   <section id="command-reference">
 <h1>Command reference<a class="headerlink" href="#command-reference" title="Link to this heading">¶</a></h1>
-<p><p>dv_flow_mgr</p>
+<p><p>DV Flow Manager (dfm) - A dataflow-based build system for silicon design and verification.</p>
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
-           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
+           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
 <section id="dv_flow.mgr.__main__-get_parser-named-arguments">
@@ -154,37 +154,365 @@
 </section>
 <section id="show">
 <h3>show<a class="headerlink" href="#show" title="Link to this heading">¶</a></h3>
-<p>Display information about a task or tasks</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">a</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="n">task</span><span class="p">]</span>
+<p>Display and search packages, tasks, types, and tags</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">{</span><span class="n">packages</span><span class="p">,</span><span class="n">tasks</span><span class="p">,</span><span class="n">task</span><span class="p">,</span><span class="n">types</span><span class="p">,</span><span class="n">tags</span><span class="p">,</span><span class="n">package</span><span class="p">,</span><span class="n">project</span><span class="p">,</span><span class="n">skills</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
 <section id="positional-arguments_repeat2">
 <h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat2" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
-<dt><kbd>task</kbd></dt>
-<dd><p>task to show</p>
+<dt><kbd>show_subcommand</kbd></dt>
+<dd><p>Possible choices: packages, tasks, task, types, tags, package, project, skills</p>
 </dd>
 </dl>
 </section>
+<section id="Sub-commands_repeat1">
+<h4>Sub-commands<a class="headerlink" href="#Sub-commands_repeat1" title="Link to this heading">¶</a></h4>
+<section id="packages">
+<h5>packages<a class="headerlink" href="#packages" title="Link to this heading">¶</a></h5>
+<p>List and search available packages</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">packages</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">regex</span> <span class="n">REGEX</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tag</span> <span class="n">TAG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
+                  <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+</pre></div>
+</div>
 <section id="named-arguments_repeat2">
-<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat2" title="Link to this heading">¶</a></h4>
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat2" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
-<dt><kbd>-a, --all</kbd></dt>
-<dd><p>Shows all tasks required for the subject to run</p>
+<dt><kbd>--search</kbd></dt>
+<dd><p>Search by keyword in name, desc, and doc</p>
+</dd>
+<dt><kbd>--regex</kbd></dt>
+<dd><p>Search by regex pattern in desc and doc</p>
+</dd>
+<dt><kbd>--tag</kbd></dt>
+<dd><p>Filter by tag (format: TagType or TagType:field=value)</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
 </dd>
 <dt><kbd>-v, --verbose</kbd></dt>
-<dd><p>Shows additional information about tasks</p>
+<dd><p>Show additional details</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
 </dd>
 <dt><kbd>-D</kbd></dt>
-<dd><p>Parameter override; may be used multiple times</p>
+<dd><p>Parameter override</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
 </dd>
 <dt><kbd>-c, --config</kbd></dt>
-<dd><p>Specifies the active configuration for the root package</p>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
 </dd>
 </dl>
+</section>
+</section>
+<section id="tasks">
+<h5>tasks<a class="headerlink" href="#tasks" title="Link to this heading">¶</a></h5>
+<p>List and search tasks</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">tasks</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">regex</span> <span class="n">REGEX</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tag</span> <span class="n">TAG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
+               <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+               <span class="p">[</span><span class="o">--</span><span class="n">package</span> <span class="n">PACKAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">scope</span> <span class="p">{</span><span class="n">root</span><span class="p">,</span><span class="n">export</span><span class="p">,</span><span class="n">local</span><span class="p">}]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat3">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat3" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--search</kbd></dt>
+<dd><p>Search by keyword in name, desc, and doc</p>
+</dd>
+<dt><kbd>--regex</kbd></dt>
+<dd><p>Search by regex pattern in desc and doc</p>
+</dd>
+<dt><kbd>--tag</kbd></dt>
+<dd><p>Filter by tag (format: TagType or TagType:field=value)</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+<dt><kbd>--package</kbd></dt>
+<dd><p>Filter tasks by package name</p>
+</dd>
+<dt><kbd>--scope</kbd></dt>
+<dd><p>Possible choices: root, export, local</p>
+<p>Filter tasks by visibility scope</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="task">
+<h5>task<a class="headerlink" href="#task" title="Link to this heading">¶</a></h5>
+<p>Display detailed information about a task</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">task</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">needs</span> <span class="p">[</span><span class="n">DEPTH</span><span class="p">]]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span>
+              <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+              <span class="n">name</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat3">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat3" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>name</kbd></dt>
+<dd><p>Task name (e.g., std.FileSet)</p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat4">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat4" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--needs</kbd></dt>
+<dd><p>Show dependency chain. Optional DEPTH limits levels (-1=unlimited)</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="types">
+<h5>types<a class="headerlink" href="#types" title="Link to this heading">¶</a></h5>
+<p>List and search data types</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">types</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">regex</span> <span class="n">REGEX</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tag</span> <span class="n">TAG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
+               <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+               <span class="p">[</span><span class="o">--</span><span class="n">package</span> <span class="n">PACKAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tags</span><span class="o">-</span><span class="n">only</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">data</span><span class="o">-</span><span class="n">items</span><span class="o">-</span><span class="n">only</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat5">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat5" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--search</kbd></dt>
+<dd><p>Search by keyword in name, desc, and doc</p>
+</dd>
+<dt><kbd>--regex</kbd></dt>
+<dd><p>Search by regex pattern in desc and doc</p>
+</dd>
+<dt><kbd>--tag</kbd></dt>
+<dd><p>Filter by tag (format: TagType or TagType:field=value)</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+<dt><kbd>--package</kbd></dt>
+<dd><p>Filter types by package name</p>
+</dd>
+<dt><kbd>--tags-only</kbd></dt>
+<dd><p>Show only tag types (deriving from std.Tag)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--data-items-only</kbd></dt>
+<dd><p>Show only data item types (deriving from std.DataItem)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="tags">
+<h5>tags<a class="headerlink" href="#tags" title="Link to this heading">¶</a></h5>
+<p>List tag types and their usage</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">tags</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span>
+              <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat6">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat6" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--search</kbd></dt>
+<dd><p>Search tag types by keyword</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="package">
+<h5>package<a class="headerlink" href="#package" title="Link to this heading">¶</a></h5>
+<p>Display detailed information about a package</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">package</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+                 <span class="n">name</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat4">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat4" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>name</kbd></dt>
+<dd><p>Package name (e.g., std)</p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat7">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat7" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="project">
+<h5>project<a class="headerlink" href="#project" title="Link to this heading">¶</a></h5>
+<p>Display current project structure</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">project</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">imports</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">configs</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+                 <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat8">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat8" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--imports</kbd></dt>
+<dd><p>Show imported packages</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--configs</kbd></dt>
+<dd><p>Show available configurations</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="skills">
+<h5>skills<a class="headerlink" href="#skills" title="Link to this heading">¶</a></h5>
+<p>List and query agent skills (DataSet types tagged with AgentSkillTag)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">skills</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">package</span> <span class="n">PACKAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">full</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+                <span class="p">[</span><span class="n">name</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat5">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat5" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>name</kbd></dt>
+<dd><p>Skill name to show details for (e.g., std.AgentSkill)</p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat9">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat9" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--search</kbd></dt>
+<dd><p>Search skills by keyword in name, desc, and skill_doc</p>
+</dd>
+<dt><kbd>--package</kbd></dt>
+<dd><p>Filter skills by package name</p>
+</dd>
+<dt><kbd>--full</kbd></dt>
+<dd><p>Show full skill documentation (with specific skill)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Show additional details</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
 </section>
 </section>
 <section id="cache">
@@ -193,32 +521,32 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">cache</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">{</span><span class="n">init</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat3">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat3" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat6">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat6" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>cache_subcommand</kbd></dt>
 <dd><p>Possible choices: init</p>
 </dd>
 </dl>
 </section>
-<section id="Sub-commands_repeat1">
-<h4>Sub-commands<a class="headerlink" href="#Sub-commands_repeat1" title="Link to this heading">¶</a></h4>
+<section id="Sub-commands_repeat2">
+<h4>Sub-commands<a class="headerlink" href="#Sub-commands_repeat2" title="Link to this heading">¶</a></h4>
 <section id="init">
 <h5>init<a class="headerlink" href="#init" title="Link to this heading">¶</a></h5>
 <p>Initialize a cache directory</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">cache</span> <span class="n">init</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">shared</span><span class="p">]</span> <span class="n">cache_dir</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat4">
-<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat4" title="Link to this heading">¶</a></h6>
+<section id="positional-arguments_repeat7">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat7" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>cache_dir</kbd></dt>
 <dd><p>Path to cache directory</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat3">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat3" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat10">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat10" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--shared</kbd></dt>
 <dd><p>Create a shared cache for team use with group permissions</p>
@@ -229,14 +557,88 @@
 </section>
 </section>
 </section>
+<section id="validate">
+<h3>validate<a class="headerlink" href="#validate" title="Link to this heading">¶</a></h3>
+<p>Validate flow.yaml/flow.dv files for errors and warnings</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">validate</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+             <span class="p">[</span><span class="n">flow_file</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat8">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat8" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>flow_file</kbd></dt>
+<dd><p>Flow file to validate (default: auto-detect)</p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat11">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat11" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format for programmatic consumption</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="context">
+<h3>context<a class="headerlink" href="#context" title="Link to this heading">¶</a></h3>
+<p>Output comprehensive project context for LLM agent consumption</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">context</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">imports</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">installed</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+            <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat12">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat12" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format (default)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--imports</kbd></dt>
+<dd><p>Include detailed information about imported packages</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--installed</kbd></dt>
+<dd><p>Include list of all installed packages</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-v, --verbose</kbd></dt>
+<dd><p>Include additional details (docs, params)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+</dl>
+</section>
+</section>
 <section id="util">
 <h3>util<a class="headerlink" href="#util" title="Link to this heading">¶</a></h3>
 <p>Internal utility command</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">util</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="n">cmd</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat5">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat5" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat9">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat9" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>cmd</kbd></dt>
 <dd></dd>
@@ -246,6 +648,8 @@
 </section>
 </section>
 </section>
+<p><p>For LLM agents: See the skill file at: /home/runner/work/dv-flow-mgr/dv-flow-mgr/src/dv_flow/mgr/share/skill.md</p>
+</p>
 <section id="commands-overview">
 <h2>Commands Overview<a class="headerlink" href="#commands-overview" title="Link to this heading">¶</a></h2>
 <p>DV Flow Manager provides several commands for working with flows:</p>
@@ -348,39 +752,161 @@ that execute are shown.</p>
 </section>
 <section id="show-command">
 <h2>Show Command<a class="headerlink" href="#show-command" title="Link to this heading">¶</a></h2>
-<p>Display information about tasks without executing them.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASK<span class="o">]</span>
+<p>The show command provides discovery and inspection of packages, tasks, types, and tags.
+It supports both human-readable and machine-parseable (JSON) output for Agent consumption.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span><span class="o">[</span>SUBCOMMAND<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
 </pre></div>
 </div>
-<p>If no task is specified, shows a list of available tasks.</p>
-<section id="show-options">
-<h3>Show Options<a class="headerlink" href="#show-options" title="Link to this heading">¶</a></h3>
-<dl>
-<dt><code class="docutils literal notranslate"><span class="pre">-a,</span> <span class="pre">--all</span></code></dt><dd><p>Show all tasks required for the specified task to run, including dependencies.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>build<span class="w"> </span>-a
-</pre></div>
-</div>
+<section id="sub-commands">
+<h3>Sub-Commands<a class="headerlink" href="#sub-commands" title="Link to this heading">¶</a></h3>
+<p>The show command supports the following sub-commands:</p>
+<ul class="simple">
+<li><p><strong>packages</strong> - List and search available packages</p></li>
+<li><p><strong>tasks</strong> - List and search tasks across packages</p></li>
+<li><p><strong>task &lt;name&gt;</strong> - Display detailed information about a specific task</p></li>
+<li><p><strong>types</strong> - List data types and tags</p></li>
+<li><p><strong>tags</strong> - List tag types and their usage</p></li>
+<li><p><strong>package &lt;name&gt;</strong> - Display detailed information about a package</p></li>
+<li><p><strong>project</strong> - Display current project structure</p></li>
+</ul>
+</section>
+<section id="id1">
+<h3>Common Options<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>These options are available across most show sub-commands:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--search</span> <span class="pre">KEYWORD</span></code></dt><dd><p>Search by keyword in name, description, and documentation fields.
+Case-insensitive substring matching.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show additional detailed information about tasks, including parameters
-and dependency relationships.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>build<span class="w"> </span>-v
-</pre></div>
-</div>
+<dt><code class="docutils literal notranslate"><span class="pre">--regex</span> <span class="pre">PATTERN</span></code></dt><dd><p>Search by Python regex pattern in description and documentation.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--tag</span> <span class="pre">TAG</span></code></dt><dd><p>Filter by tag. Format: <code class="docutils literal notranslate"><span class="pre">TagType</span></code> or <code class="docutils literal notranslate"><span class="pre">TagType:field=value</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--json</span></code></dt><dd><p>Output in JSON format for programmatic consumption by Agents.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show additional details including full documentation and parameters.</p>
 </dd>
 </dl>
 </section>
-<section id="show-examples">
-<h3>Show Examples<a class="headerlink" href="#show-examples" title="Link to this heading">¶</a></h3>
-<p><strong>List all available tasks:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show
+<section id="show-packages">
+<h3>Show Packages<a class="headerlink" href="#show-packages" title="Link to this heading">¶</a></h3>
+<p>List and search available packages.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span><span class="w"> </span><span class="o">[</span>-v<span class="o">]</span>
 </pre></div>
 </div>
-<p><strong>Show information about a specific task:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>sim-image
+<p>Examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># List all packages</span>
+dfm<span class="w"> </span>show<span class="w"> </span>packages
+
+<span class="c1"># Search for verification packages</span>
+dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> </span>--search<span class="w"> </span>verification
+
+<span class="c1"># JSON output for scripting</span>
+dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> </span>--json
 </pre></div>
 </div>
-<p><strong>Show full dependency tree:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>sim-image<span class="w"> </span>-a
+</section>
+<section id="show-tasks">
+<h3>Show Tasks<a class="headerlink" href="#show-tasks" title="Link to this heading">¶</a></h3>
+<p>List and search tasks across all packages.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span><span class="o">[</span>--package<span class="w"> </span>PKG<span class="o">]</span><span class="w"> </span><span class="o">[</span>--scope<span class="w"> </span>SCOPE<span class="o">]</span><span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span>
+</pre></div>
+</div>
+<p>Options:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--package</span> <span class="pre">PKG</span></code></dt><dd><p>Filter tasks to a specific package.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--scope</span> <span class="pre">{root,export,local}</span></code></dt><dd><p>Filter tasks by visibility scope.</p>
+</dd>
+</dl>
+<p>Examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># List all tasks</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks
+
+<span class="c1"># Search for file-related tasks</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--search<span class="w"> </span>file
+
+<span class="c1"># List tasks in std package</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--package<span class="w"> </span>std
+</pre></div>
+</div>
+</section>
+<section id="show-task-detail">
+<h3>Show Task Detail<a class="headerlink" href="#show-task-detail" title="Link to this heading">¶</a></h3>
+<p>Display detailed information about a specific task.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>&lt;name&gt;<span class="w"> </span><span class="o">[</span>--needs<span class="w"> </span><span class="o">[</span>DEPTH<span class="o">]]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span><span class="w"> </span><span class="o">[</span>-v<span class="o">]</span>
+</pre></div>
+</div>
+<p>Options:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--needs</span> <span class="pre">[DEPTH]</span></code></dt><dd><p>Show the needs (dependency) chain for this task. Optional DEPTH limits
+traversal levels (-1 or omitted for unlimited).</p>
+</dd>
+</dl>
+<p>Examples:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Show task details</span>
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>std.FileSet
+
+<span class="c1"># Show task with full needs chain</span>
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>myproject.build<span class="w"> </span>--needs
+
+<span class="c1"># Show needs chain limited to 2 levels</span>
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>myproject.build<span class="w"> </span>--needs<span class="w"> </span><span class="m">2</span>
+
+<span class="c1"># JSON output with full details</span>
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>std.FileSet<span class="w"> </span>--json
+</pre></div>
+</div>
+</section>
+<section id="show-types">
+<h3>Show Types<a class="headerlink" href="#show-types" title="Link to this heading">¶</a></h3>
+<p>List data types and tag types.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>types<span class="w"> </span><span class="o">[</span>--tags-only<span class="o">]</span><span class="w"> </span><span class="o">[</span>--data-items-only<span class="o">]</span><span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span>
+</pre></div>
+</div>
+<p>Options:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--tags-only</span></code></dt><dd><p>Show only tag types (types deriving from std.Tag).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--data-items-only</span></code></dt><dd><p>Show only data item types (types deriving from std.DataItem).</p>
+</dd>
+</dl>
+</section>
+<section id="show-tags">
+<h3>Show Tags<a class="headerlink" href="#show-tags" title="Link to this heading">¶</a></h3>
+<p>List tag types and their usage counts.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>tags<span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="show-package-detail">
+<h3>Show Package Detail<a class="headerlink" href="#show-package-detail" title="Link to this heading">¶</a></h3>
+<p>Display detailed information about a specific package.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>package<span class="w"> </span>&lt;name&gt;<span class="w"> </span><span class="o">[</span>--json<span class="o">]</span><span class="w"> </span><span class="o">[</span>-v<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="show-project">
+<h3>Show Project<a class="headerlink" href="#show-project" title="Link to this heading">¶</a></h3>
+<p>Display information about the current project.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>project<span class="w"> </span><span class="o">[</span>--imports<span class="o">]</span><span class="w"> </span><span class="o">[</span>--configs<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span><span class="w"> </span><span class="o">[</span>-v<span class="o">]</span>
+</pre></div>
+</div>
+<p>Options:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--imports</span></code></dt><dd><p>Show detailed import information.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--configs</span></code></dt><dd><p>Show available configurations.</p>
+</dd>
+</dl>
+</section>
+<section id="legacy-mode">
+<h3>Legacy Mode<a class="headerlink" href="#legacy-mode" title="Link to this heading">¶</a></h3>
+<p>For backward compatibility, the following legacy invocations are supported:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># List project tasks (equivalent to: dfm show tasks --package &lt;project&gt;)</span>
+dfm<span class="w"> </span>show
+
+<span class="c1"># Show task with dependency tree (legacy behavior)</span>
+dfm<span class="w"> </span>show<span class="w"> </span>&lt;task&gt;<span class="w"> </span>-a
 </pre></div>
 </div>
 </section>
@@ -628,6 +1154,7 @@ dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="
 <li class="toctree-l2"><a class="reference internal" href="#common-patterns">Common Patterns</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="llms.html">LLM Agent Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="task_runners.html">Task Runners</a></li>
 </ul>
@@ -637,7 +1164,7 @@ dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="reference/types_api.html" title="previous chapter">Type System API</a></li>
-      <li>Next: <a href="pytask_api.html" title="next chapter">Python Task API</a></li>
+      <li>Next: <a href="llms.html" title="next chapter">LLM Agent Integration</a></li>
   </ul></li>
 </ul>
 </div>

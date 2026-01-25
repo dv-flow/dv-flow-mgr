@@ -8,11 +8,13 @@ User Guide
    fundamentals
    packages
    tasks_using
+   visibility
    tasks_developing
    configuration
    expressions
    advanced_features
    stdlib
+   llm_integration
 
 DV Flow input specification builds on three key concepts:
 

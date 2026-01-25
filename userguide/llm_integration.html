@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>LLM Integration &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Flow-Spec Reference" href="../reference/index.html" />
+    <link rel="prev" title="Standard Library" href="stdlib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="llm-integration">
+<h1>LLM Integration<a class="headerlink" href="#llm-integration" title="Link to this heading">¶</a></h1>
+<p>This guide explains how to enable and optimize LLM (Large Language Model) agent
+support in your DV Flow Manager projects. With proper configuration, AI assistants
+like GitHub Copilot CLI, Claude, and OpenAI Codex can effectively discover,
+understand, and generate DFM flows for your projects.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager provides built-in support for LLM agent integration through:</p>
+<ol class="arabic simple">
+<li><p><strong>Skill Discovery</strong> - The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span> <span class="pre">skills</span></code> command lists available agent skills</p></li>
+<li><p><strong>JSON Output</strong> - Machine-readable output for programmatic consumption</p></li>
+<li><p><strong>Skill Documentation</strong> - Detailed capability documentation accessible to agents</p></li>
+<li><p><strong>AGENTS.md</strong> - Project-level documentation for AI assistants</p></li>
+</ol>
+<section id="why-enable-llm-support">
+<h3>Why Enable LLM Support?<a class="headerlink" href="#why-enable-llm-support" title="Link to this heading">¶</a></h3>
+<p>Enabling LLM support in your project allows AI assistants to:</p>
+<ul class="simple">
+<li><p>Automatically discover your project’s build capabilities</p></li>
+<li><p>Generate correct flow.yaml/flow.dv configurations</p></li>
+<li><p>Understand task dependencies and dataflow patterns</p></li>
+<li><p>Debug and modify existing flows with minimal hallucination</p></li>
+<li><p>Execute builds and simulations via the CLI</p></li>
+</ul>
+</section>
+</section>
+<section id="creating-agents-md">
+<h2>Creating AGENTS.md<a class="headerlink" href="#creating-agents-md" title="Link to this heading">¶</a></h2>
+<p>The recommended way to enable LLM support is to create an <code class="docutils literal notranslate"><span class="pre">AGENTS.md</span></code> file in
+your project root. This file is automatically discovered by AI assistants.</p>
+<section id="recommended-template">
+<h3>Recommended Template<a class="headerlink" href="#recommended-template" title="Link to this heading">¶</a></h3>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span><span class="gh"># Project Name</span>
+
+Brief description of what this project does.
+
+<span class="gu">## DV Flow Manager</span>
+
+This project uses DV Flow Manager (dfm) for build automation.
+
+<span class="gu">### Getting Started</span>
+
+<span class="sb">```bash</span>
+<span class="c1"># Get DFM documentation path</span>
+dfm<span class="w"> </span>--help
+
+<span class="c1"># List available package capabilities</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills
+
+<span class="c1"># List available tasks</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks
+
+<span class="c1"># Show project structure</span>
+dfm<span class="w"> </span>show<span class="w"> </span>project<span class="w"> </span>--json
+<span class="sb">```</span>
+
+<span class="gu">### Skill Documentation</span>
+
+Run <span class="sb">`dfm --help`</span> to get the absolute path to the comprehensive skill.md
+documentation file.
+
+<span class="gu">## Project Structure</span>
+
+<span class="sb">```</span>
+<span class="sb">project-root/</span>
+<span class="sb">├── flow.yaml          # Main flow definition</span>
+<span class="sb">├── AGENTS.md          # This file</span>
+<span class="sb">├── src/</span>
+<span class="sb">│   └── rtl/           # RTL source files</span>
+<span class="sb">└── tb/                # Testbench files</span>
+<span class="sb">```</span>
+
+<span class="gu">## Key Tasks</span>
+
+| Task | Description | Usage |
+|------|-------------|-------|
+| <span class="sb">`build`</span> | Compile RTL and testbench | <span class="sb">`dfm run build`</span> |
+| <span class="sb">`sim`</span> | Run simulation | <span class="sb">`dfm run sim`</span> |
+| <span class="sb">`test`</span> | Run all tests | <span class="sb">`dfm run test`</span> |
+
+<span class="gu">## Configurations</span>
+
+| Config | Description | Usage |
+|--------|-------------|-------|
+| <span class="sb">`debug`</span> | Debug build with tracing | <span class="sb">`dfm run build -c debug`</span> |
+| <span class="sb">`release`</span> | Optimized build | <span class="sb">`dfm run build -c release`</span> |
+
+<span class="gu">## Common Workflows</span>
+
+<span class="gu">### Build and Run Simulation</span>
+
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>run<span class="w"> </span>sim
+<span class="sb">```</span>
+
+<span class="gu">### Run Specific Test</span>
+
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-D<span class="w"> </span><span class="nv">test_name</span><span class="o">=</span>smoke_test
+<span class="sb">```</span>
+
+<span class="gu">## Package Dependencies</span>
+
+This project uses the following DFM packages:
+
+<span class="k">-</span><span class="w"> </span><span class="sb">`hdlsim.vlt`</span> - Verilator simulation support
+
+To discover capabilities of these packages:
+
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--package<span class="w"> </span>hdlsim.vlt
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--package<span class="w"> </span>hdlsim.vlt
+<span class="sb">```</span>
+</pre></div>
+</div>
+</section>
+<section id="best-practices">
+<h3>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Keep it Concise</strong> - LLM context windows are limited, so focus on essential information</p></li>
+<li><p><strong>Include Examples</strong> - Show common command patterns and task usage</p></li>
+<li><p><strong>Document Configurations</strong> - List available configurations and their purposes</p></li>
+<li><p><strong>Reference dfm Commands</strong> - Point agents to <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span></code> commands for detailed info</p></li>
+</ol>
+</section>
+</section>
+<section id="defining-custom-skills">
+<h2>Defining Custom Skills<a class="headerlink" href="#defining-custom-skills" title="Link to this heading">¶</a></h2>
+<p>For packages that want to expose their capabilities to LLM agents, define skills
+as DataSet types tagged with <code class="docutils literal notranslate"><span class="pre">std.AgentSkillTag</span></code>.</p>
+<section id="basic-skill-definition">
+<h3>Basic Skill Definition<a class="headerlink" href="#basic-skill-definition" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_package</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># Default skill for the package (recommended name: AgentSkill)</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AgentSkill</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.DataSet</span>
+<span class="w">      </span><span class="nt">tags</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkillTag</span>
+<span class="w">      </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">My package agent skill</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-package-skill&quot;</span>
+<span class="w">        </span><span class="nt">desc</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Build</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">test</span><span class="nv"> </span><span class="s">MyPackage</span><span class="nv"> </span><span class="s">components&quot;</span>
+<span class="w">        </span><span class="nt">skill_doc</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">            </span><span class="no"># MyPackage Skill</span>
+
+<span class="w">            </span><span class="no">## Quick Start</span>
+<span class="w">            </span><span class="no">```yaml</span>
+<span class="w">            </span><span class="no">imports:</span>
+<span class="w">              </span><span class="no">- name: my_package</span>
+<span class="w">                </span><span class="no">as: mp</span>
+<span class="w">            </span><span class="no">tasks:</span>
+<span class="w">              </span><span class="no">- name: build</span>
+<span class="w">                </span><span class="no">uses: mp.Build</span>
+<span class="w">                </span><span class="no">with:</span>
+<span class="w">                  </span><span class="no">target: [my_module]</span>
+<span class="w">            </span><span class="no">```</span>
+
+<span class="w">            </span><span class="no">## Available Tasks</span>
+<span class="w">            </span><span class="no">- `Build` - Compiles the design</span>
+<span class="w">            </span><span class="no">- `Test` - Runs test suite</span>
+<span class="w">            </span><span class="no">- `Lint` - Code linting</span>
+</pre></div>
+</div>
+</section>
+<section id="skill-fields">
+<h3>Skill Fields<a class="headerlink" href="#skill-fields" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">std.AgentSkill</span></code> type supports the following fields:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Unique skill identifier (e.g., “hdl-simulation”)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">desc</span></code></p></td>
+<td><p>str</p></td>
+<td><p>One-line description for listing</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">skill_doc</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Full markdown documentation with examples</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">examples</span></code></p></td>
+<td><p>list</p></td>
+<td><p>List of YAML example snippets</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">related_tasks</span></code></p></td>
+<td><p>list</p></td>
+<td><p>List of related task names</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">path</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Optional path to detailed documentation file</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="discovering-skills">
+<h2>Discovering Skills<a class="headerlink" href="#discovering-skills" title="Link to this heading">¶</a></h2>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span> <span class="pre">skills</span></code> command to discover available skills:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># List all skills</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills
+
+<span class="c1"># Filter by package</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--package<span class="w"> </span>hdlsim.vlt
+
+<span class="c1"># Search by keyword</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--search<span class="w"> </span>verilator
+
+<span class="c1"># Show full documentation for a specific skill</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>hdlsim.vlt.AgentSkill<span class="w"> </span>--full
+
+<span class="c1"># JSON output for programmatic use</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--json
+</pre></div>
+</div>
+</section>
+<section id="verifying-agent-compatibility">
+<h2>Verifying Agent Compatibility<a class="headerlink" href="#verifying-agent-compatibility" title="Link to this heading">¶</a></h2>
+<p>To verify your project is properly configured for LLM agents:</p>
+<ol class="arabic">
+<li><p><strong>Check skill discovery</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>skills
+</pre></div>
+</div>
+</li>
+<li><p><strong>Verify JSON output</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>project<span class="w"> </span>--json
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--json
+</pre></div>
+</div>
+</li>
+<li><p><strong>Test agent workflow</strong>:</p>
+<p>Try the sequence of commands an agent would use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>--help<span class="w">                    </span><span class="c1"># Get skill.md path</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w">              </span><span class="c1"># Discover capabilities</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--package<span class="w"> </span>std<span class="w"> </span><span class="c1"># List available tasks</span>
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>std.FileSet<span class="w">    </span><span class="c1"># Get task details</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="example-complete-project-setup">
+<h2>Example: Complete Project Setup<a class="headerlink" href="#example-complete-project-setup" title="Link to this heading">¶</a></h2>
+<p>Here’s a complete example of a project with LLM support enabled:</p>
+<section id="project-structure">
+<h3>Project Structure<a class="headerlink" href="#project-structure" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>my_project/
+├── AGENTS.md           # Agent documentation
+├── flow.dv             # Main flow definition
+├── src/
+│   └── rtl/
+│       └── counter.sv
+└── tb/
+    └── counter_tb.sv
+</pre></div>
+</div>
+</section>
+<section id="flow-dv">
+<h3>flow.dv<a class="headerlink" href="#flow-dv" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># Custom project skill</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AgentSkill</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.DataItem</span>
+<span class="w">      </span><span class="nt">tags</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkillTag</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-project-build&quot;</span>
+<span class="w">        </span><span class="nt">desc</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Build</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">simulate</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">counter</span><span class="nv"> </span><span class="s">design&quot;</span>
+<span class="w">        </span><span class="nt">skill_doc</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">            </span><span class="no"># Counter Project</span>
+
+<span class="w">            </span><span class="no">## Quick Start</span>
+<span class="w">            </span><span class="no">```bash</span>
+<span class="w">            </span><span class="no">dfm run sim     # Build and run simulation</span>
+<span class="w">            </span><span class="no">dfm run test    # Run tests</span>
+<span class="w">            </span><span class="no">```</span>
+
+<span class="w">            </span><span class="no">## Tasks</span>
+<span class="w">            </span><span class="no">- `rtl` - RTL source files</span>
+<span class="w">            </span><span class="no">- `tb` - Testbench files</span>
+<span class="w">            </span><span class="no">- `build` - Compile simulation</span>
+<span class="w">            </span><span class="no">- `sim` - Run simulation</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/rtl</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tb</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tb</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tb</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">counter_tb</span><span class="p p-Indicator">]</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimRun</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">build</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="agents-md">
+<h3>AGENTS.md<a class="headerlink" href="#agents-md" title="Link to this heading">¶</a></h3>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span><span class="gh"># Counter Project</span>
+
+A simple counter design with Verilator simulation.
+
+<span class="gu">## Quick Start</span>
+
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>run<span class="w"> </span>sim<span class="w">    </span><span class="c1"># Build and run simulation</span>
+<span class="sb">```</span>
+
+<span class="gu">## Tasks</span>
+
+| Task | Description |
+|------|-------------|
+| <span class="sb">`build`</span> | Compile counter RTL and testbench |
+| <span class="sb">`sim`</span> | Run simulation |
+
+<span class="gu">## DFM Commands</span>
+
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w">           </span><span class="c1"># List project capabilities</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w">            </span><span class="c1"># List available tasks</span>
+dfm<span class="w"> </span>show<span class="w"> </span>project<span class="w"> </span>--json<span class="w">   </span><span class="c1"># Get project structure</span>
+<span class="sb">```</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../incremental.html">Incremental Builds</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="fundamentals.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">LLM Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../llms.html">LLM Agent Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="stdlib.html" title="previous chapter">Standard Library</a></li>
+      <li>Next: <a href="../reference/index.html" title="next chapter">Flow-Spec Reference</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/userguide/llm_integration.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
