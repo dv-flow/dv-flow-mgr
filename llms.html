@@ -46,6 +46,7 @@ enabling AI assistants to discover, understand, and work with DFM flows effectiv
 <li><p><strong>Generate</strong> correct flow.yaml/flow.dv configurations</p></li>
 <li><p><strong>Debug</strong> and <strong>modify</strong> existing flows with minimal hallucination</p></li>
 <li><p><strong>Execute</strong> builds and simulations via the dfm CLI</p></li>
+<li><p><strong>Run tasks dynamically</strong> from within LLM-driven Prompt tasks</p></li>
 </ol>
 </section>
 <section id="the-dfm-help-output">
@@ -170,6 +171,110 @@ $<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>
 </div>
 </section>
 </section>
+<section id="llm-call-interface-server-mode">
+<h2>LLM Call Interface (Server Mode)<a class="headerlink" href="#llm-call-interface-server-mode" title="Link to this heading">¶</a></h2>
+<p>When running inside an LLM-driven <code class="docutils literal notranslate"><span class="pre">std.Prompt</span></code> task, the <code class="docutils literal notranslate"><span class="pre">dfm</span></code> command
+automatically connects to the parent DFM session via a Unix socket server.
+This enables LLMs to execute tasks that share resources with the parent session.</p>
+<section id="how-it-works">
+<h3>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>When <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">run</span></code> starts, a command server is created on a Unix socket</p></li>
+<li><p>The socket path is set in <code class="docutils literal notranslate"><span class="pre">DFM_SERVER_SOCKET</span></code> environment variable</p></li>
+<li><p>Child processes (like LLM assistants) detect this variable</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">dfm</span></code> command runs in client mode, forwarding requests to the server</p></li>
+<li><p>Tasks execute within the parent session’s context</p></li>
+</ol>
+</section>
+<section id="benefits">
+<h3>Benefits<a class="headerlink" href="#benefits" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Resource Sharing</strong>: Respects parent session’s parallelism limits (<code class="docutils literal notranslate"><span class="pre">-j</span></code>)</p></li>
+<li><p><strong>State Consistency</strong>: Sees outputs from tasks already completed in the session</p></li>
+<li><p><strong>Cache Sharing</strong>: Uses the same memento cache for incremental builds</p></li>
+<li><p><strong>Unified Logging</strong>: All task output appears in the parent session’s logs</p></li>
+</ul>
+</section>
+<section id="commands-available-in-server-mode">
+<h3>Commands Available in Server Mode<a class="headerlink" href="#commands-available-in-server-mode" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">DFM_SERVER_SOCKET</span></code> is set, the following commands work:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Execute tasks via parent session</span>
+dfm<span class="w"> </span>run<span class="w"> </span>task1<span class="w"> </span>task2
+dfm<span class="w"> </span>run<span class="w"> </span>task1<span class="w"> </span>-D<span class="w"> </span><span class="nv">param</span><span class="o">=</span>value
+dfm<span class="w"> </span>run<span class="w"> </span>task1<span class="w"> </span>--timeout<span class="w"> </span><span class="m">300</span>
+
+<span class="c1"># Query project state</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>my_project.build
+dfm<span class="w"> </span>context<span class="w"> </span>--json
+
+<span class="c1"># Validate configuration</span>
+dfm<span class="w"> </span>validate
+
+<span class="c1"># Health check</span>
+dfm<span class="w"> </span>ping
+</pre></div>
+</div>
+</section>
+<section id="example-llm-generating-and-compiling-rtl">
+<h3>Example: LLM Generating and Compiling RTL<a class="headerlink" href="#example-llm-generating-and-compiling-rtl" title="Link to this heading">¶</a></h3>
+<p>When an LLM running inside a <code class="docutils literal notranslate"><span class="pre">std.Prompt</span></code> task needs to compile generated code:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. LLM creates RTL files</span>
+cat<span class="w"> </span>&gt;<span class="w"> </span>counter.sv<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<span class="s">module counter(input clk, rst_n, output logic [7:0] count);</span>
+<span class="s">  always_ff @(posedge clk or negedge rst_n)</span>
+<span class="s">    if (!rst_n) count &lt;= 0;</span>
+<span class="s">    else count &lt;= count + 1;</span>
+<span class="s">endmodule</span>
+<span class="s">EOF</span>
+
+<span class="c1"># 2. Run compilation via parent DFM session</span>
+dfm<span class="w"> </span>run<span class="w"> </span>hdlsim.vlt.SimImage<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-D<span class="w"> </span>hdlsim.vlt.SimImage.top<span class="o">=</span>counter
+
+<span class="c1"># 3. Output is JSON with status, outputs, and markers</span>
+<span class="c1"># {&quot;status&quot;: 0, &quot;outputs&quot;: [...], &quot;markers&quot;: []}</span>
+</pre></div>
+</div>
+</section>
+<section id="json-response-format">
+<h3>JSON Response Format<a class="headerlink" href="#json-response-format" title="Link to this heading">¶</a></h3>
+<p>All server mode commands return JSON responses:</p>
+<p><strong>Success Response:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;task&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hdlsim.vlt.SimImage&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;output&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hdlsim.SimImage&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;exe_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/rundir/Vtop&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Error Response:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;task&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hdlsim.vlt.SimImage&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;msg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Compilation failed: syntax error&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;error&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
 <section id="agent-friendly-discovery">
 <h2>Agent-Friendly Discovery<a class="headerlink" href="#agent-friendly-discovery" title="Link to this heading">¶</a></h2>
 <section id="json-output-for-dfm-show">
@@ -186,9 +291,33 @@ dfm<span class="w"> </span>show<span class="w"> </span>project<span class="w"> <
 
 <span class="c1"># List available skills</span>
 dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--json
+
+<span class="c1"># Get full project context</span>
+dfm<span class="w"> </span>context<span class="w"> </span>--json
 </pre></div>
 </div>
 <p>This enables agents to query DFM metadata and construct correct configurations.</p>
+</section>
+<section id="the-dfm-context-command">
+<h3>The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">context</span></code> Command<a class="headerlink" href="#the-dfm-context-command" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">context</span></code> command provides comprehensive project information in a
+single JSON output, ideal for LLM consumption:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>dfm<span class="w"> </span>context<span class="w"> </span>--json
+<span class="o">{</span>
+<span class="w">  </span><span class="s2">&quot;project&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;my_project&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;root_dir&quot;</span>:<span class="w"> </span><span class="s2">&quot;/path/to/project&quot;</span>,
+<span class="w">    </span><span class="s2">&quot;rundir&quot;</span>:<span class="w"> </span><span class="s2">&quot;/path/to/rundir&quot;</span>
+<span class="w">  </span><span class="o">}</span>,
+<span class="w">  </span><span class="s2">&quot;tasks&quot;</span>:<span class="w"> </span><span class="o">[</span>
+<span class="w">    </span><span class="o">{</span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;my_project.build&quot;</span>,<span class="w"> </span><span class="s2">&quot;scope&quot;</span>:<span class="w"> </span><span class="s2">&quot;root&quot;</span>,<span class="w"> </span><span class="s2">&quot;uses&quot;</span>:<span class="w"> </span><span class="s2">&quot;hdlsim.vlt.SimImage&quot;</span><span class="o">}</span>,
+<span class="w">    </span><span class="o">{</span><span class="s2">&quot;name&quot;</span>:<span class="w"> </span><span class="s2">&quot;my_project.rtl&quot;</span>,<span class="w"> </span><span class="s2">&quot;scope&quot;</span>:<span class="w"> </span><span class="s2">&quot;local&quot;</span>,<span class="w"> </span><span class="s2">&quot;uses&quot;</span>:<span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="o">}</span>
+<span class="w">  </span><span class="o">]</span>,
+<span class="w">  </span><span class="s2">&quot;types&quot;</span>:<span class="w"> </span><span class="o">[</span>...<span class="o">]</span>,
+<span class="w">  </span><span class="s2">&quot;skills&quot;</span>:<span class="w"> </span><span class="o">[</span>...<span class="o">]</span>
+<span class="o">}</span>
+</pre></div>
+</div>
 </section>
 </section>
 <section id="integration-with-ai-assistants">
@@ -202,6 +331,9 @@ dfm<span class="w"> </span>--help
 <span class="c1"># Use show commands for discovery</span>
 dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--json
 dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> </span>--json
+
+<span class="c1"># Inside a Prompt task, execute tasks via server</span>
+dfm<span class="w"> </span>run<span class="w"> </span>build_task
 </pre></div>
 </div>
 </section>
@@ -268,6 +400,43 @@ dfm<span class="w"> </span>run<span class="w"> </span>build
 </pre></div>
 </div>
 </section>
+<section id="dynamic-code-generation-and-verification">
+<h3>Dynamic Code Generation and Verification<a class="headerlink" href="#dynamic-code-generation-and-verification" title="Link to this heading">¶</a></h3>
+<p><strong>User prompt</strong>: “Generate a counter module and verify it compiles”</p>
+<p><strong>Agent workflow</strong> (inside a Prompt task):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. Generate the RTL</span>
+cat<span class="w"> </span>&gt;<span class="w"> </span>counter.sv<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<span class="s">module counter #(parameter WIDTH=8) (</span>
+<span class="s">  input  logic clk,</span>
+<span class="s">  input  logic rst_n,</span>
+<span class="s">  output logic [WIDTH-1:0] count</span>
+<span class="s">);</span>
+<span class="s">  always_ff @(posedge clk or negedge rst_n)</span>
+<span class="s">    if (!rst_n) count &lt;= &#39;0;</span>
+<span class="s">    else count &lt;= count + 1&#39;b1;</span>
+<span class="s">endmodule</span>
+<span class="s">EOF</span>
+
+<span class="c1"># 2. Run compilation through parent session</span>
+dfm<span class="w"> </span>run<span class="w"> </span>hdlsim.vlt.SimImage<span class="w"> </span>-D<span class="w"> </span><span class="nv">top</span><span class="o">=</span>counter
+
+<span class="c1"># 3. Check if compilation succeeded</span>
+<span class="c1"># (Parse JSON response)</span>
+
+<span class="c1"># 4. Write result file for Prompt task</span>
+cat<span class="w"> </span>&gt;<span class="w"> </span>result.json<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<span class="s">{</span>
+<span class="s">  &quot;status&quot;: 0,</span>
+<span class="s">  &quot;changed&quot;: true,</span>
+<span class="s">  &quot;output&quot;: [</span>
+<span class="s">    {&quot;type&quot;: &quot;std.FileSet&quot;, &quot;basedir&quot;: &quot;.&quot;, &quot;files&quot;: [&quot;counter.sv&quot;]}</span>
+<span class="s">  ],</span>
+<span class="s">  &quot;markers&quot;: []</span>
+<span class="s">}</span>
+<span class="s">EOF</span>
+</pre></div>
+</div>
+</section>
 <section id="adding-uvm-support">
 <h3>Adding UVM Support<a class="headerlink" href="#adding-uvm-support" title="Link to this heading">¶</a></h3>
 <p><strong>User prompt</strong>: “Add UVM support to my simulation”</p>
@@ -312,6 +481,7 @@ dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </sp
 <li><p><strong>Start with help</strong>: Run <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">--help</span></code> to get the skill.md path</p></li>
 <li><p><strong>Use skills for discovery</strong>: <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span> <span class="pre">skills</span></code> lists package capabilities</p></li>
 <li><p><strong>Use JSON output</strong>: <code class="docutils literal notranslate"><span class="pre">--json</span></code> flag enables programmatic parsing</p></li>
+<li><p><strong>Use context command</strong>: <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">context</span> <span class="pre">--json</span></code> provides complete project state</p></li>
 <li><p><strong>Verify suggestions</strong>: Always review AI-generated configurations</p></li>
 <li><p><strong>Report issues</strong>: If AI consistently misunderstands, the skill docs may need updates</p></li>
 </ol>
@@ -323,6 +493,7 @@ features. With the skill.md documentation and <code class="docutils literal notr
 <li><p>Help with package organization</p></li>
 <li><p>Debug flow definition issues</p></li>
 <li><p>Propose DFM-specific best practices</p></li>
+<li><p><strong>Execute tasks dynamically inside Prompt tasks</strong></p></li>
 </ul>
 </section>
 <section id="enabling-llm-support-in-your-project">
@@ -371,6 +542,7 @@ including creating AGENTS.md files and defining custom skills, see the
 <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#the-dfm-help-output">The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">--help</span></code> Output</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#the-dfm-show-skills-command">The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span> <span class="pre">skills</span></code> Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#llm-call-interface-server-mode">LLM Call Interface (Server Mode)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#agent-friendly-discovery">Agent-Friendly Discovery</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#integration-with-ai-assistants">Integration with AI Assistants</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#example-agent-workflows">Example Agent Workflows</a></li>
