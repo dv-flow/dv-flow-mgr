@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import argparse
+import json
 import logging
 import os
 from .cmds.cmd_graph import CmdGraph
@@ -386,7 +387,141 @@ def get_parser():
 
     return parser
 
+
+def _run_client_mode(socket_path: str) -> int:
+    """
+    Run dfm in client mode, forwarding commands to the parent session's server.
+    
+    This is used when DFM_SERVER_SOCKET is set, indicating we're running
+    inside an LLM assistant process within a Prompt task.
+    """
+    import asyncio
+    import sys
+    from .dfm_server import DfmClient
+    
+    async def run_client():
+        client = DfmClient(socket_path)
+        
+        try:
+            await client.connect()
+            
+            # Parse command from sys.argv
+            args = sys.argv[1:]
+            
+            if not args:
+                print("Usage: dfm <command> [args...]", file=sys.stderr)
+                return 1
+            
+            cmd = args[0]
+            
+            if cmd == "run":
+                # dfm run task1 task2 ...
+                tasks = []
+                param_overrides = {}
+                timeout = None
+                
+                i = 1
+                while i < len(args):
+                    if args[i] == "-D" and i + 1 < len(args):
+                        # Parse parameter override
+                        override = args[i + 1]
+                        if "=" in override:
+                            key, value = override.split("=", 1)
+                            param_overrides[key] = value
+                        i += 2
+                    elif args[i] == "--timeout" and i + 1 < len(args):
+                        timeout = float(args[i + 1])
+                        i += 2
+                    elif not args[i].startswith("-"):
+                        tasks.append(args[i])
+                        i += 1
+                    else:
+                        i += 1
+                
+                if not tasks:
+                    print("Error: No tasks specified", file=sys.stderr)
+                    return 1
+                
+                result = await client.run(tasks, param_overrides, timeout)
+                print(json.dumps(result, indent=2))
+                return result.get("status", 0)
+            
+            elif cmd == "show":
+                if len(args) < 2:
+                    print("Error: show requires subcommand", file=sys.stderr)
+                    return 1
+                
+                subcmd = args[1]
+                
+                if subcmd == "tasks":
+                    params = {}
+                    i = 2
+                    while i < len(args):
+                        if args[i] == "--package" and i + 1 < len(args):
+                            params["package"] = args[i + 1]
+                            i += 2
+                        elif args[i] == "--scope" and i + 1 < len(args):
+                            params["scope"] = args[i + 1]
+                            i += 2
+                        elif args[i] == "--search" and i + 1 < len(args):
+                            params["search"] = args[i + 1]
+                            i += 2
+                        else:
+                            i += 1
+                    
+                    result = await client.show_tasks(**params)
+                    print(json.dumps(result, indent=2))
+                    
+                elif subcmd == "task" and len(args) > 2:
+                    result = await client.show_task(args[2])
+                    print(json.dumps(result, indent=2))
+                    
+                else:
+                    print(f"Error: Unknown show subcommand: {subcmd}", file=sys.stderr)
+                    return 1
+            
+            elif cmd == "context":
+                include_imports = "--imports" in args
+                verbose = "-v" in args or "--verbose" in args
+                result = await client.context(include_imports, verbose)
+                print(json.dumps(result, indent=2))
+            
+            elif cmd == "validate":
+                file_arg = None
+                for i, arg in enumerate(args[1:], 1):
+                    if not arg.startswith("-"):
+                        file_arg = arg
+                        break
+                result = await client.validate(file_arg)
+                print(json.dumps(result, indent=2))
+                return 0 if result.get("valid", False) else 1
+            
+            elif cmd == "ping":
+                result = await client.ping()
+                print(json.dumps(result, indent=2))
+            
+            else:
+                print(f"Error: Unknown command: {cmd}", file=sys.stderr)
+                return 1
+            
+            return 0
+            
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        finally:
+            await client.disconnect()
+    
+    return asyncio.run(run_client())
+
+
 def main():
+    # Check if we should run in client mode
+    socket_path = os.environ.get("DFM_SERVER_SOCKET")
+    if socket_path:
+        # Running inside an LLM assistant - forward to parent session
+        return _run_client_mode(socket_path)
+    
     parser = get_parser()
     args = parser.parse_args()
 
@@ -400,4 +535,5 @@ def main():
     return args.func(args)
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main() or 0)
