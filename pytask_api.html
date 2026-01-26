@@ -118,6 +118,36 @@ fails, an error marker will be added.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.exec_parallel">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">exec_parallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">ExecCmd</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logfilters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">callable</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.exec_parallel" title="Link to this definition">¶</a></dt>
+<dd><p>Execute multiple commands in parallel, subject to nproc limits.</p>
+<p>Each command runs independently, respecting the exec_semaphore
+concurrency limits. Returns an array of status codes corresponding
+to each command in the input array.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>cmds: List of ExecCmd objects describing commands to run
+logfilters: Optional dict mapping command index to logfilter callable</p>
+</dd>
+<dt>Returns:</dt><dd><p>List of integer status codes, one per command in same order as input</p>
+</dd>
+</dl>
+<p>Example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr.task_run_ctxt</span> <span class="kn">import</span> <span class="n">ExecCmd</span>
+
+<span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file1.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile1.log&#39;</span><span class="p">),</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file2.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile2.log&#39;</span><span class="p">),</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file3.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile3.log&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="n">statuses</span> <span class="o">=</span> <span class="k">await</span> <span class="n">runner</span><span class="o">.</span><span class="n">exec_parallel</span><span class="p">(</span><span class="n">cmds</span><span class="p">)</span>
+<span class="c1"># statuses[0] = exit code for file1.c compile</span>
+<span class="c1"># statuses[1] = exit code for file2.c compile</span>
+<span class="c1"># statuses[2] = exit code for file3.c compile</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.info">
 <span class="sig-name descname"><span class="pre">info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dv_flow.mgr.TaskMarkerLoc" title="dv_flow.mgr.task_data.TaskMarkerLoc"><span class="pre">TaskMarkerLoc</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.info" title="Link to this definition">¶</a></dt>
 <dd><p>Add an error marker related to the task’s execution</p>
@@ -544,6 +574,32 @@ instance that can be added to task outputs.</p>
 <span class="p">)</span>
 </pre></div>
 </div>
+</dd>
+<dt><strong>exec_parallel(cmds, logfilters=None)</strong></dt><dd><p>Execute multiple commands in parallel, subject to nproc limits. Each command
+runs independently, respecting the exec_semaphore concurrency limits. Returns
+a list of integer status codes corresponding to each command in the input array.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">cmds</span></code> parameter takes a list of <code class="docutils literal notranslate"><span class="pre">ExecCmd</span></code> objects, which describe
+each command to execute:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">dv_flow.mgr</span> <span class="kn">import</span> <span class="n">ExecCmd</span>
+
+<span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file1.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile1.log&#39;</span><span class="p">),</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file2.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile2.log&#39;</span><span class="p">),</span>
+    <span class="n">ExecCmd</span><span class="p">(</span><span class="n">cmd</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;gcc&#39;</span><span class="p">,</span> <span class="s1">&#39;-c&#39;</span><span class="p">,</span> <span class="s1">&#39;file3.c&#39;</span><span class="p">],</span> <span class="n">logfile</span><span class="o">=</span><span class="s1">&#39;compile3.log&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+<span class="n">statuses</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">exec_parallel</span><span class="p">(</span><span class="n">cmds</span><span class="p">)</span>
+<span class="c1"># statuses[0] = exit code for file1.c compile</span>
+<span class="c1"># statuses[1] = exit code for file2.c compile</span>
+<span class="c1"># statuses[2] = exit code for file3.c compile</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">ExecCmd</span></code> class has the following attributes:</p>
+<ul class="simple">
+<li><p><strong>cmd</strong>: List of command arguments (e.g., <code class="docutils literal notranslate"><span class="pre">['ls',</span> <span class="pre">'-la']</span></code>)</p></li>
+<li><p><strong>logfile</strong>: Optional log file name for command output</p></li>
+<li><p><strong>cwd</strong>: Optional working directory (defaults to task rundir)</p></li>
+<li><p><strong>env</strong>: Optional environment variables dict (defaults to task env)</p></li>
+</ul>
 </dd>
 <dt><strong>error(msg), warning(msg), info(msg)</strong></dt><dd><p>Add markers to the task output for user notification.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ctxt</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Compilation failed&quot;</span><span class="p">)</span>

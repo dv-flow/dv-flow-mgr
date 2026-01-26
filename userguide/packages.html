@@ -100,14 +100,14 @@ become available without explicit imports.</p>
 </pre></div>
 </div>
 <p>Your plugin module should provide a <code class="docutils literal notranslate"><span class="pre">dfm_packages()</span></code> function that returns
-a dictionary mapping package names to their flow.dv file paths:</p>
+a dictionary mapping package names to their flow.yaml file paths:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># my_package/plugin.py</span>
 <span class="kn">import</span> <span class="nn">os</span>
 
 <span class="k">def</span> <span class="nf">dfm_packages</span><span class="p">():</span>
     <span class="n">pkg_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s2">&quot;my_tool&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pkg_dir</span><span class="p">,</span> <span class="s2">&quot;flow.dv&quot;</span><span class="p">)</span>
+        <span class="s2">&quot;my_tool&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pkg_dir</span><span class="p">,</span> <span class="s2">&quot;flow.yaml&quot;</span><span class="p">)</span>
     <span class="p">}</span>
 </pre></div>
 </div>
@@ -140,7 +140,7 @@ There are several ways to import packages:</p>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top</span>
 
 <span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subdir/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subdir/flow.yaml</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/my_lib</span>
 
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
@@ -148,7 +148,7 @@ There are several ways to import packages:</p>
 <span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lib.some_task</span>
 </pre></div>
 </div>
-<p>When a directory is specified, DV Flow searches for <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code> or <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>
+<p>When a directory is specified, DV Flow searches for <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code> or <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>
 files in the subdirectory tree.</p>
 </section>
 <section id="import-with-alias">
@@ -176,11 +176,11 @@ files in the subdirectory tree.</p>
 <li><p><strong>Package registry</strong> - Built-in and installed packages</p></li>
 </ol>
 <p>This allows sub-packages to import sibling packages naturally:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In packages/ip1/flow.dv</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In packages/ip1/flow.yaml</span>
 <span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ip1</span>
 <span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/ip2/flow.dv</span><span class="w">  </span><span class="c1"># Finds sibling relative to project root</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">packages/ip2/flow.yaml</span><span class="w">  </span><span class="c1"># Finds sibling relative to project root</span>
 </pre></div>
 </div>
 </section>
@@ -218,8 +218,8 @@ package namespace:</p>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">big_project</span>
 
 <span class="w">    </span><span class="nt">fragments</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/rtl/flow.dv</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/tb/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/rtl/flow.yaml</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/tb/flow.yaml</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/</span>
 
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
@@ -228,7 +228,7 @@ package namespace:</p>
 </pre></div>
 </div>
 <p>Fragment files use the <code class="docutils literal notranslate"><span class="pre">fragment</span></code> keyword instead of <code class="docutils literal notranslate"><span class="pre">package</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># src/rtl/flow.dv</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># src/rtl/flow.yaml</span>
 <span class="nt">fragment</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>

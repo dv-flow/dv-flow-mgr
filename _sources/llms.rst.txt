@@ -12,7 +12,7 @@ The goal of LLM integration is to enable AI agents to:
 
 1. **Discover** available DFM capabilities, packages, tasks, and types
 2. **Understand** DFM's dataflow-based build system paradigm
-3. **Generate** correct flow.yaml/flow.dv configurations
+3. **Generate** correct flow.yaml/flow.yaml configurations
 4. **Debug** and **modify** existing flows with minimal hallucination
 5. **Execute** builds and simulations via the dfm CLI
 6. **Run tasks dynamically** from within LLM-driven Prompt tasks

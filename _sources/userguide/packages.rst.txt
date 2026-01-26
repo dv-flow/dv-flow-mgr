@@ -78,7 +78,7 @@ To create your own plugin package, add an entry point in your ``pyproject.toml``
     my_plugin = "my_package.plugin"
 
 Your plugin module should provide a ``dfm_packages()`` function that returns
-a dictionary mapping package names to their flow.dv file paths:
+a dictionary mapping package names to their flow.yaml file paths:
 
 .. code-block:: python
 
@@ -88,7 +88,7 @@ a dictionary mapping package names to their flow.dv file paths:
     def dfm_packages():
         pkg_dir = os.path.dirname(__file__)
         return {
-            "my_tool": os.path.join(pkg_dir, "flow.dv")
+            "my_tool": os.path.join(pkg_dir, "flow.yaml")
         }
 
 See the developer documentation for complete details on creating plugin packages.
@@ -127,14 +127,14 @@ Import a package from a file or directory path:
         name: top
 
         imports:
-        - subdir/flow.dv
+        - subdir/flow.yaml
         - packages/my_lib
 
         tasks:
         - name: use_imported
           uses: my_lib.some_task
 
-When a directory is specified, DV Flow searches for ``flow.dv`` or ``flow.yaml`` 
+When a directory is specified, DV Flow searches for ``flow.yaml`` or ``flow.yaml`` 
 files in the subdirectory tree.
 
 Import with Alias
@@ -168,11 +168,11 @@ This allows sub-packages to import sibling packages naturally:
 
 .. code-block:: yaml
 
-    # In packages/ip1/flow.dv
+    # In packages/ip1/flow.yaml
     package:
         name: ip1
         imports:
-        - packages/ip2/flow.dv  # Finds sibling relative to project root
+        - packages/ip2/flow.yaml  # Finds sibling relative to project root
 
 Package Parameters
 ==================
@@ -213,8 +213,8 @@ package namespace:
         name: big_project
 
         fragments:
-        - src/rtl/flow.dv
-        - src/tb/flow.dv
+        - src/rtl/flow.yaml
+        - src/tb/flow.yaml
         - tests/
 
         tasks:
@@ -225,7 +225,7 @@ Fragment files use the ``fragment`` keyword instead of ``package``:
 
 .. code-block:: yaml
 
-    # src/rtl/flow.dv
+    # src/rtl/flow.yaml
     fragment:
         tasks:
         - name: build

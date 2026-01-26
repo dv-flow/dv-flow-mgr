@@ -53,7 +53,7 @@ understand, and generate DFM flows for your projects.</p>
 <p>Enabling LLM support in your project allows AI assistants to:</p>
 <ul class="simple">
 <li><p>Automatically discover your project’s build capabilities</p></li>
-<li><p>Generate correct flow.yaml/flow.dv configurations</p></li>
+<li><p>Generate correct flow.yaml/flow.yaml configurations</p></li>
 <li><p>Understand task dependencies and dataflow patterns</p></li>
 <li><p>Debug and modify existing flows with minimal hallucination</p></li>
 <li><p>Execute builds and simulations via the CLI</p></li>
@@ -304,7 +304,7 @@ dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </sp
 <h3>Project Structure<a class="headerlink" href="#project-structure" title="Link to this heading">¶</a></h3>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>my_project/
 ├── AGENTS.md           # Agent documentation
-├── flow.dv             # Main flow definition
+├── flow.yaml             # Main flow definition
 ├── src/
 │   └── rtl/
 │       └── counter.sv
@@ -313,8 +313,8 @@ dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </sp
 </pre></div>
 </div>
 </section>
-<section id="flow-dv">
-<h3>flow.dv<a class="headerlink" href="#flow-dv" title="Link to this heading">¶</a></h3>
+<section id="flow-yaml">
+<h3>flow.yaml<a class="headerlink" href="#flow-yaml" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
 

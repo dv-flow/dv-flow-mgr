@@ -385,6 +385,35 @@ The ``TaskRunCtxt`` class provides additional methods for task implementations:
             cwd="/tmp/build"
         )
 
+**exec_parallel(cmds, logfilters=None)**
+    Execute multiple commands in parallel, subject to nproc limits. Each command
+    runs independently, respecting the exec_semaphore concurrency limits. Returns
+    a list of integer status codes corresponding to each command in the input array.
+    
+    The ``cmds`` parameter takes a list of ``ExecCmd`` objects, which describe
+    each command to execute:
+    
+    .. code-block:: python
+    
+        from dv_flow.mgr import ExecCmd
+        
+        cmds = [
+            ExecCmd(cmd=['gcc', '-c', 'file1.c'], logfile='compile1.log'),
+            ExecCmd(cmd=['gcc', '-c', 'file2.c'], logfile='compile2.log'),
+            ExecCmd(cmd=['gcc', '-c', 'file3.c'], logfile='compile3.log'),
+        ]
+        statuses = await ctxt.exec_parallel(cmds)
+        # statuses[0] = exit code for file1.c compile
+        # statuses[1] = exit code for file2.c compile
+        # statuses[2] = exit code for file3.c compile
+    
+    The ``ExecCmd`` class has the following attributes:
+    
+    * **cmd**: List of command arguments (e.g., ``['ls', '-la']``)
+    * **logfile**: Optional log file name for command output
+    * **cwd**: Optional working directory (defaults to task rundir)
+    * **env**: Optional environment variables dict (defaults to task env)
+
 **error(msg), warning(msg), info(msg)**
     Add markers to the task output for user notification.
     

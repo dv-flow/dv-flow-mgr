@@ -345,7 +345,7 @@ Visibility works the same way in package fragments:
 
 .. code-block:: yaml
 
-    # src/rtl/flow.dv
+    # src/rtl/flow.yaml
     fragment:
       tasks:
       - root: compile_rtl

@@ -23,7 +23,7 @@ Why Enable LLM Support?
 Enabling LLM support in your project allows AI assistants to:
 
 * Automatically discover your project's build capabilities
-* Generate correct flow.yaml/flow.dv configurations
+* Generate correct flow.yaml/flow.yaml configurations
 * Understand task dependencies and dataflow patterns
 * Debug and modify existing flows with minimal hallucination
 * Execute builds and simulations via the CLI
@@ -273,14 +273,14 @@ Project Structure
 
     my_project/
     ├── AGENTS.md           # Agent documentation
-    ├── flow.dv             # Main flow definition
+    ├── flow.yaml             # Main flow definition
     ├── src/
     │   └── rtl/
     │       └── counter.sv
     └── tb/
         └── counter_tb.sv
 
-flow.dv
+flow.yaml
 -------
 
 .. code-block:: yaml

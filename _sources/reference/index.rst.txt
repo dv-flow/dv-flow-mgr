@@ -3,7 +3,7 @@ Flow-Spec Reference
 ###################
 
 This section provides detailed reference documentation for the DV Flow 
-specification format (flow.dv YAML files).
+specification format (flow.yaml YAML files).
 
 File Root Elements
 ==================
@@ -27,7 +27,7 @@ package file or its fragments.
 Each package fragment element specifies either a directory or a file.
 If a file is specified, then that file is loaded. It is expected that the
 content will be a DV-Flow package fragment. If a directory is specified,
-then a top-down search is performed for `flow.dv` files in the subdirectory
+then a top-down search is performed for `flow.yaml` files in the subdirectory
 tree. 
 
 The structure of a package fragment file is nearly identical to a package
