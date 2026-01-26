@@ -40,7 +40,7 @@ These options are available across multiple commands:
 
 ``--root PATH``
     Specify the root directory for the flow. By default, dfm searches upward
-    from the current directory for a flow.dv or flow.yaml file.
+    from the current directory for a flow.yaml or flow.yaml file.
     
     .. code-block:: bash
     

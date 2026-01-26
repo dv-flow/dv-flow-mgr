@@ -29,7 +29,7 @@ from .task_data import *
 from .task_def import *
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
 from .task_graph_builder import TaskGraphBuilder
-from .task_run_ctxt import TaskRunCtxt
+from .task_run_ctxt import TaskRunCtxt, ExecCmd
 from .task_runner import TaskRunner, TaskSetRunner
 from .task_listener_log import TaskListenerLog
 from .util.util import parse_parameter_overrides, loadProjPkgDef

@@ -17,6 +17,7 @@ Use this skill when:
 - Running `dfm` commands (run, show, graph)
 - Debugging build flow issues
 - Working with standard library tasks (std.FileSet, std.Exec, std.Message, etc.)
+- **Executing dfm commands from within an LLM-driven Prompt task**
 
 ## Quick Reference
 
@@ -58,9 +59,14 @@ dfm show tasks --search kw  # Search tasks by keyword
 dfm show task std.FileSet   # Show detailed task info
 dfm show types              # List data types and tags
 dfm show project            # Show current project structure
+dfm context --json          # Get full project context (for Agents)
 
 # Visualization
 dfm graph task -o flow.dot  # Generate dependency graph
+
+# Validation
+dfm validate                # Validate flow configuration
+dfm validate --json         # JSON output for programmatic use
 ```
 
 ### Expression Syntax
@@ -72,6 +78,74 @@ msg: "Building version ${{ version }}"
 iff: ${{ debug_level > 0 }}
 command: ${{ "make debug" if debug else "make release" }}
 ```
+
+## LLM Call Interface (Running Inside Prompt Tasks)
+
+When running inside an LLM-driven `std.Prompt` task, the `dfm` command automatically
+connects to the parent DFM session via a Unix socket. This enables LLMs to:
+
+- Execute tasks that share resources with the parent session
+- Query project state and task information
+- Validate configurations before execution
+
+### Environment Detection
+
+When `DFM_SERVER_SOCKET` environment variable is set, `dfm` runs in client mode:
+
+```bash
+# These commands work inside a Prompt task:
+dfm run task1 task2         # Execute tasks via parent session
+dfm show tasks              # Query available tasks
+dfm context --json          # Get project context
+dfm validate                # Validate configuration
+dfm ping                    # Health check
+```
+
+### Running Tasks from Within a Prompt
+
+When an LLM needs to compile or simulate code it generated:
+
+```bash
+# 1. Create RTL files
+cat > counter.sv << 'EOF'
+module counter(input clk, rst_n, output logic [7:0] count);
+  always_ff @(posedge clk or negedge rst_n)
+    if (!rst_n) count <= 0;
+    else count <= count + 1;
+endmodule
+EOF
+
+# 2. Run compilation via parent DFM session
+dfm run hdlsim.vlt.SimImage -D hdlsim.vlt.SimImage.top=counter
+
+# 3. Check result (JSON output)
+# Returns: {"status": 0, "outputs": [...], "markers": []}
+```
+
+### Querying Project State
+
+```bash
+# Get full project context
+dfm context --json
+# Returns:
+# {
+#   "project": {"name": "my_project", "root_dir": "/path/to/project"},
+#   "tasks": [{"name": "my_project.build", "scope": "root", ...}],
+#   "types": [...],
+#   "skills": [...]
+# }
+
+# Get specific task details
+dfm show task my_project.build --json
+# Returns detailed task information including parameters and dependencies
+```
+
+### Benefits of Server Mode
+
+1. **Resource Sharing**: Respects parent session's parallelism limits (`-j`)
+2. **State Consistency**: Sees outputs from tasks already completed
+3. **Cache Sharing**: Uses same memento cache for incremental builds
+4. **Unified Logging**: All task output appears in parent session's logs
 
 ## Detailed Documentation
 
@@ -165,3 +239,14 @@ project/
 pip install dv-flow-mgr
 pip install dv-flow-libhdlsim  # Optional: HDL simulator support
 ```
+
+## Detailed Documentation
+
+For comprehensive documentation, see the following reference files:
+
+- [Core Concepts](references/concepts.md) - Tasks, packages, dataflow, types
+- [Task Reference](references/tasks.md) - Using and defining tasks
+- [Standard Library](references/stdlib.md) - Built-in std.* tasks
+- [CLI Reference](references/cli.md) - Command line interface
+- [Advanced Patterns](references/advanced.md) - Complex workflows and optimization
+- [Task Development](references/task_development.md) - **Creating custom task implementations and plugin packages** (use when developing new tasks)

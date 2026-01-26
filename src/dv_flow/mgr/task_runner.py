@@ -94,6 +94,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     force_run : bool = False
     cache_providers : List = dc.field(default_factory=list)
     hash_registry : 'ExtRgy' = None
+    enable_server : bool = True  # Enable DFM command server for LLM integration
 
     _anon_tid : int = 1
     _exec_semaphore : asyncio.Semaphore = dc.field(default=None, init=False)
@@ -102,6 +103,9 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     _task_state : Dict[TaskNode, TaskState] = dc.field(default_factory=dict, init=False)
     _ready_queue : asyncio.Queue = dc.field(default=None, init=False)
     _dep_map : Dict[TaskNode, Set[TaskNode]] = dc.field(default_factory=dict, init=False)
+    
+    # Command server for LLM integration
+    _command_server : 'DfmCommandServer' = dc.field(default=None, init=False)
 
     _log : ClassVar = logging.getLogger("TaskSetRunner")
 
@@ -118,6 +122,13 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         
         # Initialize dynamic scheduler
         self._init_dynamic_scheduler()
+    
+    @property
+    def server_socket_path(self) -> str:
+        """Get the command server socket path, if server is running"""
+        if self._command_server:
+            return self._command_server.socket_path
+        return None
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
@@ -128,6 +139,20 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
 
         if not os.path.isdir(os.path.join(self.rundir, "cache")):
             os.makedirs(os.path.join(self.rundir, "cache"))
+
+        # Start command server for LLM integration (if enabled and builder available)
+        if self.enable_server and self.builder is not None:
+            from .dfm_server import DfmCommandServer
+            self._command_server = DfmCommandServer(
+                runner=self,
+                builder=self.builder
+            )
+            await self._command_server.start()
+            
+            # Set environment variable for child processes
+            self.env["DFM_SERVER_SOCKET"] = self._command_server.socket_path
+            self.env["DFM_SESSION_RUNDIR"] = self.rundir
+            self._log.info(f"Command server started at {self._command_server.socket_path}")
 
         # Enable dynamic scheduling
         self._dynamic_enabled = True
@@ -186,6 +211,11 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         finally:
             # Disable dynamic scheduling
             self._dynamic_enabled = False
+            
+            # Stop command server
+            if self._command_server:
+                await self._command_server.stop()
+                self._command_server = None
 
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)

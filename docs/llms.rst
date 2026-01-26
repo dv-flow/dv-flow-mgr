@@ -12,9 +12,10 @@ The goal of LLM integration is to enable AI agents to:
 
 1. **Discover** available DFM capabilities, packages, tasks, and types
 2. **Understand** DFM's dataflow-based build system paradigm
-3. **Generate** correct flow.yaml/flow.dv configurations
+3. **Generate** correct flow.yaml/flow.yaml configurations
 4. **Debug** and **modify** existing flows with minimal hallucination
 5. **Execute** builds and simulations via the dfm CLI
+6. **Run tasks dynamically** from within LLM-driven Prompt tasks
 
 The ``dfm --help`` Output
 =========================
@@ -146,6 +147,118 @@ Skills are defined as DataSet types tagged with ``std.AgentSkillTag``:
                       top: [my_module]
                 ```
 
+LLM Call Interface (Server Mode)
+================================
+
+When running inside an LLM-driven ``std.Prompt`` task, the ``dfm`` command
+automatically connects to the parent DFM session via a Unix socket server.
+This enables LLMs to execute tasks that share resources with the parent session.
+
+How It Works
+------------
+
+1. When ``dfm run`` starts, a command server is created on a Unix socket
+2. The socket path is set in ``DFM_SERVER_SOCKET`` environment variable
+3. Child processes (like LLM assistants) detect this variable
+4. The ``dfm`` command runs in client mode, forwarding requests to the server
+5. Tasks execute within the parent session's context
+
+Benefits
+--------
+
+* **Resource Sharing**: Respects parent session's parallelism limits (``-j``)
+* **State Consistency**: Sees outputs from tasks already completed in the session
+* **Cache Sharing**: Uses the same memento cache for incremental builds
+* **Unified Logging**: All task output appears in the parent session's logs
+
+Commands Available in Server Mode
+---------------------------------
+
+When ``DFM_SERVER_SOCKET`` is set, the following commands work:
+
+.. code-block:: bash
+
+    # Execute tasks via parent session
+    dfm run task1 task2
+    dfm run task1 -D param=value
+    dfm run task1 --timeout 300
+
+    # Query project state
+    dfm show tasks
+    dfm show task my_project.build
+    dfm context --json
+
+    # Validate configuration
+    dfm validate
+
+    # Health check
+    dfm ping
+
+Example: LLM Generating and Compiling RTL
+-----------------------------------------
+
+When an LLM running inside a ``std.Prompt`` task needs to compile generated code:
+
+.. code-block:: bash
+
+    # 1. LLM creates RTL files
+    cat > counter.sv << 'EOF'
+    module counter(input clk, rst_n, output logic [7:0] count);
+      always_ff @(posedge clk or negedge rst_n)
+        if (!rst_n) count <= 0;
+        else count <= count + 1;
+    endmodule
+    EOF
+
+    # 2. Run compilation via parent DFM session
+    dfm run hdlsim.vlt.SimImage \
+      -D hdlsim.vlt.SimImage.top=counter
+
+    # 3. Output is JSON with status, outputs, and markers
+    # {"status": 0, "outputs": [...], "markers": []}
+
+JSON Response Format
+--------------------
+
+All server mode commands return JSON responses:
+
+**Success Response:**
+
+.. code-block:: json
+
+    {
+      "status": 0,
+      "outputs": [
+        {
+          "task": "hdlsim.vlt.SimImage",
+          "changed": true,
+          "output": [
+            {
+              "type": "hdlsim.SimImage",
+              "exe_path": "/path/to/rundir/Vtop"
+            }
+          ]
+        }
+      ],
+      "markers": []
+    }
+
+**Error Response:**
+
+.. code-block:: json
+
+    {
+      "status": 1,
+      "outputs": [],
+      "markers": [
+        {
+          "task": "hdlsim.vlt.SimImage",
+          "msg": "Compilation failed: syntax error",
+          "severity": "error"
+        }
+      ]
+    }
+
 Agent-Friendly Discovery
 ========================
 
@@ -168,7 +281,33 @@ The ``dfm show`` commands support ``--json`` output for programmatic consumption
     # List available skills
     dfm show skills --json
 
+    # Get full project context
+    dfm context --json
+
 This enables agents to query DFM metadata and construct correct configurations.
+
+The ``dfm context`` Command
+---------------------------
+
+The ``dfm context`` command provides comprehensive project information in a
+single JSON output, ideal for LLM consumption:
+
+.. code-block:: bash
+
+    $ dfm context --json
+    {
+      "project": {
+        "name": "my_project",
+        "root_dir": "/path/to/project",
+        "rundir": "/path/to/rundir"
+      },
+      "tasks": [
+        {"name": "my_project.build", "scope": "root", "uses": "hdlsim.vlt.SimImage"},
+        {"name": "my_project.rtl", "scope": "local", "uses": "std.FileSet"}
+      ],
+      "types": [...],
+      "skills": [...]
+    }
 
 Integration with AI Assistants
 ==============================
@@ -185,6 +324,9 @@ GitHub Copilot CLI
     # Use show commands for discovery
     dfm show skills --json
     dfm show packages --json
+
+    # Inside a Prompt task, execute tasks via server
+    dfm run build_task
 
 ChatGPT / Claude
 ----------------
@@ -254,6 +396,46 @@ Project Initialization
           uses: sim.SimRun
           needs: [build]
 
+Dynamic Code Generation and Verification
+----------------------------------------
+
+**User prompt**: "Generate a counter module and verify it compiles"
+
+**Agent workflow** (inside a Prompt task):
+
+.. code-block:: bash
+
+    # 1. Generate the RTL
+    cat > counter.sv << 'EOF'
+    module counter #(parameter WIDTH=8) (
+      input  logic clk,
+      input  logic rst_n,
+      output logic [WIDTH-1:0] count
+    );
+      always_ff @(posedge clk or negedge rst_n)
+        if (!rst_n) count <= '0;
+        else count <= count + 1'b1;
+    endmodule
+    EOF
+
+    # 2. Run compilation through parent session
+    dfm run hdlsim.vlt.SimImage -D top=counter
+
+    # 3. Check if compilation succeeded
+    # (Parse JSON response)
+
+    # 4. Write result file for Prompt task
+    cat > result.json << 'EOF'
+    {
+      "status": 0,
+      "changed": true,
+      "output": [
+        {"type": "std.FileSet", "basedir": ".", "files": ["counter.sv"]}
+      ],
+      "markers": []
+    }
+    EOF
+
 Adding UVM Support
 ------------------
 
@@ -303,8 +485,9 @@ Best Practices
 1. **Start with help**: Run ``dfm --help`` to get the skill.md path
 2. **Use skills for discovery**: ``dfm show skills`` lists package capabilities
 3. **Use JSON output**: ``--json`` flag enables programmatic parsing
-4. **Verify suggestions**: Always review AI-generated configurations
-5. **Report issues**: If AI consistently misunderstands, the skill docs may need updates
+4. **Use context command**: ``dfm context --json`` provides complete project state
+5. **Verify suggestions**: Always review AI-generated configurations
+6. **Report issues**: If AI consistently misunderstands, the skill docs may need updates
 
 Without proper context, AI assistants may suggest incorrect syntax or non-existent
 features. With the skill.md documentation and ``dfm show skills``, assistants can:
@@ -314,6 +497,7 @@ features. With the skill.md documentation and ``dfm show skills``, assistants ca
 * Help with package organization
 * Debug flow definition issues
 * Propose DFM-specific best practices
+* **Execute tasks dynamically inside Prompt tasks**
 
 Enabling LLM Support in Your Project
 ====================================
