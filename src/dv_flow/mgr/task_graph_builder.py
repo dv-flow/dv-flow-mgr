@@ -119,7 +119,7 @@ class TaskGraphBuilder(object):
             # root: full path to the package file
             # rootdir: directory containing the package file
             # srcdir: directory containing the package file (same as rootdir for root package)
-            pkg_file = self.root_pkg.srcinfo.file
+            pkg_file = self.root_pkg.srcinfo.file if self.root_pkg.srcinfo else None
             self._eval.set("root", pkg_file)
             self._eval.set("rootdir", self.root_pkg.basedir)
             self._eval.set("srcdir", self.root_pkg.basedir)
