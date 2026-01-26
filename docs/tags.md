@@ -267,7 +267,7 @@ Tags are stored as Type instances on Task and Package objects:
 ```python
 from dv_flow.mgr import PackageLoader
 
-pkg = PackageLoader().load("flow.dv")
+pkg = PackageLoader().load("flow.yaml")
 task = pkg.task_m["myproject.build"]
 
 # Access tags

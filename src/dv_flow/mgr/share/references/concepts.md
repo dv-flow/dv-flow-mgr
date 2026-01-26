@@ -113,8 +113,8 @@ package:
           value: true
   
   fragments:               # Split package across files
-    - src/rtl/flow.dv
-    - src/tb/flow.dv
+    - src/rtl/flow.yaml
+    - src/tb/flow.yaml
 ```
 
 ### Package Parameters
@@ -346,12 +346,12 @@ Split large packages across multiple files:
 package:
   name: big_project
   fragments:
-    - src/rtl/flow.dv
-    - src/tb/flow.dv
+    - src/rtl/flow.yaml
+    - src/tb/flow.yaml
 ```
 
 ```yaml
-# src/rtl/flow.dv
+# src/rtl/flow.yaml
 fragment:
   tasks:
     - name: rtl_sources

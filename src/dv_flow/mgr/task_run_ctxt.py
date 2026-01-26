@@ -1,16 +1,31 @@
 import asyncio
 import dataclasses as dc
-from pydantic import BaseModel
-import pydantic.dataclasses as pdc
+from pydantic import BaseModel, ConfigDict, Field
 import os
 import logging
-from typing import Dict, List, TYPE_CHECKING, Union
+from typing import Callable, Dict, List, Optional, TYPE_CHECKING, Union
 from .task_data import TaskMarker, SeverityE, TaskMarkerLoc, TaskDataOutput
 from .task_node_ctxt import TaskNodeCtxt
 
 class ExecInfo(BaseModel):
-    cmd : List[str] = pdc.Field(default_factory=list)
-    status : int = pdc.Field(default=0)
+    cmd : List[str] = Field(default_factory=list)
+    status : int = Field(default=0)
+
+class ExecCmd(BaseModel):
+    """Describes a command to be executed by exec_parallel.
+    
+    Attributes:
+        cmd: List of command arguments (e.g., ['ls', '-la'])
+        logfile: Optional log file name for command output
+        cwd: Optional working directory (defaults to task rundir)
+        env: Optional environment variables (defaults to task env)
+    """
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    cmd : List[str] = Field(default_factory=list)
+    logfile : Optional[str] = Field(default=None)
+    cwd : Optional[str] = Field(default=None)
+    env : Optional[Dict[str, str]] = Field(default=None)
 
 if TYPE_CHECKING:
     from .task_runner import TaskRunner
@@ -55,9 +70,68 @@ class TaskRunCtxt(object):
             raise e
         return item
     
-#    async def exec_group(self,
-#                         cmd_list : List[Union[]] )
+    async def exec_parallel(self, 
+                            cmds: List[ExecCmd],
+                            logfilters: Dict[int, callable] = None) -> List[int]:
+        """
+        Execute multiple commands in parallel, subject to nproc limits.
         
+        Each command runs independently, respecting the exec_semaphore
+        concurrency limits. Returns an array of status codes corresponding
+        to each command in the input array.
+        
+        Args:
+            cmds: List of ExecCmd objects describing commands to run
+            logfilters: Optional dict mapping command index to logfilter callable
+        
+        Returns:
+            List of integer status codes, one per command in same order as input
+            
+        Example:
+        
+        .. code-block:: python
+        
+            from dv_flow.mgr.task_run_ctxt import ExecCmd
+            
+            cmds = [
+                ExecCmd(cmd=['gcc', '-c', 'file1.c'], logfile='compile1.log'),
+                ExecCmd(cmd=['gcc', '-c', 'file2.c'], logfile='compile2.log'),
+                ExecCmd(cmd=['gcc', '-c', 'file3.c'], logfile='compile3.log'),
+            ]
+            statuses = await runner.exec_parallel(cmds)
+            # statuses[0] = exit code for file1.c compile
+            # statuses[1] = exit code for file2.c compile
+            # statuses[2] = exit code for file3.c compile
+        """
+        if logfilters is None:
+            logfilters = {}
+        
+        async def run_one(index: int, cmd_desc: ExecCmd) -> int:
+            """Run a single command with semaphore gating"""
+            return await self.exec(
+                cmd=cmd_desc.cmd,
+                logfile=cmd_desc.logfile,
+                logfilter=logfilters.get(index),
+                cwd=cmd_desc.cwd,
+                env=cmd_desc.env
+            )
+        
+        # Create tasks for all commands
+        tasks = [run_one(i, cmd) for i, cmd in enumerate(cmds)]
+        
+        # Execute all in parallel (semaphore inside exec() gates actual process execution)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Convert exceptions to error status and log
+        statuses = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                self.error("Command %d failed with exception: %s" % (i, str(result)))
+                statuses.append(-1)
+            else:
+                statuses.append(result)
+        
+        return statuses
 
     async def exec(self, 
                    cmd : List[str],

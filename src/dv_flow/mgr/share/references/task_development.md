@@ -40,7 +40,7 @@ async def MyTask(runner, input) -> TaskDataResult:
 ```
 
 ```yaml
-# flow.dv
+# flow.yaml
 package:
   name: my_package
   
@@ -128,6 +128,37 @@ async def CompileTask(runner, input) -> TaskDataResult:
     
     return TaskDataResult(status=status, changed=(status == 0))
 ```
+
+### Executing Multiple Commands in Parallel
+
+Use `runner.exec_parallel()` to execute multiple commands concurrently, 
+respecting the configured nproc limits:
+
+```python
+from dv_flow.mgr import ExecCmd
+
+async def ParallelCompileTask(runner, input) -> TaskDataResult:
+    # Define commands to run in parallel
+    cmds = [
+        ExecCmd(cmd=["gcc", "-c", "file1.c", "-o", "file1.o"], logfile="compile1.log"),
+        ExecCmd(cmd=["gcc", "-c", "file2.c", "-o", "file2.o"], logfile="compile2.log"),
+        ExecCmd(cmd=["gcc", "-c", "file3.c", "-o", "file3.o"], logfile="compile3.log"),
+    ]
+    
+    # Execute all commands in parallel (subject to nproc limits)
+    statuses = await runner.exec_parallel(cmds)
+    
+    # statuses is a list of exit codes in the same order as cmds
+    failed = any(s != 0 for s in statuses)
+    
+    return TaskDataResult(status=1 if failed else 0, changed=True)
+```
+
+The `ExecCmd` class describes each command:
+- `cmd`: List of command arguments
+- `logfile`: Optional log file name for output
+- `cwd`: Optional working directory (defaults to task rundir)
+- `env`: Optional environment variables dict
 
 ### Processing Input Filesets
 
@@ -226,7 +257,7 @@ my-dv-flow-plugin/
 │   └── my_flow_plugin/
 │       ├── __init__.py
 │       ├── __ext__.py          # Plugin entry point
-│       ├── flow.dv             # Package definition
+│       ├── flow.yaml             # Package definition
 │       └── tasks.py            # Task implementations
 ```
 
@@ -256,16 +287,16 @@ my_plugin = "my_flow_plugin.__ext__"
 import os
 
 def dvfm_packages():
-    """Return mapping of package names to flow.dv paths."""
+    """Return mapping of package names to flow.yaml paths."""
     pkg_dir = os.path.dirname(os.path.abspath(__file__))
     return {
-        'my_tool': os.path.join(pkg_dir, "flow.dv"),
+        'my_tool': os.path.join(pkg_dir, "flow.yaml"),
         # Can register multiple packages
-        'my_tool.extra': os.path.join(pkg_dir, "extra_flow.dv"),
+        'my_tool.extra': os.path.join(pkg_dir, "extra_flow.yaml"),
     }
 ```
 
-### flow.dv (Package Definition)
+### flow.yaml (Package Definition)
 
 ```yaml
 package:
@@ -307,7 +338,7 @@ package:
 ### Concrete Implementation Package
 
 ```yaml
-# vlt_flow.dv - Verilator-specific implementation
+# vlt_flow.yaml - Verilator-specific implementation
 package:
   name: my_tool.vlt
   
