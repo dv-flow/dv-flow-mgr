@@ -156,6 +156,28 @@ For comprehensive documentation, see the following reference files:
 - [Standard Library](references/stdlib.md) - Built-in std.* tasks
 - [CLI Reference](references/cli.md) - Command line interface
 - [Advanced Patterns](references/advanced.md) - Complex workflows and optimization
+- [Flow Schema](dv.flow.schema.json) - JSON Schema for flow.yaml validation
+
+## Flow File Format
+
+DV Flow uses YAML files (`flow.yaml` or `flow.dv`) to define workflows. The file structure is validated against a JSON Schema located at `dv.flow.schema.json`.
+
+### Schema Validation
+
+To validate your flow file or generate the schema:
+
+```bash
+# Get the JSON Schema
+dfm util schema > flow.schema.json
+
+# Use with YAML validators (e.g., VS Code YAML extension)
+# Add to your flow.yaml:
+# yaml-language-server: $schema=./dv.flow.schema.json
+```
+
+The schema defines two root types:
+- **package** - Full project definition with tasks, types, configs, and imports
+- **fragment** - Reusable partial definition for inclusion in packages
 
 ## Core Concepts Summary
 

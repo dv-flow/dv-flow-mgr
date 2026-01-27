@@ -25,10 +25,18 @@ from .param_def import ParamDef
 from .srcinfo import SrcInfo
 
 class TypeDef(BaseModel):
-    name : str
-    uses : str = None
-    doc : str = None
-    params : Dict[str, Union[str, ParamDef]] = Field(alias="with", default_factory=dict)
+    name : str = Field(
+        description="Name of the data type")
+    uses : str = Field(
+        default=None,
+        description="Base type to inherit from. Supports type extension/specialization")
+    doc : str = Field(
+        default=None,
+        description="Documentation for this type definition")
+    params : Dict[str, Union[str, ParamDef]] = Field(
+        alias="with", 
+        default_factory=dict,
+        description="Parameters for this type. Can be simple values or full parameter definitions")
     tags : List[Union[str, Dict[str, Any]]] = Field(
         default_factory=list,
         description="Tags as type references with optional parameter overrides")

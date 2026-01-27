@@ -37,6 +37,7 @@ class TaskSpec(object):
 class NeedSpec(object):
     name : str
     block : bool = False
+    srcinfo : SrcInfo = None
 
 class RundirE(enum.Enum):
     Unique = "unique"
@@ -52,18 +53,25 @@ class PassthroughE(enum.Enum):
     Unused = "unused"
 
 class GenerateSpec(BaseModel):
-    shell: Union[str, None] = dc.Field(default=None)
-    run: str
+    shell: Union[str, None] = dc.Field(
+        default=None,
+        description="Shell to use for running the generate command. Defaults to 'bash'")
+    run: str = dc.Field(
+        description="Shell command to execute. Must output valid YAML task definitions to stdout")
 
 class StrategyDef(BaseModel):
-    chain: Union[bool, None] = dc.Field(default=None)
-    generate: Union[GenerateSpec, None] = dc.Field(default=None)
+    chain: Union[bool, None] = dc.Field(
+        default=None,
+        description="Enable chain strategy: run body tasks sequentially with each consuming output of previous task")
+    generate: Union[GenerateSpec, None] = dc.Field(
+        default=None,
+        description="Enable generate strategy: dynamically create tasks by running a shell command that outputs task definitions")
     matrix : Union[Dict[str,List[Any]],None] = dc.Field(
         default=None,
-        description="Matrix of parameter values to explore")
+        description="Matrix of parameter values to explore. Creates one task instance per combination of values")
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
-        description="Body tasks for matrix strategy")
+        description="Body tasks for strategy execution. Used with chain and matrix strategies")
 
 class CacheDef(BaseModel):
     """Cache configuration for a task"""

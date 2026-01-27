@@ -44,14 +44,31 @@ class VisibilityE(enum.Enum):
     EXPORT = "export"
 
 class ParamDef(BaseModel):
-    doc : str = None
-    desc : str = None
-    type : Union[str, 'ComplexType'] = None
-#    derived : bool = Field(default=False)
-    value : Union[Any, None] = None
-    append : Union[Any, None] = None
-    prepend : Union[Any, None] = None
-    path_append : Union[Any, None] = Field(alias="path-append", default=None)
-    path_prepend : Union[Any, None] = Field(alias="path-prepend", default=None)
+    doc : str = Field(
+        default=None,
+        description="Full documentation for this parameter")
+    desc : str = Field(
+        default=None,
+        description="Short description of this parameter")
+    type : Union[str, 'ComplexType'] = Field(
+        default=None,
+        description="Parameter type (e.g., 'str', 'int', 'bool', 'list', 'map', or a complex type definition)")
+    value : Union[Any, None] = Field(
+        default=None,
+        description="Default value for this parameter")
+    append : Union[Any, None] = Field(
+        default=None,
+        description="Value to append to list-type parameters")
+    prepend : Union[Any, None] = Field(
+        default=None,
+        description="Value to prepend to list-type parameters")
+    path_append : Union[Any, None] = Field(
+        alias="path-append", 
+        default=None,
+        description="Path to append to path-type parameters (OS-specific separator)")
+    path_prepend : Union[Any, None] = Field(
+        alias="path-prepend", 
+        default=None,
+        description="Path to prepend to path-type parameters (OS-specific separator)")
     srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
 

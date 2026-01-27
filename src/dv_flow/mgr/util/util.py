@@ -46,8 +46,28 @@ def parse_parameter_overrides(def_list):
             ov[name] = value
     return ov
 
+def _is_package_file(fpath: str) -> bool:
+    """Check if a flow file contains a 'package' key (not a fragment)."""
+    try:
+        if fpath.endswith(".toml"):
+            import tomllib
+            with open(fpath, "rb") as fp:
+                doc = tomllib.load(fp)
+        else:
+            with open(fpath, "r") as fp:
+                doc = yaml.safe_load(fp)
+        return doc is not None and "package" in doc
+    except Exception:
+        return False
+
+
 def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None):
-    """Locates the project's flow spec and returns the PackageDef"""
+    """Locates the project's flow spec and returns the PackageDef.
+    
+    Searches for a flow file containing a 'package' key. Fragment files
+    (those with 'fragment' instead of 'package') are skipped, and the
+    search continues up the directory tree.
+    """
 
     _log.debug("--> loadProjPkgDef %s" % path)
 
@@ -65,15 +85,19 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
                 _log.debug("Trying path %s (%s)" % (
                     fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
                 if os.path.exists(fpath):
-                    rootfile = fpath
-                    break
+                    # Check if this is actually a package file, not a fragment
+                    if _is_package_file(fpath):
+                        rootfile = fpath
+                        break
+                    else:
+                        _log.debug("Skipping %s (fragment file, not a package)" % fpath)
             if rootfile is not None:
                 break
             else:
                 dir = os.path.dirname(dir)
 
         if rootfile is None:
-            _log.debug("Failed to find flow.dv/flow.yaml/flow.toml")
+            _log.debug("Failed to find flow.dv/flow.yaml/flow.toml with 'package' key")
             if listener:
                 listener(TaskMarker(
                     msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,

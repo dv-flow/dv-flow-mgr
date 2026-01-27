@@ -29,10 +29,19 @@ from .task_def import TaskDef
 from .type_def import TypeDef
 
 class FragmentDef(BaseModel):
-    tasks : List[TaskDef] = dc.Field(default_factory=list)
-    imports : List[Union[str,PackageImportSpec]] = dc.Field(default_factory=list, alias="imports")
-    fragments: List[str] = dc.Field(default_factory=list)
-    types : List[TypeDef] = dc.Field(default_factory=list)
+    tasks : List[TaskDef] = dc.Field(
+        default_factory=list,
+        description="List of tasks defined in this fragment")
+    imports : List[Union[str,PackageImportSpec]] = dc.Field(
+        default_factory=list, 
+        alias="imports",
+        description="List of packages to import. Can be package names (strings) or import specifications")
+    fragments: List[str] = dc.Field(
+        default_factory=list,
+        description="List of nested fragment file paths to include")
+    types : List[TypeDef] = dc.Field(
+        default_factory=list,
+        description="List of data type definitions for this fragment")
     srcinfo : SrcInfo = dc.Field(default=None)
 
     _basedir : str = None

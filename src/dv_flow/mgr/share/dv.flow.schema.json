@@ -1,0 +1,1047 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dv-flow.github.io/dv.flow.schema.json",
+  "title": "DV Flow specification schema",
+  "description": "JSON Schema for DV Flow YAML workflow definitions",
+  "type": "object",
+  "oneOf": [
+    {
+      "properties": {
+        "package": {
+          "$ref": "#/defs/PackageDef",
+          "title": "Package Definition",
+          "description": "Root package definition for a DV Flow project"
+        }
+      },
+      "required": [
+        "package"
+      ]
+    },
+    {
+      "properties": {
+        "fragment": {
+          "$ref": "#/defs/FragmentDef",
+          "title": "Fragment Definition",
+          "description": "Reusable fragment containing tasks, types, and imports"
+        }
+      },
+      "required": [
+        "fragment"
+      ]
+    }
+  ],
+  "defs": {
+    "CacheDef": {
+      "additionalProperties": false,
+      "description": "Cache configuration for a task",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Whether caching is enabled for this task",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "hash": {
+          "description": "Extra hash expressions to include in cache key",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hash",
+          "type": "array"
+        },
+        "compression": {
+          "$ref": "#/defs/CompressionType",
+          "default": "no",
+          "description": "Compression type for cached artifacts"
+        }
+      },
+      "title": "CacheDef",
+      "type": "object",
+      "$$target": "#/defs/CacheDef"
+    },
+    "ComplexType": {
+      "properties": {
+        "list": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/ListType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "map": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/MapType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "ComplexType",
+      "type": "object",
+      "$$target": "#/defs/ComplexType"
+    },
+    "CompressionType": {
+      "description": "Compression types for cache artifacts",
+      "enum": [
+        "no",
+        "yes",
+        "gzip",
+        "bzip2"
+      ],
+      "title": "CompressionType",
+      "type": "string",
+      "$$target": "#/defs/CompressionType"
+    },
+    "ConfigDef": {
+      "properties": {
+        "name": {
+          "description": "Name of the configuration",
+          "title": "Name",
+          "type": "string"
+        },
+        "with": {
+          "description": "Configuration parameters map",
+          "items": {
+            "$ref": "#/defs/ParamDef"
+          },
+          "title": "With",
+          "type": "array"
+        },
+        "uses": {
+          "default": null,
+          "description": "Name of the configuration to use as a base",
+          "title": "Uses",
+          "type": "string"
+        },
+        "overrides": {
+          "description": "List of package overrides",
+          "items": {
+            "$ref": "#/defs/OverrideDef"
+          },
+          "title": "Overrides",
+          "type": "array"
+        },
+        "extensions": {
+          "description": "List of extensions to apply",
+          "items": {
+            "$ref": "#/defs/ExtendDef"
+          },
+          "title": "Extensions",
+          "type": "array"
+        },
+        "imports": {
+          "description": "List of packages to import for this config",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/defs/PackageImportSpec"
+              }
+            ]
+          },
+          "title": "Imports",
+          "type": "array"
+        },
+        "fragments": {
+          "description": "List of fragments to apply for this config",
+          "items": {
+            "type": "string"
+          },
+          "title": "Fragments",
+          "type": "array"
+        },
+        "tasks": {
+          "description": "List of tasks defined/overridden by this config",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "types": {
+          "description": "List of types defined/overridden by this config",
+          "items": {
+            "$ref": "#/defs/TypeDef"
+          },
+          "title": "Types",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ConfigDef",
+      "type": "object",
+      "$$target": "#/defs/ConfigDef"
+    },
+    "ConsumesE": {
+      "enum": [
+        "none",
+        "all"
+      ],
+      "title": "ConsumesE",
+      "type": "string",
+      "$$target": "#/defs/ConsumesE"
+    },
+    "ExtendDef": {
+      "description": "Extension definition",
+      "properties": {
+        "task": {
+          "description": "Name of the task to extend",
+          "title": "Task",
+          "type": "string"
+        },
+        "with": {
+          "description": "Parameter extensions to apply to the task",
+          "items": {
+            "$ref": "#/defs/ParamDef"
+          },
+          "title": "With",
+          "type": "array"
+        },
+        "uses": {
+          "default": null,
+          "description": "Name of the extension to use as a base",
+          "title": "Uses",
+          "type": "string"
+        },
+        "needs": {
+          "description": "List of tasks to depend on",
+          "items": {
+            "type": "string"
+          },
+          "title": "Needs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task"
+      ],
+      "title": "ExtendDef",
+      "type": "object",
+      "$$target": "#/defs/ExtendDef"
+    },
+    "FragmentDef": {
+      "properties": {
+        "tasks": {
+          "description": "List of tasks defined in this fragment",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "imports": {
+          "description": "List of packages to import. Can be package names (strings) or import specifications",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/defs/PackageImportSpec"
+              }
+            ]
+          },
+          "title": "Imports",
+          "type": "array"
+        },
+        "fragments": {
+          "description": "List of nested fragment file paths to include",
+          "items": {
+            "type": "string"
+          },
+          "title": "Fragments",
+          "type": "array"
+        },
+        "types": {
+          "description": "List of data type definitions for this fragment",
+          "items": {
+            "$ref": "#/defs/TypeDef"
+          },
+          "title": "Types",
+          "type": "array"
+        }
+      },
+      "title": "FragmentDef",
+      "type": "object",
+      "$$target": "#/defs/FragmentDef"
+    },
+    "GenerateSpec": {
+      "properties": {
+        "shell": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shell to use for running the generate command. Defaults to 'bash'",
+          "title": "Shell"
+        },
+        "run": {
+          "description": "Shell command to execute. Must output valid YAML task definitions to stdout",
+          "title": "Run",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "title": "GenerateSpec",
+      "type": "object",
+      "$$target": "#/defs/GenerateSpec"
+    },
+    "ListType": {
+      "properties": {
+        "item": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {}
+          ],
+          "title": "Item"
+        }
+      },
+      "required": [
+        "item"
+      ],
+      "title": "ListType",
+      "type": "object",
+      "$$target": "#/defs/ListType"
+    },
+    "MapType": {
+      "properties": {
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {}
+          ],
+          "title": "Key"
+        },
+        "val": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {}
+          ],
+          "title": "Val"
+        }
+      },
+      "required": [
+        "key",
+        "val"
+      ],
+      "title": "MapType",
+      "type": "object",
+      "$$target": "#/defs/MapType"
+    },
+    "OverrideDef": {
+      "description": "Override definition",
+      "properties": {
+        "override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Task or package to override",
+          "title": "Override"
+        },
+        "with": {
+          "description": "Override to use",
+          "title": "With",
+          "type": "string"
+        }
+      },
+      "required": [
+        "override",
+        "with"
+      ],
+      "title": "OverrideDef",
+      "type": "object",
+      "$$target": "#/defs/OverrideDef"
+    },
+    "PackageDef": {
+      "properties": {
+        "name": {
+          "description": "Name of the package",
+          "title": "Name",
+          "type": "string"
+        },
+        "desc": {
+          "default": null,
+          "description": "Short description of the package",
+          "title": "Desc",
+          "type": "string"
+        },
+        "type": {
+          "description": "List of data types defined by this package",
+          "items": {
+            "$ref": "#/defs/PackageSpec"
+          },
+          "title": "Type",
+          "type": "array"
+        },
+        "tasks": {
+          "description": "List of tasks defined in the package",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "imports": {
+          "description": "List of packages to import. Can be package names (strings) or import specifications with configuration",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/defs/PackageImportSpec"
+              }
+            ]
+          },
+          "title": "Imports",
+          "type": "array"
+        },
+        "overrides": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Parameter and package overrides. Maps override targets to replacement values",
+          "title": "Overrides",
+          "type": "object"
+        },
+        "fragments": {
+          "description": "List of fragment file paths to include in this package",
+          "items": {
+            "type": "string"
+          },
+          "title": "Fragments",
+          "type": "array"
+        },
+        "types": {
+          "description": "List of data type definitions for this package",
+          "items": {
+            "$ref": "#/defs/TypeDef"
+          },
+          "title": "Types",
+          "type": "array"
+        },
+        "uses": {
+          "default": null,
+          "description": "Name of a base package to inherit from. This package extends the base package's tasks and types",
+          "title": "Uses",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "$ref": "#/defs/ParamDef"
+              }
+            ]
+          },
+          "description": "Package parameters",
+          "title": "With",
+          "type": "object"
+        },
+        "configs": {
+          "description": "List of package configurations",
+          "items": {
+            "$ref": "#/defs/ConfigDef"
+          },
+          "title": "Configs",
+          "type": "array"
+        },
+        "tags": {
+          "description": "Tags as type references with optional parameter overrides",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PackageDef",
+      "type": "object",
+      "$$target": "#/defs/PackageDef"
+    },
+    "PackageImportSpec": {
+      "properties": {
+        "from": {
+          "default": null,
+          "description": "Package identifier or file path to import",
+          "title": "From",
+          "type": "string"
+        },
+        "as": {
+          "default": null,
+          "description": "Alias name for the imported package",
+          "title": "As",
+          "type": "string"
+        },
+        "config": {
+          "default": null,
+          "description": "Configuration name to apply when importing",
+          "title": "Config",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": true,
+          "description": "Parameter overrides to apply to the imported package",
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "title": "PackageImportSpec",
+      "type": "object",
+      "$$target": "#/defs/PackageImportSpec"
+    },
+    "ParamDef": {
+      "properties": {
+        "doc": {
+          "default": null,
+          "description": "Full documentation for this parameter",
+          "title": "Doc",
+          "type": "string"
+        },
+        "desc": {
+          "default": null,
+          "description": "Short description of this parameter",
+          "title": "Desc",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/defs/ComplexType"
+            }
+          ],
+          "default": null,
+          "description": "Parameter type (e.g., 'str', 'int', 'bool', 'list', 'map', or a complex type definition)",
+          "title": "Type"
+        },
+        "value": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default value for this parameter",
+          "title": "Value"
+        },
+        "append": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Value to append to list-type parameters",
+          "title": "Append"
+        },
+        "prepend": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Value to prepend to list-type parameters",
+          "title": "Prepend"
+        },
+        "path-append": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to append to path-type parameters (OS-specific separator)",
+          "title": "Path-Append"
+        },
+        "path-prepend": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to prepend to path-type parameters (OS-specific separator)",
+          "title": "Path-Prepend"
+        }
+      },
+      "title": "ParamDef",
+      "type": "object",
+      "$$target": "#/defs/ParamDef"
+    },
+    "PassthroughE": {
+      "enum": [
+        "none",
+        "all",
+        "unused"
+      ],
+      "title": "PassthroughE",
+      "type": "string",
+      "$$target": "#/defs/PassthroughE"
+    },
+    "RundirE": {
+      "enum": [
+        "unique",
+        "inherit"
+      ],
+      "title": "RundirE",
+      "type": "string",
+      "$$target": "#/defs/RundirE"
+    },
+    "StrategyDef": {
+      "properties": {
+        "chain": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable chain strategy: run body tasks sequentially with each consuming output of previous task",
+          "title": "Chain"
+        },
+        "generate": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/GenerateSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable generate strategy: dynamically create tasks by running a shell command that outputs task definitions"
+        },
+        "matrix": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {},
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Matrix of parameter values to explore. Creates one task instance per combination of values",
+          "title": "Matrix"
+        },
+        "body": {
+          "description": "Body tasks for strategy execution. Used with chain and matrix strategies",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Body",
+          "type": "array"
+        }
+      },
+      "title": "StrategyDef",
+      "type": "object",
+      "$$target": "#/defs/StrategyDef"
+    },
+    "TaskDef": {
+      "additionalProperties": false,
+      "description": "Holds definition information (ie the YAML view) for a task",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the task",
+          "title": "Task Name"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the task (marked as root scope)",
+          "title": "Root Task Name"
+        },
+        "export": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the task (marked as export scope)",
+          "title": "Export Task Name"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the task (marked as local scope)",
+          "title": "Local Task Name"
+        },
+        "override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the task to override",
+          "title": "Overide Name"
+        },
+        "uses": {
+          "default": null,
+          "description": "Task from which this task is derived",
+          "title": "Base type",
+          "type": "string"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Visibility scope: 'root' (executable), 'export' (visible outside package), 'local' (fragment-only)",
+          "title": "Task visibility scope"
+        },
+        "body": {
+          "description": "Sub-tasks",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Body",
+          "type": "array"
+        },
+        "iff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {}
+          ],
+          "default": null,
+          "description": "Condition that must be true for this task to run",
+          "title": "Task enable condition"
+        },
+        "pytask": {
+          "default": null,
+          "description": "Python-based implementation (deprecated)",
+          "title": "Pytask",
+          "type": "string"
+        },
+        "run": {
+          "default": null,
+          "description": "Shell-based implementation",
+          "title": "Run",
+          "type": "string"
+        },
+        "shell": {
+          "default": "bash",
+          "description": "Shell to use for shell-based implementation",
+          "title": "Shell",
+          "type": "string"
+        },
+        "strategy": {
+          "$ref": "#/defs/StrategyDef",
+          "default": null
+        },
+        "desc": {
+          "default": "",
+          "description": "Short description of the task's purpose",
+          "title": "Task description",
+          "type": "string"
+        },
+        "doc": {
+          "default": "",
+          "description": "Full documentation of the task",
+          "title": "Task documentation",
+          "type": "string"
+        },
+        "needs": {
+          "description": "List of tasks that this task depends on",
+          "items": {
+            "type": "string"
+          },
+          "title": "Needs",
+          "type": "array"
+        },
+        "feeds": {
+          "description": "List of tasks that depend on this task (inverse of needs)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Feeds",
+          "type": "array"
+        },
+        "with": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "description": "Parameters for the task",
+          "title": "With",
+          "type": "object"
+        },
+        "rundir": {
+          "$ref": "#/defs/RundirE",
+          "default": "unique",
+          "description": "Specifies handling of this tasks's run directory"
+        },
+        "passthrough": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/PassthroughE"
+            },
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies whether this task should pass its inputs to its output",
+          "title": "Passthrough"
+        },
+        "consumes": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/ConsumesE"
+            },
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies matching patterns for parameter sets that this task consumes",
+          "title": "Consumes"
+        },
+        "uptodate": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Up-to-date check: false=always run, string=Python method, None=use default check",
+          "title": "Uptodate"
+        },
+        "cache": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/CacheDef"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Cache configuration. True=enabled with defaults, False=disabled, CacheDef=custom config",
+          "title": "Cache"
+        },
+        "tags": {
+          "description": "Tags as type references with optional parameter overrides",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "title": "TaskDef",
+      "type": "object",
+      "$$target": "#/defs/TaskDef"
+    },
+    "TypeDef": {
+      "properties": {
+        "name": {
+          "description": "Name of the data type",
+          "title": "Name",
+          "type": "string"
+        },
+        "uses": {
+          "default": null,
+          "description": "Base type to inherit from. Supports type extension/specialization",
+          "title": "Uses",
+          "type": "string"
+        },
+        "doc": {
+          "default": null,
+          "description": "Documentation for this type definition",
+          "title": "Doc",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/defs/ParamDef"
+              }
+            ]
+          },
+          "description": "Parameters for this type. Can be simple values or full parameter definitions",
+          "title": "With",
+          "type": "object"
+        },
+        "tags": {
+          "description": "Tags as type references with optional parameter overrides",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "TypeDef",
+      "type": "object",
+      "$$target": "#/defs/TypeDef"
+    }
+  }
+}

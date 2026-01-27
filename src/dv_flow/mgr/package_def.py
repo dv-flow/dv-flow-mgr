@@ -49,22 +49,27 @@ class PackageDef(BaseModel):
     desc : str = Field(
         default=None,
         description="Short description of the package")
-    type : List[PackageSpec] = Field(default_factory=list)
+    type : List[PackageSpec] = Field(
+        default_factory=list,
+        description="List of data types defined by this package")
     tasks : List[TaskDef] = Field(
         default_factory=list,
         description="List of tasks defined in the package")
     imports : List[Union[str,PackageImportSpec]] = Field(
         default_factory=list,
-        description="List of packages to import")
-    overrides : Dict[str, str] = Field(default_factory=dict,
-        description="Overrides for packages and parameters")
+        description="List of packages to import. Can be package names (strings) or import specifications with configuration")
+    overrides : Dict[str, str] = Field(
+        default_factory=dict,
+        description="Parameter and package overrides. Maps override targets to replacement values")
     fragments: List[str] = Field(
         default_factory=list,
-        description="List of fragments to include")
-    types : List[TypeDef] = Field(default_factory=list)
+        description="List of fragment file paths to include in this package")
+    types : List[TypeDef] = Field(
+        default_factory=list,
+        description="List of data type definitions for this package")
     uses : str = Field(
         default=None,
-        description="Name of the package to use as a base")
+        description="Name of a base package to inherit from. This package extends the base package's tasks and types")
     params : Dict[str,Union[str,list,ParamDef]] = Field(
         default_factory=dict, alias="with",
         description="Package parameters")

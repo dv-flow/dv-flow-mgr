@@ -10,10 +10,14 @@ def get_parser():
 
     subparsers = parser.add_subparsers(required=True)
 
-    schema = subparsers.add_parser('schema', help='Write schema')
+    schema = subparsers.add_parser('schema', 
+                                   help='Output JSON schema for DV Flow definitions')
     schema.add_argument("-o", "--output", 
-                        help="Destination file", 
+                        help="Destination file (default: stdout)", 
                         default="-")
+    schema.add_argument("--generate",
+                        action="store_true",
+                        help="Generate schema from Pydantic models instead of loading canonical schema (development mode)")
     schema.set_defaults(f=CmdSchema())
 
     return parser

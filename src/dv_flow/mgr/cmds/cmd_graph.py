@@ -20,6 +20,8 @@
 #*
 #****************************************************************************
 import asyncio
+import io
+import json
 import os
 import logging
 from typing import ClassVar
@@ -29,6 +31,10 @@ from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_graph_dot_writer import TaskGraphDotWriter
 from .util import get_rootdir
+
+# Markers for programmatic extraction of graph content
+DFM_GRAPH_BEGIN = "<<<DFM_GRAPH_BEGIN>>>"
+DFM_GRAPH_END = "<<<DFM_GRAPH_END>>>"
 
 
 class CmdGraph(object):
@@ -88,9 +94,32 @@ class CmdGraph(object):
             if output is None:
                 output = "-"
 
-            TaskGraphDotWriter(show_params=getattr(args, "show_params", False)).write(
-                t,
-                output
-            )
+            use_json = getattr(args, "json", False)
+            
+            if use_json:
+                # Capture DOT output to string for JSON wrapping
+                dot_buffer = io.StringIO()
+                TaskGraphDotWriter(show_params=getattr(args, "show_params", False)).write(
+                    t,
+                    dot_buffer
+                )
+                dot_content = dot_buffer.getvalue()
+                
+                # Output with markers for easy extraction
+                result = {
+                    "graph": dot_content
+                }
+                json_output = f"{DFM_GRAPH_BEGIN}\n{json.dumps(result)}\n{DFM_GRAPH_END}"
+                
+                if output == "-":
+                    print(json_output)
+                else:
+                    with open(output, 'w') as f:
+                        f.write(json_output)
+            else:
+                TaskGraphDotWriter(show_params=getattr(args, "show_params", False)).write(
+                    t,
+                    output
+                )
 
         return 0

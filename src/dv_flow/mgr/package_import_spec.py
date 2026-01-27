@@ -47,7 +47,19 @@ class PackageSpec(object):
 
 @dc.dataclass
 class PackageImportSpec(object):
-    path : str = dc.Field(default=None, alias="from")
-    alias : str = dc.Field(default=None, alias="as")
-    config : str = dc.Field(default=None, alias="config")
-    params : Dict[str,Any] = dc.Field(default_factory=dict, alias="with")
+    path : str = dc.Field(
+        default=None, 
+        alias="from",
+        json_schema_extra={"description": "Package identifier or file path to import"})
+    alias : str = dc.Field(
+        default=None, 
+        alias="as",
+        json_schema_extra={"description": "Alias name for the imported package"})
+    config : str = dc.Field(
+        default=None, 
+        alias="config",
+        json_schema_extra={"description": "Configuration name to apply when importing"})
+    params : Dict[str,Any] = dc.Field(
+        default_factory=dict, 
+        alias="with",
+        json_schema_extra={"description": "Parameter overrides to apply to the imported package"})

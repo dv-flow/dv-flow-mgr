@@ -19,17 +19,24 @@ class TaskGraphDotWriter(object):
     def write(self, node, filename):
         self._log.debug("--> TaskGraphDotWriter::write")
 
-        if filename == "-":
+        if hasattr(filename, 'write'):
+            # File-like object (e.g., StringIO)
+            self.fp = filename
+            should_close = False
+        elif filename == "-":
             self.fp = sys.stdout
+            should_close = False
         else:
             self.fp = open(filename, "w")
+            should_close = True
         self.println("digraph G {")
         # First, build-out all nodes
         self.build_node(node)
         self.process_needs(node)
         self.println("}")
 
-        self.fp.close()
+        if should_close:
+            self.fp.close()
         self._log.debug("<-- TaskGraphDotWriter::write")
 
     def build_node(self, node):
