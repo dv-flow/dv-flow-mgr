@@ -29,6 +29,11 @@ from .task_def import TaskDef
 from .type_def import TypeDef
 
 class FragmentDef(BaseModel):
+    model_config = {"extra": "forbid"}
+    
+    name : str = dc.Field(
+        default=None,
+        description="Optional name for this fragment. If present, all tasks are prefixed with <package>.<name>.<task>")
     tasks : List[TaskDef] = dc.Field(
         default_factory=list,
         description="List of tasks defined in this fragment")

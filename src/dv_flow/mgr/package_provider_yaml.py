@@ -59,6 +59,7 @@ class PackageProviderYaml(PackageProvider):
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _loading : bool = dc.field(default=False)
+    _fragment_names : Dict[str, str] = dc.field(default_factory=dict)  # Track fragment names -> file
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
     # Shared parser hook that dispatches based on file extension
@@ -660,8 +661,28 @@ class PackageProviderYaml(PackageProvider):
                     basedir = os.path.dirname(file)
                     pkg.fragment_def_l.append(frag)
 
+                    # Check for name collisions
+                    if frag.name is not None:
+                        if frag.name in self._fragment_names:
+                            marker = TaskMarker(
+                                msg=f"Duplicate fragment name '{frag.name}' (previously defined in {self._fragment_names[frag.name]})",
+                                severity=SeverityE.Error,
+                                loc=TaskMarkerLoc(path=file))
+                            loader.marker(marker)
+                        else:
+                            self._fragment_names[frag.name] = file
+
                     self._loadPackageImports(loader, pkg, frag.imports, basedir)
                     self._loadFragments(loader, pkg, frag.fragments, basedir, taskdefs, typedefs)
+                    
+                    # Annotate each task and type with the fragment name
+                    for task in frag.tasks:
+                        if not hasattr(task, '_fragment_name'):
+                            task._fragment_name = frag.name
+                    for typedef in frag.types:
+                        if not hasattr(typedef, '_fragment_name'):
+                            typedef._fragment_name = frag.name
+                    
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
             except pydantic.ValidationError as e:
@@ -710,9 +731,9 @@ class PackageProviderYaml(PackageProvider):
                                 msg=error_msg, 
                                 severity=SeverityE.Error,
                                 loc=TaskMarkerLoc(path=file))
-                        self.marker(marker)
-            else:
-                print("Warning: file %s is not a fragment" % file)
+                        loader.marker(marker)
+        else:
+            print("Warning: file %s is not a fragment" % file)
         loader.popPath()
 
     def _loadTasks(self, 
@@ -725,19 +746,27 @@ class PackageProviderYaml(PackageProvider):
         # Declare first
         tasks = []
         for taskdef in taskdefs:
-            if taskdef.name in pkg.task_m.keys():
-                raise Exception("Duplicate task %s" % taskdef.name)
+            # Build the task name, including fragment name if present
+            if hasattr(taskdef, '_fragment_name') and taskdef._fragment_name is not None:
+                task_name = f"{pkg.name}.{taskdef._fragment_name}.{taskdef.name}"
+            else:
+                task_name = f"{pkg.name}.{taskdef.name}"
+            
+            # Skip duplicate check for override tasks - they're allowed to override existing tasks
+            if not (hasattr(taskdef, 'override') and taskdef.override):
+                if task_name in pkg.task_m.keys():
+                    raise Exception("Duplicate task %s" % task_name)
             
             # TODO: resolve 'needs'
             needs = []
 
             if taskdef.srcinfo is None:
                 raise Exception("null srcinfo")
-            self._log.debug("Create task %s in pkg %s" % (self._getScopeFullname(taskdef.name), pkg.name))
+            self._log.debug("Create task %s in pkg %s" % (task_name, pkg.name))
             desc = taskdef.desc if taskdef.desc is not None else ""
             doc = taskdef.doc if taskdef.doc is not None else ""
             task = Task(
-                name=self._getScopeFullname(taskdef.name),
+                name=task_name,
                 desc=desc,
                 doc=doc,
                 package=pkg,
@@ -757,7 +786,13 @@ class PackageProviderYaml(PackageProvider):
 
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
-            self._pkg_s[-1].add(task, taskdef.name)
+            
+            # Add task to symbol scope with appropriate name
+            if hasattr(taskdef, '_fragment_name') and taskdef._fragment_name is not None:
+                # Add to fragment scope
+                self._pkg_s[-1].add(task, f"{taskdef._fragment_name}.{taskdef.name}")
+            else:
+                self._pkg_s[-1].add(task, taskdef.name)
 
         # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
         for taskdef, task in tasks:
@@ -783,14 +818,25 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("--> _loadTypes")
         types = []
         for td in typedefs:
+            # Build the type name, including fragment name if present
+            if hasattr(td, '_fragment_name') and td._fragment_name is not None:
+                type_name = f"{pkg.name}.{td._fragment_name}.{td.name}"
+            else:
+                type_name = f"{pkg.name}.{td.name}"
+            
             tt = Type(
-                name=self._getScopeFullname(td.name),
+                name=type_name,
                 doc=td.doc,
                 tags=td.tags if td.tags else [],
                 srcinfo=td.srcinfo,
                 typedef=td)
             pkg.type_m[tt.name] = tt
-            self._pkg_s[-1].addType(tt, td.name)
+            
+            # Add type to symbol scope with appropriate name
+            if hasattr(td, '_fragment_name') and td._fragment_name is not None:
+                self._pkg_s[-1].addType(tt, f"{td._fragment_name}.{td.name}")
+            else:
+                self._pkg_s[-1].addType(tt, td.name)
             types.append((td, tt))
         
         # Now, resolve 'uses' and build out
@@ -1182,15 +1228,28 @@ class PackageProviderYaml(PackageProvider):
             if "${{" in need_name:
                 need_name = loader.evalExpr(need_name)
             
+            # If this taskdef is from a fragment and the need is unqualified, 
+            # try to qualify it with the fragment name first
+            fragment_name = getattr(taskdef, '_fragment_name', None)
+            
             if need_name.endswith(".needs"):
                 # Find the original task first
-                nt = self._findTask(need_name[:-len(".needs")], loader)
+                need_base = need_name[:-len(".needs")]
+                # Try fragment-qualified name first if in a fragment
+                if fragment_name and '.' not in need_base:
+                    nt = self._findTask(f"{fragment_name}.{need_base}", loader)
+                if nt is None:
+                    nt = self._findTask(need_base, loader)
                 if nt is None:
                     loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
                 for nn in nt.needs:
                     task.needs.append(nn)
             else:
-                nt = self._findTask(need_name, loader)
+                # Try fragment-qualified name first if in a fragment and need is unqualified
+                if fragment_name and '.' not in need_name:
+                    nt = self._findTask(f"{fragment_name}.{need_name}", loader)
+                if nt is None:
+                    nt = self._findTask(need_name, loader)
             
                 if nt is None:
                     loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
