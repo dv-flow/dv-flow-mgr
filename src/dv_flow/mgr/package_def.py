@@ -44,6 +44,8 @@ class Override(BaseModel):
     override : str = Field(alias="with")
 
 class PackageDef(BaseModel):
+    model_config = {"extra": "forbid"}
+    
     name : str = Field(
         description="Name of the package")
     desc : str = Field(
