@@ -20,7 +20,7 @@ def test_cli_collects_param_overrides_graph_and_show():
     ov_g = parse_parameter_overrides(args_g.param_overrides)
     assert ov_g == {"foo": "bar"}
 
-    args_s = parser.parse_args(["show", "-D", "name=value"])
+    args_s = parser.parse_args(["show", "packages", "-D", "name=value"])
     assert args_s.param_overrides == ["name=value"]
     ov_s = parse_parameter_overrides(args_s.param_overrides)
     assert ov_s == {"name": "value"}
