@@ -114,40 +114,45 @@ Create a file with specified content.
 
 ---
 
-## std.Exec
+## Running Shell Commands
 
-Execute a shell command.
+Execute shell commands by specifying `shell: bash` (or another shell) and providing the command with `run:`.
 
 ### Example
 
 ```yaml
 - name: run_script
-  uses: std.Exec
-  with:
-    command: "./scripts/process.sh"
-    shell: bash
+  shell: bash
+  run: ./scripts/process.sh
 
-- name: conditional_run
-  uses: std.Exec
-  with:
-    command: "make all"
-    when: changed
-    timestamp: "build/timestamp.txt"
+- name: inline_commands
+  shell: bash
+  run: |
+    echo "Processing data..."
+    ./scripts/process.sh
+    echo "Done"
+
+- name: with_dependencies
+  shell: bash
+  run: make all
+  needs: [sources]
 ```
 
-### Parameters
+### Shell Options
 
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `command` | Yes | Shell command to execute |
-| `shell` | No | Shell to use (default: `bash`) |
-| `when` | No | `always` (default) or `changed` |
-| `timestamp` | No | File to check for timestamp-based execution |
+| Shell | Description |
+|-------|-------------|
+| `bash` | Bourne Again Shell (most common) |
+| `sh` | POSIX shell |
+| `python` | Python interpreter |
+| `pytask` | Python task with context (for custom tasks) |
 
-### Consumes/Produces
+### Notes
 
-- **Consumes**: all
-- **Produces**: Passes through all inputs
+- Use YAML's `|` for multi-line scripts that preserve newlines
+- Use YAML's `>` for multi-line scripts that fold into single line
+- Commands run in the task's rundir by default
+- Standard output/stderr are captured to log files
 
 ---
 
@@ -372,10 +377,9 @@ tasks:
         PATH: /opt/verilator/bin
   
   - name: run
-    uses: std.Exec
+    shell: bash
+    run: verilator --version
     needs: [setup]
-    with:
-      command: "verilator --version"
 ```
 
 ### File Generation + Collection

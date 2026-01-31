@@ -84,12 +84,12 @@ Parameters
 * **attributes** - [Optional] Set of attributes to tag the fileset with (e.g., ['uvm', 'testbench'])
 
 
-std.Exec
-========
+Running Shell Commands
+======================
 
-Executes a shell command as part of the task flow. This is useful for
-running external tools, scripts, or commands that don't have dedicated
-task implementations.
+Shell commands are executed by specifying ``shell: bash`` (or another shell)
+and providing the command with ``run:``. This is useful for running external
+tools, scripts, or commands that don't have dedicated task implementations.
 
 Example
 -------
@@ -101,35 +101,28 @@ Example
     
         tasks:
         - name: run_script
-          uses: std.Exec
-          with:
-            command: "./scripts/process_data.sh"
-            shell: bash
-            when: changed
+          shell: bash
+          run: ./scripts/process_data.sh
+        
+        - name: inline_commands
+          shell: bash
+          run: |
+            echo "Processing data..."
+            ./scripts/process.sh
+            echo "Done"
 
-Consumes
---------
-All inputs by default (``consumes: all``)
+Shell Tasks
+-----------
 
-Produces
---------
-Passes through all inputs to output. Does not produce additional data items.
+Shell tasks support all standard shells. Common options:
 
-Parameters
-----------
+* ``bash`` - Bourne Again Shell (most common)
+* ``sh`` - POSIX shell
+* ``python`` - Python interpreter
+* ``pytask`` - Python task with context (for custom tasks)
 
-* **command** - [Required] The shell command to execute
-* **shell** - [Optional] Shell to use for execution (default: "bash")
-* **when** - [Optional] Controls when the command runs:
-
-  * ``"always"`` - Always run the command (default)
-  * ``"changed"`` - Only run if upstream tasks changed
-
-* **timestamp** - [Optional] Path to a timestamp file to check for changes
-
-The ``timestamp`` parameter allows incremental execution based on file
-timestamps. If specified, the task compares the timestamp of the file
-against the previous execution to determine if output changed.
+The ``run:`` field specifies the command or script to execute. For inline
+scripts, use YAML's multi-line syntax (``|`` or ``>``).
 
 
 std.SetEnv

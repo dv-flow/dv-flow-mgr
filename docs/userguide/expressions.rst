@@ -226,9 +226,8 @@ Use ternary-like conditional logic:
       
       tasks:
       - name: build
-        uses: std.Exec
-        with:
-          command: ${{ "make debug" if debug else "make release" }}
+        shell: bash
+        run: ${{ "make debug" if debug else "make release" }}
 
 Note: Python-style conditional expressions (``x if condition else y``) are supported.
 

@@ -14,6 +14,8 @@ DV Flow Manager provides several commands for working with flows:
 
 * **run**: Execute tasks in a flow
 * **show**: Display information about tasks
+* **agent**: Launch AI assistants with DV Flow context
+* **context**: Output project context for LLM agents
 * **graph**: Generate visual task dependency graphs
 * **util**: Internal utility commands
 
@@ -321,6 +323,237 @@ For backward compatibility, the following legacy invocations are supported:
     
     # Show task with dependency tree (legacy behavior)
     dfm show <task> -a
+
+Agent Command
+=============
+
+Launch an AI assistant with DV Flow context, including skills, personas, tools, and references.
+
+.. code-block:: bash
+
+    dfm agent [OPTIONS] [TASKS...]
+
+The agent command configures and launches an AI assistant (GitHub Copilot CLI, OpenAI Codex, etc.)
+with project-specific context. When you specify task references, dfm evaluates those tasks and
+their dependencies to collect agent resources (skills, personas, tools, references), then generates
+a comprehensive system prompt for the AI assistant.
+
+Agent Options
+-------------
+
+``-a, --assistant {copilot,codex,mock}``
+    Specify which AI assistant to use. If not specified, dfm auto-detects the available
+    assistant by checking for installed tools in this order: copilot, codex.
+    
+    .. code-block:: bash
+    
+        dfm agent PiratePersona --assistant copilot
+
+``-m, --model MODEL``
+    Specify the AI model to use. The format depends on the assistant:
+    
+    * **Copilot**: Model names like ``gpt-4``, ``gpt-3.5-turbo``
+    * **Codex**: OpenAI model identifiers
+    
+    .. code-block:: bash
+    
+        dfm agent PiratePersona --model gpt-4
+
+``--clean``
+    Clean the rundir before executing tasks. Useful when you want to ensure
+    fresh evaluation of all agent resource tasks.
+    
+    .. code-block:: bash
+    
+        dfm agent MyPersona --clean
+
+``--ui {log,progress,tui}``
+    Select UI mode for task execution during context building:
+    
+    * **log**: Plain text output
+    * **progress**: Progress bars (default for terminals)
+    * **tui**: Full-screen interface
+    
+    .. code-block:: bash
+    
+        dfm agent MyPersona --ui progress
+
+``--json``
+    Output the collected context as JSON instead of launching the assistant.
+    Useful for debugging or integration with custom tools.
+    
+    .. code-block:: bash
+    
+        dfm agent PiratePersona --json
+
+``--config-file FILE``
+    Write the system prompt to FILE instead of launching the assistant.
+    Useful for reviewing what context will be provided to the agent.
+    
+    .. code-block:: bash
+    
+        dfm agent PiratePersona --config-file context.md
+
+Agent Resources
+---------------
+
+The agent command recognizes four types of agent resources defined in your flow:
+
+**AgentSkill**
+    A capability or knowledge domain that the agent should possess. Skills are
+    typically documented in markdown files that describe commands, APIs, or 
+    domain-specific knowledge.
+    
+    .. code-block:: yaml
+    
+        tasks:
+        - local: SwordPlaySkill
+          uses: std.AgentSkill
+          desc: Playbook of sword fighting moves
+          with:
+            files:
+            - "${{ srcdir }}/sword_skill.md"
+
+**AgentPersona**
+    A character or role that the agent should adopt. Personas can depend on
+    skills to combine capabilities with personality.
+    
+    .. code-block:: yaml
+    
+        tasks:
+        - local: PiratePersona
+          uses: std.AgentPersona
+          needs: SwordPlaySkill
+          desc: |
+            I'm a crusty pirate with a tankard of rum and a 
+            parrot on me shoulder. If you're feeling feisty,
+            I'll show you my skill at fighting
+
+**AgentTool**
+    An MCP (Model Context Protocol) server or external tool that the agent
+    can invoke.
+    
+    .. code-block:: yaml
+    
+        tasks:
+        - local: FileSystemTool
+          uses: std.AgentTool
+          desc: File system operations
+          with:
+            command: mcp-server-filesystem
+            args: ["--root", "${{ rootdir }}"]
+
+**AgentReference**
+    Documentation or reference material that the agent should consult.
+    
+    .. code-block:: yaml
+    
+        tasks:
+        - local: APIReference
+          uses: std.AgentReference
+          desc: Project API documentation
+          with:
+            files:
+            - "${{ srcdir }}/api_docs.md"
+
+Agent Examples
+--------------
+
+**Launch agent with a persona:**
+
+.. code-block:: bash
+
+    dfm agent PiratePersona
+
+This evaluates the PiratePersona task and all its dependencies (like SwordPlaySkill),
+generates a system prompt with the persona description and skill documentation, then
+launches the configured AI assistant.
+
+**Launch with multiple contexts:**
+
+.. code-block:: bash
+
+    dfm agent PiratePersona CodingSkill TestingSkill
+
+Combines multiple personas and skills into a single agent session.
+
+**Preview context without launching:**
+
+.. code-block:: bash
+
+    dfm agent PiratePersona --config-file preview.md
+    cat preview.md
+
+**Debug context collection:**
+
+.. code-block:: bash
+
+    dfm agent PiratePersona --json | jq
+
+**Use specific model:**
+
+.. code-block:: bash
+
+    dfm agent PiratePersona --model gpt-4 --assistant copilot
+
+**Force fresh evaluation:**
+
+.. code-block:: bash
+
+    dfm agent MyPersona --clean
+
+Agent Workflow
+--------------
+
+When you run ``dfm agent``, the following steps occur:
+
+1. **Task Resolution**: Resolve task references to task definitions
+2. **Graph Building**: Build dependency graph for all referenced tasks
+3. **Task Execution**: Execute tasks to evaluate agent resources
+4. **Resource Collection**: Extract skills, personas, tools, and references
+5. **Prompt Generation**: Generate comprehensive system prompt with:
+   
+   * Project information
+   * Available dfm commands
+   * Skill documentation
+   * Persona descriptions
+   * Reference materials
+   * Tool configurations
+
+6. **Assistant Launch**: Launch AI assistant with context in interactive mode
+
+Context Command
+===============
+
+Output project context information for LLM agents.
+
+.. code-block:: bash
+
+    dfm context [OPTIONS]
+
+The context command generates comprehensive information about your DV Flow Manager
+project in a format optimized for consumption by AI assistants. This is useful for
+providing project awareness to LLM tools.
+
+Context Options
+---------------
+
+``--root PATH``
+    Specify the root directory for the flow.
+
+Output includes:
+
+* Project name and description
+* Package structure and imports
+* Available tasks with descriptions
+* Type definitions
+* Configuration options
+
+Example:
+
+.. code-block:: bash
+
+    dfm context
 
 Graph Command
 =============

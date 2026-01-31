@@ -35,9 +35,10 @@ The std package provides fundamental tasks that are commonly used across all flo
 * **std.FileSet** - Collect files matching patterns
 * **std.Message** - Display messages during execution
 * **std.CreateFile** - Create files from literal content
-* **std.Exec** - Execute shell commands
 * **std.SetEnv** - Set environment variables
 * **std.IncDirs** - Extract include directories from filesets
+
+Shell commands are executed by specifying ``shell: bash`` with ``run:``.
 
 The std package is always available and does not require an explicit import.
 

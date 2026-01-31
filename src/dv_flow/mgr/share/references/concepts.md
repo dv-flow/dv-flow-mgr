@@ -291,7 +291,8 @@ Control where tasks execute:
     - name: create_file
       uses: std.CreateFile
     - name: process_file
-      uses: std.Exec
+      shell: bash
+      run: cat data.txt
       needs: [create_file]  # Can access create_file's output
 ```
 

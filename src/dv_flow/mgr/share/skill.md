@@ -16,7 +16,8 @@ Use this skill when:
 - Setting up package parameters and configurations
 - Running `dfm` commands (run, show, graph)
 - Debugging build flow issues
-- Working with standard library tasks (std.FileSet, std.Exec, std.Message, etc.)
+- Working with standard library tasks (std.FileSet, std.Message, etc.)
+- Executing shell commands with `shell: bash` and `run:`
 - **Executing dfm commands from within an LLM-driven Prompt task**
 
 ## Quick Reference

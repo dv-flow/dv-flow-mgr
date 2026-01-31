@@ -230,9 +230,10 @@ def GenerateParallel(ctxt, input):
     count = input.params.task_count
     for i in range(count):
         task = ctxt.mkTaskNode(
-            "std.Exec",
+            None,  # No base task
             name=ctxt.mkName(f"task_{i}"),
-            command=f"./process.sh {i}"
+            shell="bash",
+            run=f"./process.sh {i}"
         )
         ctxt.addTask(task)
 ```
@@ -267,9 +268,8 @@ package:
 ```yaml
 tasks:
   - name: generate
-    uses: std.Exec
-    with:
-      command: "./generate.sh"
+    shell: bash
+    run: ./generate.sh
     uptodate: my_pkg.CheckInputs
 ```
 
@@ -297,13 +297,13 @@ async def CheckInputs(ctxt):
 
 ### Timestamp-Based Execution
 
+For timestamp-based execution, use custom uptodate checks with memento state.
+
 ```yaml
 - name: generate
-  uses: std.Exec
-  with:
-    command: "./generate.sh"
-    when: changed
-    timestamp: "generated/marker.txt"
+  shell: bash
+  run: ./generate.sh
+  uptodate: my_pkg.CheckTimestamp
 ```
 
 ## Resource Management
@@ -372,9 +372,8 @@ tasks:
         file: ["a.v", "b.v", "c.v", "d.v"]
     body:
       - name: process
-        uses: std.Exec
-        with:
-          command: "./process.sh ${{ matrix.file }}"
+        shell: bash
+        run: ./process.sh ${{ matrix.file }}
 ```
 
 ## Debugging Flows

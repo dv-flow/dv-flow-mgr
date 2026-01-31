@@ -118,34 +118,6 @@ package:
     doc: |
       Creates a list of include directories from a set of
       input files.
-  - name: Exec
-    shell: pytask
-    run: dv_flow.mgr.std.exec.Exec
-    desc: Executes a subprocess
-    with:
-      shell:
-        type: str
-        value: "bash"
-        doc: |
-          Shell to use for executing the command
-      command:
-        type: str
-        value: ""
-        doc: |
-          Command to execute
-      when:
-        type: str
-        value: "always"
-        doc: |
-          Specifies when the command is run.
-          - always  -- Command is always run (default)
-          - changed -- If upstream tasks change
-      timestamp:
-        type: str
-        value: ""
-        doc: |
-          Optional timestamp file to determine if running 
-          the command changed the output
 
   - name: Prompt
     desc: |
@@ -243,6 +215,21 @@ package:
       capabilities that can be discovered and utilized by AI agents to 
       perform specialized tasks.
 
+  - name: AgentToolTag
+    uses: std.Tag
+    doc: |
+      Tag that marks datasets as containing tool definitions
+
+  - name: AgentPersonaTag
+    uses: std.Tag
+    doc: |
+      Tag that marks datasets as containing a persona
+
+  - name: AgentReferenceTag
+    uses: std.Tag
+    doc: |
+      Tag that marks datasets as containing references
+
   - name: DataItem
     with:
       type:
@@ -303,51 +290,60 @@ package:
             val:
               type: str
 
-  - name: AgentSkill
+  - name: AgentResource
     uses: std.DataItem
+    doc: |
+      Base dataset type for agent skills, tools, references, and personas.
+      Provides common fields for specifying content via files, inline content, or URLs.
+    with:
+      files:
+        type: list
+        doc: |
+          List of files to include in this resource
+      content:
+        type: str
+        doc: |
+          Inline content for this resource
+      urls:
+        type: list
+        doc: |
+          URLs pointing to external resources
+
+  - name: AgentSkill
+    uses: std.AgentResource
     doc: |
       Defines an agent skill dataset. Agent skills represent capabilities 
       that AI agents can discover and utilize to perform specialized tasks.
       
-      Packages should define an AgentSkill type tagged with std.AgentSkillTag
+      Packages should define an AgentSkill type that uses std.AgentSkill
       to expose their capabilities to LLM agents. The skill documentation
-      (skill_doc field) should include:
-      - Quick start examples
-      - Available tasks and their parameters
-      - Common usage patterns
-    tags:
-    - std.AgentSkillTag
+      should be provided in a skill.md file.
+    tags: [std.AgentSkillTag]
+
+  - name: AgentPersona
+    uses: std.DataItem
+    doc: |
+      Specifies a persona
+    tags: [std.AgentPersonaTag]
     with:
-      name:
-        doc: |
-          Unique skill name identifier (e.g., "hdl-simulation", "verilator-sim")
+      persona:
         type: str
-        value: ""
-      desc:
-        doc: |
-          Short one-line description of the agent skill
+
+  - name: AgentTool
+    uses: std.DataItem
+    doc: |
+      Specifies a URL or set of files that specify an MCP server to use
+    tags: [std.AgentToolTag]
+    with:
+      command:
         type: str
-        value: ""
-      skill_doc:
-        doc: |
-          Full markdown documentation for the agent skill. Should include:
-          - Quick start examples
-          - Available tasks and parameters  
-          - Common usage patterns
-        type: str
-        value: ""
-      examples:
-        doc: |
-          List of YAML example snippets demonstrating skill usage
+      args:
         type: list
-        value: []
-      related_tasks:
-        doc: |
-          List of task names related to this skill
-        type: list
-        value: []
-      path:
-        doc: |
-          Optional path to a detailed skill documentation file
+      url: 
         type: str
-        value: ""
+
+  - name: AgentReference
+    uses: std.AgentResource
+    doc: |
+      Specifies a set of files or URLs for an agent to use as reference
+    tags: [std.AgentReferenceTag]

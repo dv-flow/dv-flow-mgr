@@ -74,7 +74,7 @@ class SVHashProvider:
         """
         try:
             # Import svdep
-            import svdep.native as svdep
+            import svdep
             
             # Get absolute paths to files
             basedir = Path(fileset.basedir)

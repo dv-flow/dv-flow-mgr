@@ -641,6 +641,8 @@ class PackageProviderYaml(PackageProvider):
             imp_path = imp
         elif imp.path is not None:
             imp_path = imp.path
+        elif hasattr(imp, 'name') and imp.name is not None:
+            imp_path = imp.name
         else:
             raise Exception("imp.path is none: %s" % str(imp))
         
@@ -648,6 +650,19 @@ class PackageProviderYaml(PackageProvider):
 
         imp_path = loader.evalExpr(imp_path)
 
+        # First try to load as a package name from registry
+        sub_pkg = None
+        try:
+            sub_pkg = loader.findPackage(imp_path)
+            if sub_pkg is not None:
+                self._log.debug("Found package %s in registry" % imp_path)
+                pkg.pkg_m[sub_pkg.name] = sub_pkg
+                self._log.debug("<-- _loadPackageImport %s" % str(imp))
+                return
+        except Exception as e:
+            self._log.debug("Could not find package %s in registry: %s" % (imp_path, e))
+
+        # If not found in registry, try as file path
         if not os.path.isabs(imp_path):
             for root in (basedir, os.path.dirname(loader.rootDir())):
                 self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
@@ -1051,7 +1066,8 @@ class PackageProviderYaml(PackageProvider):
                     pdflt = pdflt_m[ptype_s]
 
                 if p in field_m.keys():
-                    raise Exception("Duplicate field %s" % p)
+                    # Allow overriding inherited parameters
+                    self._log.debug(f"  overriding inherited field {p}")
                 if param.value is not None:
                     val = param.value
                     if isinstance(val, str) and "${{" in val:
@@ -1222,7 +1238,27 @@ class PackageProviderYaml(PackageProvider):
                 
                 if not param_exists_in_base and base_task:
                     # Parameter not found in base inheritance chain
-                    loader.error("Parameter %s not found in base task %s" % (p, base_task.name), 
+                    # Collect available parameters and suggest similar ones
+                    available_params = self._collect_all_params_in_chain(base_task)
+                    suggestion = ""
+                    if available_params:
+                        # Try fuzzy matching first
+                        matches = difflib.get_close_matches(p, available_params, n=3, cutoff=0.4)
+                        if matches:
+                            if len(matches) == 1:
+                                suggestion = f". Did you mean '{matches[0]}'?"
+                            else:
+                                suggestion = f". Did you mean one of: {', '.join(repr(m) for m in matches)}?"
+                        else:
+                            # No good fuzzy matches, show all available parameters
+                            # Filter out internal parameters (src, seq, type) for cleaner suggestions
+                            user_params = [p for p in available_params if p not in ('src', 'seq', 'type')]
+                            if user_params:
+                                suggestion = f". Available parameters: {', '.join(repr(p) for p in user_params)}"
+                            elif available_params:
+                                suggestion = f". Available parameters: {', '.join(repr(p) for p in available_params)}"
+                    
+                    loader.error("Parameter '%s' not found in base task %s%s" % (p, base_task.name, suggestion), 
                                taskdef.srcinfo)
                     continue
                 
@@ -1259,6 +1295,42 @@ class PackageProviderYaml(PackageProvider):
             current = getattr(current, 'uses', None)
         
         return None
+    
+    def _collect_all_params_in_chain(self, base_task: Optional[Union[Task, Type]]) -> List[str]:
+        """
+        Collect all parameter names from the inheritance chain.
+        Returns a list of all available parameter names.
+        """
+        param_names = []
+        current = base_task
+        visited = set()
+        
+        while current is not None:
+            if id(current) in visited:
+                break
+            visited.add(id(current))
+            
+            # Collect from param_defs
+            if hasattr(current, 'param_defs') and current.param_defs:
+                param_names.extend(current.param_defs.definitions.keys())
+            
+            # Collect from paramT (old-style)
+            if hasattr(current, 'paramT') and current.paramT:
+                if hasattr(current.paramT, 'model_fields'):
+                    param_names.extend(current.paramT.model_fields.keys())
+            
+            # Move up the inheritance chain
+            current = getattr(current, 'uses', None)
+        
+        # Return unique list preserving order
+        seen = set()
+        unique_params = []
+        for p in param_names:
+            if p not in seen:
+                seen.add(p)
+                unique_params.append(p)
+        
+        return unique_params
     
     def _collect_inherited_param_defaults(self, task: Union[Task, Type]) -> Dict[str, Any]:
         """

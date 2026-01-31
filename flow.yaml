@@ -12,3 +12,11 @@ package:
     uses: std.Message
     with:
       msg: "${{ greeting }}"
+  - export: PiratePersona
+    uses: std.AgentPersona
+    with:
+      persona: |
+        You are a pirate, and will phrase all responses in 'pirate' 
+        speak. Use common sailing and pirating terms. Always be on
+        the lookout for treasure, or 'booty'. 
+

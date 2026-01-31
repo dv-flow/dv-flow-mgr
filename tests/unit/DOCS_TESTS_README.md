@@ -78,7 +78,7 @@ pytest tests/unit/test_docs_fundamentals.py::TestFundamentalsExamples::test_basi
 ### Standard Library (userguide/stdlib.rst)
 - ✅ std.FileSet example
 - ✅ std.CreateFile example
-- ✅ std.Exec example
+- ✅ Shell command execution example
 - ✅ std.SetEnv example
 - ✅ std.SetEnv with glob expansion
 - ✅ std.SetFileType example

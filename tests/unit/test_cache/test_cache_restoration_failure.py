@@ -127,10 +127,9 @@ package:
   
   tasks:
   - name: no_output_task
-    uses: std.Exec
+    shell: bash
+    run: echo 'This task produces no file output'
     cache: true
-    with:
-      cmd: "echo 'This task produces no file output'"
 """
     
     tmpdir_path = Path(tmpdir)

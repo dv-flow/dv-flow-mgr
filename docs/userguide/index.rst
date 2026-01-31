@@ -15,6 +15,7 @@ User Guide
    advanced_features
    stdlib
    llm_integration
+   agent_integration
 
 DV Flow input specification builds on three key concepts:
 

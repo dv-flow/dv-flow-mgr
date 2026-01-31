@@ -30,6 +30,7 @@ from .cmds.cmd_util import CmdUtil
 from .cmds.cmd_cache import CmdCache
 from .cmds.cmd_validate import CmdValidate
 from .cmds.cmd_context import CmdContext
+from .cmds.cmd_agent import CmdAgent
 from .cmds.cache.cmd_init import CmdCacheInit
 from .cmds.show import (
     CmdShowPackages, CmdShowTasks, CmdShowTask,
@@ -381,6 +382,39 @@ def get_parser():
     context_parser.add_argument("--root",
                                 help="Specifies the root directory for the flow")
     context_parser.set_defaults(func=CmdContext())
+
+    agent_parser = subparsers.add_parser('agent',
+        help='Launch an AI assistant with DV Flow context')
+    agent_parser.add_argument('tasks',
+        nargs='*',
+        help='Task references to use as context (skills, personas, tools, references)')
+    agent_parser.add_argument('-a', '--assistant',
+        choices=['copilot', 'codex', 'mock'],
+        help='Specify which assistant to use (auto-detected by default)')
+    agent_parser.add_argument('-m', '--model',
+        help='Specify the AI model to use')
+    agent_parser.add_argument('--root',
+        help='Specifies the root directory for the flow')
+    agent_parser.add_argument('-c', '--config',
+        help='Specifies the active configuration for the root package')
+    agent_parser.add_argument('-D',
+        dest='param_overrides',
+        action='append',
+        default=[],
+        metavar='NAME=VALUE',
+        help='Parameter override; may be used multiple times')
+    agent_parser.add_argument('--config-file',
+        help='Output assistant config file instead of launching (for debugging)')
+    agent_parser.add_argument('--json',
+        action='store_true',
+        help='Output context as JSON instead of launching assistant')
+    agent_parser.add_argument('--clean',
+        action='store_true',
+        help='Clean rundir before executing tasks')
+    agent_parser.add_argument('--ui',
+        choices=['log', 'progress', 'tui'],
+        help='Select UI mode for task execution')
+    agent_parser.set_defaults(func=CmdAgent())
 
     util_parser = subparsers.add_parser('util',
         help="Internal utility command")
