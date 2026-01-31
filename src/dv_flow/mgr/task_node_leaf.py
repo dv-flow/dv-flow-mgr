@@ -183,7 +183,11 @@ class TaskNodeLeaf(TaskNode):
                             
                             excluded_fields = ("type", "src", "seq", "name", "params")
                             try:
-                                item = runner.mkDataItem(out_data.get("type", "std.FileSet"), **{
+                                # Get type, ensuring it's not empty
+                                item_type = out_data.get("type") or "std.FileSet"
+                                if not out_data.get("type"):
+                                    self._log.warning(f"Cached output item has empty/missing type field, falling back to std.FileSet")
+                                item = runner.mkDataItem(item_type, **{
                                     k: v for k, v in out_data.items()
                                     if k not in excluded_fields
                                 })
@@ -290,7 +294,11 @@ class TaskNodeLeaf(TaskNode):
                         # Exclude fields that are set separately or may not be in the type schema
                         excluded_fields = ("type", "src", "seq", "name", "params")
                         try:
-                            item = runner.mkDataItem(out_data.get("type", "std.FileSet"), **{
+                            # Get type, ensuring it's not empty
+                            item_type = out_data.get("type") or "std.FileSet"
+                            if not out_data.get("type"):
+                                self._log.warning("Output item in exec_data has empty/missing type field, falling back to std.FileSet")
+                            item = runner.mkDataItem(item_type, **{
                                 k: v for k, v in out_data.items() 
                                 if k not in excluded_fields
                             })
@@ -426,6 +434,11 @@ class TaskNodeLeaf(TaskNode):
         for i,out in enumerate(local_out):
             out.src = self.name
             out.seq = i
+            # Validate that output has a valid type
+            output_type = getattr(out, "type", None)
+            if not output_type:
+                self._log.error("Task %s produced output item without a valid type field (index %d)" % (self.name, i))
+                raise Exception("Task %s produced output item without a valid type field. All output items must have a non-empty 'type' field." % self.name)
             self._log.debug("Adding output of type %s" % out.type)
             output.append(out)
 

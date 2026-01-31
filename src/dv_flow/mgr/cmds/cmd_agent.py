@@ -59,8 +59,8 @@ class CmdAgent:
         # Determine UI mode for task execution
         ui = getattr(args, 'ui', None)
         if ui is None:
-            # Auto-select based on whether output is a terminal
-            ui = 'progress' if sys.stdout.isatty() else 'log'
+            # Auto-select: progressbar if terminal, log otherwise
+            ui = 'progressbar' if sys.stdout.isatty() else 'log'
             # When logging is enabled at INFO or above, prefer plain-text log
             root_level = logging.getLogger().level
             if root_level <= logging.INFO:

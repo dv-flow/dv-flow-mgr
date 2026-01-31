@@ -132,8 +132,6 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
         # Ensure that the rundir exists or can be created
-        self.enter()
-
         if not os.path.isdir(self.rundir):
             os.makedirs(self.rundir)
 
@@ -188,6 +186,12 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             self._task_state[t] = TaskState.NOT_STARTED
             self._task_completion_events[t.name] = asyncio.Event()
             self._pending_tasks[t.name] = t
+
+        # Set total task count for progress monitors
+        self.total_task_count = len(self._dep_map)
+        
+        # Notify listeners that execution is starting
+        self.enter()
 
         # Find initial ready tasks (no dependencies)
         for t, deps in self._dep_map.items():
@@ -599,6 +603,13 @@ class SingleTaskRunner(TaskRunner):
         # TODO: notify of task start
         ret : TaskDataResult = await task.task(self, input)
         # TODO: notify of task complete
+
+        # Validate that all output items have a valid type field
+        for i, out in enumerate(ret.output):
+            output_type = getattr(out, "type", None)
+            if not output_type:
+                self._log.error("Task %s produced output item without a valid type field (index %d)" % (task.name, i))
+                raise Exception("Task %s produced output item without a valid type field. All output items must have a non-empty 'type' field." % task.name)
 
         # Store the result
         task.output = TaskDataOutput(

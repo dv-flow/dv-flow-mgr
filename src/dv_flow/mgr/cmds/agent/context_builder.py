@@ -29,6 +29,7 @@ from ...task_graph_builder import TaskGraphBuilder
 from ...task_runner import TaskSetRunner
 from ...task_listener_log import TaskListenerLog
 from ...task_listener_progress import TaskListenerProgress
+from ...task_listener_progress_bar import TaskListenerProgressBar
 
 
 @dataclass
@@ -169,6 +170,8 @@ class AgentContextBuilder:
         # Create task listener based on UI mode
         if self.ui_mode == 'progress':
             listener = TaskListenerProgress()
+        elif self.ui_mode == 'progressbar':
+            listener = TaskListenerProgressBar(message="Initializing...")
         else:
             listener = TaskListenerLog()
         

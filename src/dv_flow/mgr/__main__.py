@@ -113,8 +113,8 @@ def get_parser():
     run_parser.add_argument("-c", "--config",
                             help="Specifies the active configuration for the root package")
     run_parser.add_argument("-u", "--ui",
-                        help="Console UI style (log, progress, tui). Default: progress if terminal else log",
-                        choices=("log","progress","tui"),
+                        help="Console UI style (log, progress, progressbar, tui). Default: progress if terminal else log",
+                        choices=("log","progress","progressbar","tui"),
                         default=None)
     run_parser.add_argument("-D",
                         dest="param_overrides",
@@ -412,7 +412,7 @@ def get_parser():
         action='store_true',
         help='Clean rundir before executing tasks')
     agent_parser.add_argument('--ui',
-        choices=['log', 'progress', 'tui'],
+        choices=['log', 'progress', 'progressbar', 'tui'],
         help='Select UI mode for task execution')
     agent_parser.set_defaults(func=CmdAgent())
 
