@@ -7,6 +7,8 @@ import pydantic
 import re
 import yaml
 from typing import Any, ClassVar, Dict, List, Optional, Union
+from .cond_def import CondDef
+from .config_def import ConfigDef
 from .fragment_def import FragmentDef
 from .loader_scope import LoaderScope
 from .marker_listener import MarkerListener
@@ -20,9 +22,10 @@ from .param_def_collection import ParamDefCollection
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
 from .task import Task, Strategy, StrategyGenerate
-from .task_def import TaskDef, ConsumesE, RundirE, PassthroughE, StrategyDef
+from .task_def import TaskDef, ConsumesE, RundirE, PassthroughE, StrategyDef, CacheDef
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
+from .type_def import TypeDef
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
 
 def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
@@ -60,6 +63,7 @@ class PackageProviderYaml(PackageProvider):
     _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _loading : bool = dc.field(default=False)
     _fragment_names : Dict[str, str] = dc.field(default_factory=dict)  # Track fragment names -> file
+    _field_srcinfo_map : Dict[int, Dict] = dc.field(default_factory=dict)  # Store _field_srcinfo by object id
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
     # Shared parser hook that dispatches based on file extension
@@ -69,6 +73,29 @@ class PackageProviderYaml(PackageProvider):
             return PackageProviderToml(path=file)._parse_file(file, is_root)
         with open(file, "r") as fp:
             return yaml.load(fp, Loader=YamlSrcInfoLoader(file))
+    
+    def _save_field_srcinfo(self, obj):
+        """Recursively save and remove _field_srcinfo from dict objects."""
+        if isinstance(obj, dict):
+            # Save _field_srcinfo if present
+            if '_field_srcinfo' in obj:
+                self._field_srcinfo_map[id(obj)] = obj.pop('_field_srcinfo')
+            # Recurse into dict values
+            for v in obj.values():
+                self._save_field_srcinfo(v)
+        elif isinstance(obj, list):
+            # Recurse into list items
+            for item in obj:
+                self._save_field_srcinfo(item)
+    
+    def _get_field_srcinfo(self, obj, field_name):
+        """Get field srcinfo for an object if available."""
+        obj_id = id(obj)
+        if obj_id in self._field_srcinfo_map:
+            field_info = self._field_srcinfo_map[obj_id]
+            if field_name in field_info:
+                return field_info[field_name]
+        return None
 
     def getPackageNames(self, loader : PackageLoaderP) -> List[str]: 
         assert not self._loading
@@ -125,6 +152,10 @@ class PackageProviderYaml(PackageProvider):
 
         if "package" not in doc.keys():
             raise Exception("Missing 'package' key in %s" % root)
+        
+        # Save _field_srcinfo before Pydantic validation (it's metadata, not schema)
+        self._save_field_srcinfo(doc)
+        
         try:
             pkg_def = PackageDef(**(doc["package"]))
 
@@ -140,16 +171,30 @@ class PackageProviderYaml(PackageProvider):
 #                    print("  Error: %s" % str(ee))
                     obj = doc["package"]
                     loc = None
-                    print("Errors: %s" % str(ee))
+                    self._log.debug("Validation error: %s" % str(ee))
                     
                     # Extract parent object and model class for similarity matching
                     parent_obj = None
                     model_class = None
                     # Check context path to determine which model we're validating
                     loc_list = list(ee['loc'])
+                    
+                    # Determine model class based on path context
                     if 'tasks' in loc_list:
                         model_class = TaskDef
+                    elif 'types' in loc_list:
+                        model_class = TypeDef
+                    elif 'configs' in loc_list:
+                        model_class = ConfigDef
+                    elif 'strategy' in loc_list:
+                        model_class = StrategyDef
+                    elif 'cache' in loc_list and isinstance(obj, dict):
+                        model_class = CacheDef
+                    elif len(loc_list) == 1:
+                        # Top-level package field
+                        model_class = PackageDef
                     
+                    # Navigate to the object with the error
                     for i, el in enumerate(ee['loc']):
                         if i == len(ee['loc']) - 1:
                             parent_obj = obj
@@ -164,6 +209,15 @@ class PackageProviderYaml(PackageProvider):
                                 pass
                         if type(obj) == dict and 'srcinfo' in obj.keys():
                             loc = obj['srcinfo']
+                    
+                    # Try to get field-level location if available
+                    if parent_obj is not None:
+                        field_name = str(ee['loc'][-1])
+                        field_loc = self._get_field_srcinfo(parent_obj, field_name)
+                        if field_loc is not None:
+                            # Use field-level location for more precise error reporting
+                            loc = field_loc
+                            self._log.debug("Using field-level srcinfo for '%s'" % field_name)
                     
                     # Enhance error message for extra_forbidden errors
                     error_msg = ee['msg']
@@ -352,6 +406,32 @@ class PackageProviderYaml(PackageProvider):
                     pkg.task_m[alias.name] = alias
             self._loadTypes(pkg, loader, typedefs)
             self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
+            
+            # Validate feeds references after all tasks are loaded
+            for fed_name, feeding_tasks in loader.feedsMap().items():
+                fed_task = self._findTask(fed_name, loader)
+                if fed_task is None:
+                    # Task referenced in feeds does not exist - report error
+                    if feeding_tasks:
+                        feeding_task = feeding_tasks[0]
+                        if hasattr(feeding_task, 'srcinfo') and feeding_task.srcinfo is not None:
+                            loc = feeding_task.srcinfo
+                            
+                            error_msg = f"Task '{feeding_task.name}' references undefined task '{fed_name}' in feeds field"
+                            error_msg += loader.getSimilarNamesError(fed_name, only_tasks=True)
+                            
+                            marker = TaskMarker(
+                                msg=error_msg,
+                                severity=SeverityE.Error,
+                                loc=TaskMarkerLoc(path=loc.file, line=loc.lineno, pos=loc.linepos))
+                        else:
+                            error_msg = f"Undefined task '{fed_name}' referenced in feeds"
+                            error_msg += loader.getSimilarNamesError(fed_name, only_tasks=True)
+                            marker = TaskMarker(
+                                msg=error_msg,
+                                severity=SeverityE.Error)
+                        loader.marker(marker)
+            
             # Resolve tags after types and tasks are loaded
             self._resolveTags(pkg, pkg_def.tags, loader)
             # Remap needs of tasks in root namespace to overridden names
@@ -486,6 +566,28 @@ class PackageProviderYaml(PackageProvider):
                         not (isinstance(n, tuple) and n[0] == feeding_task) and n != feeding_task
                         for n in fed_task.needs):
                         fed_task.needs.append(feeding_task)
+            else:
+                # Task referenced in feeds does not exist - report error
+                # Find the feeding task to get source location
+                if feeding_tasks:
+                    feeding_task = feeding_tasks[0]
+                    if hasattr(feeding_task, 'srcinfo') and feeding_task.srcinfo is not None:
+                        loc = feeding_task.srcinfo
+                        
+                        error_msg = f"Task '{feeding_task.name}' references undefined task '{fed_name}' in feeds field"
+                        error_msg += loader.getSimilarNamesError(fed_name, only_tasks=True)
+                        
+                        marker = TaskMarker(
+                            msg=error_msg,
+                            severity=SeverityE.Error,
+                            loc=TaskMarkerLoc(path=loc.file, line=loc.lineno, pos=loc.linepos))
+                    else:
+                        error_msg = f"Undefined task '{fed_name}' referenced in feeds"
+                        error_msg += loader.getSimilarNamesError(fed_name, only_tasks=True)
+                        marker = TaskMarker(
+                            msg=error_msg,
+                            severity=SeverityE.Error)
+                    loader.marker(marker)
 
         self._log.debug("<-- _mkPackage %s (%s)" % (pkg_def.name, pkg.name))
         return pkg
@@ -656,6 +758,9 @@ class PackageProviderYaml(PackageProvider):
         doc = self._parse_file(file, is_root=False)
         self._log.debug("doc: %s" % str(doc))
         if doc is not None and "fragment" in doc.keys():
+            # Save _field_srcinfo before validation
+            self._save_field_srcinfo(doc)
+            
             try:
                     frag = FragmentDef(**(doc["fragment"]))
                     basedir = os.path.dirname(file)
@@ -686,7 +791,7 @@ class PackageProviderYaml(PackageProvider):
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
             except pydantic.ValidationError as e:
-                    print("Errors: %s" % file)
+                    self._log.debug("Fragment validation errors: %s" % file)
                     error_paths = []
                     loc = None
                     for ee in e.errors():
@@ -697,16 +802,32 @@ class PackageProviderYaml(PackageProvider):
                         model_class = None
                         # Check context path to determine which model we're validating
                         loc_list = list(ee['loc'])
+                        
+                        # Determine model class based on path context
                         if 'tasks' in loc_list:
                             model_class = TaskDef
+                        elif 'types' in loc_list:
+                            model_class = TypeDef
+                        elif len(loc_list) == 1:
+                            # Top-level fragment field
+                            model_class = FragmentDef
                         
                         for i, el in enumerate(ee['loc']):
                             if i == len(ee['loc']) - 1:
                                 parent_obj = obj
-                            print("el: %s" % str(el))
+                            self._log.debug("el: %s" % str(el))
                             obj = obj[el]
                             if type(obj) == dict and 'srcinfo' in obj.keys():
                                 loc = obj['srcinfo']
+                        
+                        # Try to get field-level location if available
+                        if parent_obj is not None:
+                            field_name = str(ee['loc'][-1])
+                            field_loc = self._get_field_srcinfo(parent_obj, field_name)
+                            if field_loc is not None:
+                                # Use field-level location for more precise error reporting
+                                loc = field_loc
+                                self._log.debug("Using field-level srcinfo for '%s'" % field_name)
                         
                         # Enhance error message for extra_forbidden errors
                         error_msg = ee['msg']
