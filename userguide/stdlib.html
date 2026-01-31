@@ -115,11 +115,11 @@ parameter set having the filetype of <cite>verilogSource</cite>.</p>
 </ul>
 </section>
 </section>
-<section id="std-exec">
-<h2>std.Exec<a class="headerlink" href="#std-exec" title="Link to this heading">¶</a></h2>
-<p>Executes a shell command as part of the task flow. This is useful for
-running external tools, scripts, or commands that don’t have dedicated
-task implementations.</p>
+<section id="running-shell-commands">
+<h2>Running Shell Commands<a class="headerlink" href="#running-shell-commands" title="Link to this heading">¶</a></h2>
+<p>Shell commands are executed by specifying <code class="docutils literal notranslate"><span class="pre">shell:</span> <span class="pre">bash</span></code> (or another shell)
+and providing the command with <code class="docutils literal notranslate"><span class="pre">run:</span></code>. This is useful for running external
+tools, scripts, or commands that don’t have dedicated task implementations.</p>
 <section id="id5">
 <h3>Example<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
@@ -127,38 +127,29 @@ task implementations.</p>
 
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_script</span>
-<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Exec</span>
-<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;./scripts/process_data.sh&quot;</span>
-<span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
-<span class="w">        </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">changed</span>
+<span class="w">      </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./scripts/process_data.sh</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">inline_commands</span>
+<span class="w">      </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">echo &quot;Processing data...&quot;</span>
+<span class="w">        </span><span class="no">./scripts/process.sh</span>
+<span class="w">        </span><span class="no">echo &quot;Done&quot;</span>
 </pre></div>
 </div>
 </section>
-<section id="id6">
-<h3>Consumes<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
-<p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
-</section>
-<section id="id7">
-<h3>Produces<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
-<p>Passes through all inputs to output. Does not produce additional data items.</p>
-</section>
-<section id="id8">
-<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<section id="shell-tasks">
+<h3>Shell Tasks<a class="headerlink" href="#shell-tasks" title="Link to this heading">¶</a></h3>
+<p>Shell tasks support all standard shells. Common options:</p>
 <ul class="simple">
-<li><p><strong>command</strong> - [Required] The shell command to execute</p></li>
-<li><p><strong>shell</strong> - [Optional] Shell to use for execution (default: “bash”)</p></li>
-<li><p><strong>when</strong> - [Optional] Controls when the command runs:</p>
-<ul>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;always&quot;</span></code> - Always run the command (default)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;changed&quot;</span></code> - Only run if upstream tasks changed</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bash</span></code> - Bourne Again Shell (most common)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sh</span></code> - POSIX shell</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span></code> - Python interpreter</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytask</span></code> - Python task with context (for custom tasks)</p></li>
 </ul>
-</li>
-<li><p><strong>timestamp</strong> - [Optional] Path to a timestamp file to check for changes</p></li>
-</ul>
-<p>The <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> parameter allows incremental execution based on file
-timestamps. If specified, the task compares the timestamp of the file
-against the previous execution to determine if output changed.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">run:</span></code> field specifies the command or script to execute. For inline
+scripts, use YAML’s multi-line syntax (<code class="docutils literal notranslate"><span class="pre">|</span></code> or <code class="docutils literal notranslate"><span class="pre">&gt;</span></code>).</p>
 </section>
 </section>
 <section id="std-setenv">
@@ -166,8 +157,8 @@ against the previous execution to determine if output changed.</p>
 <p>Sets environment variables for use by downstream tasks. Supports glob
 pattern expansion for paths, making it easy to configure tool paths
 and directories.</p>
-<section id="id9">
-<h3>Example<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<section id="id6">
+<h3>Example<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">setenv.example</span>
 
@@ -200,16 +191,16 @@ relative to the task’s source directory:</p>
 <p>If multiple paths match, they are joined with the platform path separator
 (<cite>:</cite> on Unix, <cite>;</cite> on Windows).</p>
 </section>
-<section id="id10">
-<h3>Consumes<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Consumes<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
 </section>
-<section id="id11">
-<h3>Produces<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h3>Produces<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
 <p>Produces a <code class="docutils literal notranslate"><span class="pre">std.Env</span></code> data item containing the environment variable mappings.</p>
 </section>
-<section id="id12">
-<h3>Parameters<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<section id="id9">
+<h3>Parameters<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><strong>setenv</strong> - [Optional] Map of environment variable names to values</p></li>
 <li><p><strong>append_path</strong> - [Optional] Map of environment variables to values that should be appended</p></li>
@@ -223,8 +214,8 @@ path separator logic for PATH-like environment variables.</p>
 <h2>std.SetFileType<a class="headerlink" href="#std-setfiletype" title="Link to this heading">¶</a></h2>
 <p>Modifies the file type of input filesets. This is useful when you need
 to reinterpret files with a different type for different tools.</p>
-<section id="id13">
-<h3>Example<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>Example<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">setfiletype.example</span>
 
@@ -243,16 +234,16 @@ to reinterpret files with a different type for different tools.</p>
 </pre></div>
 </div>
 </section>
-<section id="id14">
-<h3>Consumes<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<section id="id11">
+<h3>Consumes<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
 <p>Only <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">[{type:</span> <span class="pre">std.FileSet}]</span></code>)</p>
 </section>
-<section id="id15">
-<h3>Produces<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<section id="id12">
+<h3>Produces<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
 <p>Produces new <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items with the updated file type.</p>
 </section>
-<section id="id16">
-<h3>Parameters<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
+<section id="id13">
+<h3>Parameters<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><strong>filetype</strong> - [Required] The new file type to assign to all consumed filesets</p></li>
 </ul>
@@ -263,8 +254,8 @@ to reinterpret files with a different type for different tools.</p>
 <p>Extracts include directories from input filesets and produces them as
 a structured list. This is useful for passing include paths to compilation
 tools.</p>
-<section id="id17">
-<h3>Example<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<section id="id14">
+<h3>Example<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">incdirs.example</span>
 
@@ -283,16 +274,16 @@ tools.</p>
 </pre></div>
 </div>
 </section>
-<section id="id18">
-<h3>Consumes<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
+<section id="id15">
+<h3>Consumes<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> data items</p>
 </section>
-<section id="id19">
-<h3>Produces<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
+<section id="id16">
+<h3>Produces<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
 <p>Produces a data item containing the collected include directories.</p>
 </section>
-<section id="id20">
-<h3>Parameters<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
+<section id="id17">
+<h3>Parameters<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
 <p>None. The task operates entirely on input filesets.</p>
 </section>
 </section>
@@ -300,8 +291,8 @@ tools.</p>
 <h2>std.Message<a class="headerlink" href="#std-message" title="Link to this heading">¶</a></h2>
 <p>Displays a message during task execution. Useful for logging, debugging,
 and providing user feedback during flow execution.</p>
-<section id="id21">
-<h3>Example<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
+<section id="id18">
+<h3>Example<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message.example</span>
 
@@ -319,16 +310,16 @@ and providing user feedback during flow execution.</p>
 </pre></div>
 </div>
 </section>
-<section id="id22">
-<h3>Consumes<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<section id="id19">
+<h3>Consumes<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
 <p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>)</p>
 </section>
-<section id="id23">
-<h3>Produces<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
+<section id="id20">
+<h3>Produces<a class="headerlink" href="#id20" title="Link to this heading">¶</a></h3>
 <p>Passes through all inputs. Does not produce additional data items.</p>
 </section>
-<section id="id24">
-<h3>Parameters<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<section id="id21">
+<h3>Parameters<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p><strong>msg</strong> - [Optional] The message to display (default: empty string)</p></li>
 </ul>
@@ -357,8 +348,8 @@ will fail with an error.</p>
 <p>This task enables AI-assisted workflows for code generation, documentation,
 test creation, and other automated tasks that benefit from large language
 model capabilities.</p>
-<section id="id25">
-<h3>Example<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id22">
+<h3>Example<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
 <p>Basic usage:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt.example</span>
@@ -396,19 +387,19 @@ model capabilities.</p>
 </pre></div>
 </div>
 </section>
-<section id="id26">
-<h3>Consumes<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id23">
+<h3>Consumes<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
 <p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>). Input data is available in the
 prompt via the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">}}</span></code> variable.</p>
 </section>
-<section id="id27">
-<h3>Produces<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<section id="id24">
+<h3>Produces<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
 <p>Outputs are determined by the AI assistant’s result JSON file. Typically
 produces <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> items for generated files, but can produce any
 data type specified in the result.</p>
 </section>
-<section id="id28">
-<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<section id="id25">
+<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
 <ul>
 <li><p><strong>system_prompt</strong> - [Optional] System prompt template. Can include variable references:</p>
 <ul class="simple">
@@ -553,6 +544,7 @@ Contributions are welcome!</p>
 <li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="agent_integration.html">AI Agent Integration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>

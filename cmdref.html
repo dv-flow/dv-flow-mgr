@@ -38,7 +38,7 @@
 <p><p>DV Flow Manager (dfm) - A dataflow-based build system for silicon design and verification.</p>
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
-           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
+           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">agent</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
 <section id="dv_flow.mgr.__main__-get_parser-named-arguments">
@@ -635,14 +635,69 @@
 </dl>
 </section>
 </section>
+<section id="agent">
+<h3>agent<a class="headerlink" href="#agent" title="Link to this heading">¶</a></h3>
+<p>Launch an AI assistant with DV Flow context</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">agent</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">a</span> <span class="p">{</span><span class="n">copilot</span><span class="p">,</span><span class="n">codex</span><span class="p">,</span><span class="n">mock</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">m</span> <span class="n">MODEL</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span>
+          <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">config</span><span class="o">-</span><span class="n">file</span> <span class="n">CONFIG_FILE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span>
+          <span class="p">[</span><span class="o">--</span><span class="n">ui</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span>
+          <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat9">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat9" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>tasks</kbd></dt>
+<dd><p>Task references to use as context (skills, personas, tools, references)</p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat13">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat13" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>-a, --assistant</kbd></dt>
+<dd><p>Possible choices: copilot, codex, mock</p>
+<p>Specify which assistant to use (auto-detected by default)</p>
+</dd>
+<dt><kbd>-m, --model</kbd></dt>
+<dd><p>Specify the AI model to use</p>
+</dd>
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration for the root package</p>
+</dd>
+<dt><kbd>-D</kbd></dt>
+<dd><p>Parameter override; may be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>--config-file</kbd></dt>
+<dd><p>Output assistant config file instead of launching (for debugging)</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output context as JSON instead of launching assistant</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--clean</kbd></dt>
+<dd><p>Clean rundir before executing tasks</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--ui</kbd></dt>
+<dd><p>Possible choices: log, progress, tui</p>
+<p>Select UI mode for task execution</p>
+</dd>
+</dl>
+</section>
+</section>
 <section id="util">
 <h3>util<a class="headerlink" href="#util" title="Link to this heading">¶</a></h3>
 <p>Internal utility command</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">util</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="n">cmd</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat9">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat9" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat10">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat10" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>cmd</kbd></dt>
 <dd></dd>
@@ -660,6 +715,8 @@
 <ul class="simple">
 <li><p><strong>run</strong>: Execute tasks in a flow</p></li>
 <li><p><strong>show</strong>: Display information about tasks</p></li>
+<li><p><strong>agent</strong>: Launch AI assistants with DV Flow context</p></li>
+<li><p><strong>context</strong>: Output project context for LLM agents</p></li>
 <li><p><strong>graph</strong>: Generate visual task dependency graphs</p></li>
 <li><p><strong>util</strong>: Internal utility commands</p></li>
 </ul>
@@ -915,6 +972,202 @@ dfm<span class="w"> </span>show<span class="w"> </span>&lt;task&gt;<span class="
 </div>
 </section>
 </section>
+<section id="agent-command">
+<h2>Agent Command<a class="headerlink" href="#agent-command" title="Link to this heading">¶</a></h2>
+<p>Launch an AI assistant with DV Flow context, including skills, personas, tools, and references.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASKS...<span class="o">]</span>
+</pre></div>
+</div>
+<p>The agent command configures and launches an AI assistant (GitHub Copilot CLI, OpenAI Codex, etc.)
+with project-specific context. When you specify task references, dfm evaluates those tasks and
+their dependencies to collect agent resources (skills, personas, tools, references), then generates
+a comprehensive system prompt for the AI assistant.</p>
+<section id="agent-options">
+<h3>Agent Options<a class="headerlink" href="#agent-options" title="Link to this heading">¶</a></h3>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-a,</span> <span class="pre">--assistant</span> <span class="pre">{copilot,codex,mock}</span></code></dt><dd><p>Specify which AI assistant to use. If not specified, dfm auto-detects the available
+assistant by checking for installed tools in this order: copilot, codex.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--assistant<span class="w"> </span>copilot
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-m,</span> <span class="pre">--model</span> <span class="pre">MODEL</span></code></dt><dd><p>Specify the AI model to use. The format depends on the assistant:</p>
+<ul class="simple">
+<li><p><strong>Copilot</strong>: Model names like <code class="docutils literal notranslate"><span class="pre">gpt-4</span></code>, <code class="docutils literal notranslate"><span class="pre">gpt-3.5-turbo</span></code></p></li>
+<li><p><strong>Codex</strong>: OpenAI model identifiers</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--model<span class="w"> </span>gpt-4
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--clean</span></code></dt><dd><p>Clean the rundir before executing tasks. Useful when you want to ensure
+fresh evaluation of all agent resource tasks.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--clean
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--ui</span> <span class="pre">{log,progress,tui}</span></code></dt><dd><p>Select UI mode for task execution during context building:</p>
+<ul class="simple">
+<li><p><strong>log</strong>: Plain text output</p></li>
+<li><p><strong>progress</strong>: Progress bars (default for terminals)</p></li>
+<li><p><strong>tui</strong>: Full-screen interface</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--ui<span class="w"> </span>progress
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--json</span></code></dt><dd><p>Output the collected context as JSON instead of launching the assistant.
+Useful for debugging or integration with custom tools.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--json
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--config-file</span> <span class="pre">FILE</span></code></dt><dd><p>Write the system prompt to FILE instead of launching the assistant.
+Useful for reviewing what context will be provided to the agent.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--config-file<span class="w"> </span>context.md
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="agent-resources">
+<h3>Agent Resources<a class="headerlink" href="#agent-resources" title="Link to this heading">¶</a></h3>
+<p>The agent command recognizes four types of agent resources defined in your flow:</p>
+<dl>
+<dt><strong>AgentSkill</strong></dt><dd><p>A capability or knowledge domain that the agent should possess. Skills are
+typically documented in markdown files that describe commands, APIs, or
+domain-specific knowledge.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SwordPlaySkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Playbook of sword fighting moves</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/sword_skill.md&quot;</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>AgentPersona</strong></dt><dd><p>A character or role that the agent should adopt. Personas can depend on
+skills to combine capabilities with personality.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PiratePersona</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SwordPlaySkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I&#39;m a crusty pirate with a tankard of rum and a</span>
+<span class="w">    </span><span class="no">parrot on me shoulder. If you&#39;re feeling feisty,</span>
+<span class="w">    </span><span class="no">I&#39;ll show you my skill at fighting</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>AgentTool</strong></dt><dd><p>An MCP (Model Context Protocol) server or external tool that the agent
+can invoke.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FileSystemTool</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentTool</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">File system operations</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mcp-server-filesystem</span>
+<span class="w">    </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;--root&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">rootdir</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>AgentReference</strong></dt><dd><p>Documentation or reference material that the agent should consult.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">APIReference</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentReference</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Project API documentation</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/api_docs.md&quot;</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="agent-examples">
+<h3>Agent Examples<a class="headerlink" href="#agent-examples" title="Link to this heading">¶</a></h3>
+<p><strong>Launch agent with a persona:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona
+</pre></div>
+</div>
+<p>This evaluates the PiratePersona task and all its dependencies (like SwordPlaySkill),
+generates a system prompt with the persona description and skill documentation, then
+launches the configured AI assistant.</p>
+<p><strong>Launch with multiple contexts:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>CodingSkill<span class="w"> </span>TestingSkill
+</pre></div>
+</div>
+<p>Combines multiple personas and skills into a single agent session.</p>
+<p><strong>Preview context without launching:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--config-file<span class="w"> </span>preview.md
+cat<span class="w"> </span>preview.md
+</pre></div>
+</div>
+<p><strong>Debug context collection:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+</pre></div>
+</div>
+<p><strong>Use specific model:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PiratePersona<span class="w"> </span>--model<span class="w"> </span>gpt-4<span class="w"> </span>--assistant<span class="w"> </span>copilot
+</pre></div>
+</div>
+<p><strong>Force fresh evaluation:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--clean
+</pre></div>
+</div>
+</section>
+<section id="agent-workflow">
+<h3>Agent Workflow<a class="headerlink" href="#agent-workflow" title="Link to this heading">¶</a></h3>
+<p>When you run <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code>, the following steps occur:</p>
+<ol class="arabic simple">
+<li><p><strong>Task Resolution</strong>: Resolve task references to task definitions</p></li>
+<li><p><strong>Graph Building</strong>: Build dependency graph for all referenced tasks</p></li>
+<li><p><strong>Task Execution</strong>: Execute tasks to evaluate agent resources</p></li>
+<li><p><strong>Resource Collection</strong>: Extract skills, personas, tools, and references</p></li>
+<li><p><strong>Prompt Generation</strong>: Generate comprehensive system prompt with:</p>
+<ul class="simple">
+<li><p>Project information</p></li>
+<li><p>Available dfm commands</p></li>
+<li><p>Skill documentation</p></li>
+<li><p>Persona descriptions</p></li>
+<li><p>Reference materials</p></li>
+<li><p>Tool configurations</p></li>
+</ul>
+</li>
+<li><p><strong>Assistant Launch</strong>: Launch AI assistant with context in interactive mode</p></li>
+</ol>
+</section>
+</section>
+<section id="context-command">
+<h2>Context Command<a class="headerlink" href="#context-command" title="Link to this heading">¶</a></h2>
+<p>Output project context information for LLM agents.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>context<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+</pre></div>
+</div>
+<p>The context command generates comprehensive information about your DV Flow Manager
+project in a format optimized for consumption by AI assistants. This is useful for
+providing project awareness to LLM tools.</p>
+<section id="context-options">
+<h3>Context Options<a class="headerlink" href="#context-options" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--root</span> <span class="pre">PATH</span></code></dt><dd><p>Specify the root directory for the flow.</p>
+</dd>
+</dl>
+<p>Output includes:</p>
+<ul class="simple">
+<li><p>Project name and description</p></li>
+<li><p>Package structure and imports</p></li>
+<li><p>Available tasks with descriptions</p></li>
+<li><p>Type definitions</p></li>
+<li><p>Configuration options</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>context
+</pre></div>
+</div>
+</section>
+</section>
 <section id="graph-command">
 <h2>Graph Command<a class="headerlink" href="#graph-command" title="Link to this heading">¶</a></h2>
 <p>Generate a visual representation of task dependencies.</p>
@@ -1150,6 +1403,8 @@ dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="
 <li class="toctree-l2"><a class="reference internal" href="#common-options">Common Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#run-command">Run Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#show-command">Show Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#agent-command">Agent Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#context-command">Context Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#graph-command">Graph Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#ui-modes">UI Modes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#trace-output">Trace Output</a></li>

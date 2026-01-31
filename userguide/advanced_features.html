@@ -167,9 +167,10 @@ build systems, and performance-critical scenarios.</p>
 
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">count</span><span class="p">):</span>
         <span class="n">task</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">mkTaskNode</span><span class="p">(</span>
-            <span class="s2">&quot;std.Exec&quot;</span><span class="p">,</span>
+            <span class="kc">None</span><span class="p">,</span>  <span class="c1"># No base task</span>
             <span class="n">name</span><span class="o">=</span><span class="n">ctxt</span><span class="o">.</span><span class="n">mkName</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;task_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
-            <span class="n">command</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;./process.sh </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">shell</span><span class="o">=</span><span class="s2">&quot;bash&quot;</span><span class="p">,</span>
+            <span class="n">run</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;./process.sh </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
         <span class="n">ctxt</span><span class="o">.</span><span class="n">addTask</span><span class="p">(</span><span class="n">task</span><span class="p">)</span>
 </pre></div>
@@ -307,9 +308,8 @@ build systems, and performance-critical scenarios.</p>
 <span class="w">        </span><span class="nt">file</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;a.v&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;b.v&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;c.v&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;d.v&quot;</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">body</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">process</span>
-<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Exec</span>
-<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">        </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;./process.sh</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.file</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">      </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./process.sh ${{ matrix.file }}</span>
 
 <span class="w">  </span><span class="c1"># Sequential critical section</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical_task</span>
@@ -327,10 +327,8 @@ build systems, and performance-critical scenarios.</p>
 <p>Optimize incremental builds with smart dependencies:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generated_code</span>
-<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Exec</span>
-<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;./generate.sh&quot;</span>
-<span class="w">    </span><span class="nt">timestamp</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;generated/timestamp.txt&quot;</span>
+<span class="w">  </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./generate.sh</span>
 <span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg.CheckGeneratorInputs</span>
 
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
@@ -557,6 +555,7 @@ dfm<span class="w"> </span>run<span class="w"> </span>problem_task<span class="w
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="agent_integration.html">AI Agent Integration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>

@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>AI Agent Integration &#8212; DV Flow Manager  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Flow-Spec Reference" href="../reference/index.html" />
+    <link rel="prev" title="LLM Integration" href="llm_integration.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ai-agent-integration">
+<h1>AI Agent Integration<a class="headerlink" href="#ai-agent-integration" title="Link to this heading">¶</a></h1>
+<p>This guide explains how to integrate AI assistants with DV Flow Manager using the
+<code class="docutils literal notranslate"><span class="pre">agent</span></code> command. By defining skills, personas, tools, and references in your flow,
+you can create context-aware AI assistants that understand your project and workflows.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager’s agent integration allows you to:</p>
+<ul class="simple">
+<li><p>Launch AI assistants (GitHub Copilot CLI, OpenAI Codex) with project-specific context</p></li>
+<li><p>Define reusable skills that describe capabilities and knowledge domains</p></li>
+<li><p>Create personas that combine skills with specific roles or personalities</p></li>
+<li><p>Provide reference documentation directly to the AI</p></li>
+<li><p>Configure external tools and MCP servers for the AI to use</p></li>
+</ul>
+<p>The agent command evaluates task definitions to collect these resources, generates
+a comprehensive system prompt, and launches the AI assistant in interactive mode.</p>
+</section>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Define a skill</strong> in your <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>:</p></li>
+</ol>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DVFlowSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DV Flow Manager capabilities and commands</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/skills/dvflow_skill.md&quot;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><strong>Create the skill documentation</strong> (<code class="docutils literal notranslate"><span class="pre">skills/dvflow_skill.md</span></code>):</p></li>
+</ol>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span><span class="gh"># DV Flow Manager Skill</span>
+
+<span class="gu">## Available Commands</span>
+
+<span class="k">-</span><span class="w"> </span><span class="sb">`dfm run [tasks]`</span> - Execute workflow tasks
+<span class="k">-</span><span class="w"> </span><span class="sb">`dfm show tasks`</span> - List available tasks
+<span class="k">-</span><span class="w"> </span><span class="sb">`dfm show task &lt;name&gt;`</span> - Get task details
+
+<span class="gu">## Common Workflows</span>
+
+<span class="gu">### Building the project</span>
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>run<span class="w"> </span>build
+<span class="sb">```</span>
+
+<span class="gu">### Running tests</span>
+<span class="sb">```bash</span>
+dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span>
+<span class="sb">```</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p><strong>Launch the agent</strong>:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>DVFlowSkill
+</pre></div>
+</div>
+<p>The AI assistant will launch with knowledge of DV Flow Manager commands and your
+project structure.</p>
+</section>
+<section id="agent-resources">
+<h2>Agent Resources<a class="headerlink" href="#agent-resources" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager supports four types of agent resources, each serving a different purpose.</p>
+<section id="skills-agentskill">
+<h3>Skills (AgentSkill)<a class="headerlink" href="#skills-agentskill" title="Link to this heading">¶</a></h3>
+<p>Skills define capabilities and knowledge domains. They typically contain:</p>
+<ul class="simple">
+<li><p>Command references</p></li>
+<li><p>API documentation</p></li>
+<li><p>Best practices</p></li>
+<li><p>Domain-specific knowledge</p></li>
+</ul>
+<p><strong>Definition:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MySkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Description of what this skill provides</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/path/to/skill.md&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/path/to/examples.md&quot;</span>
+</pre></div>
+</div>
+<p><strong>Skill File Format:</strong></p>
+<p>Skills are typically written in Markdown and should be structured for easy consumption
+by AI models:</p>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span><span class="gh"># Skill Name</span>
+
+Brief overview of what this skill covers.
+
+<span class="gu">## Commands</span>
+
+List of commands with descriptions and examples.
+
+<span class="gu">## Concepts</span>
+
+Key concepts and terminology.
+
+<span class="gu">## Examples</span>
+
+Practical examples of usage.
+
+<span class="gu">## Common Patterns</span>
+
+Frequently used patterns and idioms.
+</pre></div>
+</div>
+<p><strong>Best Practices:</strong></p>
+<ul class="simple">
+<li><p>Keep skill files focused on a single domain</p></li>
+<li><p>Use clear, concise language</p></li>
+<li><p>Include plenty of examples</p></li>
+<li><p>Organize with clear headings</p></li>
+<li><p>Keep each skill under 5000 tokens if possible</p></li>
+</ul>
+</section>
+<section id="personas-agentpersona">
+<h3>Personas (AgentPersona)<a class="headerlink" href="#personas-agentpersona" title="Link to this heading">¶</a></h3>
+<p>Personas define the role or character the AI should adopt. They can depend on skills
+to combine capabilities with personality.</p>
+<p><strong>Definition:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExpertEngineer</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">DVFlowSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">PythonSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">TestingSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I am an expert verification engineer with deep knowledge of</span>
+<span class="w">    </span><span class="no">DV Flow Manager. I write clear, well-documented code and</span>
+<span class="w">    </span><span class="no">comprehensive tests. I prefer incremental development with</span>
+<span class="w">    </span><span class="no">frequent validation.</span>
+</pre></div>
+</div>
+<p><strong>Using Personas:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>ExpertEngineer
+</pre></div>
+</div>
+<p>The assistant will:</p>
+<ol class="arabic simple">
+<li><p>Adopt the persona’s role and communication style</p></li>
+<li><p>Have access to all dependent skills</p></li>
+<li><p>Apply the persona’s principles to responses</p></li>
+</ol>
+<p><strong>Example Personas:</strong></p>
+<ul class="simple">
+<li><p><strong>Debugger</strong>: Focuses on systematic problem diagnosis</p></li>
+<li><p><strong>Optimizer</strong>: Prioritizes performance and efficiency</p></li>
+<li><p><strong>Teacher</strong>: Explains concepts clearly with examples</p></li>
+<li><p><strong>Reviewer</strong>: Provides constructive code review feedback</p></li>
+</ul>
+</section>
+<section id="tools-agenttool">
+<h3>Tools (AgentTool)<a class="headerlink" href="#tools-agenttool" title="Link to this heading">¶</a></h3>
+<p>Tools define external programs or MCP servers that the agent can invoke.</p>
+<p><strong>Definition:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FileSystemTool</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentTool</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">File system operations via MCP</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">npx</span>
+<span class="w">    </span><span class="nt">args</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-y&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;@modelcontextprotocol/server-filesystem&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">rootdir</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>MCP Server Integration:</strong></p>
+<p>Model Context Protocol (MCP) servers provide structured interfaces for tools.
+Popular MCP servers include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-filesystem</span></code> - File operations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-git</span></code> - Git operations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-sqlite</span></code> - Database queries</p></li>
+</ul>
+<p><strong>Note:</strong> MCP integration is currently in development. Tools are prepared for
+future use but may not be fully functional in all assistants yet.</p>
+</section>
+<section id="references-agentreference">
+<h3>References (AgentReference)<a class="headerlink" href="#references-agentreference" title="Link to this heading">¶</a></h3>
+<p>References provide documentation and reference material to the agent.</p>
+<p><strong>Definition:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ProjectDocs</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentReference</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Project architecture and API documentation</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">rootdir</span><span class="nv"> </span><span class="s">}}/docs/architecture.md&quot;</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">rootdir</span><span class="nv"> </span><span class="s">}}/docs/api_reference.md&quot;</span>
+<span class="w">    </span><span class="nt">urls</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;https://example.com/external-docs&quot;</span>
+</pre></div>
+</div>
+<p><strong>When to Use References:</strong></p>
+<ul class="simple">
+<li><p>Project-specific documentation</p></li>
+<li><p>API specifications</p></li>
+<li><p>Architecture diagrams</p></li>
+<li><p>Design documents</p></li>
+<li><p>External documentation links</p></li>
+</ul>
+</section>
+</section>
+<section id="creating-agent-aware-packages">
+<h2>Creating Agent-Aware Packages<a class="headerlink" href="#creating-agent-aware-packages" title="Link to this heading">¶</a></h2>
+<p>To make your package easy to use with AI agents, follow these guidelines.</p>
+<section id="package-level-skills">
+<h3>Package-Level Skills<a class="headerlink" href="#package-level-skills" title="Link to this heading">¶</a></h3>
+<p>Create a skill that describes your package’s capabilities:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In mypackage/flow.yaml</span>
+<span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hardware verification utilities</span>
+
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyPackageSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Capabilities provided by mypackage</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">pkgdir</span><span class="nv"> </span><span class="s">}}/docs/agent_skill.md&quot;</span>
+</pre></div>
+</div>
+<p>Discoverable with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>skills
+dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--package<span class="w"> </span>mypackage
+</pre></div>
+</div>
+</section>
+<section id="project-level-personas">
+<h3>Project-Level Personas<a class="headerlink" href="#project-level-personas" title="Link to this heading">¶</a></h3>
+<p>Create personas for common project roles:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In project/flow.yaml</span>
+
+<span class="nt">imports</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pkg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="c1"># Import skills from packages</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyPackageSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage.MyPackageSkill</span>
+
+<span class="c1"># Define project-specific persona</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ProjectDeveloper</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">MyPackageSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I am familiar with this project&#39;s structure and conventions.</span>
+<span class="w">    </span><span class="no">I follow the team&#39;s coding standards and testing practices.</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="composing-contexts">
+<h2>Composing Contexts<a class="headerlink" href="#composing-contexts" title="Link to this heading">¶</a></h2>
+<p>You can combine multiple resources when launching an agent:</p>
+<p><strong>Multiple Skills:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PythonSkill<span class="w"> </span>TestingSkill<span class="w"> </span>DocumentationSkill
+</pre></div>
+</div>
+<p><strong>Persona with Extra Skills:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>ProjectDeveloper<span class="w"> </span>DebugSkill<span class="w"> </span>ProfilingSkill
+</pre></div>
+</div>
+<p><strong>Everything:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>MainPersona<span class="w"> </span>ProjectDocs<span class="w"> </span>FileSystemTool
+</pre></div>
+</div>
+</section>
+<section id="advanced-usage">
+<h2>Advanced Usage<a class="headerlink" href="#advanced-usage" title="Link to this heading">¶</a></h2>
+<section id="debugging-context">
+<h3>Debugging Context<a class="headerlink" href="#debugging-context" title="Link to this heading">¶</a></h3>
+<p>Preview what context will be sent to the agent:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save prompt to file</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--config-file<span class="w"> </span>prompt.md
+
+<span class="c1"># View as JSON</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq
+
+<span class="c1"># Check specific sections</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.skills&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="custom-models">
+<h3>Custom Models<a class="headerlink" href="#custom-models" title="Link to this heading">¶</a></h3>
+<p>Use specific AI models:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># With Copilot</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--assistant<span class="w"> </span>copilot<span class="w"> </span>--model<span class="w"> </span>gpt-4
+
+<span class="c1"># With Codex</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--assistant<span class="w"> </span>codex<span class="w"> </span>--model<span class="w"> </span>code-davinci-002
+</pre></div>
+</div>
+</section>
+<section id="fresh-context">
+<h3>Fresh Context<a class="headerlink" href="#fresh-context" title="Link to this heading">¶</a></h3>
+<p>Force re-evaluation of all tasks:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--clean
+</pre></div>
+</div>
+<p>This ensures all skill files and references are read fresh, useful when you’ve
+updated documentation.</p>
+</section>
+<section id="parameterized-resources">
+<h3>Parameterized Resources<a class="headerlink" href="#parameterized-resources" title="Link to this heading">¶</a></h3>
+<p>Agent resources can use parameters:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">params</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project_phase</span>
+<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">  </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span>
+
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PhaseSpecificSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Skills for ${{ project_phase }} phase</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/skills/${{</span><span class="nv"> </span><span class="s">project_phase</span><span class="nv"> </span><span class="s">}}_skill.md&quot;</span>
+</pre></div>
+</div>
+<p>Use with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>PhaseSpecificSkill<span class="w"> </span>-D<span class="w"> </span><span class="nv">project_phase</span><span class="o">=</span>testing
+</pre></div>
+</div>
+</section>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<section id="skill-organization">
+<h3>Skill Organization<a class="headerlink" href="#skill-organization" title="Link to this heading">¶</a></h3>
+<p><strong>Do:</strong></p>
+<ul class="simple">
+<li><p>Create focused, single-purpose skills</p></li>
+<li><p>Use clear, hierarchical structure</p></li>
+<li><p>Include practical examples</p></li>
+<li><p>Keep skills under 5000 tokens each</p></li>
+<li><p>Version control skill documents</p></li>
+</ul>
+<p><strong>Don’t:</strong></p>
+<ul class="simple">
+<li><p>Create monolithic “everything” skills</p></li>
+<li><p>Include outdated information</p></li>
+<li><p>Use jargon without explanation</p></li>
+<li><p>Forget to update skills when APIs change</p></li>
+</ul>
+</section>
+<section id="persona-design">
+<h3>Persona Design<a class="headerlink" href="#persona-design" title="Link to this heading">¶</a></h3>
+<p><strong>Effective Personas:</strong></p>
+<ul class="simple">
+<li><p>Have clear, specific roles</p></li>
+<li><p>Include behavioral guidelines</p></li>
+<li><p>List explicit do’s and don’ts</p></li>
+<li><p>Reference relevant skills</p></li>
+<li><p>Use natural, conversational language</p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CarefulReviewer</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">CodingStandards</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">SecuritySkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I am a careful code reviewer who:</span>
+<span class="w">    </span><span class="no">- Checks for security vulnerabilities first</span>
+<span class="w">    </span><span class="no">- Validates error handling and edge cases</span>
+<span class="w">    </span><span class="no">- Ensures code follows team standards</span>
+<span class="w">    </span><span class="no">- Provides constructive, actionable feedback</span>
+<span class="w">    </span><span class="no">- Points out both problems and good practices</span>
+</pre></div>
+</div>
+</section>
+<section id="testing-agent-resources">
+<h3>Testing Agent Resources<a class="headerlink" href="#testing-agent-resources" title="Link to this heading">¶</a></h3>
+<p>Test your agent resources before committing:</p>
+<ol class="arabic">
+<li><p><strong>Preview context</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>YourPersona<span class="w"> </span>--config-file<span class="w"> </span>preview.md
+</pre></div>
+</div>
+</li>
+<li><p><strong>Check for errors</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>YourPersona<span class="w"> </span>--json
+</pre></div>
+</div>
+</li>
+<li><p><strong>Launch and validate</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>YourPersona
+</pre></div>
+</div>
+</li>
+<li><p><strong>Ask test questions</strong> to verify the agent has correct context</p></li>
+</ol>
+</section>
+<section id="documentation-updates">
+<h3>Documentation Updates<a class="headerlink" href="#documentation-updates" title="Link to this heading">¶</a></h3>
+<p>Keep agent resources synchronized with your code:</p>
+<ul class="simple">
+<li><p>Update skills when commands change</p></li>
+<li><p>Revise personas as team practices evolve</p></li>
+<li><p>Refresh references when documentation moves</p></li>
+<li><p>Review and update quarterly</p></li>
+</ul>
+</section>
+</section>
+<section id="common-patterns">
+<h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading">¶</a></h2>
+<section id="development-assistant">
+<h3>Development Assistant<a class="headerlink" href="#development-assistant" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ProjectSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Project commands and structure</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/project_skill.md&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DevAssistant</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ProjectSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I help with day-to-day development tasks.</span>
+<span class="w">    </span><span class="no">I can run builds, execute tests, and explain errors.</span>
+</pre></div>
+</div>
+<p><strong>Usage:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>DevAssistant
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting-expert">
+<h3>Troubleshooting Expert<a class="headerlink" href="#troubleshooting-expert" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DebugSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Debugging techniques and tools</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/debug_skill.md&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LogAnalysisSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Log file analysis patterns</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/log_analysis.md&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Troubleshooter</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">DebugSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">LogAnalysisSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I am a systematic troubleshooter who:</span>
+<span class="w">    </span><span class="no">- Reproduces issues reliably</span>
+<span class="w">    </span><span class="no">- Forms hypotheses before diving into code</span>
+<span class="w">    </span><span class="no">- Uses logging and traces effectively</span>
+<span class="w">    </span><span class="no">- Documents findings for future reference</span>
+</pre></div>
+</div>
+<p><strong>Usage:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>Troubleshooter
+</pre></div>
+</div>
+</section>
+<section id="documentation-writer">
+<h3>Documentation Writer<a class="headerlink" href="#documentation-writer" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DocStyleSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Documentation style guide</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/style_guide.md&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">APIReference</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentReference</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Current API documentation</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/api/*.md&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DocWriter</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">DocStyleSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I write clear, comprehensive documentation with:</span>
+<span class="w">    </span><span class="no">- Practical examples</span>
+<span class="w">    </span><span class="no">- Clear explanations</span>
+<span class="w">    </span><span class="no">- Proper formatting</span>
+<span class="w">    </span><span class="no">- Accurate cross-references</span>
+</pre></div>
+</div>
+<p><strong>Usage:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>DocWriter<span class="w"> </span>APIReference
+</pre></div>
+</div>
+</section>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading">¶</a></h2>
+<section id="complete-example-verification-project">
+<h3>Complete Example: Verification Project<a class="headerlink" href="#complete-example-verification-project" title="Link to this heading">¶</a></h3>
+<p><strong>File: flow.yaml</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myproject</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hardware verification project</span>
+
+<span class="nt">imports</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pkg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verification_lib</span>
+
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="c1"># Skills</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UVMSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UVM methodology and patterns</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/skills/uvm_skill.md&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ProjectSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Project-specific commands and workflows</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">srcdir</span><span class="nv"> </span><span class="s">}}/docs/skills/project_skill.md&quot;</span>
+
+<span class="c1"># References</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DesignSpec</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentReference</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Design specification documents</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">rootdir</span><span class="nv"> </span><span class="s">}}/specs/design_spec.md&quot;</span>
+
+<span class="c1"># Personas</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VerificationEngineer</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">UVMSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ProjectSkill</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I am a verification engineer working on this project.</span>
+<span class="w">    </span><span class="no">I write UVM testbenches, analyze coverage, and debug failures.</span>
+<span class="w">    </span><span class="no">I follow the project&#39;s coding standards and verification plan.</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TestDebugger</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">UVMSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ProjectSkill</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">DesignSpec</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">I specialize in debugging failing tests.</span>
+<span class="w">    </span><span class="no">I systematically analyze waveforms, logs, and assertions.</span>
+<span class="w">    </span><span class="no">I reproduce issues reliably before proposing fixes.</span>
+</pre></div>
+</div>
+<p><strong>Usage:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># General development</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>VerificationEngineer
+
+<span class="c1"># Debugging a specific test</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>TestDebugger
+
+<span class="c1"># Quick reference access</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>ProjectSkill<span class="w"> </span>DesignSpec<span class="w"> </span>--config-file<span class="w"> </span>quick_ref.md
+</pre></div>
+</div>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
+<section id="agent-not-launching">
+<h3>Agent Not Launching<a class="headerlink" href="#agent-not-launching" title="Link to this heading">¶</a></h3>
+<p><strong>Error:</strong> “No AI assistant available”</p>
+<p><strong>Solution:</strong> Install an AI assistant:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># For GitHub Copilot CLI</span>
+npm<span class="w"> </span>install<span class="w"> </span>-g<span class="w"> </span>@github/copilot-cli
+
+<span class="c1"># Verify installation</span>
+copilot<span class="w"> </span>--version
+</pre></div>
+</div>
+<p><strong>Error:</strong> “Assistant ‘copilot’ not available”</p>
+<p><strong>Solution:</strong> Ensure the assistant is in your PATH and properly configured.</p>
+</section>
+<section id="tasks-not-evaluating">
+<h3>Tasks Not Evaluating<a class="headerlink" href="#tasks-not-evaluating" title="Link to this heading">¶</a></h3>
+<p><strong>Error:</strong> “Task execution failed”</p>
+<p><strong>Solution:</strong> Run tasks directly first to ensure they work:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>MySkill
+dfm<span class="w"> </span>agent<span class="w"> </span>MySkill
+</pre></div>
+</div>
+<p>Check that all file paths in <code class="docutils literal notranslate"><span class="pre">files:</span></code> arrays are valid and accessible.</p>
+</section>
+<section id="context-too-large">
+<h3>Context Too Large<a class="headerlink" href="#context-too-large" title="Link to this heading">¶</a></h3>
+<p><strong>Issue:</strong> The generated prompt is too large for the model</p>
+<p><strong>Solution:</strong></p>
+<ol class="arabic simple">
+<li><p>Split large skills into smaller, focused ones</p></li>
+<li><p>Use multiple smaller agent sessions instead of one large one</p></li>
+<li><p>Reference external docs via URLs instead of including full text</p></li>
+</ol>
+</section>
+<section id="missing-skills">
+<h3>Missing Skills<a class="headerlink" href="#missing-skills" title="Link to this heading">¶</a></h3>
+<p><strong>Issue:</strong> Skills not appearing in agent context</p>
+<p><strong>Solution:</strong> Verify skills are properly tagged:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>skills
+dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>MySkill
+dfm<span class="w"> </span>agent<span class="w"> </span>MySkill<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.skills&#39;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="faq">
+<h2>FAQ<a class="headerlink" href="#faq" title="Link to this heading">¶</a></h2>
+<p><strong>Q: Can I use the agent command in CI/CD?</strong></p>
+<p>A: The agent command is designed for interactive use. For CI/CD, use the standard
+<code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">run</span></code> and <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span></code> commands.</p>
+<p><strong>Q: How do I share personas across projects?</strong></p>
+<p>A: Define personas in a shared package that projects can import:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">imports</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pkg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">company_agents</span>
+
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompanyEngineer</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">company_agents.StandardEngineerPersona</span>
+</pre></div>
+</div>
+<p><strong>Q: Can I create private skills?</strong></p>
+<p>A: Yes, use local scope tasks that won’t be exported:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PrivateSkill</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">  </span><span class="c1"># Not marked for export</span>
+</pre></div>
+</div>
+<p><strong>Q: How often should I update skills?</strong></p>
+<p>A: Update skills whenever:</p>
+<ul class="simple">
+<li><p>Commands or APIs change</p></li>
+<li><p>New features are added</p></li>
+<li><p>Team practices evolve</p></li>
+<li><p>Feedback shows confusion</p></li>
+</ul>
+<p><strong>Q: Can agents execute dfm commands?</strong></p>
+<p>A: Yes, when launched with the agent command, assistants can execute dfm commands
+in the project directory. The system prompt includes available dfm commands and usage.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="llm_integration.html"><span class="doc">LLM Integration</span></a> - General LLM integration guide</p></li>
+<li><p><a class="reference internal" href="tasks_developing.html"><span class="doc">Developing Tasks</span></a> - Creating tasks</p></li>
+<li><p><a class="reference internal" href="../cmdref.html"><span class="doc">Command reference</span></a> - Command reference</p></li>
+<li><p><a class="reference internal" href="stdlib.html"><span class="doc">Standard Library</span></a> - Standard library reference</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">DV Flow Manager</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../incremental.html">Incremental Builds</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="fundamentals.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Flow-Spec Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cmdref.html">Command reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../llms.html">LLM Agent Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../pytask_api.html">Python Task API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../task_runners.html">Task Runners</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="llm_integration.html" title="previous chapter">LLM Integration</a></li>
+      <li>Next: <a href="../reference/index.html" title="next chapter">Flow-Spec Reference</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/userguide/agent_integration.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

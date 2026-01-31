@@ -236,9 +236,8 @@ task graph elaboration, before any task execution begins.</p>
 
 <span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
-<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Exec</span>
-<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;make debug&quot; if debug else &quot;make release&quot; }}</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;make debug&quot; if debug else &quot;make release&quot; }}</span>
 </pre></div>
 </div>
 <p>Note: Python-style conditional expressions (<code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">if</span> <span class="pre">condition</span> <span class="pre">else</span> <span class="pre">y</span></code>) are supported.</p>
@@ -493,6 +492,7 @@ task graph elaboration, before any task execution begins.</p>
 <li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="agent_integration.html">AI Agent Integration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
