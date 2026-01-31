@@ -28,10 +28,8 @@ package:
     for i in range(num_tasks):
         flow_content += f"""
   - name: task_{i}
-    uses: std.Exec
-    with:
-      shell: bash
-      command: "date +%s.%N > start_{i}.txt && sleep 1"
+    shell: bash
+    run: date +%s.%N > start_{i}.txt && sleep 1
 """
     
     # Add a final task that depends on all others to trigger them all
@@ -147,10 +145,8 @@ package:
     for i in range(num_tasks):
         flow_content += f"""
   - name: task_{i}
-    uses: std.Exec
-    with:
-      shell: bash
-      command: "date +%s.%N > start_{i}.txt && sleep 0.5"
+    shell: bash
+    run: date +%s.%N > start_{i}.txt && sleep 0.5
 """
     
     # Add a final task that depends on all others to trigger them all

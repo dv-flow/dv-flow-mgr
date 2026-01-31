@@ -339,13 +339,11 @@ package:
   name: pkg1
   tasks:
   - name: Sleep10
-    uses: std.Exec
-    with:
-      command: sleep 2
+    shell: bash
+    run: sleep 2
   - name: Sleep5
-    uses: std.Exec
-    with:
-      command: sleep 1
+    shell: bash
+    run: sleep 1
   - name: Sleep
     needs: [Sleep10, Sleep5]
 

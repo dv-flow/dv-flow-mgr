@@ -47,6 +47,9 @@ class PackageSpec(object):
 
 @dc.dataclass
 class PackageImportSpec(object):
+    name : str = dc.Field(
+        default=None,
+        json_schema_extra={"description": "Package name to import (alternative to 'from')"})
     path : str = dc.Field(
         default=None, 
         alias="from",

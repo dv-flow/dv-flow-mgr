@@ -66,7 +66,7 @@ Created comprehensive unit tests for all code examples in the DV Flow Manager do
 - **Key Tests**:
   - All 7 standard library tasks
   - std.FileSet with glob patterns
-  - std.Exec command execution
+  - Shell command execution with `shell: bash` and `run:`
   - std.SetEnv with glob expansion
   - std.Message with expressions
   - Complete workflow integration

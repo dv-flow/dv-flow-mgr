@@ -151,9 +151,10 @@ Use generator parameters to control graph structure:
         
         for i in range(count):
             task = ctxt.mkTaskNode(
-                "std.Exec",
+                None,  # No base task
                 name=ctxt.mkName(f"task_{i}"),
-                command=f"./process.sh {mode} {i}"
+                shell="bash",
+                run=f"./process.sh {mode} {i}"
             )
             ctxt.addTask(task)
 
@@ -302,9 +303,8 @@ Control parallelism at different levels:
             file: ["a.v", "b.v", "c.v", "d.v"]
         body:
         - name: process
-          uses: std.Exec
-          with:
-            command: "./process.sh ${{ matrix.file }}"
+          shell: bash
+          run: ./process.sh ${{ matrix.file }}
       
       # Sequential critical section
       - name: critical_task
@@ -326,10 +326,8 @@ Optimize incremental builds with smart dependencies:
 
     tasks:
     - name: generated_code
-      uses: std.Exec
-      with:
-        command: "./generate.sh"
-        timestamp: "generated/timestamp.txt"
+      shell: bash
+      run: ./generate.sh
       uptodate: my_pkg.CheckGeneratorInputs
     
     - name: compile

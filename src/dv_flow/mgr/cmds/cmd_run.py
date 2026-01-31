@@ -33,6 +33,7 @@ from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_listener_tui import TaskListenerTui
 from ..task_listener_progress import TaskListenerProgress
+from ..task_listener_progress_bar import TaskListenerProgressBar
 from ..task_listener_trace import TaskListenerTrace
 from ..cache_config import load_cache_providers
 from .util import get_rootdir
@@ -87,6 +88,8 @@ class CmdRun(object):
                 listener = TaskListenerLog()
             elif ui == 'progress':
                 listener = TaskListenerProgress()
+            elif ui == 'progressbar':
+                listener = TaskListenerProgressBar(message="Initalizing...")
             elif ui == 'tui':
                 listener = TaskListenerTui()
             else:

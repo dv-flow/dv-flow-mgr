@@ -559,24 +559,46 @@ class SkillCollector:
         return skills
     
     def _is_skill(self, type_obj) -> bool:
-        """Check if a type object is an agent skill (tagged with AgentSkillTag)."""
-        tags = getattr(type_obj, 'tags', [])
-        if not tags:
-            return False
+        """Check if a type object is an agent skill (tagged with AgentSkillTag).
         
+        Checks both the type's own tags and inherited tags from base types.
+        """
+        # Check type's own tags
+        tags = getattr(type_obj, 'tags', [])
         for tag in tags:
-            tag_name = ''
-            if isinstance(tag, str):
-                tag_name = tag
-            elif hasattr(tag, 'name'):
-                tag_name = tag.name
-            elif hasattr(tag, '__class__'):
-                tag_name = tag.__class__.__name__
-            
-            if 'AgentSkillTag' in tag_name:
+            if self._is_agent_skill_tag(tag):
                 return True
         
+        # Check inherited tags from base types
+        current = getattr(type_obj, 'uses', None)
+        visited = set()
+        while current is not None:
+            # Avoid infinite loops
+            type_id = id(current)
+            if type_id in visited:
+                break
+            visited.add(type_id)
+            
+            tags = getattr(current, 'tags', [])
+            for tag in tags:
+                if self._is_agent_skill_tag(tag):
+                    return True
+            
+            current = getattr(current, 'uses', None)
+        
         return False
+    
+    def _is_agent_skill_tag(self, tag) -> bool:
+        """Check if a tag is AgentSkillTag."""
+        tag_name = ''
+        if isinstance(tag, str):
+            tag_name = tag
+        elif hasattr(tag, 'name'):
+            tag_name = tag.name
+        elif hasattr(tag, '__class__'):
+            tag_name = tag.__class__.__name__
+        
+        return 'AgentSkillTag' in tag_name
     
     def _is_skill_def(self, type_def: TypeDef) -> bool:
         """Check if a TypeDef is an agent skill."""
@@ -598,27 +620,69 @@ class SkillCollector:
     
     def _type_to_skill_info(self, type_obj, pkg_name: str) -> Dict[str, Any]:
         """Convert Type object to skill info dict."""
+        import os
         short_name = type_obj.name.split('.')[-1] if '.' in type_obj.name else type_obj.name
         
-        # Extract skill fields from params
+        # Extract skill fields from params (support both old and new formats)
         desc = ''
         skill_doc = ''
         skill_name = ''
+        files = []
+        content = ''
+        urls = []
         
         if hasattr(type_obj, 'param_defs') and type_obj.param_defs:
             defs = type_obj.param_defs.definitions
+            # Old format support
             if 'desc' in defs:
                 desc = defs['desc'].value if hasattr(defs['desc'], 'value') else ''
             if 'skill_doc' in defs:
                 skill_doc = defs['skill_doc'].value if hasattr(defs['skill_doc'], 'value') else ''
             if 'name' in defs:
                 skill_name = defs['name'].value if hasattr(defs['name'], 'value') else ''
+            # New format support
+            if 'content' in defs:
+                content = defs['content'].value if hasattr(defs['content'], 'value') else ''
+            if 'files' in defs:
+                files_val = defs['files'].value if hasattr(defs['files'], 'value') else []
+                if isinstance(files_val, list):
+                    files = files_val
+            if 'urls' in defs:
+                urls_val = defs['urls'].value if hasattr(defs['urls'], 'value') else []
+                if isinstance(urls_val, list):
+                    urls = urls_val
+        
+        # Use content as desc if desc is empty
+        if not desc and content:
+            desc = content
         
         # Also check doc field on the type itself
         type_doc = getattr(type_obj, 'doc', '') or ''
         if not desc and type_doc:
             # Use first line of doc as desc
             desc = type_doc.split('\n')[0].strip()
+        
+        # If verbose, load skill.md from files
+        if self._verbose and files:
+            skill_md = None
+            # Find the package basedir
+            basedir = ''
+            if hasattr(type_obj, 'pkg') and hasattr(type_obj.pkg, 'basedir'):
+                basedir = type_obj.pkg.basedir
+            
+            for file in files:
+                if file.endswith('skill.md'):
+                    skill_md = file
+                    break
+            
+            if skill_md and basedir:
+                skill_path = os.path.join(basedir, skill_md)
+                if os.path.exists(skill_path):
+                    try:
+                        with open(skill_path, 'r') as f:
+                            skill_doc = f.read()
+                    except Exception as e:
+                        self._log.debug(f"Could not read skill.md: {e}")
         
         info = {
             'name': type_obj.name,
@@ -632,15 +696,21 @@ class SkillCollector:
         if self._verbose:
             info['skill_doc'] = skill_doc or type_doc
             info['uses'] = type_obj.uses.name if hasattr(type_obj, 'uses') and type_obj.uses else None
+            info['files'] = files
+            info['urls'] = urls
         
         return info
     
     def _type_def_to_skill_info(self, type_def: TypeDef, pkg_name: str) -> Dict[str, Any]:
         """Convert TypeDef to skill info dict."""
-        # Extract skill fields from params
+        import os
+        # Extract skill fields from params (support both old and new formats)
         desc = ''
         skill_doc = ''
         skill_name = ''
+        files = []
+        content = ''
+        urls = []
         
         params = type_def.params or {}
         for name, param in params.items():
@@ -659,11 +729,62 @@ class SkillCollector:
                     skill_name = param.get('value', '')
                 elif hasattr(param, 'value'):
                     skill_name = param.value
+            elif name == 'content':
+                if isinstance(param, dict):
+                    content = param.get('value', '')
+                elif hasattr(param, 'value'):
+                    content = param.value
+            elif name == 'files':
+                if isinstance(param, dict):
+                    files_val = param.get('value', [])
+                elif hasattr(param, 'value'):
+                    files_val = param.value
+                else:
+                    files_val = []
+                if isinstance(files_val, list):
+                    files = files_val
+            elif name == 'urls':
+                if isinstance(param, dict):
+                    urls_val = param.get('value', [])
+                elif hasattr(param, 'value'):
+                    urls_val = param.value
+                else:
+                    urls_val = []
+                if isinstance(urls_val, list):
+                    urls = urls_val
+        
+        # Use content as desc if desc is empty
+        if not desc and content:
+            desc = content
         
         # Also use doc from the type def
         type_doc = type_def.doc or ''
         if not desc and type_doc:
             desc = type_doc.split('\n')[0].strip()
+        
+        # If verbose, load skill.md from files
+        if self._verbose and files:
+            skill_md = None
+            # Try to get basedir from the package loader
+            basedir = ''
+            if hasattr(type_def, 'pkg') and hasattr(type_def.pkg, 'basedir'):
+                basedir = type_def.pkg.basedir
+            elif self._pkg and hasattr(self._pkg, 'basedir'):
+                basedir = self._pkg.basedir
+            
+            for file in files:
+                if file.endswith('skill.md'):
+                    skill_md = file
+                    break
+            
+            if skill_md and basedir:
+                skill_path = os.path.join(basedir, skill_md)
+                if os.path.exists(skill_path):
+                    try:
+                        with open(skill_path, 'r') as f:
+                            skill_doc = f.read()
+                    except Exception as e:
+                        self._log.debug(f"Could not read skill.md: {e}")
         
         info = {
             'name': f"{pkg_name}.{type_def.name}",
@@ -677,5 +798,7 @@ class SkillCollector:
         if self._verbose:
             info['skill_doc'] = skill_doc or type_doc
             info['uses'] = type_def.uses
+            info['files'] = files
+            info['urls'] = urls
         
         return info

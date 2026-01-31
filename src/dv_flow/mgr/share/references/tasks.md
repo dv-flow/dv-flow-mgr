@@ -124,11 +124,12 @@ Use `uses` (or `type`) to specify the base task:
 Common base tasks:
 - `std.FileSet` - Collect files
 - `std.Message` - Display message
-- `std.Exec` - Run shell command
 - `std.CreateFile` - Create file from content
 - `std.SetEnv` - Set environment variables
 - `hdlsim.vlt.SimImage` - Verilator simulation image
 - `hdlsim.vlt.SimRun` - Run Verilator simulation
+
+Shell commands are executed with `shell: bash` and `run:`.
 
 ## Dependencies
 
@@ -326,10 +327,8 @@ Use `rundir: inherit` for subtasks to share directory:
         content: "test data"
     
     - name: process
-      uses: std.Exec
-      needs: [create]
-      with:
-        command: "cat data.txt"
+      shell: bash
+      run: cat data.txt
 ```
 
 ### Parameterized Compound Tasks
@@ -414,7 +413,8 @@ Each task gets dedicated directory:
 
 ```yaml
 - name: task1
-  uses: std.Exec
+  shell: bash
+  run: echo "Hello"
   rundir: unique    # Gets own directory: rundir/task1/
 ```
 
@@ -429,7 +429,8 @@ Share parent's directory:
     - name: step1
       uses: std.CreateFile
     - name: step2
-      uses: std.Exec
+      shell: bash
+      run: echo "Processing"
       needs: [step1]  # Can access step1's files
 ```
 
@@ -538,8 +539,7 @@ tasks:
         PATH: /opt/tools/bin
   
   - name: run_tool
-    uses: std.Exec
+    shell: bash
+    run: my_tool --run
     needs: [setup_env]
-    with:
-      command: "my_tool --run"
 ```
