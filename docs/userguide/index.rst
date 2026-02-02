@@ -8,6 +8,7 @@ User Guide
    fundamentals
    packages
    tasks_using
+   dataflow
    visibility
    tasks_developing
    configuration

@@ -197,6 +197,9 @@ class TaskDef(BaseModel):
     consumes : Union[ConsumesE, List[Any], None] = dc.Field(
         default=None,
         description="Specifies matching patterns for parameter sets that this task consumes")
+    produces : Union[List[Dict[str, Any]], None] = dc.Field(
+        default=None,
+        description="Specifies matching patterns for datasets that this task produces")
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")

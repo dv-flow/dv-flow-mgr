@@ -809,3 +809,42 @@ class SkillCollector:
             info['urls'] = urls
         
         return info
+
+
+class ProducesCollector:
+    """Collects tasks that match a produces pattern."""
+    
+    def __init__(self, pattern_str: str):
+        """
+        Initialize with pattern string like "type=std.FileSet,filetype=verilog"
+        """
+        self.pattern = self._parse_pattern(pattern_str)
+    
+    def _parse_pattern(self, pattern_str: str) -> Dict[str, str]:
+        """Parse comma-separated key=value pairs."""
+        pattern = {}
+        for pair in pattern_str.split(','):
+            if '=' in pair:
+                key, value = pair.split('=', 1)
+                pattern[key.strip()] = value.strip()
+        return pattern
+    
+    def matches(self, task) -> bool:
+        """Check if task produces matches the pattern."""
+        if not hasattr(task, 'produces') or not task.produces:
+            return False
+        
+        # Check if any produces pattern matches
+        for produces_pattern in task.produces:
+            if self._pattern_matches(produces_pattern):
+                return True
+        return False
+    
+    def _pattern_matches(self, produces_pattern: Dict) -> bool:
+        """Check if produces pattern matches the filter pattern."""
+        for key, value in self.pattern.items():
+            if key not in produces_pattern:
+                return False
+            if str(produces_pattern[key]) != value:
+                return False
+        return True

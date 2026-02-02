@@ -12,9 +12,11 @@ DV Flow Manager is a YAML-based build system and execution engine designed for s
 Use this skill when:
 - Creating or modifying `flow.yaml` or `flow.dv` files
 - Writing task definitions for HDL compilation, simulation, or verification
-- Configuring dataflow between tasks using `needs`, `consumes`, `passthrough`
+- Configuring dataflow between tasks using `needs`, `consumes`, `produces`, `passthrough`
+- Discovering tasks by their outputs using `produces` patterns
+- Validating dataflow compatibility between producer and consumer tasks
 - Setting up package parameters and configurations
-- Running `dfm` commands (run, show, graph)
+- Running `dfm` commands (run, show, graph, validate)
 - Debugging build flow issues
 - Working with standard library tasks (std.FileSet, std.Message, etc.)
 - Executing shell commands with `shell: bash` and `run:`
@@ -34,10 +36,16 @@ package:
       with:
         type: systemVerilogSource
         include: "*.sv"
+      produces:
+        - type: std.FileSet
+          filetype: systemVerilogSource
     
     - name: sim
       uses: hdlsim.vlt.SimImage
       needs: [rtl_files]
+      consumes:
+        - type: std.FileSet
+          filetype: systemVerilogSource
       with:
         top: [my_top]
 ```
@@ -57,10 +65,14 @@ dfm show packages           # List all available packages
 dfm show packages --json    # JSON output for Agents
 dfm show tasks              # List all visible tasks
 dfm show tasks --search kw  # Search tasks by keyword
-dfm show task std.FileSet   # Show detailed task info
+dfm show task std.FileSet   # Show detailed task info (includes produces)
 dfm show types              # List data types and tags
 dfm show project            # Show current project structure
 dfm context --json          # Get full project context (for Agents)
+
+# Task discovery by outputs (uses produces)
+dfm show tasks --produces "type=std.FileSet,filetype=verilog"
+dfm show tasks --produces "type=std.FileSet" --json
 
 # Visualization
 dfm graph task -o flow.dot  # Generate dependency graph
@@ -147,6 +159,123 @@ dfm show task my_project.build --json
 2. **State Consistency**: Sees outputs from tasks already completed
 3. **Cache Sharing**: Uses same memento cache for incremental builds
 4. **Unified Logging**: All task output appears in parent session's logs
+
+## Using Produces/Consumes for Task Discovery (AI Assistants)
+
+When helping users build workflows, use produces/consumes to identify compatible tasks:
+
+### Finding Tasks by Output Type
+
+```bash
+# Find all tasks that produce verilog files
+dfm show tasks --produces "type=std.FileSet,filetype=verilog" --json
+
+# Find tasks that produce any FileSet
+dfm show tasks --produces "type=std.FileSet" --json
+
+# Find tasks with specific output characteristics
+dfm show tasks --produces "type=std.FileSet,filetype=verilog,stage=compiled"
+```
+
+### Understanding Task Relationships
+
+When a task needs specific inputs, find compatible producers:
+
+```bash
+# 1. User wants to simulate - what tasks produce simulation inputs?
+dfm show tasks --produces "type=std.FileSet,filetype=verilog" --json
+
+# 2. Check what a specific task produces
+dfm show task VerilogCompiler --json
+# Look at "produces" field in output
+
+# 3. Validate compatibility before suggesting workflow
+dfm validate --json
+# Check for warnings about produces/consumes mismatches
+```
+
+### Matching Logic
+
+**OR Logic**: If ANY consume pattern matches ANY produce pattern → compatible
+
+**Subset Matching**: Consumer can be less specific than producer
+
+```yaml
+# Producer (more specific)
+produces:
+  - type: std.FileSet
+    filetype: verilog
+    vendor: synopsys
+    optimization: speed
+
+# Consumer (less specific) - MATCHES!
+consumes:
+  - type: std.FileSet
+    filetype: verilog
+```
+
+### Building Compatible Workflows
+
+1. **Identify user's goal** - What output do they need?
+2. **Find producers** - `dfm show tasks --produces "type=..."`
+3. **Check consumer requirements** - `dfm show task ConsumerTask` → look at consumes
+4. **Validate** - `dfm validate` to check compatibility
+5. **Suggest workflow** - Connect producer → consumer via `needs`
+
+### Example: Building a Compilation Pipeline
+
+```bash
+# User: "I need to compile and simulate my Verilog"
+
+# 1. Find verilog compilers
+dfm show tasks --produces "type=std.FileSet,filetype=verilog" --json
+# Returns: [VerilogCompiler, PreProcessor, ...]
+
+# 2. Find simulators that consume verilog
+dfm show task Simulator --json
+# Check consumes field: [{"type": "std.FileSet", "filetype": "verilog"}]
+
+# 3. Suggest workflow
+# - name: sim
+#   uses: Simulator
+#   needs: [VerilogCompiler]  # Compatible!
+```
+
+### Pattern Attribute Matching
+
+Match patterns by any attributes defined in produces/consumes:
+
+```yaml
+# Common attributes for std.FileSet:
+filetype: verilog|systemVerilog|vhdl|...
+stage: preprocessed|compiled|optimized
+vendor: synopsys|cadence|mentor|...
+optimization: speed|area|power
+format: json|xml|ucdb|...
+
+# Custom types can have arbitrary attributes
+produces:
+  - type: custom.BuildArtifact
+    language: python
+    arch: x86_64
+    debug: true
+```
+
+### Validation Warnings
+
+If validation shows warnings, help fix them:
+
+```bash
+$ dfm validate
+WARNING: Task 'Consumer' consumes [{'type': 'std.FileSet', 'filetype': 'vhdl'}]
+         but 'Producer' produces [{'type': 'std.FileSet', 'filetype': 'verilog'}].
+```
+
+**Solutions:**
+1. Change consumer to accept verilog: `filetype: verilog`
+2. Find different producer that outputs vhdl
+3. Add converter task in between
+4. Check if parameter can adjust producer's output
 
 ## Detailed Documentation
 
@@ -239,11 +368,34 @@ package:
       uses: std.Message
 ```
 
-### Dataflow
+### Dataflow & Produces/Consumes
 Tasks communicate via typed data items, not global variables:
 - `needs: [task1, task2]` - Specify dependencies
+- `produces: [patterns]` - Declare what output datasets this task creates
 - `consumes: all|none|[patterns]` - Control what inputs reach implementation
 - `passthrough: all|none|unused|[patterns]` - Control what inputs forward to output
+
+**Produces/Consumes enable:**
+1. **Task Discovery** - Find tasks that produce specific outputs
+2. **Dependency Validation** - Check dataflow compatibility
+3. **Relationship Understanding** - Identify which tasks can work together
+
+```yaml
+# Producer declares outputs
+- name: VerilogCompiler
+  produces:
+    - type: std.FileSet
+      filetype: verilog
+  run: compile_verilog.sh
+
+# Consumer declares requirements  
+- name: Simulator
+  needs: [VerilogCompiler]
+  consumes:
+    - type: std.FileSet
+      filetype: verilog
+  run: simulate.sh
+```
 
 ## File Structure
 
@@ -273,3 +425,7 @@ For comprehensive documentation, see the following reference files:
 - [CLI Reference](references/cli.md) - Command line interface
 - [Advanced Patterns](references/advanced.md) - Complex workflows and optimization
 - [Task Development](references/task_development.md) - **Creating custom task implementations and plugin packages** (use when developing new tasks)
+
+**For dataflow and produces/consumes:**
+- See the User Guide: Dataflow & Produces (docs/userguide/dataflow.rst) for complete documentation
+- See docs/produces.md for quick reference

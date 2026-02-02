@@ -205,7 +205,7 @@ List and search tasks across all packages.
 
 .. code-block:: bash
 
-    dfm show tasks [--package PKG] [--scope SCOPE] [--search KEYWORD] [--json]
+    dfm show tasks [--package PKG] [--scope SCOPE] [--produces PATTERN] [--search KEYWORD] [--json]
 
 Options:
 
@@ -214,6 +214,22 @@ Options:
 
 ``--scope {root,export,local}``
     Filter tasks by visibility scope.
+
+``--produces PATTERN``
+    Filter tasks by produces pattern. Use comma-separated key=value pairs
+    to specify the pattern. All specified attributes must match (AND logic),
+    but tasks can have additional attributes (subset matching).
+    
+    .. code-block:: bash
+    
+        # Find tasks that produce std.FileSet
+        dfm show tasks --produces "type=std.FileSet"
+        
+        # Find tasks that produce verilog files
+        dfm show tasks --produces "type=std.FileSet,filetype=verilog"
+        
+        # Find vendor-specific outputs
+        dfm show tasks --produces "type=std.FileSet,filetype=verilog,vendor=synopsys"
 
 Examples:
 
@@ -227,6 +243,9 @@ Examples:
     
     # List tasks in std package
     dfm show tasks --package std
+    
+    # Find tasks that produce FileSet outputs
+    dfm show tasks --produces "type=std.FileSet"
 
 Show Task Detail
 ----------------
@@ -258,6 +277,38 @@ Examples:
     
     # JSON output with full details
     dfm show task std.FileSet --json
+
+The task detail output includes:
+
+* **Name and Package**: Full task name and containing package
+* **Base**: Task inheritance (uses relationship)
+* **Scope**: Visibility (root, export, local)
+* **Description and Documentation**: Task purpose and usage
+* **Parameters**: Task parameters with types and defaults
+* **Produces**: Output dataset patterns this task creates (see :doc:`userguide/dataflow`)
+* **Consumes**: Input dataset patterns this task accepts
+* **Direct Needs**: Immediate dependencies
+
+Example output showing produces:
+
+.. code-block:: text
+
+    Task:        my_flow.VerilogCompiler
+    Package:     my_flow
+    Base:        -
+    Scope:       -
+    
+    Description:
+      Compiles Verilog RTL with optimization
+    
+    Parameters:
+      optimization  str     O2    Optimization level
+    
+    Produces:
+      - type=std.FileSet, filetype=verilog, optimization=O2
+    
+    Direct Needs:
+      - my_flow.SourceFiles
 
 Show Types
 ----------
@@ -323,6 +374,121 @@ For backward compatibility, the following legacy invocations are supported:
     
     # Show task with dependency tree (legacy behavior)
     dfm show <task> -a
+
+Validate Command
+================
+
+The validate command checks your flow definition for errors and potential issues,
+including dataflow compatibility between tasks.
+
+.. code-block:: bash
+
+    dfm validate [--json]
+
+The validator performs the following checks:
+
+1. **Syntax Validation**: YAML/DV parsing and schema validation
+2. **Undefined References**: Detects references to non-existent tasks
+3. **Circular Dependencies**: Detects circular task dependencies
+4. **Dataflow Compatibility**: Checks produces/consumes patterns between connected tasks
+5. **Unused Tasks**: Warns about tasks that are defined but never referenced
+
+Validation Output
+-----------------
+
+**Errors** prevent the workflow from executing:
+
+* Parse errors in flow definition
+* Undefined task references
+* Circular dependencies
+
+**Warnings** indicate potential issues but allow execution:
+
+* Dataflow mismatches (produces/consumes incompatibility)
+* Unused tasks
+* Missing optional declarations
+
+Example output:
+
+.. code-block:: text
+
+    Package: my_flow
+      Tasks: 8
+      Types: 3
+    
+    Warnings (1):
+      WARNING: Task 'Simulator' consumes [{'type': 'std.FileSet', 'filetype': 'vhdl'}]
+               but 'VerilogCompiler' produces [{'type': 'std.FileSet', 'filetype': 'verilog'}].
+               No consume pattern matches any produce pattern.
+    
+    ✓ Validation passed
+      (1 warning(s))
+
+JSON Output
+-----------
+
+Use ``--json`` for programmatic consumption:
+
+.. code-block:: bash
+
+    dfm validate --json
+
+.. code-block:: json
+
+    {
+      "valid": true,
+      "errors": [],
+      "warnings": [
+        {
+          "type": "DataflowMismatch",
+          "message": "Task 'Simulator' consumes ... but 'VerilogCompiler' produces ...",
+          "producer": "my_flow.VerilogCompiler",
+          "consumer": "my_flow.Simulator"
+        }
+      ],
+      "info": [
+        {
+          "type": "PackageInfo",
+          "name": "my_flow",
+          "task_count": 8,
+          "type_count": 3
+        }
+      ],
+      "error_count": 0,
+      "warning_count": 1
+    }
+
+Dataflow Validation
+-------------------
+
+The validator checks that produces patterns from producer tasks match the
+consumes patterns of consumer tasks. See :doc:`userguide/dataflow` for details
+on compatibility rules.
+
+**Compatibility Rules:**
+
+* Consumer with ``consumes: all`` accepts any produces
+* Producer with no produces declared is assumed compatible
+* **OR Logic**: If ANY consume pattern matches ANY produce pattern, the dataflow is valid
+* Pattern matching uses subset logic (producer can have extra attributes)
+
+**When to fix warnings:**
+
+* The consumer truly needs different data than what's produced
+* There's a typo in task names or pattern attributes
+* You want strict validation for production workflows
+
+**When to accept warnings:**
+
+* Outputs are dynamic and not known until runtime
+* The mismatch is intentional (flexible workflow)
+* You're in early development/prototyping
+
+See Also
+--------
+
+* :doc:`userguide/dataflow` - Complete dataflow and produces documentation
+* ``dfm show task <name>`` - View task produces/consumes patterns
 
 Agent Command
 =============

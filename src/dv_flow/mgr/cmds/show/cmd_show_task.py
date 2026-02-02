@@ -145,6 +145,7 @@ class CmdShowTask:
             'rundir': str(task.rundir.value) if hasattr(task, 'rundir') and task.rundir else 'unique',
             'passthrough': str(task.passthrough) if hasattr(task, 'passthrough') and task.passthrough else None,
             'consumes': str(task.consumes) if hasattr(task, 'consumes') and task.consumes else None,
+            'produces': task.produces if hasattr(task, 'produces') and task.produces else None,
         }
         
         return info
@@ -284,6 +285,17 @@ class CmdShowTask:
             self._print_needs_chain_header()
             self._print_needs_chain(info['needs_chain'], indent=2)
         else:
+            # Show consumes and produces
+            if info.get('consumes'):
+                formatter.add_field("Consumes", info['consumes'])
+            
+            if info.get('produces'):
+                produces_strs = []
+                for pattern in info['produces']:
+                    pattern_str = ', '.join(f"{k}={v}" for k, v in pattern.items())
+                    produces_strs.append(pattern_str)
+                formatter.add_list("Produces", produces_strs)
+            
             if info.get('needs'):
                 formatter.add_list("Direct Needs", info['needs'])
             else:

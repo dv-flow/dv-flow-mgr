@@ -40,6 +40,7 @@ class Task(object):
     iff : str = None
     needs : List[str] = dc.field(default_factory=list)
     consumes : Union[ConsumesE, List[Dict[str, Any]]] = dc.field(default=None)
+    produces : Union[List[Dict[str, Any]], None] = dc.field(default=None)
     passthrough : Union[PassthroughE, List[Dict[str, Any]]] = dc.field(default=None)
     rundir : RundirE = None
     uptodate : Union[bool, str, None] = None
@@ -82,6 +83,8 @@ class Task(object):
             task["shell"] = self.shell
         if self.srcinfo is not None:
             task["srcinfo"] = self.srcinfo.dump()
+        if self.produces is not None and len(self.produces):
+            task["produces"] = self.produces
 
         return task
 
