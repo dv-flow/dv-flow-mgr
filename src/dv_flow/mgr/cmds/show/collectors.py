@@ -262,13 +262,20 @@ class TaskCollector:
         desc = getattr(task, 'desc', '') or ''
         doc = getattr(task, 'doc', '') or ''
         
+        # Get uses - convert to name if it's an object
+        uses = getattr(task, 'uses', None)
+        if uses is not None and hasattr(uses, 'name'):
+            uses = uses.name
+        elif uses is not None and not isinstance(uses, str):
+            uses = str(uses)
+        
         info = {
             'name': task.name,
             'short_name': short_name,
             'package': pkg_name,
             'desc': desc,
             'doc': doc,
-            'uses': getattr(task, 'uses', None),
+            'uses': uses,
             'scope': scope,
             'tags': self._tags_to_list(getattr(task, 'tags', [])),
         }
