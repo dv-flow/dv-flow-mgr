@@ -1,0 +1,165 @@
+# Example: Produces Feature Demonstration
+#
+# This example demonstrates the produces feature in DV Flow Manager,
+# showing how tasks declare their outputs and how validation checks
+# dataflow compatibility.
+
+package:
+  name: produces_example
+
+  tasks:
+    # Root task that orchestrates the workflow
+    - root: BuildAndSimulate
+      body:
+        # Stage 1: Generate Verilog RTL source files
+        - name: GenerateRTL
+          desc: Generate Verilog RTL design files
+          produces:
+            - type: std.FileSet
+              filetype: verilog
+              stage: rtl
+          run: |
+            mkdir -p rtl
+            echo "module top(); endmodule" > rtl/design.v
+            echo "Generated RTL"
+            
+        # Stage 2: Compile Verilog to simulation model
+        - name: CompileVerilog
+          desc: Compile Verilog files to simulation library
+          needs: [GenerateRTL]
+          consumes:
+            - type: std.FileSet
+              filetype: verilog
+          produces:
+            - type: std.FileSet
+              filetype: simLib
+              stage: compiled
+          run: |
+            mkdir -p sim
+            echo "Compiling verilog files from input..."
+            echo "Created simulation library"
+            
+        # Stage 3: Run simulation using compiled model
+        - name: RunSimulation
+          desc: Execute simulation with compiled model
+          needs: [CompileVerilog]
+          consumes:
+            - type: std.FileSet
+              filetype: simLib
+          produces:
+            - type: std.FileSet
+              filetype: waveform
+              format: vcd
+            - type: std.FileSet
+              filetype: log
+              format: text
+          run: |
+            mkdir -p results
+            echo "Running simulation..."
+            echo "Generated waveform and log files"
+            
+        # Stage 4: Generate HTML report from simulation outputs
+        - name: GenerateReport
+          desc: Create HTML report from simulation logs
+          needs: [RunSimulation]
+          consumes:
+            - type: std.FileSet
+              filetype: log
+          produces:
+            - type: std.FileSet
+              filetype: html
+              category: report
+          run: |
+            mkdir -p reports
+            echo "<html><body>Simulation Report</body></html>" > reports/report.html
+            echo "Generated HTML report"
+
+    # Example: Parameterized task with produces using parameter references
+    - name: GenericFileProducer
+      desc: Produces files of a configurable type
+      with:
+        output_type:
+          type: str
+          value: verilog
+          desc: Type of files to produce
+        format:
+          type: str
+          value: text
+          desc: Format of the output files
+      produces:
+        # Parameter references are evaluated at runtime
+        - type: std.FileSet
+          filetype: "${{ params.output_type }}"
+          format: "${{ params.format }}"
+      run: |
+        echo "Producing ${{ output_type }} files in ${{ format }} format..."
+
+    # Example: Multi-type producer
+    - name: MultiOutputTask
+      desc: Task that produces multiple output types
+      produces:
+        - type: std.FileSet
+          filetype: verilog
+          category: design
+        - type: std.FileSet
+          filetype: verilogInclude
+          category: headers
+        - type: custom.Metadata
+          format: json
+      run: |
+        echo "Producing multiple output types..."
+        mkdir -p outputs
+        echo "// Verilog design" > outputs/design.v
+        echo "// Verilog header" > outputs/header.vh
+        echo "{\"version\": \"1.0\"}" > outputs/metadata.json
+    
+    # Example: Base task for inheritance
+    - name: BaseCompiler
+      desc: Base compiler with standard optimization
+      with:
+        optimization:
+          type: str
+          value: "O2"
+          desc: Optimization level
+      produces:
+        - type: std.FileSet
+          filetype: verilog
+          stage: compiled
+          optimization: "${{ params.optimization }}"
+      run: |
+        echo "Base compilation with ${{ optimization }} optimization"
+    
+    # Example: Derived task that extends base produces
+    - name: AdvancedCompiler
+      desc: Advanced compiler that adds coverage generation
+      uses: BaseCompiler
+      produces:
+        # Adds additional output (extends base produces)
+        - type: std.FileSet
+          filetype: coverage
+          format: ucdb
+      with:
+        optimization:
+          type: str
+          value: "O3"  # Override default
+      run: |
+        echo "Advanced compilation with coverage at ${{ optimization }}"
+        
+    # Note: AdvancedCompiler produces BOTH:
+    #   1. std.FileSet with filetype=verilog (inherited from BaseCompiler)
+    #   2. std.FileSet with filetype=coverage (added by AdvancedCompiler)
+    
+    # Example: Task with no produces (dynamic outputs)
+    - name: DynamicTask
+      desc: Task with outputs that vary at runtime
+      # No produces declared - that's OK, assumes unknown/dynamic outputs
+      run: |
+        echo "This task produces dynamic outputs not known at definition time"
+    
+    # Example: Task with explicitly no outputs
+    - name: SideEffectTask
+      desc: Task that only has side effects, no data outputs
+      produces: []  # Explicitly declare no outputs
+      run: |
+        echo "This task has side effects only"
+        # Maybe it sends notifications, updates a database, etc.
