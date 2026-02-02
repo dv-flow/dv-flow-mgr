@@ -63,6 +63,23 @@ class CmdShowTasks:
         if scope_filter:
             tasks = filter_by_scope(tasks, scope_filter)
         
+        # Apply produces filter
+        produces_filter = getattr(args, 'produces', None)
+        if produces_filter:
+            from .collectors import ProducesCollector
+            collector = ProducesCollector(produces_filter)
+            # Need to get actual Task objects to check produces
+            # Filter using task info from the package
+            if pkg and hasattr(pkg, 'task_m'):
+                filtered = []
+                for task_info in tasks:
+                    task_name = task_info['name']
+                    if task_name in pkg.task_m:
+                        task = pkg.task_m[task_name]
+                        if collector.matches(task):
+                            filtered.append(task_info)
+                tasks = filtered
+        
         # Apply search filters
         searcher = Searcher(
             keyword=getattr(args, 'search', None),

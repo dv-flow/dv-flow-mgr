@@ -818,6 +818,7 @@ class TaskGraphBuilder(object):
             ctxt=self._ctxt,
             passthrough=task.passthrough,
             consumes=task.consumes,
+            produces=task.produces,
             uptodate=task.uptodate,
             taskdef=task,
             task=None)  # We'll set this later
@@ -830,6 +831,12 @@ class TaskGraphBuilder(object):
         # Note: Most evaluation now happens in ParamBuilder, but we still
         # need to handle runtime-only variables like 'rundir'
         self._expandParams(params, eval)
+
+        # Evaluate produces patterns after params are set
+        if task.produces is not None:
+            from .produces_eval import ProducesEvaluator
+            evaluator = ProducesEvaluator(self._eval)
+            node.produces = evaluator.evaluate(task.produces, params)
 
 
         if task.rundir == RundirE.Unique:

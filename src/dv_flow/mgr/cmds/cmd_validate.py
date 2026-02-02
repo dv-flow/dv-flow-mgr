@@ -131,7 +131,11 @@ class CmdValidate:
             unused_tasks = self._check_unused_tasks(pkg)
             warnings.extend(unused_tasks)
             
-            # Phase 5: Collect info about the package
+            # Phase 5: Check dataflow compatibility (warning)
+            dataflow_warnings = self._check_dataflow_compatibility(pkg, loader, root)
+            warnings.extend(dataflow_warnings)
+            
+            # Phase 6: Collect info about the package
             info.append({
                 'type': 'PackageInfo',
                 'name': pkg.name,
@@ -312,6 +316,78 @@ class CmdValidate:
                         'message': f"Task '{task_name}' is defined but never referenced"
                     })
         
+        return warnings
+    
+    def _check_dataflow_compatibility(self, pkg, loader, root) -> List[Dict[str, Any]]:
+        """Check produces/consumes compatibility between connected tasks."""
+        warnings = []
+        
+        from ..dataflow_matcher import DataflowMatcher
+        
+        matcher = DataflowMatcher()
+        
+        # Find all root tasks to validate
+        root_tasks = []
+        if hasattr(pkg, 'task_m') and pkg.task_m:
+            for task_name, task in pkg.task_m.items():
+                if getattr(task, 'is_root', False):
+                    root_tasks.append(task_name)
+        
+        # Build task graph for each root task and check dataflow
+        for root_task_name in root_tasks:
+            try:
+                builder = TaskGraphBuilder(
+                    root_pkg=pkg, 
+                    rundir=os.path.join(root, ".validate_tmp"),
+                    loader=loader
+                )
+                root_node = builder.mkTaskNode(root_task_name)
+                
+                # Traverse task graph and check all dependencies
+                warnings.extend(self._check_node_dataflow(root_node, matcher))
+                
+            except Exception as e:
+                self._log.debug(f"Could not build graph for {root_task_name}: {e}")
+        
+        return warnings
+    
+    def _check_node_dataflow(self, node, matcher) -> List[Dict[str, Any]]:
+        """Recursively check dataflow compatibility for a node and its dependencies."""
+        warnings = []
+        visited = set()
+        
+        def check_recursive(current_node):
+            if id(current_node) in visited:
+                return
+            visited.add(id(current_node))
+            
+            # Check this node's dependencies
+            for need, is_blocking in current_node.needs:
+                if not is_blocking:  # Only check dataflow dependencies
+                    compatible, error_msg = matcher.check_compatibility(
+                        produces=need.produces,
+                        consumes=current_node.consumes,
+                        producer_name=need.name,
+                        consumer_name=current_node.name
+                    )
+                    
+                    if not compatible:
+                        warnings.append({
+                            'type': 'DataflowMismatch',
+                            'message': error_msg,
+                            'producer': need.name,
+                            'consumer': current_node.name,
+                        })
+                
+                # Recurse into dependency
+                check_recursive(need)
+            
+            # Also recurse into compound task subtasks
+            if hasattr(current_node, 'tasks'):
+                for subtask in current_node.tasks:
+                    check_recursive(subtask)
+        
+        check_recursive(node)
         return warnings
     
     def _find_similar(self, name: str, known: Set[str], max_results: int = 3) -> List[str]:

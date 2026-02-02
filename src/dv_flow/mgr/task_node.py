@@ -28,7 +28,7 @@ import datetime
 import pydantic.dataclasses as pdc
 import logging
 import toposort
-from typing import Any, Callable, ClassVar, Dict, List, Tuple
+from typing import Any, Callable, ClassVar, Dict, List, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node_ctxt import TaskNodeCtxt
 from .task_run_ctxt import TaskRunCtxt
@@ -52,6 +52,7 @@ class TaskNode(object):
     changed : bool = False # TODO: seems unused
     passthrough : bool = False
     consumes : List[Any] = dc.field(default_factory=list)
+    produces : Union[List[Dict[str, Any]], None] = dc.field(default=None)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
     rundir : List[str] = dc.field(default=None)
     output : TaskDataOutput = dc.field(default=None)
@@ -183,6 +184,11 @@ class TaskNode(object):
             data["passthrough"] = self.passthrough
         else:
             data["passthrough"] = str(self.passthrough)
+
+        if isinstance(self.produces, list):
+            data["produces"] = self.produces
+        else:
+            data["produces"] = str(self.produces) if self.produces else None
 
         with open(os.path.join(rundir, "%s.exec_data.json" % self.name), "w") as f:
             json.dump(data, f, indent=2)

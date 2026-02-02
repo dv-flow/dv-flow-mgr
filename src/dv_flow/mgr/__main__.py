@@ -171,6 +171,8 @@ def get_parser():
     show_tasks_parser.add_argument("--scope",
                                    choices=["root", "export", "local"],
                                    help="Filter tasks by visibility scope")
+    show_tasks_parser.add_argument("--produces",
+                                   help="Filter tasks by produces pattern (e.g., 'type=std.FileSet,filetype=verilog')")
     show_tasks_parser.set_defaults(func=CmdShowTasks())
 
     # show task <name>

@@ -1389,10 +1389,11 @@ class PackageProviderYaml(PackageProvider):
 
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
         
-        passthrough, consumes, rundir, uptodate = self._getPTConsumesRundirUptodate(taskdef, task.uses)
+        passthrough, consumes, produces, rundir, uptodate = self._getPTConsumesProducesRundirUptodate(taskdef, task.uses)
 
         task.passthrough = passthrough
         task.consumes = consumes
+        task.produces = produces
         task.rundir = rundir
         task.uptodate = uptodate
 
@@ -1580,10 +1581,11 @@ class PackageProviderYaml(PackageProvider):
                         loader.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % uses_name)
 
-            passthrough, consumes, rundir, uptodate = self._getPTConsumesRundirUptodate(td, st.uses)
+            passthrough, consumes, produces, rundir, uptodate = self._getPTConsumesProducesRundirUptodate(td, st.uses)
 
             st.passthrough = passthrough
             st.consumes = consumes
+            st.produces = produces
             st.rundir = rundir
             st.uptodate = uptodate
 
@@ -1696,10 +1698,11 @@ class PackageProviderYaml(PackageProvider):
     def _getScopeFullname(self, leaf=None):
         return self._pkg_s[-1].getScopeFullname(leaf)
 
-    def _getPTConsumesRundirUptodate(self, taskdef : TaskDef, base_t : Union[Task,Type]):
-        self._log.debug("_getPTConsumesRundirUptodate %s" % taskdef.name)
+    def _getPTConsumesProducesRundirUptodate(self, taskdef : TaskDef, base_t : Union[Task,Type]):
+        self._log.debug("_getPTConsumesProducesRundirUptodate %s" % taskdef.name)
         passthrough = taskdef.passthrough
         consumes = taskdef.consumes.copy() if isinstance(taskdef.consumes, list) else taskdef.consumes
+        produces = taskdef.produces.copy() if isinstance(taskdef.produces, list) else taskdef.produces
         rundir = taskdef.rundir
         uptodate = taskdef.uptodate
 #        needs = [] if task.needs is None else task.needs.copy()
@@ -1709,6 +1712,13 @@ class PackageProviderYaml(PackageProvider):
                 passthrough = base_t.passthrough
             if consumes is None:
                 consumes = base_t.consumes
+            # Inherit produces - extend base produces with new produces
+            if base_t.produces is not None:
+                if produces is None:
+                    produces = base_t.produces.copy() if isinstance(base_t.produces, list) else base_t.produces
+                elif isinstance(produces, list) and isinstance(base_t.produces, list):
+                    # Extend: new produces patterns extend inherited ones
+                    produces = base_t.produces.copy() + produces
             if rundir is None:
                 rundir = base_t.rundir
             if uptodate is None:
@@ -1720,7 +1730,7 @@ class PackageProviderYaml(PackageProvider):
             consumes = ConsumesE.All
 
 
-        return (passthrough, consumes, rundir, uptodate)
+        return (passthrough, consumes, produces, rundir, uptodate)
 
     def _resolveTags(self, target, tag_defs, loader):
         """Resolve tag type references and instantiate Type objects."""
