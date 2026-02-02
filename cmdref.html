@@ -218,6 +218,7 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="n">tasks</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">search</span> <span class="n">SEARCH</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">regex</span> <span class="n">REGEX</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tag</span> <span class="n">TAG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
                <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
                <span class="p">[</span><span class="o">--</span><span class="n">package</span> <span class="n">PACKAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">scope</span> <span class="p">{</span><span class="n">root</span><span class="p">,</span><span class="n">export</span><span class="p">,</span><span class="n">local</span><span class="p">}]</span>
+               <span class="p">[</span><span class="o">--</span><span class="n">produces</span> <span class="n">PRODUCES</span><span class="p">]</span>
 </pre></div>
 </div>
 <section id="named-arguments_repeat3">
@@ -256,6 +257,9 @@
 <dt><kbd>--scope</kbd></dt>
 <dd><p>Possible choices: root, export, local</p>
 <p>Filter tasks by visibility scope</p>
+</dd>
+<dt><kbd>--produces</kbd></dt>
+<dd><p>Filter tasks by produces pattern (e.g., ‘type=std.FileSet,filetype=verilog’)</p>
 </dd>
 </dl>
 </section>
@@ -869,14 +873,28 @@ dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> 
 <section id="show-tasks">
 <h3>Show Tasks<a class="headerlink" href="#show-tasks" title="Link to this heading">¶</a></h3>
 <p>List and search tasks across all packages.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span><span class="o">[</span>--package<span class="w"> </span>PKG<span class="o">]</span><span class="w"> </span><span class="o">[</span>--scope<span class="w"> </span>SCOPE<span class="o">]</span><span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span><span class="o">[</span>--package<span class="w"> </span>PKG<span class="o">]</span><span class="w"> </span><span class="o">[</span>--scope<span class="w"> </span>SCOPE<span class="o">]</span><span class="w"> </span><span class="o">[</span>--produces<span class="w"> </span>PATTERN<span class="o">]</span><span class="w"> </span><span class="o">[</span>--search<span class="w"> </span>KEYWORD<span class="o">]</span><span class="w"> </span><span class="o">[</span>--json<span class="o">]</span>
 </pre></div>
 </div>
 <p>Options:</p>
-<dl class="simple">
+<dl>
 <dt><code class="docutils literal notranslate"><span class="pre">--package</span> <span class="pre">PKG</span></code></dt><dd><p>Filter tasks to a specific package.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">--scope</span> <span class="pre">{root,export,local}</span></code></dt><dd><p>Filter tasks by visibility scope.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--produces</span> <span class="pre">PATTERN</span></code></dt><dd><p>Filter tasks by produces pattern. Use comma-separated key=value pairs
+to specify the pattern. All specified attributes must match (AND logic),
+but tasks can have additional attributes (subset matching).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Find tasks that produce std.FileSet</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet&quot;</span>
+
+<span class="c1"># Find tasks that produce verilog files</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet,filetype=verilog&quot;</span>
+
+<span class="c1"># Find vendor-specific outputs</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet,filetype=verilog,vendor=synopsys&quot;</span>
+</pre></div>
+</div>
 </dd>
 </dl>
 <p>Examples:</p>
@@ -888,6 +906,9 @@ dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </s
 
 <span class="c1"># List tasks in std package</span>
 dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--package<span class="w"> </span>std
+
+<span class="c1"># Find tasks that produce FileSet outputs</span>
+dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -915,6 +936,36 @@ dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </sp
 
 <span class="c1"># JSON output with full details</span>
 dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>std.FileSet<span class="w"> </span>--json
+</pre></div>
+</div>
+<p>The task detail output includes:</p>
+<ul class="simple">
+<li><p><strong>Name and Package</strong>: Full task name and containing package</p></li>
+<li><p><strong>Base</strong>: Task inheritance (uses relationship)</p></li>
+<li><p><strong>Scope</strong>: Visibility (root, export, local)</p></li>
+<li><p><strong>Description and Documentation</strong>: Task purpose and usage</p></li>
+<li><p><strong>Parameters</strong>: Task parameters with types and defaults</p></li>
+<li><p><strong>Produces</strong>: Output dataset patterns this task creates (see <a class="reference internal" href="userguide/dataflow.html"><span class="doc">Dataflow &amp; Produces</span></a>)</p></li>
+<li><p><strong>Consumes</strong>: Input dataset patterns this task accepts</p></li>
+<li><p><strong>Direct Needs</strong>: Immediate dependencies</p></li>
+</ul>
+<p>Example output showing produces:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Task:        my_flow.VerilogCompiler
+Package:     my_flow
+Base:        -
+Scope:       -
+
+Description:
+  Compiles Verilog RTL with optimization
+
+Parameters:
+  optimization  str     O2    Optimization level
+
+Produces:
+  - type=std.FileSet, filetype=verilog, optimization=O2
+
+Direct Needs:
+  - my_flow.SourceFiles
 </pre></div>
 </div>
 </section>
@@ -970,6 +1021,114 @@ dfm<span class="w"> </span>show
 dfm<span class="w"> </span>show<span class="w"> </span>&lt;task&gt;<span class="w"> </span>-a
 </pre></div>
 </div>
+</section>
+</section>
+<section id="validate-command">
+<h2>Validate Command<a class="headerlink" href="#validate-command" title="Link to this heading">¶</a></h2>
+<p>The validate command checks your flow definition for errors and potential issues,
+including dataflow compatibility between tasks.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>validate<span class="w"> </span><span class="o">[</span>--json<span class="o">]</span>
+</pre></div>
+</div>
+<p>The validator performs the following checks:</p>
+<ol class="arabic simple">
+<li><p><strong>Syntax Validation</strong>: YAML/DV parsing and schema validation</p></li>
+<li><p><strong>Undefined References</strong>: Detects references to non-existent tasks</p></li>
+<li><p><strong>Circular Dependencies</strong>: Detects circular task dependencies</p></li>
+<li><p><strong>Dataflow Compatibility</strong>: Checks produces/consumes patterns between connected tasks</p></li>
+<li><p><strong>Unused Tasks</strong>: Warns about tasks that are defined but never referenced</p></li>
+</ol>
+<section id="validation-output">
+<h3>Validation Output<a class="headerlink" href="#validation-output" title="Link to this heading">¶</a></h3>
+<p><strong>Errors</strong> prevent the workflow from executing:</p>
+<ul class="simple">
+<li><p>Parse errors in flow definition</p></li>
+<li><p>Undefined task references</p></li>
+<li><p>Circular dependencies</p></li>
+</ul>
+<p><strong>Warnings</strong> indicate potential issues but allow execution:</p>
+<ul class="simple">
+<li><p>Dataflow mismatches (produces/consumes incompatibility)</p></li>
+<li><p>Unused tasks</p></li>
+<li><p>Missing optional declarations</p></li>
+</ul>
+<p>Example output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Package: my_flow
+  Tasks: 8
+  Types: 3
+
+Warnings (1):
+  WARNING: Task &#39;Simulator&#39; consumes [{&#39;type&#39;: &#39;std.FileSet&#39;, &#39;filetype&#39;: &#39;vhdl&#39;}]
+           but &#39;VerilogCompiler&#39; produces [{&#39;type&#39;: &#39;std.FileSet&#39;, &#39;filetype&#39;: &#39;verilog&#39;}].
+           No consume pattern matches any produce pattern.
+
+✓ Validation passed
+  (1 warning(s))
+</pre></div>
+</div>
+</section>
+<section id="json-output">
+<h3>JSON Output<a class="headerlink" href="#json-output" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">--json</span></code> for programmatic consumption:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>validate<span class="w"> </span>--json
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;valid&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;errors&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">  </span><span class="nt">&quot;warnings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DataflowMismatch&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Task &#39;Simulator&#39; consumes ... but &#39;VerilogCompiler&#39; produces ...&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;producer&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_flow.VerilogCompiler&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;consumer&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_flow.Simulator&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;PackageInfo&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_flow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;task_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;error_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;warning_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="dataflow-validation">
+<h3>Dataflow Validation<a class="headerlink" href="#dataflow-validation" title="Link to this heading">¶</a></h3>
+<p>The validator checks that produces patterns from producer tasks match the
+consumes patterns of consumer tasks. See <a class="reference internal" href="userguide/dataflow.html"><span class="doc">Dataflow &amp; Produces</span></a> for details
+on compatibility rules.</p>
+<p><strong>Compatibility Rules:</strong></p>
+<ul class="simple">
+<li><p>Consumer with <code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code> accepts any produces</p></li>
+<li><p>Producer with no produces declared is assumed compatible</p></li>
+<li><p><strong>OR Logic</strong>: If ANY consume pattern matches ANY produce pattern, the dataflow is valid</p></li>
+<li><p>Pattern matching uses subset logic (producer can have extra attributes)</p></li>
+</ul>
+<p><strong>When to fix warnings:</strong></p>
+<ul class="simple">
+<li><p>The consumer truly needs different data than what’s produced</p></li>
+<li><p>There’s a typo in task names or pattern attributes</p></li>
+<li><p>You want strict validation for production workflows</p></li>
+</ul>
+<p><strong>When to accept warnings:</strong></p>
+<ul class="simple">
+<li><p>Outputs are dynamic and not known until runtime</p></li>
+<li><p>The mismatch is intentional (flexible workflow)</p></li>
+<li><p>You’re in early development/prototyping</p></li>
+</ul>
+</section>
+<section id="see-also">
+<h3>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="reference internal" href="userguide/dataflow.html"><span class="doc">Dataflow &amp; Produces</span></a> - Complete dataflow and produces documentation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">show</span> <span class="pre">task</span> <span class="pre">&lt;name&gt;</span></code> - View task produces/consumes patterns</p></li>
+</ul>
 </section>
 </section>
 <section id="agent-command">
@@ -1403,6 +1562,7 @@ dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="
 <li class="toctree-l2"><a class="reference internal" href="#common-options">Common Options</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#run-command">Run Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#show-command">Show Command</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#validate-command">Validate Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#agent-command">Agent Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#context-command">Context Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#graph-command">Graph Command</a></li>
