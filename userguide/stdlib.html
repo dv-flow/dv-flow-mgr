@@ -340,8 +340,8 @@ and providing user feedback during flow execution.</p>
 </div>
 </section>
 </section>
-<section id="std-prompt">
-<h2>std.Prompt<a class="headerlink" href="#std-prompt" title="Link to this heading">¶</a></h2>
+<section id="std-agent">
+<h2>std.Agent<a class="headerlink" href="#std-agent" title="Link to this heading">¶</a></h2>
 <p>Executes an AI assistant with a specified prompt and collects structured
 results. The AI assistant must create a valid JSON result file or the task
 will fail with an error.</p>
@@ -352,11 +352,11 @@ model capabilities.</p>
 <h3>Example<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
 <p>Basic usage:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt.example</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agent.example</span>
 
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generate_code</span>
-<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Prompt</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Agent</span>
 <span class="w">      </span><span class="nt">with</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">user_prompt</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Generate</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">Python</span><span class="nv"> </span><span class="s">function</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">parse</span><span class="nv"> </span><span class="s">CSV</span><span class="nv"> </span><span class="s">files&quot;</span>
 <span class="w">        </span><span class="nt">assistant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">copilot</span>
@@ -364,11 +364,11 @@ model capabilities.</p>
 </div>
 <p>Custom system prompt:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt.custom</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agent.custom</span>
 
 <span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generate_test</span>
-<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Prompt</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Agent</span>
 <span class="w">      </span><span class="nt">with</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">system_prompt</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <span class="w">          </span><span class="no">You are a test generation assistant.</span>
@@ -458,7 +458,7 @@ contains invalid JSON.</p></li>
 </section>
 <section id="error-handling">
 <h3>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h3>
-<p>The Prompt task uses strict validation:</p>
+<p>The Agent task uses strict validation:</p>
 <ul class="simple">
 <li><p><strong>Missing result file</strong> → Task fails with status=1</p></li>
 <li><p><strong>Invalid JSON syntax</strong> → Task fails with status=1</p></li>
@@ -469,7 +469,7 @@ contains invalid JSON.</p></li>
 </section>
 <section id="debugging">
 <h3>Debugging<a class="headerlink" href="#debugging" title="Link to this heading">¶</a></h3>
-<p>When the Prompt task runs, it creates several files in the task’s run directory:</p>
+<p>When the Agent task runs, it creates several files in the task’s run directory:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">{name}.prompt.txt</span></code> - The complete prompt sent to the AI assistant</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">{name}.result.json</span></code> - The structured result from the AI (if created)</p></li>

@@ -15,7 +15,7 @@ The goal of LLM integration is to enable AI agents to:
 3. **Generate** correct flow.yaml/flow.yaml configurations
 4. **Debug** and **modify** existing flows with minimal hallucination
 5. **Execute** builds and simulations via the dfm CLI
-6. **Run tasks dynamically** from within LLM-driven Prompt tasks
+6. **Run tasks dynamically** from within LLM-driven Agent tasks
 
 The ``dfm --help`` Output
 =========================
@@ -150,7 +150,7 @@ Skills are defined as DataSet types tagged with ``std.AgentSkillTag``:
 LLM Call Interface (Server Mode)
 ================================
 
-When running inside an LLM-driven ``std.Prompt`` task, the ``dfm`` command
+When running inside an LLM-driven ``std.Agent`` task, the ``dfm`` command
 automatically connects to the parent DFM session via a Unix socket server.
 This enables LLMs to execute tasks that share resources with the parent session.
 
@@ -197,7 +197,7 @@ When ``DFM_SERVER_SOCKET`` is set, the following commands work:
 Example: LLM Generating and Compiling RTL
 -----------------------------------------
 
-When an LLM running inside a ``std.Prompt`` task needs to compile generated code:
+When an LLM running inside a ``std.Agent`` task needs to compile generated code:
 
 .. code-block:: bash
 
@@ -325,7 +325,7 @@ GitHub Copilot CLI
     dfm show skills --json
     dfm show packages --json
 
-    # Inside a Prompt task, execute tasks via server
+    # Inside an Agent task, execute tasks via server
     dfm run build_task
 
 ChatGPT / Claude
@@ -401,7 +401,7 @@ Dynamic Code Generation and Verification
 
 **User prompt**: "Generate a counter module and verify it compiles"
 
-**Agent workflow** (inside a Prompt task):
+**Agent workflow** (inside an Agent task):
 
 .. code-block:: bash
 
@@ -424,7 +424,7 @@ Dynamic Code Generation and Verification
     # 3. Check if compilation succeeded
     # (Parse JSON response)
 
-    # 4. Write result file for Prompt task
+    # 4. Write result file for Agent task
     cat > result.json << 'EOF'
     {
       "status": 0,
@@ -497,7 +497,7 @@ features. With the skill.md documentation and ``dfm show skills``, assistants ca
 * Help with package organization
 * Debug flow definition issues
 * Propose DFM-specific best practices
-* **Execute tasks dynamically inside Prompt tasks**
+* **Execute tasks dynamically inside Agent tasks**
 
 Enabling LLM Support in Your Project
 ====================================

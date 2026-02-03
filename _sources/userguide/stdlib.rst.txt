@@ -329,8 +329,8 @@ Messages support expression syntax for dynamic content:
           msg: "Building version ${{ version }}"
 
 
-std.Prompt
-==========
+std.Agent
+=========
 
 Executes an AI assistant with a specified prompt and collects structured 
 results. The AI assistant must create a valid JSON result file or the task 
@@ -348,11 +348,11 @@ Basic usage:
 .. code-block:: yaml
 
     package:
-        name: prompt.example
+        name: agent.example
     
         tasks:
         - name: generate_code
-          uses: std.Prompt
+          uses: std.Agent
           with:
             user_prompt: "Generate a Python function to parse CSV files"
             assistant: copilot
@@ -362,11 +362,11 @@ Custom system prompt:
 .. code-block:: yaml
 
     package:
-        name: prompt.custom
+        name: agent.custom
     
         tasks:
         - name: generate_test
-          uses: std.Prompt
+          uses: std.Agent
           with:
             system_prompt: |
               You are a test generation assistant.
@@ -457,7 +457,7 @@ Fields:
 Error Handling
 --------------
 
-The Prompt task uses strict validation:
+The Agent task uses strict validation:
 
 * **Missing result file** → Task fails with status=1
 * **Invalid JSON syntax** → Task fails with status=1
@@ -468,7 +468,7 @@ The Prompt task uses strict validation:
 Debugging
 ---------
 
-When the Prompt task runs, it creates several files in the task's run directory:
+When the Agent task runs, it creates several files in the task's run directory:
 
 * ``{name}.prompt.txt`` - The complete prompt sent to the AI assistant
 * ``{name}.result.json`` - The structured result from the AI (if created)

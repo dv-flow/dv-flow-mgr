@@ -46,7 +46,7 @@ enabling AI assistants to discover, understand, and work with DFM flows effectiv
 <li><p><strong>Generate</strong> correct flow.yaml/flow.yaml configurations</p></li>
 <li><p><strong>Debug</strong> and <strong>modify</strong> existing flows with minimal hallucination</p></li>
 <li><p><strong>Execute</strong> builds and simulations via the dfm CLI</p></li>
-<li><p><strong>Run tasks dynamically</strong> from within LLM-driven Prompt tasks</p></li>
+<li><p><strong>Run tasks dynamically</strong> from within LLM-driven Agent tasks</p></li>
 </ol>
 </section>
 <section id="the-dfm-help-output">
@@ -173,7 +173,7 @@ $<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>
 </section>
 <section id="llm-call-interface-server-mode">
 <h2>LLM Call Interface (Server Mode)<a class="headerlink" href="#llm-call-interface-server-mode" title="Link to this heading">¶</a></h2>
-<p>When running inside an LLM-driven <code class="docutils literal notranslate"><span class="pre">std.Prompt</span></code> task, the <code class="docutils literal notranslate"><span class="pre">dfm</span></code> command
+<p>When running inside an LLM-driven <code class="docutils literal notranslate"><span class="pre">std.Agent</span></code> task, the <code class="docutils literal notranslate"><span class="pre">dfm</span></code> command
 automatically connects to the parent DFM session via a Unix socket server.
 This enables LLMs to execute tasks that share resources with the parent session.</p>
 <section id="how-it-works">
@@ -218,7 +218,7 @@ dfm<span class="w"> </span>ping
 </section>
 <section id="example-llm-generating-and-compiling-rtl">
 <h3>Example: LLM Generating and Compiling RTL<a class="headerlink" href="#example-llm-generating-and-compiling-rtl" title="Link to this heading">¶</a></h3>
-<p>When an LLM running inside a <code class="docutils literal notranslate"><span class="pre">std.Prompt</span></code> task needs to compile generated code:</p>
+<p>When an LLM running inside a <code class="docutils literal notranslate"><span class="pre">std.Agent</span></code> task needs to compile generated code:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. LLM creates RTL files</span>
 cat<span class="w"> </span>&gt;<span class="w"> </span>counter.sv<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
 <span class="s">module counter(input clk, rst_n, output logic [7:0] count);</span>
@@ -332,7 +332,7 @@ dfm<span class="w"> </span>--help
 dfm<span class="w"> </span>show<span class="w"> </span>skills<span class="w"> </span>--json
 dfm<span class="w"> </span>show<span class="w"> </span>packages<span class="w"> </span>--json
 
-<span class="c1"># Inside a Prompt task, execute tasks via server</span>
+<span class="c1"># Inside an Agent task, execute tasks via server</span>
 dfm<span class="w"> </span>run<span class="w"> </span>build_task
 </pre></div>
 </div>
@@ -403,7 +403,7 @@ dfm<span class="w"> </span>run<span class="w"> </span>build
 <section id="dynamic-code-generation-and-verification">
 <h3>Dynamic Code Generation and Verification<a class="headerlink" href="#dynamic-code-generation-and-verification" title="Link to this heading">¶</a></h3>
 <p><strong>User prompt</strong>: “Generate a counter module and verify it compiles”</p>
-<p><strong>Agent workflow</strong> (inside a Prompt task):</p>
+<p><strong>Agent workflow</strong> (inside an Agent task):</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. Generate the RTL</span>
 cat<span class="w"> </span>&gt;<span class="w"> </span>counter.sv<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
 <span class="s">module counter #(parameter WIDTH=8) (</span>
@@ -423,7 +423,7 @@ dfm<span class="w"> </span>run<span class="w"> </span>hdlsim.vlt.SimImage<span c
 <span class="c1"># 3. Check if compilation succeeded</span>
 <span class="c1"># (Parse JSON response)</span>
 
-<span class="c1"># 4. Write result file for Prompt task</span>
+<span class="c1"># 4. Write result file for Agent task</span>
 cat<span class="w"> </span>&gt;<span class="w"> </span>result.json<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
 <span class="s">{</span>
 <span class="s">  &quot;status&quot;: 0,</span>
@@ -493,7 +493,7 @@ features. With the skill.md documentation and <code class="docutils literal notr
 <li><p>Help with package organization</p></li>
 <li><p>Debug flow definition issues</p></li>
 <li><p>Propose DFM-specific best practices</p></li>
-<li><p><strong>Execute tasks dynamically inside Prompt tasks</strong></p></li>
+<li><p><strong>Execute tasks dynamically inside Agent tasks</strong></p></li>
 </ul>
 </section>
 <section id="enabling-llm-support-in-your-project">
