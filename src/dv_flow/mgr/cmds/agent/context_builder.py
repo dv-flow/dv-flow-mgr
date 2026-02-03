@@ -195,7 +195,8 @@ class AgentContextBuilder:
             if '.' not in task_name:
                 task_name = f"{self.pkg.name}.{task_name}"
             
-            task_node = builder.mkTaskNode(task_name)
+            # CLI/Agent usage: allow root package prefix
+            task_node = builder.mkTaskNode(task_name, allow_root_prefix=True)
             task_nodes.append(task_node)
         
         self._log.debug(f"Executing {len(task_nodes)} task node(s)")

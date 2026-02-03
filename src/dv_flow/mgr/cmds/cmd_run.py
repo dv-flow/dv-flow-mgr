@@ -184,9 +184,11 @@ class CmdRun(object):
         tasks = []
 
         for spec in args.tasks:
+            # CLI usage: allow root package prefix for fragment-qualified names
+            # If no dot, prepend package name (existing behavior)
             if spec.find('.') == -1:
                 spec = pkg.name + "." + spec
-            task = builder.mkTaskNode(spec)
+            task = builder.mkTaskNode(spec, allow_root_prefix=True)
             tasks.append(task)
 
         asyncio.run(runner.run(tasks))

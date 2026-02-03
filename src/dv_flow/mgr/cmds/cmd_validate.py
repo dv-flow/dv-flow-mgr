@@ -341,7 +341,8 @@ class CmdValidate:
                     rundir=os.path.join(root, ".validate_tmp"),
                     loader=loader
                 )
-                root_node = builder.mkTaskNode(root_task_name)
+                # CLI usage: allow root package prefix
+                root_node = builder.mkTaskNode(root_task_name, allow_root_prefix=True)
                 
                 # Traverse task graph and check all dependencies
                 warnings.extend(self._check_node_dataflow(root_node, matcher))

@@ -88,7 +88,8 @@ class CmdGraph(object):
             if task is None:
                 raise Exception("Task '%s' not found in package '%s'" % (args.task, pkg.name))
 
-            t = builder.mkTaskNode(task.name)
+            # CLI usage: allow root package prefix
+            t = builder.mkTaskNode(task.name, allow_root_prefix=True)
 
             output = getattr(args, "output", "-")
             if output is None:

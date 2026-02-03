@@ -34,15 +34,6 @@ class LoaderScope(SymbolScope):
             assert self.loader is not None
             pkg : Package = self.loader.findPackage(pkg_name)
 
-            # if pkg_name in self.loader._pkg_m.keys():
-            #     pkg = self.loader._pkg_m[pkg_name]
-            # else:
-            #     self.loader._findPackage(pkg_name)
-            #     path = self.loader.pkg_rgy.findPackagePath(pkg_name)
-            #     if path is not None:
-            #         path = os.path.normpath(path)
-            #         pkg = self.loader._loadPackage(path)
-            #         self.loader._pkg_m[pkg_name] = pkg
             if pkg is not None:
                 self._log.debug("Found pkg %s (%s)" % (pkg_name, str(pkg.task_m.keys())))
             else:

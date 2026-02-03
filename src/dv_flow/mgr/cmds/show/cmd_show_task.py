@@ -196,8 +196,8 @@ class CmdShowTask:
             rundir = os.path.join(pkg.basedir, "rundir")
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
             
-            # Build the task node
-            task_node = builder.mkTaskNode(task_name)
+            # Build the task node (CLI usage: allow root package prefix)
+            task_node = builder.mkTaskNode(task_name, allow_root_prefix=True)
             
             # Collect needs recursively
             needs_chain = []

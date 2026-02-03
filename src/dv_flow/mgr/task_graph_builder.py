@@ -260,7 +260,14 @@ class TaskGraphBuilder(object):
                 self._compound_task_ctxt_s[-1].task_m[name] = task
         self._log.debug("<-- addTask: %s" % name)
 
-    def findTask(self, name, create=True):
+    def findTask(self, name, create=True, allow_root_prefix=False):
+        """Find a task node by name.
+        
+        Args:
+            name: Task name to find
+            create: If True, create the task node if the task exists but node doesn't
+            allow_root_prefix: If True (for CLI usage), try prepending root package name if exact match fails
+        """
         task = None
 
         if len(self._compound_task_ctxt_s) > 0:
@@ -276,7 +283,12 @@ class TaskGraphBuilder(object):
             if name in self.root_pkg.task_m.keys():
                 task = self.mkTaskGraph(name)
                 self._log.debug("Found task %s in root package" % name)
-            pass
+            elif allow_root_prefix:
+                # Try prepending the root package name for fragment-qualified names (CLI usage only)
+                qualified_name = f"{self.root_pkg.name}.{name}"
+                if qualified_name in self.root_pkg.task_m.keys():
+                    task = self.mkTaskGraph(qualified_name)
+                    self._log.debug("Found task %s as %s in root package" % (name, qualified_name))
 
             # Check the current package
 #            if len(self._pkg_s) > 0 and name in self._pkg_s[-1].task_m.keys():
@@ -329,7 +341,17 @@ class TaskGraphBuilder(object):
             ret = self._name_resolution_stack[-1].resolve_variable(name)
         return ret
 
-    def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, **kwargs):
+    def mkTaskNode(self, task_t, name=None, srcdir=None, needs=None, allow_root_prefix=False, **kwargs):
+        """Create a task node from a task type/name.
+        
+        Args:
+            task_t: Task type or name to create node from
+            name: Optional name override for the node
+            srcdir: Optional source directory
+            needs: Optional list of task dependencies
+            allow_root_prefix: If True (CLI usage), try prepending root package name if exact match fails
+            **kwargs: Additional parameters to set on the task
+        """
         self._log.debug("--> mkTaskNode: %s" % task_t)
         ret = None
 
@@ -338,6 +360,13 @@ class TaskGraphBuilder(object):
             task = self._task_m[task_t]
         elif self.loader is not None:
             task = self.loader.findTask(task_t)
+            
+            # If not found and CLI usage is allowed, try with root package prefix
+            if task is None and allow_root_prefix and self.root_pkg is not None:
+                qualified_name = f"{self.root_pkg.name}.{task_t}"
+                task = self.loader.findTask(qualified_name)
+                if task is not None:
+                    self._log.debug("Found task %s as %s with root prefix" % (task_t, qualified_name))
 
             if task is None:
                 type = None
