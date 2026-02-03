@@ -49,6 +49,136 @@ the comprehensive documentation:
 The skill path is always an absolute path to ensure LLM agents can reliably
 locate and read the file regardless of the current working directory.
 
+Parameter Overrides
+===================
+
+DFM supports runtime parameter overrides via the ``-D`` option and ``-P`` parameter
+file option. This allows you to customize task and package parameters without
+modifying the flow definition.
+
+Command Line Overrides (``-D``)
+--------------------------------
+
+The ``-D`` option accepts parameter overrides in several forms:
+
+.. code-block:: bash
+
+    # Package-level parameter (no dots)
+    dfm run build -D timeout=300
+    
+    # Task parameter with leaf name (applies to any task with this param)
+    dfm run build -D top=counter
+    
+    # Task-qualified parameter (specific task)
+    dfm run build -D build.top=counter
+    
+    # Package-qualified parameter (fully qualified)
+    dfm run build -D myproject.build.top=counter
+    
+    # Multiple overrides
+    dfm run build -D top=counter -D debug=true
+
+**Type Coercion:**
+
+Parameter values are automatically converted to the correct type:
+
+- **List types**: Single values become single-element lists
+  
+  - ``-D top=counter`` → ``["counter"]``
+  - ``-D include=*.sv`` → ``["*.sv"]``
+
+- **Boolean types**: String values are converted to booleans
+  
+  - ``-D debug=true`` → ``True``
+  - ``-D debug=1`` → ``True``
+  - ``-D debug=false`` → ``False``
+
+- **Integer types**: Strings are parsed as integers
+  
+  - ``-D count=42`` → ``42``
+
+- **String types**: Values remain as strings
+  
+  - ``-D msg=hello`` → ``"hello"``
+
+JSON Parameter File (``-P``)
+-----------------------------
+
+For complex parameter types (nested dicts, lists of objects), use a JSON parameter file or inline JSON string:
+
+**From File:**
+
+.. code-block:: bash
+
+    dfm run build -P params.json
+
+**Inline JSON String (convenient for LLMs):**
+
+.. code-block:: bash
+
+    # Pass JSON directly as a string
+    dfm run build -P '{"tasks": {"build": {"top": ["counter", "decoder"]}}}'
+    
+    # Complex nested structure
+    dfm run build -P '{"tasks": {"build": {"defines": {"DEBUG": 1}}}}'
+
+**JSON Format:**
+
+.. code-block:: json
+
+    {
+      "package": {
+        "timeout": 300,
+        "verbose": true
+      },
+      "tasks": {
+        "build": {
+          "top": ["counter", "decoder"],
+          "defines": {
+            "DEBUG": 1,
+            "VERBOSE": true
+          },
+          "options": {
+            "opt_level": 2,
+            "warnings": ["all", "error"]
+          }
+        },
+        "myproject.test": {
+          "iterations": 1000
+        }
+      }
+    }
+
+**Override Precedence:**
+
+When both ``-D`` and ``-P`` are used, command-line ``-D`` options take precedence:
+
+.. code-block:: bash
+
+    # params.json sets top=["default"]
+    # This overrides it with top=["counter"]
+    dfm run build -P params.json -D top=counter
+    
+    # Also works with inline JSON
+    dfm run build -P '{"tasks": {"build": {"top": ["default"]}}}' -D top=counter
+
+Parameter Resolution Order
+---------------------------
+
+Parameters are resolved in this priority order (highest to lowest):
+
+1. **Qualified task override**: ``-D pkg.task.param=value``
+2. **Task-qualified override**: ``-D task.param=value``
+3. **Leaf parameter override**: ``-D param=value`` (matches any task with this param)
+4. **Package parameter override**: ``-D param=value`` (if package has this param)
+5. **Default value**: From flow definition
+
+This allows you to:
+
+- Override specific task parameters with qualified names
+- Apply global overrides to all matching tasks with leaf names
+- Maintain backward compatibility with package-level parameters
+
 The ``dfm show skills`` Command
 ===============================
 
@@ -210,14 +340,18 @@ When an LLM running inside a ``std.Agent`` task needs to compile generated code:
     endmodule
     EOF
 
-    # 2. Run compilation via parent DFM session
-    dfm run hdlsim.vlt.SimImage \
-      -D hdlsim.vlt.SimImage.top=counter
+    # 2. Run compilation via parent DFM session with parameter override
+    # The 'top' parameter is a list, so string "counter" becomes ["counter"]
+    dfm run hdlsim.vlt.SimImage -D top=counter
+    
+    # Alternative: fully qualified task parameter
+    dfm run hdlsim.vlt.SimImage -D hdlsim.vlt.SimImage.top=counter
+    
+    # Alternative: using a task-qualified name
+    dfm run SimImage -D SimImage.top=counter
 
     # 3. Output is JSON with status, outputs, and markers
     # {"status": 0, "outputs": [...], "markers": []}
-
-JSON Response Format
 --------------------
 
 All server mode commands return JSON responses:
@@ -308,6 +442,185 @@ single JSON output, ideal for LLM consumption:
       "types": [...],
       "skills": [...]
     }
+
+The ``dfm agent`` Command
+-------------------------
+
+The ``dfm agent`` command launches an AI assistant with comprehensive DV Flow
+context derived from your project. This command enables interactive agent sessions
+with automatic context injection from agent-related tasks.
+
+Basic Usage
+~~~~~~~~~~~
+
+.. code-block:: bash
+
+    # Launch agent with default assistant
+    dfm agent
+
+    # Launch with specific tasks providing context
+    dfm agent MySkill MyPersona MyReference
+    
+    # Launch with specific assistant and model
+    dfm agent -a copilot -m gpt-4 MySkill
+    
+    # Output context as JSON (debugging)
+    dfm agent --json MySkill
+
+Command Options
+~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    dfm agent [OPTIONS] [TASKS...]
+
+    Positional Arguments:
+      tasks                 Task references to use as context (skills, personas, tools, references)
+    
+    Options:
+      -a, --assistant       Specify assistant (copilot, codex, mock)
+      -m, --model          Specify the AI model to use
+      --config-file FILE   Output assistant config file for debugging
+      --json               Output context as JSON instead of launching
+      --clean              Clean rundir before executing tasks
+      --ui MODE            Select UI mode (log, progress, progressbar, tui)
+      -c, --config         Specifies active configuration for root package
+      -D NAME=VALUE        Parameter overrides
+
+How It Works
+~~~~~~~~~~~~
+
+1. **Context Collection**: The command evaluates specified tasks (and their dependencies)
+2. **Resource Extraction**: Extracts agent resources (skills, personas, tools, references)
+3. **Prompt Generation**: Builds a comprehensive system prompt with project context
+4. **Assistant Launch**: Launches the AI assistant with the generated context
+
+Agent Resource Types
+~~~~~~~~~~~~~~~~~~~~
+
+DV Flow provides four standard agent resource types that can be used with ``dfm agent``:
+
+**AgentSkill**
+    Defines a capability or skill that the AI agent can use. Skills typically
+    document how to accomplish specific tasks within your project.
+    
+    * Uses: ``std.AgentSkill``
+    * Tag: ``std.AgentSkillTag``
+    * Common uses: Task documentation, API references, workflow guides
+
+**AgentPersona**
+    Defines a role or personality for the AI agent to adopt during interaction.
+    
+    * Uses: ``std.AgentPersona``
+    * Tag: ``std.AgentPersonaTag``
+    * Fields: ``persona`` (str) - Description of the persona
+    * Common uses: Domain expert roles, coding styles, interaction modes
+
+**AgentTool**
+    Specifies external tools or MCP servers that the agent can invoke.
+    
+    * Uses: ``std.AgentTool``
+    * Tag: ``std.AgentToolTag``
+    * Fields: ``command`` (str), ``args`` (list), ``url`` (str)
+    * Common uses: External APIs, command-line tools, MCP servers
+
+**AgentReference**
+    Provides reference documentation or materials for the agent to consult.
+    
+    * Uses: ``std.AgentReference``
+    * Tag: ``std.AgentReferenceTag``
+    * Common uses: Project documentation, specifications, examples
+
+All resource types (except AgentPersona) inherit from ``std.AgentResource`` which provides:
+
+* ``files`` (list) - List of files to include in the resource
+* ``content`` (str) - Inline content for the resource
+* ``urls`` (list) - URLs pointing to external resources
+
+Example: Defining Agent Resources
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**AgentSkill Example:**
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+      
+      types:
+        - name: SimulationSkill
+          uses: std.AgentSkill
+          with:
+            files: ["docs/simulation_guide.md"]
+            content: |
+              # Simulation Guide
+              To run simulations, use the sim.SimRun task...
+      
+      tasks:
+        - name: SimSkill
+          uses: SimulationSkill
+
+**AgentPersona Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: HardwareExpertPersona
+        uses: std.AgentPersona
+        with:
+          persona: |
+            You are an expert hardware verification engineer with 20 years
+            of experience in RTL design and SystemVerilog. You prefer
+            structured, defensive coding practices.
+
+**AgentTool Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: WaveformViewer
+        uses: std.AgentTool
+        with:
+          command: "gtkwave"
+          args: ["--script"]
+          
+**AgentReference Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: ProjectSpec
+        uses: std.AgentReference
+        with:
+          files: ["specs/project_requirements.md"]
+          urls: ["https://example.com/api-docs"]
+
+Using Agent Resources
+~~~~~~~~~~~~~~~~~~~~~
+
+Once defined, use agent resources by referencing them in the ``dfm agent`` command:
+
+.. code-block:: bash
+
+    # Launch agent with simulation skill and hardware expert persona
+    dfm agent SimSkill HardwareExpertPersona
+    
+    # Include project specifications as reference
+    dfm agent SimSkill ProjectSpec
+    
+    # Provide multiple resources
+    dfm agent SimSkill HardwareExpertPersona ProjectSpec WaveformViewer
+
+The agent command will:
+
+1. Resolve all task references
+2. Execute tasks to evaluate their parameters
+3. Load file contents and fetch URLs
+4. Inject all context into the AI assistant's system prompt
+5. Launch an interactive session
+
+This enables the AI assistant to have deep understanding of your project's
+capabilities, constraints, and domain-specific knowledge.
 
 Integration with AI Assistants
 ==============================
@@ -479,6 +792,44 @@ Debugging Build Failures
 
     # 4. Diagnose and fix
 
+Common Parameter Override Errors
+---------------------------------
+
+When using parameter overrides, you may encounter these errors:
+
+**Unknown Parameter:**
+
+.. code-block:: bash
+
+    $ dfm run build -D invalid_param=value
+    Error: Parameter 'invalid_param' not found in task 'myproject.build'
+    Available parameters: [include, type, base]
+
+**Solution**: Check available parameters with ``dfm show task build``
+
+**Type Mismatch:**
+
+.. code-block:: bash
+
+    $ dfm run build -D count=abc
+    Error: Cannot convert 'abc' to int for parameter 'count'
+
+**Solution**: Provide correct type or use ``-P params.json`` for complex types
+
+**Complex Type from CLI:**
+
+.. code-block:: bash
+
+    $ dfm run build -D config={"key": "value"}
+    Error: Parameter 'config' requires complex type. Use -P/--param-file with JSON.
+
+**Solution**: Use JSON parameter file for dicts, nested structures:
+
+.. code-block:: bash
+
+    # params.json: {"tasks": {"build": {"config": {"key": "value"}}}}
+    dfm run build -P params.json
+
 Best Practices
 ==============
 
@@ -486,8 +837,11 @@ Best Practices
 2. **Use skills for discovery**: ``dfm show skills`` lists package capabilities
 3. **Use JSON output**: ``--json`` flag enables programmatic parsing
 4. **Use context command**: ``dfm context --json`` provides complete project state
-5. **Verify suggestions**: Always review AI-generated configurations
-6. **Report issues**: If AI consistently misunderstands, the skill docs may need updates
+5. **Parameter overrides**: Use ``-D`` for simple values, ``-P`` for complex types
+6. **Verify task parameters**: Check available params with ``dfm show task <name>``
+7. **Type awareness**: Remember that single values become lists for list-type params
+8. **Verify suggestions**: Always review AI-generated configurations
+9. **Report issues**: If AI consistently misunderstands, the skill docs may need updates
 
 Without proper context, AI assistants may suggest incorrect syntax or non-existent
 features. With the skill.md documentation and ``dfm show skills``, assistants can:
@@ -498,6 +852,7 @@ features. With the skill.md documentation and ``dfm show skills``, assistants ca
 * Debug flow definition issues
 * Propose DFM-specific best practices
 * **Execute tasks dynamically inside Agent tasks**
+* **Override task parameters at runtime**
 
 Enabling LLM Support in Your Project
 ====================================

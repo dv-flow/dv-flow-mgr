@@ -16,7 +16,6 @@ efficient avoidance of redundant work.
    :caption: Contents:
 
    quickstart
-   incremental
    userguide/index
    reference/index
    reference/types_api

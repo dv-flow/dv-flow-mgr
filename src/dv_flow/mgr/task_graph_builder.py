@@ -68,6 +68,8 @@ class TaskGraphBuilder(object):
     loader : PackageLoaderP = None
     marker_l : Callable = lambda *args, **kwargs: None
     env : Dict[str, str] = dc.field(default=None)
+    task_param_overrides : Dict[str, Dict[str, Any]] = dc.field(default_factory=dict)  # task name → {param: value}
+    leaf_param_overrides : Dict[str, Any] = dc.field(default_factory=dict)  # NEW: leaf param names to try on tasks
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -427,6 +429,9 @@ class TaskGraphBuilder(object):
                         setattr(ret.params, k, v)
                     else:
                         raise Exception("Task %s parameters do not include %s" % (task.name, k))
+                
+                # NEW: Apply task parameter overrides from -D/-P
+                self._apply_task_param_overrides(ret, task)
             finally:
                 # Clean up package context if we created one
                 self.pop_name_resolution_context()
@@ -1205,3 +1210,127 @@ class TaskGraphBuilder(object):
 
     def _findOverride(self, task):
         return task
+    
+    def _apply_task_param_overrides(self, task_node, task):
+        """Apply parameter overrides from -D/-P to a task node.
+        
+        Looks up overrides by:
+        1. Full task name (pkg.task)
+        2. Leaf task name (task)
+        3. Leaf parameter names (for -D param=value)
+        """
+        overrides = {}
+        
+        # Try full task name first
+        if task.name in self.task_param_overrides:
+            overrides.update(self.task_param_overrides[task.name])
+        
+        # Also try leaf name
+        leaf_name = task.leafname if hasattr(task, 'leafname') else task.name.split('.')[-1]
+        if leaf_name in self.task_param_overrides:
+            overrides.update(self.task_param_overrides[leaf_name])
+        
+        # Also try leaf parameter names (from -D param=value without task name)
+        if self.leaf_param_overrides and hasattr(task, 'param_defs'):
+            for param_name, param_value in self.leaf_param_overrides.items():
+                # Only apply if this task has this parameter
+                if param_name in task.param_defs.definitions:
+                    if param_name not in overrides:  # Don't override explicit task overrides
+                        overrides[param_name] = param_value
+        
+        # Apply each override
+        for param_name, param_value in overrides.items():
+            try:
+                self._apply_task_param_override(task_node, task, param_name, param_value)
+            except Exception as e:
+                self.error(f"Failed to apply override for parameter '{param_name}' on task '{task.name}': {e}")
+                raise
+    
+    def _apply_task_param_override(self, task_node, task, param_name, value):
+        """Apply a single parameter override with type coercion.
+        
+        Args:
+            task_node: TaskNode to modify
+            task: Task definition
+            param_name: Parameter name (must exist in task.param_defs)
+            value: Value from -D (string) or -P (any JSON type)
+        """
+        # Check param exists in task definition
+        if not hasattr(task, 'param_defs') or param_name not in task.param_defs.definitions:
+            available_params = list(task.param_defs.definitions.keys()) if hasattr(task, 'param_defs') else []
+            raise ValueError(
+                f"Parameter '{param_name}' not found in task '{task.name}'. "
+                f"Available parameters: {available_params}"
+            )
+        
+        param_def = task.param_defs.definitions[param_name]
+        param_type = task.param_defs.types.get(param_name)
+        
+        # Coerce value to correct type
+        coerced_value = self._coerce_param_value(value, param_type, param_name, task.name)
+        
+        # Apply to task_node.params
+        if hasattr(task_node, 'params') and hasattr(task_node.params, param_name):
+            setattr(task_node.params, param_name, coerced_value)
+        
+        # Also update param_def.value for consistency
+        param_def.value = coerced_value
+    
+    def _coerce_param_value(self, value, param_type, param_name, task_name):
+        """Coerce string value to target type with proper error handling."""
+        import typing
+        
+        # Already correct type (from JSON file)
+        if param_type and not isinstance(param_type, type):
+            # Handle typing generics
+            origin = typing.get_origin(param_type)
+            if origin is None and isinstance(value, param_type):
+                return value
+        elif param_type and isinstance(value, param_type):
+            return value
+        
+        # Get origin type for generics (List, Dict, etc.)
+        origin = typing.get_origin(param_type) if param_type else None
+        
+        if origin is list or param_type is list:
+            # List type: "item" → ["item"], ["a", "b"] → ["a", "b"]
+            if isinstance(value, str):
+                return [value]
+            elif isinstance(value, list):
+                return value
+            else:
+                return [str(value)]
+        
+        elif param_type is bool:
+            if isinstance(value, bool):
+                return value
+            s = str(value).lower().strip()
+            return s in ("1", "true", "yes", "y", "on")
+        
+        elif param_type is int:
+            try:
+                return int(value)
+            except ValueError:
+                raise ValueError(f"Cannot convert '{value}' to int for parameter '{param_name}' on task '{task_name}'")
+        
+        elif param_type is float:
+            try:
+                return float(value)
+            except ValueError:
+                raise ValueError(f"Cannot convert '{value}' to float for parameter '{param_name}' on task '{task_name}'")
+        
+        elif param_type is str:
+            return str(value)
+        
+        elif param_type is None:
+            # No type specified, return as-is
+            return value
+        
+        else:
+            # Complex type - must come from JSON
+            if isinstance(value, str):
+                raise ValueError(
+                    f"Parameter '{param_name}' on task '{task_name}' requires complex type {param_type}. "
+                    f"Use -P/--param-file with JSON format."
+                )
+            return value

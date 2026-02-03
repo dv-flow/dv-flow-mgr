@@ -65,11 +65,31 @@ class CmdRun(object):
 
         listener = TaskListenerLog()
 
+        # Parse parameter overrides from CLI (-D) and file (-P)
+        from ..util import load_param_file, merge_parameter_overrides
+        
+        cli_overrides = parse_parameter_overrides(getattr(args, "param_overrides", []))
+        file_overrides = {'package': {}, 'task': {}, 'leaf': {}}
+        
+        if hasattr(args, 'param_file') and args.param_file:
+            try:
+                file_overrides = load_param_file(args.param_file)
+            except Exception as e:
+                print(f"Error loading parameter file: {e}")
+                sys.exit(1)
+        
+        # Merge (CLI takes precedence)
+        merged_overrides = merge_parameter_overrides(cli_overrides, file_overrides)
+        
+        # Extract task and leaf overrides for later use
+        task_overrides = merged_overrides.get('task', {})
+        leaf_overrides = merged_overrides.get('leaf', {})
+
         # First, find the project we're working with using selected listener for load markers
         loader, pkg = loadProjPkgDef(
             get_rootdir(args),
             listener=listener.marker,
-            parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])),
+            parameter_overrides=merged_overrides,  # Pass full structure (will extract package params)
             config=getattr(args, "config", None))
 
         if listener.has_severity[SeverityE.Error] > 0:
@@ -152,7 +172,12 @@ class CmdRun(object):
                 shutil.rmtree(rundir)
             os.makedirs(rundir)
 
-        builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
+        builder = TaskGraphBuilder(
+            root_pkg=pkg, 
+            rundir=rundir, 
+            loader=loader,
+            task_param_overrides=task_overrides,
+            leaf_param_overrides=leaf_overrides)  # Pass leaf parameter overrides
         runner = TaskSetRunner(rundir, builder=builder)
 
         # Initialize cache providers from DV_FLOW_CACHE environment variable
