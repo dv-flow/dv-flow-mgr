@@ -145,6 +145,10 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("--> _loadPackage")
         loader.pushPath(root)
 
+        # Save current srcdir and set to this package's directory
+        prev_srcdir = loader._eval.expr_eval.variables.get("srcdir")
+        loader._eval.set("srcdir", os.path.dirname(root))
+
         pkg_def : Optional[PackageDef] = None
 
         self._log.debug("open %s" % root)
@@ -248,6 +252,8 @@ class PackageProviderYaml(PackageProvider):
         if pkg_def is not None:
             self._mkPackage(pkg, pkg_def, root, loader)
 
+        # Restore previous srcdir
+        loader._eval.set("srcdir", prev_srcdir)
         loader.popPath()
 
         self._pkg_path_m[root] = pkg
@@ -770,15 +776,20 @@ class PackageProviderYaml(PackageProvider):
             raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(loader.pathStack())))
         loader.pushPath(file)
 
-        doc = self._parse_file(file, is_root=False)
-        self._log.debug("doc: %s" % str(doc))
-        if doc is not None and "fragment" in doc.keys():
-            # Save _field_srcinfo before validation
-            self._save_field_srcinfo(doc)
-            
-            try:
+        # Save current srcdir and set to fragment's directory
+        prev_srcdir = loader._eval.expr_eval.variables.get("srcdir")
+        basedir = os.path.dirname(file)
+        loader._eval.set("srcdir", basedir)
+
+        try:
+            doc = self._parse_file(file, is_root=False)
+            self._log.debug("doc: %s" % str(doc))
+            if doc is not None and "fragment" in doc.keys():
+                # Save _field_srcinfo before validation
+                self._save_field_srcinfo(doc)
+                
+                try:
                     frag = FragmentDef(**(doc["fragment"]))
-                    basedir = os.path.dirname(file)
                     pkg.fragment_def_l.append(frag)
 
                     # Check for name collisions
@@ -805,7 +816,7 @@ class PackageProviderYaml(PackageProvider):
                     
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
-            except pydantic.ValidationError as e:
+                except pydantic.ValidationError as e:
                     self._log.debug("Fragment validation errors: %s" % file)
                     error_paths = []
                     loc = None
@@ -868,9 +879,12 @@ class PackageProviderYaml(PackageProvider):
                                 severity=SeverityE.Error,
                                 loc=TaskMarkerLoc(path=file))
                         loader.marker(marker)
-        else:
-            print("Warning: file %s is not a fragment" % file)
-        loader.popPath()
+            else:
+                print("Warning: file %s is not a fragment" % file)
+        finally:
+            # Restore previous srcdir
+            loader._eval.set("srcdir", prev_srcdir)
+            loader.popPath()
 
     def _loadTasks(self, 
                    pkg : Package, 

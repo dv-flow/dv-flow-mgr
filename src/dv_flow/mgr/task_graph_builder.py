@@ -819,6 +819,10 @@ class TaskGraphBuilder(object):
         if srcdir is None:
             srcdir = os.path.dirname(task.srcinfo.file)
         
+        # Set srcdir to the task's source directory for parameter evaluation
+        prev_srcdir = self._eval.expr_eval.variables.get("srcdir")
+        self._eval.set("srcdir", srcdir)
+        
         if params is None:
             # NEW: Build paramT lazily if not already built
             if task.paramT is None:
@@ -866,6 +870,9 @@ class TaskGraphBuilder(object):
             from .produces_eval import ProducesEvaluator
             evaluator = ProducesEvaluator(self._eval)
             node.produces = evaluator.evaluate(task.produces, params)
+        
+        # Restore previous srcdir after all parameter evaluation is complete
+        self._eval.set("srcdir", prev_srcdir)
 
 
         if task.rundir == RundirE.Unique:
@@ -935,6 +942,10 @@ class TaskGraphBuilder(object):
         if srcdir is None:
             srcdir = os.path.dirname(task.srcinfo.file)
 
+        # Set srcdir to the task's source directory for parameter evaluation
+        prev_srcdir = self._eval.expr_eval.variables.get("srcdir")
+        self._eval.set("srcdir", srcdir)
+
         if params is None:
             # Build paramT lazily
             if task.paramT is None:
@@ -953,6 +964,9 @@ class TaskGraphBuilder(object):
             srcdir=srcdir,
             params=params,
             ctxt=self._ctxt)
+        
+        # Restore previous srcdir after all parameter evaluation
+        self._eval.set("srcdir", prev_srcdir)
 
         if task.rundir == RundirE.Unique:
             self.enter_rundir(name)
