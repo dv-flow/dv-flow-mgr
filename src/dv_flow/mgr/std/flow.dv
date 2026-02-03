@@ -119,7 +119,7 @@ package:
       Creates a list of include directories from a set of
       input files.
 
-  - name: Prompt
+  - name: Agent
     desc: |
       Executes an AI assistant with a specified prompt and collects 
       structured results. The assistant MUST create a valid JSON result
@@ -130,7 +130,7 @@ package:
       If no assistant is specified, auto-probes for available assistants
       in priority order: copilot, codex.
     shell: pytask
-    run: dv_flow.mgr.std.prompt.Prompt
+    run: dv_flow.mgr.std.agent.Agent
     with:
       system_prompt:
         type: str

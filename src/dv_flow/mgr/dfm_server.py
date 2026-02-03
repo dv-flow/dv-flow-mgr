@@ -22,7 +22,7 @@
 DFM Command Server for LLM Call Interface
 
 This module implements a JSON-RPC server over Unix sockets that allows
-LLM assistant processes (running within Prompt tasks) to execute DFM
+LLM assistant processes (running within Agent tasks) to execute DFM
 commands within the context of the parent TaskSetRunner session.
 
 Key features:

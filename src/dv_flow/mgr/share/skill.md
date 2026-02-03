@@ -20,7 +20,7 @@ Use this skill when:
 - Debugging build flow issues
 - Working with standard library tasks (std.FileSet, std.Message, etc.)
 - Executing shell commands with `shell: bash` and `run:`
-- **Executing dfm commands from within an LLM-driven Prompt task**
+- **Executing dfm commands from within an LLM-driven Agent task**
 
 ## Quick Reference
 
@@ -92,9 +92,9 @@ iff: ${{ debug_level > 0 }}
 command: ${{ "make debug" if debug else "make release" }}
 ```
 
-## LLM Call Interface (Running Inside Prompt Tasks)
+## LLM Call Interface (Running Inside Agent Tasks)
 
-When running inside an LLM-driven `std.Prompt` task, the `dfm` command automatically
+When running inside an LLM-driven `std.Agent` task, the `dfm` command automatically
 connects to the parent DFM session via a Unix socket. This enables LLMs to:
 
 - Execute tasks that share resources with the parent session
@@ -106,7 +106,7 @@ connects to the parent DFM session via a Unix socket. This enables LLMs to:
 When `DFM_SERVER_SOCKET` environment variable is set, `dfm` runs in client mode:
 
 ```bash
-# These commands work inside a Prompt task:
+# These commands work inside an Agent task:
 dfm run task1 task2         # Execute tasks via parent session
 dfm show tasks              # Query available tasks
 dfm context --json          # Get project context

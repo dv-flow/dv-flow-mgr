@@ -1,5 +1,5 @@
 #****************************************************************************
-#* prompt.py
+#* agent.py
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from dv_flow.mgr import TaskDataResult, TaskMarker, SeverityE
 from .ai_assistant import get_assistant, get_available_assistant_name
 
-_log = logging.getLogger("Prompt")
+_log = logging.getLogger("Agent")
 
 class DuckTypedOutput(BaseModel):
     """Duck-typed output object that supports arbitrary fields"""
@@ -150,14 +150,14 @@ Marker fields:
 5. The task will FAIL if the result file is missing or has invalid JSON
 """
 
-class PromptMemento(BaseModel):
-    """Memento for tracking prompt execution"""
+class AgentMemento(BaseModel):
+    """Memento for tracking agent execution"""
     prompt_hash: str
     result_hash: Optional[str] = None
     timestamp: float = 0.0
 
 
-async def Prompt(runner, input) -> TaskDataResult:
+async def Agent(runner, input) -> TaskDataResult:
     """
     Execute an AI assistant with a prompt
     
@@ -172,7 +172,7 @@ async def Prompt(runner, input) -> TaskDataResult:
     
     Returns TaskDataResult with status=1 if result file is missing or invalid.
     """
-    _log.debug(f"Prompt task: {input.name}")
+    _log.debug(f"Agent task: {input.name}")
     
     status = 0
     markers = []
@@ -421,13 +421,13 @@ async def Prompt(runner, input) -> TaskDataResult:
             with open(result_path, "rb") as f:
                 result_hash = hashlib.sha256(f.read()).hexdigest()
         
-        memento = PromptMemento(
+        memento = AgentMemento(
             prompt_hash=prompt_hash,
             result_hash=result_hash,
             timestamp=os.path.getmtime(result_path) if os.path.exists(result_path) else 0.0
         )
     
-    _log.debug(f"Prompt task complete: status={status}, changed={changed}, output_count={len(output)}")
+    _log.debug(f"Agent task complete: status={status}, changed={changed}, output_count={len(output)}")
     
     return TaskDataResult(
         status=status,

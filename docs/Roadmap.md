@@ -4,6 +4,38 @@ The Flow Specification is comprised of the Flow YAML Schema and the
 semantic definition of how task graphs defined using the flow specification
 are evaluated.
 
+## 20260201
+- "Provides"
+- Write up on agentic workflows
+  - 
+- Support for AgentTool (MCP) tasks
+- Support for extending parameters instead of replacing them
+- Path-based discovery of packages
+  - DV_FLOW_PATH
+- Dynamic flow-control constructs
+  - While
+  - DoWhile
+  - Repeat
+  - If/Else
+  - Match (?)
+- Python package/task definition library
+  - Structural, declarative specification (where sensible)
+  - Allow programmatic specification where required
+  - Need to think about things like consumes/produces
+- Allow 'agent' command to pass data to the agent (ie 'arguments')
+- Allow 'agent' to run a prompt and exit
+- Enhance support for shell-implemented tasks
+  - Pass inputs as an env-var
+  - Provide built-in functions for transforming inputs
+    - ${{ files }}
+    - ${{ incdirs }}
+    - ${{ defines }}
+  - Provide a way to specify outputs -- likely by appending to a file
+    - Might need to define bash functions to simplify this...
+  - Most of the time, we can bundle up the data-retrieval with a compound
+
+
+
 ## 1.0.0
 * Package definition
 * Package import

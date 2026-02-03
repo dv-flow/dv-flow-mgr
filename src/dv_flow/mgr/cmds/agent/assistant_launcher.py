@@ -30,7 +30,7 @@ from ...std.ai_assistant import ASSISTANT_REGISTRY, get_available_assistant_name
 class AssistantLauncher:
     """Launches AI assistant with context in interactive mode.
     
-    This differs from the Prompt task which runs assistants non-interactively.
+    This differs from the Agent task which runs assistants non-interactively.
     The agent command launches an interactive terminal session with the assistant.
     """
     

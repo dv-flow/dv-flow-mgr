@@ -262,7 +262,7 @@ None.
 
 ---
 
-## std.Prompt
+## std.Agent
 
 Execute an AI assistant with a prompt and collect structured results.
 
@@ -270,7 +270,7 @@ Execute an AI assistant with a prompt and collect structured results.
 
 ```yaml
 - name: generate_test
-  uses: std.Prompt
+  uses: std.Agent
   with:
     user_prompt: "Generate unit tests for the parser module"
     assistant: copilot
@@ -280,7 +280,7 @@ Execute an AI assistant with a prompt and collect structured results.
 
 ```yaml
 - name: code_review
-  uses: std.Prompt
+  uses: std.Agent
   with:
     system_prompt: |
       You are a code review assistant.

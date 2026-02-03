@@ -61,7 +61,7 @@ Executes an AI assistant with a specified prompt and collects structured results
 ```yaml
 tasks:
   - name: analyze
-    uses: std.Prompt
+    uses: std.Agent
     with:
       user_prompt: "Analyze the test results and suggest improvements"
       result_file: analysis.json

@@ -1,11 +1,11 @@
-# Test flow for Prompt task
+# Test flow for Agent task
 
 package:
-  name: prompt_test
+  name: agent_test
 
   tasks:
-    - name: simple_prompt
-      uses: std.Prompt
+    - name: simple_agent
+      uses: std.Agent
       with:
         user_prompt: "Generate a simple hello world message"
         assistant: "copilot"

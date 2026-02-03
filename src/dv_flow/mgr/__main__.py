@@ -432,7 +432,7 @@ def _run_client_mode(socket_path: str) -> int:
     Run dfm in client mode, forwarding commands to the parent session's server.
     
     This is used when DFM_SERVER_SOCKET is set, indicating we're running
-    inside an LLM assistant process within a Prompt task.
+    inside an LLM assistant process within an Agent task.
     """
     import asyncio
     import sys
