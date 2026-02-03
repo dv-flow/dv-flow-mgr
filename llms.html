@@ -319,6 +319,173 @@ single JSON output, ideal for LLM consumption:</p>
 </pre></div>
 </div>
 </section>
+<section id="the-dfm-agent-command">
+<h3>The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code> Command<a class="headerlink" href="#the-dfm-agent-command" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code> command launches an AI assistant with comprehensive DV Flow
+context derived from your project. This command enables interactive agent sessions
+with automatic context injection from agent-related tasks.</p>
+<section id="id1">
+<h4>Basic Usage<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Launch agent with default assistant</span>
+dfm<span class="w"> </span>agent
+
+<span class="c1"># Launch with specific tasks providing context</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>MySkill<span class="w"> </span>MyPersona<span class="w"> </span>MyReference
+
+<span class="c1"># Launch with specific assistant and model</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>copilot<span class="w"> </span>-m<span class="w"> </span>gpt-4<span class="w"> </span>MySkill
+
+<span class="c1"># Output context as JSON (debugging)</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>--json<span class="w"> </span>MySkill
+</pre></div>
+</div>
+</section>
+<section id="command-options">
+<h4>Command Options<a class="headerlink" href="#command-options" title="Link to this heading">¶</a></h4>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span><span class="w"> </span><span class="o">[</span>TASKS...<span class="o">]</span>
+
+Positional<span class="w"> </span>Arguments:
+<span class="w">  </span>tasks<span class="w">                 </span>Task<span class="w"> </span>references<span class="w"> </span>to<span class="w"> </span>use<span class="w"> </span>as<span class="w"> </span>context<span class="w"> </span><span class="o">(</span>skills,<span class="w"> </span>personas,<span class="w"> </span>tools,<span class="w"> </span>references<span class="o">)</span>
+
+Options:
+<span class="w">  </span>-a,<span class="w"> </span>--assistant<span class="w">       </span>Specify<span class="w"> </span>assistant<span class="w"> </span><span class="o">(</span>copilot,<span class="w"> </span>codex,<span class="w"> </span>mock<span class="o">)</span>
+<span class="w">  </span>-m,<span class="w"> </span>--model<span class="w">          </span>Specify<span class="w"> </span>the<span class="w"> </span>AI<span class="w"> </span>model<span class="w"> </span>to<span class="w"> </span>use
+<span class="w">  </span>--config-file<span class="w"> </span>FILE<span class="w">   </span>Output<span class="w"> </span>assistant<span class="w"> </span>config<span class="w"> </span>file<span class="w"> </span><span class="k">for</span><span class="w"> </span>debugging
+<span class="w">  </span>--json<span class="w">               </span>Output<span class="w"> </span>context<span class="w"> </span>as<span class="w"> </span>JSON<span class="w"> </span>instead<span class="w"> </span>of<span class="w"> </span>launching
+<span class="w">  </span>--clean<span class="w">              </span>Clean<span class="w"> </span>rundir<span class="w"> </span>before<span class="w"> </span>executing<span class="w"> </span>tasks
+<span class="w">  </span>--ui<span class="w"> </span>MODE<span class="w">            </span>Select<span class="w"> </span>UI<span class="w"> </span>mode<span class="w"> </span><span class="o">(</span>log,<span class="w"> </span>progress,<span class="w"> </span>progressbar,<span class="w"> </span>tui<span class="o">)</span>
+<span class="w">  </span>-c,<span class="w"> </span>--config<span class="w">         </span>Specifies<span class="w"> </span>active<span class="w"> </span>configuration<span class="w"> </span><span class="k">for</span><span class="w"> </span>root<span class="w"> </span>package
+<span class="w">  </span>-D<span class="w"> </span><span class="nv">NAME</span><span class="o">=</span>VALUE<span class="w">        </span>Parameter<span class="w"> </span>overrides
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h4>How It Works<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h4>
+<ol class="arabic simple">
+<li><p><strong>Context Collection</strong>: The command evaluates specified tasks (and their dependencies)</p></li>
+<li><p><strong>Resource Extraction</strong>: Extracts agent resources (skills, personas, tools, references)</p></li>
+<li><p><strong>Prompt Generation</strong>: Builds a comprehensive system prompt with project context</p></li>
+<li><p><strong>Assistant Launch</strong>: Launches the AI assistant with the generated context</p></li>
+</ol>
+</section>
+<section id="agent-resource-types">
+<h4>Agent Resource Types<a class="headerlink" href="#agent-resource-types" title="Link to this heading">¶</a></h4>
+<p>DV Flow provides four standard agent resource types that can be used with <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code>:</p>
+<dl class="simple">
+<dt><strong>AgentSkill</strong></dt><dd><p>Defines a capability or skill that the AI agent can use. Skills typically
+document how to accomplish specific tasks within your project.</p>
+<ul class="simple">
+<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentSkill</span></code></p></li>
+<li><p>Tag: <code class="docutils literal notranslate"><span class="pre">std.AgentSkillTag</span></code></p></li>
+<li><p>Common uses: Task documentation, API references, workflow guides</p></li>
+</ul>
+</dd>
+<dt><strong>AgentPersona</strong></dt><dd><p>Defines a role or personality for the AI agent to adopt during interaction.</p>
+<ul class="simple">
+<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentPersona</span></code></p></li>
+<li><p>Tag: <code class="docutils literal notranslate"><span class="pre">std.AgentPersonaTag</span></code></p></li>
+<li><p>Fields: <code class="docutils literal notranslate"><span class="pre">persona</span></code> (str) - Description of the persona</p></li>
+<li><p>Common uses: Domain expert roles, coding styles, interaction modes</p></li>
+</ul>
+</dd>
+<dt><strong>AgentTool</strong></dt><dd><p>Specifies external tools or MCP servers that the agent can invoke.</p>
+<ul class="simple">
+<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentTool</span></code></p></li>
+<li><p>Tag: <code class="docutils literal notranslate"><span class="pre">std.AgentToolTag</span></code></p></li>
+<li><p>Fields: <code class="docutils literal notranslate"><span class="pre">command</span></code> (str), <code class="docutils literal notranslate"><span class="pre">args</span></code> (list), <code class="docutils literal notranslate"><span class="pre">url</span></code> (str)</p></li>
+<li><p>Common uses: External APIs, command-line tools, MCP servers</p></li>
+</ul>
+</dd>
+<dt><strong>AgentReference</strong></dt><dd><p>Provides reference documentation or materials for the agent to consult.</p>
+<ul class="simple">
+<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentReference</span></code></p></li>
+<li><p>Tag: <code class="docutils literal notranslate"><span class="pre">std.AgentReferenceTag</span></code></p></li>
+<li><p>Common uses: Project documentation, specifications, examples</p></li>
+</ul>
+</dd>
+</dl>
+<p>All resource types (except AgentPersona) inherit from <code class="docutils literal notranslate"><span class="pre">std.AgentResource</span></code> which provides:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">files</span></code> (list) - List of files to include in the resource</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">content</span></code> (str) - Inline content for the resource</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">urls</span></code> (list) - URLs pointing to external resources</p></li>
+</ul>
+</section>
+<section id="example-defining-agent-resources">
+<h4>Example: Defining Agent Resources<a class="headerlink" href="#example-defining-agent-resources" title="Link to this heading">¶</a></h4>
+<p><strong>AgentSkill Example:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimulationSkill</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentSkill</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;docs/simulation_guide.md&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">          </span><span class="no"># Simulation Guide</span>
+<span class="w">          </span><span class="no">To run simulations, use the sim.SimRun task...</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimSkill</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SimulationSkill</span>
+</pre></div>
+</div>
+<p><strong>AgentPersona Example:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HardwareExpertPersona</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentPersona</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">persona</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">You are an expert hardware verification engineer with 20 years</span>
+<span class="w">        </span><span class="no">of experience in RTL design and SystemVerilog. You prefer</span>
+<span class="w">        </span><span class="no">structured, defensive coding practices.</span>
+</pre></div>
+</div>
+<p><strong>AgentTool Example:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WaveformViewer</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentTool</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gtkwave&quot;</span>
+<span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;--script&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p><strong>AgentReference Example:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ProjectSpec</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentReference</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;specs/project_requirements.md&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">urls</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;https://example.com/api-docs&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="using-agent-resources">
+<h4>Using Agent Resources<a class="headerlink" href="#using-agent-resources" title="Link to this heading">¶</a></h4>
+<p>Once defined, use agent resources by referencing them in the <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Launch agent with simulation skill and hardware expert persona</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>SimSkill<span class="w"> </span>HardwareExpertPersona
+
+<span class="c1"># Include project specifications as reference</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>SimSkill<span class="w"> </span>ProjectSpec
+
+<span class="c1"># Provide multiple resources</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>SimSkill<span class="w"> </span>HardwareExpertPersona<span class="w"> </span>ProjectSpec<span class="w"> </span>WaveformViewer
+</pre></div>
+</div>
+<p>The agent command will:</p>
+<ol class="arabic simple">
+<li><p>Resolve all task references</p></li>
+<li><p>Execute tasks to evaluate their parameters</p></li>
+<li><p>Load file contents and fetch URLs</p></li>
+<li><p>Inject all context into the AI assistant’s system prompt</p></li>
+<li><p>Launch an interactive session</p></li>
+</ol>
+<p>This enables the AI assistant to have deep understanding of your project’s
+capabilities, constraints, and domain-specific knowledge.</p>
+</section>
+</section>
 </section>
 <section id="integration-with-ai-assistants">
 <h2>Integration with AI Assistants<a class="headerlink" href="#integration-with-ai-assistants" title="Link to this heading">¶</a></h2>
