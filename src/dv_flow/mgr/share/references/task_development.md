@@ -246,6 +246,233 @@ tasks:
     debug: true
 ```
 
+## Advanced Implementation Patterns
+
+### Builder Pattern for Complex Tasks
+
+For tasks with significant complexity (like HDL compilation), use a builder class:
+
+```python
+# my_package/image_builder.py
+import dataclasses as dc
+import logging
+from typing import ClassVar
+from dv_flow.mgr import TaskRunCtxt, TaskDataResult, FileSet, TaskMarker
+
+@dc.dataclass
+class SimImageBuilder:
+    ctxt: TaskRunCtxt
+    markers: list = dc.field(default_factory=list)
+    
+    _log: ClassVar = logging.getLogger("SimImageBuilder")
+    
+    async def run(self, ctxt, input) -> TaskDataResult:
+        """Main entry point."""
+        self.ctxt = ctxt
+        status = 0
+        
+        # Gather inputs
+        files = []
+        for inp in input.inputs:
+            if inp.type == "std.FileSet" and inp.filetype == "systemVerilogSource":
+                files.extend([os.path.join(inp.basedir, f) for f in inp.files])
+        
+        # Execute build
+        status, changed = await self.build(input, files)
+        
+        # Create output
+        output = []
+        if status == 0:
+            output.append(FileSet(
+                src=input.name,
+                filetype="simDir",
+                basedir=input.rundir
+            ))
+        
+        return TaskDataResult(
+            status=status,
+            changed=changed,
+            output=output,
+            markers=self.markers
+        )
+    
+    async def build(self, input, files):
+        """Perform the actual build."""
+        cmd = ["verilator", "--binary"] + files
+        status = await self.ctxt.exec(cmd, logfile="build.log")
+        return status, (status == 0)
+
+# Entry point function
+async def SimImage(ctxt, input) -> TaskDataResult:
+    builder = SimImageBuilder(ctxt)
+    return await builder.run(ctxt, input)
+```
+
+### Log Parsing with Callbacks
+
+Extract warnings/errors from tool output:
+
+```python
+# my_package/log_parser.py
+from dv_flow.mgr.task_data import TaskMarker, SeverityE
+import re
+
+class ToolLogParser:
+    def __init__(self, notify=None):
+        self.notify = notify
+        self.error_pattern = re.compile(r'Error:\s+(.+)')
+        self.warning_pattern = re.compile(r'Warning:\s+(.+)')
+    
+    def line(self, line: str):
+        """Process one line of log output."""
+        # Check for errors
+        m = self.error_pattern.search(line)
+        if m and self.notify:
+            self.notify(TaskMarker(
+                severity=SeverityE.Error,
+                msg=m.group(1)
+            ))
+            return
+        
+        # Check for warnings
+        m = self.warning_pattern.search(line)
+        if m and self.notify:
+            self.notify(TaskMarker(
+                severity=SeverityE.Warning,
+                msg=m.group(1)
+            ))
+
+# Usage in task
+async def MyTask(runner, input) -> TaskDataResult:
+    markers = []
+    
+    status = await runner.exec(
+        ["my-tool", "input.txt"],
+        logfile="tool.log",
+        logfilter=ToolLogParser(notify=lambda m: markers.append(m)).line
+    )
+    
+    return TaskDataResult(status=status, markers=markers)
+```
+
+### Data Classes for Configuration
+
+Group related parameters and state:
+
+```python
+# my_package/sim_data.py
+import dataclasses as dc
+from typing import List
+
+@dc.dataclass
+class SimImageData:
+    """Configuration data for simulation image build."""
+    files: List[str] = dc.field(default_factory=list)
+    incdirs: List[str] = dc.field(default_factory=list)
+    defines: List[str] = dc.field(default_factory=list)
+    top: List[str] = dc.field(default_factory=list)
+    args: List[str] = dc.field(default_factory=list)
+    trace: bool = False
+    timing: bool = True
+
+# Usage in task
+async def build_image(input) -> TaskDataResult:
+    data = SimImageData()
+    
+    # Collect from inputs
+    for inp in input.inputs:
+        if inp.type == "std.FileSet":
+            data.files.extend([os.path.join(inp.basedir, f) for f in inp.files])
+            data.incdirs.extend(inp.incdirs)
+    
+    # Collect from parameters
+    data.top = input.params.top
+    data.trace = input.params.trace
+    
+    # Build command
+    cmd = ["verilator", "--binary"]
+    for incdir in data.incdirs:
+        cmd.append(f"+incdir+{incdir}")
+    cmd.extend(data.files)
+    # ...
+```
+
+### Runner Pattern for Execution Tasks
+
+Separate configuration collection from execution:
+
+```python
+# my_package/sim_runner.py
+import dataclasses as dc
+from dv_flow.mgr import TaskRunCtxt, TaskDataResult, FileSet
+
+@dc.dataclass
+class SimRunner:
+    ctxt: TaskRunCtxt = None
+    
+    async def run(self, ctxt, input) -> TaskDataResult:
+        """Collect inputs and execute simulation."""
+        self.ctxt = ctxt
+        
+        # Find simulation directory
+        sim_dir = None
+        for inp in input.inputs:
+            if inp.type == "std.FileSet" and inp.filetype == "simDir":
+                sim_dir = inp.basedir
+                break
+        
+        if sim_dir is None:
+            return TaskDataResult(
+                status=1,
+                markers=[TaskMarker(
+                    severity=SeverityE.Error,
+                    msg="No simulation directory found"
+                )]
+            )
+        
+        # Execute
+        status = await self.runsim(sim_dir, input.params.plusargs)
+        
+        return TaskDataResult(
+            status=status,
+            output=[FileSet(
+                src=input.name,
+                filetype="simRunDir",
+                basedir=input.rundir
+            )]
+        )
+    
+    async def runsim(self, sim_dir, plusargs):
+        """Override in subclass for specific simulator."""
+        cmd = [os.path.join(sim_dir, "simv")]
+        for arg in plusargs:
+            cmd.append(f"+{arg}")
+        return await self.ctxt.exec(cmd, logfile="sim.log")
+```
+
+### Using Python's Logging
+
+Add structured logging to task implementations:
+
+```python
+import logging
+from typing import ClassVar
+
+class MyTaskBuilder:
+    _log: ClassVar = logging.getLogger("MyTaskBuilder")
+    
+    async def run(self, ctxt, input):
+        self._log.info("Starting build for %s", input.name)
+        self._log.debug("Parameters: %s", input.params)
+        
+        # Task implementation...
+        
+        if status == 0:
+            self._log.info("Build completed successfully")
+        else:
+            self._log.error("Build failed with status %d", status)
+```
+
 ## Creating a Plugin Package
 
 ### Package Structure
@@ -402,6 +629,152 @@ tasks:
   passthrough: unused   # Forward only unconsumed inputs (default)
 ```
 
+### Processing Input Data in Implementation
+
+When implementing tasks, filter inputs by type and filetype:
+
+```python
+async def MyTask(runner, input) -> TaskDataResult:
+    source_files = []
+    compile_args = []
+    
+    # Process each input data item
+    for inp in input.inputs:
+        # Check data type first
+        if inp.type == "std.FileSet":
+            # Then check filetype
+            if inp.filetype in ("verilogSource", "systemVerilogSource"):
+                for f in inp.files:
+                    source_files.append(os.path.join(inp.basedir, f))
+            elif inp.filetype == "simLib":
+                # Handle library dependencies
+                pass
+        elif inp.type == "hdlsim.SimCompileArgs":
+            # Custom type for structured configuration
+            compile_args.extend(inp.args)
+    
+    # Use collected data...
+```
+
+### Best Practices for Dataflow
+
+**1. Declare specific consumes patterns:**
+```yaml
+# Good - specific about what's needed
+consumes:
+- filetype: verilogSource
+- filetype: systemVerilogSource
+- type: hdlsim.SimCompileArgs
+
+# Avoid - too broad, gets everything
+consumes: all
+```
+
+**2. Use meaningful filetype values:**
+```python
+# Output with descriptive filetype
+return TaskDataResult(
+    output=[
+        FileSet(
+            src=input.name,
+            filetype="simDir",        # Not just "directory"
+            basedir=input.rundir
+        )
+    ]
+)
+```
+
+**3. Create custom types for structured data:**
+```yaml
+# Define reusable configuration types
+types:
+- name: SimCompileArgs
+  with:
+    args: {type: list}
+    incdirs: {type: list}
+    defines: {type: list}
+
+# Task produces structured data
+- name: configure
+  run: |
+    from dv_flow.mgr import DataItem
+    config = DataItem(
+        type="hdlsim.SimCompileArgs",
+        args=["-O2", "-g"],
+        incdirs=["include/"],
+        defines=["DEBUG=1"]
+    )
+    return TaskDataResult(output=[config])
+```
+
+**4. Use passthrough for compatibility:**
+```yaml
+# When tool doesn't support a concept but needs to pass data through
+- name: SimLib
+  uses: hdlsim.SimLib
+  passthrough: all    # Verilator doesn't have pre-compiled libs
+  desc: Passthrough (no library support)
+```
+
+**5. Filter multiple filetypes efficiently:**
+```python
+# Collect different file types in one pass
+sv_files = []
+c_files = []
+dpi_libs = []
+
+for inp in input.inputs:
+    if inp.type == "std.FileSet":
+        if inp.filetype in ("verilogSource", "systemVerilogSource"):
+            sv_files.extend([os.path.join(inp.basedir, f) for f in inp.files])
+        elif inp.filetype in ("cSource", "cppSource"):
+            c_files.extend([os.path.join(inp.basedir, f) for f in inp.files])
+        elif inp.filetype == "systemVerilogDPI":
+            dpi_libs.extend([os.path.join(inp.basedir, f) for f in inp.files])
+```
+
+**6. Use FileSet attributes for metadata:**
+```python
+# Producer adds metadata
+output = FileSet(
+    filetype="verilogVPI",
+    files=["myvpi.so"],
+    attributes=["entrypoint=vpi_register"]
+)
+
+# Consumer extracts metadata
+for inp in input.inputs:
+    if inp.filetype == "verilogVPI":
+        entrypoint = None
+        for attr in inp.attributes:
+            if attr.startswith("entrypoint="):
+                entrypoint = attr.split("=", 1)[1]
+```
+
+**7. Validate required inputs:**
+```python
+from dv_flow.mgr.task_data import TaskMarker, SeverityE
+
+async def MyTask(runner, input) -> TaskDataResult:
+    sim_dir = None
+    
+    for inp in input.inputs:
+        if inp.type == "std.FileSet" and inp.filetype == "simDir":
+            sim_dir = inp.basedir
+            break
+    
+    if sim_dir is None:
+        return TaskDataResult(
+            status=1,
+            markers=[TaskMarker(
+                severity=SeverityE.Error,
+                msg="Missing required simDir input"
+            )]
+        )
+    
+    # Proceed with task...
+```
+
 ## Incremental Execution
 
 ### Using Mementos
@@ -509,6 +882,10 @@ def create_tests(ctxt, input):
 4. **Log output** - Use `runner.exec()` with `logfile=`
 5. **Report errors** - Add `TaskMarker` for user-visible issues
 6. **Document parameters** - Add `doc:` field in YAML
+7. **Declare specific consumes** - Be explicit about required input types
+8. **Use meaningful filetypes** - Choose descriptive filetype values for FileSet outputs
+9. **Validate inputs** - Check for required inputs and report errors early
+10. **Process inputs by type** - Filter `input.inputs` by checking `inp.type` and `inp.filetype`
 
 ### Package Development Checklist
 
