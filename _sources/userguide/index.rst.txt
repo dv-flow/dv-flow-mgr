@@ -11,6 +11,7 @@ User Guide
    dataflow
    visibility
    tasks_developing
+   incremental
    configuration
    expressions
    advanced_features
