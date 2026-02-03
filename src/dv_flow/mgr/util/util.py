@@ -28,10 +28,21 @@ from ..task_data import TaskMarker, TaskMarkerLoc, SeverityE
 _log = logging.getLogger("util")
 
 def parse_parameter_overrides(def_list):
-    """Parses ['name=value', ...] into a dict of parameter overrides."""
-    ov = {}
+    """Parses ['name=value', ...] into categorized parameter overrides.
+    
+    Returns:
+        dict with keys:
+            'package': {param_name: value}  # Package-level parameters
+            'task': {task_name: {param: value}}  # Task-level parameters
+            'leaf': {param_name: value}  # Ambiguous leaf names (could be task params)
+    """
+    package_ov = {}
+    task_ov = {}
+    leaf_ov = {}  # NEW: leaf names that could match task parameters
+    
     if not def_list:
-        return ov
+        return {'package': package_ov, 'task': task_ov, 'leaf': leaf_ov}
+    
     for item in def_list:
         # Accept raw 'name=value' values (regardless of how '-D' was passed)
         s = item.strip()
@@ -42,9 +53,128 @@ def parse_parameter_overrides(def_list):
         name, value = s.split("=", 1)
         name = name.strip()
         value = value.strip()
-        if name:
-            ov[name] = value
-    return ov
+        if not name:
+            continue
+        
+        # Categorize: package vs task parameter
+        # No dots → leaf parameter (could be package or task)
+        # One dot → could be pkg.param or task.param (defer to runtime)
+        # Two+ dots → definitely task parameter (pkg.task.param)
+        
+        dot_count = name.count('.')
+        if dot_count == 0:
+            # No dots: leaf name - could be package or task parameter
+            # Store in both package (backward compat) and leaf (for task matching)
+            package_ov[name] = value
+            leaf_ov[name] = value
+        elif dot_count == 1:
+            # One dot: could be pkg.param or task.param
+            # Store in both for now, will be resolved at runtime
+            parts = name.split('.', 1)
+            package_ov[name] = value  # For backward compat: pkg.param
+            # Also store as potential task override
+            task_name, param_name = parts
+            if task_name not in task_ov:
+                task_ov[task_name] = {}
+            task_ov[task_name][param_name] = value
+        else:
+            # Two+ dots: pkg.task.param or longer
+            # Extract last part as param, rest as task name
+            parts = name.rsplit('.', 1)
+            task_name = parts[0]
+            param_name = parts[1]
+            if task_name not in task_ov:
+                task_ov[task_name] = {}
+            task_ov[task_name][param_name] = value
+    
+    return {'package': package_ov, 'task': task_ov, 'leaf': leaf_ov}
+
+def load_param_file(filepath):
+    """Load parameter overrides from JSON file or inline JSON string.
+    
+    Accepts either:
+    - A file path: "params.json"
+    - An inline JSON string: '{"tasks": {"build": {"top": "counter"}}}'
+    
+    File format:
+    {
+        "package": {"param1": "value1"},
+        "tasks": {
+            "taskname": {"param2": ["list", "value"]},
+            "pkg.taskname": {"param3": {"complex": "object"}}
+        }
+    }
+    
+    Returns: Same format as parse_parameter_overrides
+    """
+    import json
+    import os
+    
+    # Check if it's a JSON string (starts with { or [) or a file path
+    if filepath.strip().startswith('{') or filepath.strip().startswith('['):
+        # It's an inline JSON string
+        try:
+            data = json.loads(filepath)
+        except json.JSONDecodeError as e:
+            raise Exception(f"Error parsing inline JSON: {e}")
+    else:
+        # It's a file path
+        if not os.path.exists(filepath):
+            raise Exception(f"Parameter file not found: {filepath}")
+        
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise Exception(f"Error parsing parameter file {filepath}: {e}")
+    
+    # Normalize to expected format
+    package_ov = data.get('package', {})
+    tasks_data = data.get('tasks', {})
+    
+    # Convert tasks format: {taskname: {param: value}} → nested dict
+    task_ov = {}
+    for task_name, params in tasks_data.items():
+        task_ov[task_name] = params
+    
+    return {'package': package_ov, 'task': task_ov, 'leaf': {}}
+
+def merge_parameter_overrides(cli_overrides, file_overrides):
+    """Merge -D and -P overrides (CLI takes precedence).
+    
+    Args:
+        cli_overrides: Result from parse_parameter_overrides
+        file_overrides: Result from load_param_file
+    
+    Returns: Merged dict with same structure
+    """
+    merged = {
+        'package': {},
+        'task': {},
+        'leaf': {}
+    }
+    
+    # Start with file overrides
+    merged['package'].update(file_overrides.get('package', {}))
+    merged['leaf'].update(file_overrides.get('leaf', {}))
+    
+    file_tasks = file_overrides.get('task', {})
+    for task_name, params in file_tasks.items():
+        if task_name not in merged['task']:
+            merged['task'][task_name] = {}
+        merged['task'][task_name].update(params)
+    
+    # CLI overrides take precedence
+    merged['package'].update(cli_overrides.get('package', {}))
+    merged['leaf'].update(cli_overrides.get('leaf', {}))
+    
+    cli_tasks = cli_overrides.get('task', {})
+    for task_name, params in cli_tasks.items():
+        if task_name not in merged['task']:
+            merged['task'][task_name] = {}
+        merged['task'][task_name].update(params)
+    
+    return merged
 
 def _is_package_file(fpath: str) -> bool:
     """Check if a flow file contains a 'package' key (not a fragment)."""
@@ -67,6 +197,11 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
     Searches for a flow file containing a 'package' key. Fragment files
     (those with 'fragment' instead of 'package') are skipped, and the
     search continues up the directory tree.
+    
+    Args:
+        parameter_overrides: Can be either:
+            - Old format: dict of {name: value} for package params
+            - New format: dict with 'package' and 'task' keys
     """
 
     _log.debug("--> loadProjPkgDef %s" % path)
@@ -109,9 +244,16 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
         _log.debug("Loading rootfile: %s" % rootfile)
         try:
             listeners = [listener] if listener is not None else []
+            
+            # Extract package overrides (support both old and new format)
+            pkg_overrides = parameter_overrides or {}
+            if isinstance(pkg_overrides, dict) and 'package' in pkg_overrides:
+                # New format - extract only package overrides for loader
+                pkg_overrides = pkg_overrides['package']
+            
             loader = PackageLoader(
                 marker_listeners=listeners,
-                param_overrides=(parameter_overrides or {}))
+                param_overrides=pkg_overrides)
             ret = loader.load(rootfile, config=config)
         except Exception:
             print("Fatal Error: while parsing %s" % rootfile)

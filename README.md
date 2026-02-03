@@ -49,6 +49,34 @@ Run the flow using the `dfm run` command:
 % dfm run greet
 ```
 
+### Parameter Overrides
+
+Override task parameters at runtime:
+
+```bash
+# Simple parameter override
+% dfm run greet -D msg="Hello, DFM!"
+
+# Multiple overrides
+% dfm run build -D top=counter -D debug=true
+
+# Task-qualified override
+% dfm run build -D build.include=*.sv
+
+# Complex types via JSON file
+% dfm run build -P params.json
+
+# Or inline JSON string (convenient for LLMs)
+% dfm run build -P '{"tasks": {"build": {"top": ["counter"]}}}'
+```
+
+**Type Coercion:**
+- Single values → Lists: `-D top=counter` becomes `["counter"]`
+- Strings → Booleans: `-D debug=true` becomes `True`
+- Strings → Numbers: `-D count=42` becomes `42`
+
+See [Parameter Overrides Documentation](docs/llms.rst#parameter-overrides) for details.
+
 ## Task Caching
 
 Speed up your workflows with intelligent caching:

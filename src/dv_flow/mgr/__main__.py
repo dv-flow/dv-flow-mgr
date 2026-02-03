@@ -62,7 +62,16 @@ def get_parser():
                         action="append",
                         default=[],
                         metavar="NAME=VALUE",
-                        help="Parameter override; may be used multiple times")
+                        help="Parameter override. For package params: -D param=value. "
+                             "For task params: -D task.param=value or -D pkg.task.param=value. "
+                             "Lists auto-convert: -D top=counter becomes ['counter']. "
+                             "May be used multiple times")
+    parser.add_argument("-P", "--param-file",
+                        dest="param_file",
+                        metavar="FILE_OR_JSON",
+                        help="JSON file path or inline JSON string for complex parameter types. "
+                             "Inline example: -P '{\"tasks\": {\"build\": {\"top\": [\"counter\"]}}}'. "
+                             "CLI -D options take precedence over -P values")
     # parser.add_argument("-v", "--verbose", 
     #                     help="Enable verbose output",
     #                     action="store_true")
@@ -121,7 +130,13 @@ def get_parser():
                         action="append",
                         default=[],
                         metavar="NAME=VALUE",
-                        help="Parameter override; may be used multiple times")
+                        help="Parameter override. For package params: -D param=value. "
+                             "For task params: -D task.param=value. "
+                             "May be used multiple times")
+    run_parser.add_argument("-P", "--param-file",
+                        dest="param_file",
+                        metavar="FILE_OR_JSON",
+                        help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
     run_parser.set_defaults(func=CmdRun())
 
     show_parser = subparsers.add_parser('show', 
