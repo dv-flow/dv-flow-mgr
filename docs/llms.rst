@@ -309,6 +309,185 @@ single JSON output, ideal for LLM consumption:
       "skills": [...]
     }
 
+The ``dfm agent`` Command
+-------------------------
+
+The ``dfm agent`` command launches an AI assistant with comprehensive DV Flow
+context derived from your project. This command enables interactive agent sessions
+with automatic context injection from agent-related tasks.
+
+Basic Usage
+~~~~~~~~~~~
+
+.. code-block:: bash
+
+    # Launch agent with default assistant
+    dfm agent
+
+    # Launch with specific tasks providing context
+    dfm agent MySkill MyPersona MyReference
+    
+    # Launch with specific assistant and model
+    dfm agent -a copilot -m gpt-4 MySkill
+    
+    # Output context as JSON (debugging)
+    dfm agent --json MySkill
+
+Command Options
+~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    dfm agent [OPTIONS] [TASKS...]
+
+    Positional Arguments:
+      tasks                 Task references to use as context (skills, personas, tools, references)
+    
+    Options:
+      -a, --assistant       Specify assistant (copilot, codex, mock)
+      -m, --model          Specify the AI model to use
+      --config-file FILE   Output assistant config file for debugging
+      --json               Output context as JSON instead of launching
+      --clean              Clean rundir before executing tasks
+      --ui MODE            Select UI mode (log, progress, progressbar, tui)
+      -c, --config         Specifies active configuration for root package
+      -D NAME=VALUE        Parameter overrides
+
+How It Works
+~~~~~~~~~~~~
+
+1. **Context Collection**: The command evaluates specified tasks (and their dependencies)
+2. **Resource Extraction**: Extracts agent resources (skills, personas, tools, references)
+3. **Prompt Generation**: Builds a comprehensive system prompt with project context
+4. **Assistant Launch**: Launches the AI assistant with the generated context
+
+Agent Resource Types
+~~~~~~~~~~~~~~~~~~~~
+
+DV Flow provides four standard agent resource types that can be used with ``dfm agent``:
+
+**AgentSkill**
+    Defines a capability or skill that the AI agent can use. Skills typically
+    document how to accomplish specific tasks within your project.
+    
+    * Uses: ``std.AgentSkill``
+    * Tag: ``std.AgentSkillTag``
+    * Common uses: Task documentation, API references, workflow guides
+
+**AgentPersona**
+    Defines a role or personality for the AI agent to adopt during interaction.
+    
+    * Uses: ``std.AgentPersona``
+    * Tag: ``std.AgentPersonaTag``
+    * Fields: ``persona`` (str) - Description of the persona
+    * Common uses: Domain expert roles, coding styles, interaction modes
+
+**AgentTool**
+    Specifies external tools or MCP servers that the agent can invoke.
+    
+    * Uses: ``std.AgentTool``
+    * Tag: ``std.AgentToolTag``
+    * Fields: ``command`` (str), ``args`` (list), ``url`` (str)
+    * Common uses: External APIs, command-line tools, MCP servers
+
+**AgentReference**
+    Provides reference documentation or materials for the agent to consult.
+    
+    * Uses: ``std.AgentReference``
+    * Tag: ``std.AgentReferenceTag``
+    * Common uses: Project documentation, specifications, examples
+
+All resource types (except AgentPersona) inherit from ``std.AgentResource`` which provides:
+
+* ``files`` (list) - List of files to include in the resource
+* ``content`` (str) - Inline content for the resource
+* ``urls`` (list) - URLs pointing to external resources
+
+Example: Defining Agent Resources
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**AgentSkill Example:**
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+      
+      types:
+        - name: SimulationSkill
+          uses: std.AgentSkill
+          with:
+            files: ["docs/simulation_guide.md"]
+            content: |
+              # Simulation Guide
+              To run simulations, use the sim.SimRun task...
+      
+      tasks:
+        - name: SimSkill
+          uses: SimulationSkill
+
+**AgentPersona Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: HardwareExpertPersona
+        uses: std.AgentPersona
+        with:
+          persona: |
+            You are an expert hardware verification engineer with 20 years
+            of experience in RTL design and SystemVerilog. You prefer
+            structured, defensive coding practices.
+
+**AgentTool Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: WaveformViewer
+        uses: std.AgentTool
+        with:
+          command: "gtkwave"
+          args: ["--script"]
+          
+**AgentReference Example:**
+
+.. code-block:: yaml
+
+    tasks:
+      - name: ProjectSpec
+        uses: std.AgentReference
+        with:
+          files: ["specs/project_requirements.md"]
+          urls: ["https://example.com/api-docs"]
+
+Using Agent Resources
+~~~~~~~~~~~~~~~~~~~~~
+
+Once defined, use agent resources by referencing them in the ``dfm agent`` command:
+
+.. code-block:: bash
+
+    # Launch agent with simulation skill and hardware expert persona
+    dfm agent SimSkill HardwareExpertPersona
+    
+    # Include project specifications as reference
+    dfm agent SimSkill ProjectSpec
+    
+    # Provide multiple resources
+    dfm agent SimSkill HardwareExpertPersona ProjectSpec WaveformViewer
+
+The agent command will:
+
+1. Resolve all task references
+2. Execute tasks to evaluate their parameters
+3. Load file contents and fetch URLs
+4. Inject all context into the AI assistant's system prompt
+5. Launch an interactive session
+
+This enables the AI assistant to have deep understanding of your project's
+capabilities, constraints, and domain-specific knowledge.
+
 Integration with AI Assistants
 ==============================
 
