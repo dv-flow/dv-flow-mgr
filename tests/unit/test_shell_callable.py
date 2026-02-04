@@ -59,7 +59,7 @@ void foo() {
     builder = TaskGraphBuilder(
         root_pkg=pkg,
         rundir=os.path.join(tmpdir, "rundir"))
-    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"))
+    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"), builder=builder)
 
     entry = builder.mkTaskNode("foo.libfoo")
 
