@@ -175,10 +175,12 @@ class TaskRunCtxt(object):
         except Exception:
             pass
 
-        # Acquire exec semaphore if available (gates on actual process execution)
-        semaphore = getattr(self.runner, '_exec_semaphore', None)
-        if semaphore is not None:
-            await semaphore.acquire()
+        # Acquire job token from jobserver (replaces semaphore)
+        jobserver = getattr(self.runner, '_jobserver', None)
+        if jobserver is not None:
+            self._log.debug(f"Attempting to acquire jobserver token...")
+            await jobserver.acquire()
+            self._log.debug(f"Jobserver token acquired")
         
         # Notify exec start
         if self._exec_start_callback is not None:
@@ -214,9 +216,11 @@ class TaskRunCtxt(object):
             if self._exec_end_callback is not None:
                 self._exec_end_callback()
             
-            # Release exec semaphore
-            if semaphore is not None:
-                semaphore.release()
+            # Release job token
+            if jobserver is not None:
+                self._log.debug(f"Releasing jobserver token...")
+                jobserver.release()
+                self._log.debug(f"Jobserver token released")
 
     def create(self, path, content):
         """Create a file in the task's rundir"""
