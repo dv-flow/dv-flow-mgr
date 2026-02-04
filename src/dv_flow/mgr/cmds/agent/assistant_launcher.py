@@ -172,18 +172,24 @@ class AssistantLauncher:
         
         Returns:
             Command line as list of strings
+        
+        Note: Codex CLI 1.10+ uses the following key flags:
+            -s, --sandbox: read-only | workspace-write | danger-full-access
+            -a, --ask-for-approval: untrusted | on-failure | on-request | never
+            -m, --model: Model name
+            -i, --image: Image file (NOT for prompts)
         """
         cmd = ['codex']
         
-        # Use interactive mode with initial prompt
-        initial_prompt = f"Please read and understand the context from {context_file}"
-        cmd.extend(['-i', initial_prompt])
-        
-        # Add writable root
-        cmd.extend(['--writable-root', working_dir])
+        # Set sandbox mode for interactive use (allow workspace writes)
+        cmd.extend(['-s', 'workspace-write'])
         
         # Add model if specified
         if self.model:
-            cmd.extend(['--model', self.model])
+            cmd.extend(['-m', self.model])
+        
+        # Add initial prompt - tells user to read the context file
+        initial_prompt = f"Please read and understand the context from {context_file}"
+        cmd.append(initial_prompt)
         
         return cmd

@@ -287,8 +287,13 @@ class CodexAssistant(AIAssistantBase):
         Execute OpenAI Codex CLI with prompt in non-interactive mode
         
         Config options:
-            sandbox_mode: off | read-only | network-disabled | full (default: off)
-            approval_mode: suggest | auto-edit | full-auto (default: full-auto)
+            sandbox_mode: read-only | workspace-write | danger-full-access 
+                         (default: workspace-write)
+            approval_mode: untrusted | on-failure | on-request | never
+                          (default: never for automated execution)
+        
+        Note: Uses 'codex exec' subcommand for non-interactive execution.
+        See 'codex exec --help' for full options.
         """
         _log.debug("Executing OpenAI Codex CLI")
         
@@ -298,26 +303,26 @@ class CodexAssistant(AIAssistantBase):
             with open(prompt_input_file, 'w') as f:
                 f.write(prompt)
             
-            # Build command with non-interactive options
-            cmd = ['codex', '-q']  # -q for quiet/non-interactive mode
+            # Build command using 'exec' subcommand for non-interactive mode
+            cmd = ['codex', 'exec']
             
-            # Add prompt as positional argument
-            cmd.append(prompt)
+            # Get sandbox mode from config (default: workspace-write for safety)
+            sandbox_mode = config.get('sandbox_mode', 'workspace-write') if config else 'workspace-write'
+            cmd.extend(['-s', sandbox_mode])
+            
+            # Get approval mode from config (default: never for automated execution)
+            approval_mode = config.get('approval_mode', 'never') if config else 'never'
+            cmd.extend(['-a', approval_mode])
+            
+            # Change to run directory
+            cmd.extend(['-C', runner.root_rundir])
             
             # Add model parameter if specified
             if model:
-                cmd.extend(['--model', model])
+                cmd.extend(['-m', model])
             
-            # Get sandbox mode from config (default: off for workflow execution)
-            sandbox_mode = config.get('sandbox_mode', 'off') if config else 'off'
-            cmd.extend(['--sandbox', sandbox_mode])
-            
-            # Get approval mode from config (default: full-auto for workflow execution)
-            approval_mode = config.get('approval_mode', 'full-auto') if config else 'full-auto'
-            cmd.extend(['--approval-mode', approval_mode])
-            
-            # Add writable root for the run directory
-            cmd.extend(['--writable-root', runner.root_rundir])
+            # Add prompt as positional argument (must be last)
+            cmd.append(prompt)
             
             # Execute codex in non-interactive mode
             status = await runner.exec(

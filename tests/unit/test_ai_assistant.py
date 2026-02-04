@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import inspect
 from dv_flow.mgr.std.ai_assistant import (
     get_assistant,
     CopilotAssistant,
@@ -138,3 +139,52 @@ def test_get_available_assistant_name():
     if result is not None:
         assert isinstance(result, str)
         assert result in ASSISTANT_REGISTRY
+
+
+# ============================================================================
+# Parameterized tests across all supported assistants
+# ============================================================================
+
+@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+def test_assistant_check_available_returns_tuple(assistant_name):
+    """Test that check_available returns proper tuple for priority assistants."""
+    assistant = get_assistant(assistant_name)
+    result = assistant.check_available()
+    
+    assert isinstance(result, tuple), f"{assistant_name}: should return tuple"
+    assert len(result) == 2, f"{assistant_name}: tuple should have 2 elements"
+    assert isinstance(result[0], bool), f"{assistant_name}: first element should be bool"
+    assert isinstance(result[1], str), f"{assistant_name}: second element should be str"
+
+
+@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+def test_assistant_has_execute_method(assistant_name):
+    """Test that priority assistants have async execute method."""
+    assistant = get_assistant(assistant_name)
+    
+    assert hasattr(assistant, 'execute'), f"{assistant_name}: should have execute method"
+    assert inspect.iscoroutinefunction(assistant.execute), f"{assistant_name}: execute should be async"
+
+
+@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+def test_assistant_has_name_classmethod(assistant_name):
+    """Test that priority assistants have name classmethod."""
+    assistant_cls = ASSISTANT_REGISTRY[assistant_name]
+    
+    assert hasattr(assistant_cls, 'name'), f"{assistant_name}: should have name classmethod"
+    assert assistant_cls.name() == assistant_name, f"{assistant_name}: name() should return '{assistant_name}'"
+
+
+def test_available_assistant_fixture(available_assistant):
+    """Test that the available_assistant fixture works correctly.
+    
+    This test uses the parameterized fixture from conftest.py.
+    It will skip if the assistant is not available.
+    """
+    name, assistant = available_assistant
+    
+    # If we get here, the assistant is available
+    is_available, error = assistant.check_available()
+    assert is_available is True
+    assert error == ""
+    assert name in ASSISTANT_PRIORITY

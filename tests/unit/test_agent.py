@@ -216,7 +216,7 @@ def test_agent_build_failure(tmp_path):
     """Test handling of agent build failure"""
     input = MockInput()
     input.rundir = str(tmp_path)
-    input.params.assistant = "copilot"  # Use valid assistant
+    input.params.assistant = "mock"  # Use mock assistant (always available)
     
     # Create an input object that will fail to serialize
     class BadInput:
