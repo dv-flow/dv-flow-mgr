@@ -15,6 +15,7 @@ build automation, and CI/CD pipelines.
 - **Flexible UI** - Progress spinner or log-based output modes
 - **Task-artifact caching** - Cache task results for instant reruns
 - **AI Agent Integration** - Launch AI assistants with project-specific context, skills, and personas
+- **MCP Tool Support** - Configure stdio and HTTP-based Model Context Protocol servers for agent tools
 
 ## Quick Start
 
@@ -131,11 +132,44 @@ The agent command automatically:
 - Generates comprehensive system prompts
 - Launches your AI assistant with full project context
 
+### MCP Tool Integration
+
+Equip your agents with external tools using Model Context Protocol (MCP) servers:
+
+```yaml
+tasks:
+  # Stdio-based MCP server (command-line tools)
+  - name: FileSystemTool
+    uses: std.AgentToolStdio
+    with:
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+  
+  # HTTP-based MCP server (remote services)
+  - name: RemoteAPI
+    uses: std.AgentToolHttp
+    with:
+      url: https://api.example.com/mcp
+      validate: true
+  
+  # Agent with both tools
+  - name: PowerfulAgent
+    uses: std.Agent
+    needs: [FileSystemTool, RemoteAPI]
+```
+
+Supported MCP transports:
+- **stdio** - Command-line tools (npm packages, Python scripts)
+- **HTTP/SSE** - Remote services and APIs
+
+See [docs/userguide/mcp_tools.rst](docs/userguide/mcp_tools.rst) for complete MCP documentation.
+
 See [docs/userguide/agent_integration.rst](docs/userguide/agent_integration.rst) for detailed documentation and [examples/agent_demo/](examples/agent_demo/) for working examples.
 
 ## Documentation
 
 - [AI Agent Integration](docs/userguide/agent_integration.rst) - Launch AI assistants with DFM context
+- [MCP Tool Support](docs/userguide/mcp_tools.rst) - Configure MCP servers for agent tools
 - [Cache Documentation](docs/cache.md) - Task-artifact caching guide
 - [Quick Start](docs/quickstart.rst) - Getting started tutorial
 - [Command Reference](docs/cmdref.rst) - All available commands

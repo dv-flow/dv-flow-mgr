@@ -519,10 +519,12 @@ DV Flow provides four standard agent resource types that can be used with ``dfm 
 **AgentTool**
     Specifies external tools or MCP servers that the agent can invoke.
     
-    * Uses: ``std.AgentTool``
+    * Uses: ``std.AgentToolStdio`` or ``std.AgentToolHttp``
     * Tag: ``std.AgentToolTag``
     * Fields: ``command`` (str), ``args`` (list), ``url`` (str)
     * Common uses: External APIs, command-line tools, MCP servers
+    
+    See :doc:`userguide/mcp_tools` for detailed documentation on configuring MCP tools.
 
 **AgentReference**
     Provides reference documentation or materials for the agent to consult.
@@ -579,7 +581,7 @@ Example: Defining Agent Resources
 
     tasks:
       - name: WaveformViewer
-        uses: std.AgentTool
+        uses: std.AgentToolStdio
         with:
           command: "gtkwave"
           args: ["--script"]

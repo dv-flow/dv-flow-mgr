@@ -181,7 +181,7 @@ Tools define external programs or MCP servers that the agent can invoke.
 
     tasks:
     - local: FileSystemTool
-      uses: std.AgentTool
+      uses: std.AgentToolStdio
       desc: File system operations via MCP
       with:
         command: npx
@@ -193,14 +193,18 @@ Tools define external programs or MCP servers that the agent can invoke.
 **MCP Server Integration:**
 
 Model Context Protocol (MCP) servers provide structured interfaces for tools.
+DV Flow provides two task types for configuring MCP servers:
+
+* ``std.AgentToolStdio`` - For stdio-based MCP servers (command-line tools)
+* ``std.AgentToolHttp`` - For HTTP/SSE-based MCP servers (remote services)
+
 Popular MCP servers include:
 
 * ``@modelcontextprotocol/server-filesystem`` - File operations
 * ``@modelcontextprotocol/server-git`` - Git operations
 * ``@modelcontextprotocol/server-sqlite`` - Database queries
 
-**Note:** MCP integration is currently in development. Tools are prepared for
-future use but may not be fully functional in all assistants yet.
+See :doc:`mcp_tools` for detailed documentation on configuring and using MCP tools.
 
 References (AgentReference)
 ---------------------------
