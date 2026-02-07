@@ -603,14 +603,11 @@ The agent command recognizes four types of agent resources defined in your flow:
     
         tasks:
         - local: FileSystemTool
-          uses: std.AgentToolStdio
+          uses: std.AgentTool
           desc: File system operations
           with:
-            command: npx
-            args:
-              - -y
-              - "@modelcontextprotocol/server-filesystem"
-              - "${{ rootdir }}"
+            command: mcp-server-filesystem
+            args: ["--root", "${{ rootdir }}"]
 
 **AgentReference**
     Documentation or reference material that the agent should consult.
