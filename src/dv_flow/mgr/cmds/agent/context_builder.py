@@ -258,45 +258,61 @@ class AgentContextBuilder:
                 self._log.debug(f"No taskdef found for {task_name}")
                 continue
             
-            # Check if the task uses a type with agent tags
-            uses_type = getattr(task, 'uses', None)
-            if uses_type is None:
-                self._log.debug(f"Task {task_name} has no uses type")
+            # Check the task's output for agent-tagged types
+            result = getattr(task_node, 'result', None)
+            if result is None:
+                self._log.debug(f"No result for task {task_name}")
                 continue
             
-            uses_type_name = uses_type.name if hasattr(uses_type, 'name') else str(uses_type)
+            output_items = getattr(result, 'output', []) or []
+            if not output_items:
+                self._log.debug(f"Task {task_name} has no output items")
+                continue
             
-            # Get the type tags
-            type_tags = getattr(uses_type, 'tags', []) or []
-            tag_names = set()
-            for tag in type_tags:
-                if hasattr(tag, 'name'):
-                    tag_names.add(tag.name)
-                else:
-                    tag_names.add(str(tag))
-            
-            self._log.debug(f"Task {task_name} uses type {uses_type_name} with tags: {tag_names}")
-            
-            # Extract based on tag type (pass task_node for params access)
-            if 'std.AgentSkillTag' in tag_names:
-                skill = self._extract_skill(task, task_node)
-                if skill:
-                    context.skills.append(skill)
-            
-            if 'std.AgentPersonaTag' in tag_names:
-                persona = self._extract_persona(task, task_node)
-                if persona:
-                    context.personas.append(persona)
-            
-            if 'std.AgentToolTag' in tag_names:
-                tool = self._extract_tool(task, task_node)
-                if tool:
-                    context.tools.append(tool)
-            
-            if 'std.AgentReferenceTag' in tag_names:
-                reference = self._extract_reference(task, task_node)
-                if reference:
-                    context.references.append(reference)
+            # Process each output item
+            for output_item in output_items:
+                # Get the type info from the output item
+                output_type_name = getattr(output_item, 'type', None)
+                if not output_type_name:
+                    continue
+                
+                # Look up the type definition to check its tags
+                output_type = self.loader.findType(output_type_name)
+                if output_type is None:
+                    self._log.debug(f"Could not find type definition for {output_type_name}")
+                    continue
+                
+                # Get the type tags
+                type_tags = getattr(output_type, 'tags', []) or []
+                tag_names = set()
+                for tag in type_tags:
+                    if hasattr(tag, 'name'):
+                        tag_names.add(tag.name)
+                    else:
+                        tag_names.add(str(tag))
+                
+                self._log.debug(f"Task {task_name} output type {output_type_name} has tags: {tag_names}")
+                
+                # Extract based on tag type (pass output_item instead of task for data access)
+                if 'std.AgentSkillTag' in tag_names:
+                    skill = self._extract_skill_from_output(output_item)
+                    if skill:
+                        context.skills.append(skill)
+                
+                if 'std.AgentPersonaTag' in tag_names:
+                    persona = self._extract_persona_from_output(output_item)
+                    if persona:
+                        context.personas.append(persona)
+                
+                if 'std.AgentToolTag' in tag_names:
+                    tool = self._extract_tool_from_output(output_item)
+                    if tool:
+                        context.tools.append(tool)
+                
+                if 'std.AgentReferenceTag' in tag_names:
+                    reference = self._extract_reference_from_output(output_item)
+                    if reference:
+                        context.references.append(reference)
         
         return context
     
@@ -432,14 +448,144 @@ class AgentContextBuilder:
         
         return reference
     
+    def _extract_skill_from_output(self, output_item) -> Optional[Dict[str, Any]]:
+        """Extract skill information from output data item.
+        
+        Args:
+            output_item: AgentSkill output data item
+        """
+        skill = {
+            'name': getattr(output_item, 'src', ''),
+            'desc': getattr(output_item, 'desc', ''),  # Extract desc from data item
+            'files': [],
+            'content': '',
+            'urls': []
+        }
+        
+        # Extract fields from AgentResource
+        if hasattr(output_item, 'files'):
+            files_value = getattr(output_item, 'files', None)
+            if files_value:
+                if isinstance(files_value, list):
+                    skill['files'] = self._resolve_file_content(files_value)
+                else:
+                    skill['files'] = self._resolve_file_content([files_value])
+        
+        if hasattr(output_item, 'content'):
+            content_value = getattr(output_item, 'content', '')
+            if content_value:
+                skill['content'] = str(content_value)
+        
+        if hasattr(output_item, 'urls'):
+            urls_value = getattr(output_item, 'urls', None)
+            if urls_value:
+                if isinstance(urls_value, list):
+                    skill['urls'] = [str(u) for u in urls_value]
+                else:
+                    skill['urls'] = [str(urls_value)]
+        
+        return skill
+    
+    def _extract_persona_from_output(self, output_item) -> Optional[Dict[str, Any]]:
+        """Extract persona information from output data item.
+        
+        Args:
+            output_item: AgentPersona output data item
+        """
+        persona = {
+            'name': getattr(output_item, 'src', ''),
+            'desc': getattr(output_item, 'desc', ''),  # Extract desc from data item
+            'persona': ''
+        }
+        
+        if hasattr(output_item, 'persona'):
+            persona_value = getattr(output_item, 'persona', '')
+            if persona_value:
+                persona['persona'] = str(persona_value)
+        
+        return persona
+    
+    def _extract_tool_from_output(self, output_item) -> Optional[Dict[str, Any]]:
+        """Extract tool information from output data item.
+        
+        Args:
+            output_item: AgentTool output data item
+        """
+        tool = {
+            'name': getattr(output_item, 'src', ''),
+            'desc': getattr(output_item, 'desc', ''),  # Extract desc from data item
+            'command': '',
+            'args': [],
+            'url': ''
+        }
+        
+        # Extract fields from output item
+        if hasattr(output_item, 'command'):
+            command_value = getattr(output_item, 'command', '')
+            if command_value:
+                tool['command'] = str(command_value)
+        
+        if hasattr(output_item, 'args'):
+            args_value = getattr(output_item, 'args', None)
+            if args_value:
+                if isinstance(args_value, list):
+                    tool['args'] = [str(a) for a in args_value]
+                else:
+                    tool['args'] = [str(args_value)]
+        
+        if hasattr(output_item, 'url'):
+            url_value = getattr(output_item, 'url', '')
+            if url_value:
+                tool['url'] = str(url_value)
+        
+        return tool
+    
+    def _extract_reference_from_output(self, output_item) -> Optional[Dict[str, Any]]:
+        """Extract reference information from output data item.
+        
+        Args:
+            output_item: AgentReference output data item
+        """
+        reference = {
+            'name': getattr(output_item, 'src', ''),
+            'desc': getattr(output_item, 'desc', ''),  # Extract desc from data item
+            'files': [],
+            'content': '',
+            'urls': []
+        }
+        
+        # Extract fields from AgentResource
+        if hasattr(output_item, 'files'):
+            files_value = getattr(output_item, 'files', None)
+            if files_value:
+                if isinstance(files_value, list):
+                    reference['files'] = self._resolve_file_content(files_value)
+                else:
+                    reference['files'] = self._resolve_file_content([files_value])
+        
+        if hasattr(output_item, 'content'):
+            content_value = getattr(output_item, 'content', '')
+            if content_value:
+                reference['content'] = str(content_value)
+        
+        if hasattr(output_item, 'urls'):
+            urls_value = getattr(output_item, 'urls', None)
+            if urls_value:
+                if isinstance(urls_value, list):
+                    reference['urls'] = [str(u) for u in urls_value]
+                else:
+                    reference['urls'] = [str(urls_value)]
+        
+        return reference
+    
     def _resolve_file_content(self, file_paths: List[str]) -> List[Dict[str, str]]:
-        """Resolve file paths and read content.
+        """Resolve file paths to metadata (pointer-based, not reading content).
         
         Args:
             file_paths: List of file paths (may contain variable references)
         
         Returns:
-            List of dicts with 'path' and 'content' keys
+            List of dicts with 'path' and 'size' keys (no content embedded)
         """
         files = []
         
@@ -451,19 +597,18 @@ class AgentContextBuilder:
                 basedir = getattr(self.pkg, 'basedir', '') or os.getcwd()
                 path_str = os.path.join(basedir, path_str)
             
-            # Read file content
+            # Get file metadata (don't read content)
             try:
                 if os.path.exists(path_str):
-                    with open(path_str, 'r', encoding='utf-8') as f:
-                        content = f.read()
+                    size = os.path.getsize(path_str)
                     files.append({
                         'path': path_str,
-                        'content': content
+                        'size': size
                     })
                 else:
                     self._log.warning(f"File not found: {path_str}")
             except Exception as e:
-                self._log.warning(f"Failed to read file {path_str}: {e}")
+                self._log.warning(f"Failed to stat file {path_str}: {e}")
         
         return files
     

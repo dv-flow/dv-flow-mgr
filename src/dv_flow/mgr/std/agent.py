@@ -40,6 +40,7 @@ class DuckTypedOutput(BaseModel):
 
 # Default system prompt template
 # Notes on variable expansion:
+# - ${{ resources }} is expanded at runtime with agent skills, references, personas
 # - ${{ inputs }} is expanded at runtime by this task with JSON of input data
 # - ${{ name }} is expanded at runtime by this task with the task name
 # - ${{ result_file }} is expanded at runtime by this task with the result filename
@@ -47,6 +48,8 @@ DEFAULT_SYSTEM_PROMPT = """You are an AI assistant helping with a DV Flow task.
 
 ## Task Information
 Task name: ${{ name }}
+
+${{ resources }}
 
 ## Input Data
 The following inputs are available from upstream tasks:
@@ -179,7 +182,93 @@ async def Agent(runner, input) -> TaskDataResult:
     changed = False
     output = []
     
-    # Step 1: Determine which assistant to use
+    # Step 1: Build agent context from input data items (for MCP tools)
+    agent_context = None
+    try:
+        # Extract agent resources directly from input data items
+        if input.inputs:
+            from ..cmds.agent.context_builder import AgentContext
+            agent_context = AgentContext()
+            
+            for inp in input.inputs:
+                # Check the type field to determine resource type
+                inp_type = getattr(inp, 'type', None)
+                
+                if not inp_type:
+                    continue
+                
+                # Check if we have access to loader to look up type tags
+                if hasattr(runner, 'runner') and hasattr(runner.runner, 'builder'):
+                    builder = runner.runner.builder
+                    if hasattr(builder, 'loader'):
+                        # Look up the type definition to check its tags
+                        type_def = builder.loader.findType(inp_type)
+                        if type_def:
+                            # Get type tags
+                            type_tags = getattr(type_def, 'tags', []) or []
+                            tag_names = set()
+                            for tag in type_tags:
+                                if hasattr(tag, 'name'):
+                                    tag_names.add(tag.name)
+                                else:
+                                    tag_names.add(str(tag))
+                            
+                            # Extract based on tag type
+                            if 'std.AgentToolTag' in tag_names:
+                                tool = {
+                                    'name': getattr(inp, 'src', ''),
+                                    'desc': getattr(inp, 'desc', ''),  # Extract desc from data item
+                                    'command': str(getattr(inp, 'command', '')),
+                                    'args': list(getattr(inp, 'args', [])),
+                                    'url': str(getattr(inp, 'url', ''))
+                                }
+                                agent_context.tools.append(tool)
+                                _log.debug(f"Added tool from input: {tool['name']}")
+                            
+                            elif 'std.AgentSkillTag' in tag_names:
+                                skill = {
+                                    'name': getattr(inp, 'src', ''),
+                                    'desc': getattr(inp, 'desc', ''),  # Extract desc from data item
+                                    'files': list(getattr(inp, 'files', [])),
+                                    'content': str(getattr(inp, 'content', '')),
+                                    'urls': list(getattr(inp, 'urls', []))
+                                }
+                                agent_context.skills.append(skill)
+                                _log.debug(f"Added skill from input: {skill['name']}")
+                            
+                            elif 'std.AgentPersonaTag' in tag_names:
+                                persona = {
+                                    'name': getattr(inp, 'src', ''),
+                                    'desc': getattr(inp, 'desc', ''),  # Extract desc from data item
+                                    'persona': str(getattr(inp, 'persona', ''))
+                                }
+                                agent_context.personas.append(persona)
+                                _log.debug(f"Added persona from input: {persona['name']}")
+                            
+                            elif 'std.AgentReferenceTag' in tag_names:
+                                reference = {
+                                    'name': getattr(inp, 'src', ''),
+                                    'desc': getattr(inp, 'desc', ''),  # Extract desc from data item
+                                    'files': list(getattr(inp, 'files', [])),
+                                    'content': str(getattr(inp, 'content', '')),
+                                    'urls': list(getattr(inp, 'urls', []))
+                                }
+                                agent_context.references.append(reference)
+                                _log.debug(f"Added reference from input: {reference['name']}")
+            
+            if agent_context.tools or agent_context.skills or agent_context.personas or agent_context.references:
+                _log.info(f"Agent context built from inputs: {len(agent_context.tools)} tools, "
+                         f"{len(agent_context.skills)} skills, {len(agent_context.personas)} personas, "
+                         f"{len(agent_context.references)} references")
+            else:
+                agent_context = None  # No resources found
+    except Exception as e:
+        _log.warning(f"Failed to build agent context from inputs: {e}")
+        import traceback
+        _log.debug(traceback.format_exc())
+        # Continue without context - not fatal
+    
+    # Step 2: Determine which assistant to use
     assistant_name = input.params.assistant if input.params.assistant else None
     
     # Auto-probe for available assistant if none specified
@@ -262,7 +351,7 @@ async def Agent(runner, input) -> TaskDataResult:
                 _log.info(f"Retry attempt {attempt}/{max_retries}")
             
             exec_status, stdout, stderr = await assistant.execute(
-                full_prompt, runner, model, assistant_config
+                full_prompt, runner, model, assistant_config, agent_context
             )
             
             # Write stdout/stderr to log files
@@ -438,11 +527,233 @@ async def Agent(runner, input) -> TaskDataResult:
     )
 
 
+def _build_prompt_context(input):
+    """Separate agent resources from regular inputs.
+    
+    Args:
+        input: Task input with inputs list
+    
+    Returns:
+        Tuple of (resources dict, regular_inputs list)
+    """
+    resources = {
+        'skills': [],
+        'personas': [],
+        'references': [],
+        'tools': []
+    }
+    regular_inputs = []
+    
+    for inp in input.inputs:
+        inp_type = getattr(inp, 'type', '')
+        
+        # Check if this is an agent resource
+        if inp_type == 'std.AgentSkill':
+            resources['skills'].append({
+                'name': getattr(inp, 'src', ''),
+                'desc': getattr(inp, 'desc', ''),
+                'files': list(getattr(inp, 'files', [])),
+                'content': str(getattr(inp, 'content', '')),
+                'urls': list(getattr(inp, 'urls', []))
+            })
+        elif inp_type == 'std.AgentReference':
+            resources['references'].append({
+                'name': getattr(inp, 'src', ''),
+                'desc': getattr(inp, 'desc', ''),
+                'files': list(getattr(inp, 'files', [])),
+                'content': str(getattr(inp, 'content', '')),
+                'urls': list(getattr(inp, 'urls', []))
+            })
+        elif inp_type == 'std.AgentPersona':
+            resources['personas'].append({
+                'name': getattr(inp, 'src', ''),
+                'desc': getattr(inp, 'desc', ''),
+                'persona': str(getattr(inp, 'persona', ''))
+            })
+        elif inp_type == 'std.AgentTool':
+            # Tools handled separately via MCP config
+            resources['tools'].append({
+                'name': getattr(inp, 'src', ''),
+                'desc': getattr(inp, 'desc', ''),
+                'command': str(getattr(inp, 'command', '')),
+                'args': list(getattr(inp, 'args', [])),
+                'url': str(getattr(inp, 'url', ''))
+            })
+        else:
+            # Regular input (FileSet, etc)
+            regular_inputs.append(inp)
+    
+    return resources, regular_inputs
+
+
+def _format_resources_section(resources):
+    """Format agent resources as human-readable documentation.
+    
+    Args:
+        resources: Dict with 'skills', 'personas', 'references', 'tools' keys
+    
+    Returns:
+        Markdown-formatted string
+    """
+    lines = []
+    
+    if resources['skills']:
+        lines.append("## Available Skills")
+        lines.append("")
+        lines.append("The following skills provide specialized capabilities:")
+        lines.append("")
+        
+        for skill in resources['skills']:
+            lines.append(f"### {skill['name']}")
+            if skill['desc']:
+                lines.append(skill['desc'])
+                lines.append("")
+            
+            # File pointers (full paths)
+            if skill['files']:
+                lines.append("**Documentation files:**")
+                for file_path in skill['files']:
+                    lines.append(f"- `{file_path}`")
+                lines.append("")
+                lines.append("*Use the `view` tool to read these files when needed.*")
+                lines.append("")
+            
+            # Inline content (if provided)
+            if skill['content']:
+                lines.append("**Quick Reference:**")
+                lines.append("```")
+                lines.append(skill['content'])
+                lines.append("```")
+                lines.append("")
+            
+            # URLs
+            if skill['urls']:
+                lines.append("**External Resources:**")
+                for url in skill['urls']:
+                    lines.append(f"- {url}")
+                lines.append("")
+    
+    if resources['references']:
+        lines.append("## Reference Documentation")
+        lines.append("")
+        lines.append("The following reference materials are available:")
+        lines.append("")
+        
+        for ref in resources['references']:
+            lines.append(f"### {ref['name']}")
+            if ref['desc']:
+                lines.append(ref['desc'])
+                lines.append("")
+            
+            if ref['files']:
+                lines.append("**Reference files:**")
+                for file_path in ref['files']:
+                    lines.append(f"- `{file_path}`")
+                lines.append("")
+                lines.append("*Use the `view` tool to read sections as needed.*")
+                lines.append("")
+            
+            if ref['content']:
+                lines.append("```")
+                lines.append(ref['content'])
+                lines.append("```")
+                lines.append("")
+            
+            if ref['urls']:
+                lines.append("**External References:**")
+                for url in ref['urls']:
+                    lines.append(f"- {url}")
+                lines.append("")
+    
+    if resources['personas']:
+        lines.append("## Persona")
+        lines.append("")
+        for persona in resources['personas']:
+            if persona.get('persona'):
+                lines.append(persona['persona'])
+                lines.append("")
+    
+    return "\n".join(lines) if lines else ""
+
+
+def _format_inputs_section(regular_inputs):
+    """Format regular inputs without pydantic metadata.
+    
+    Args:
+        regular_inputs: List of input data items (not agent resources)
+    
+    Returns:
+        JSON string with cleaned input data
+    """
+    if not regular_inputs:
+        return "[]"
+    
+    inputs_list = []
+    for inp in regular_inputs:
+        try:
+            # Extract only meaningful fields, not pydantic internals
+            clean_item = {
+                'type': getattr(inp, 'type', ''),
+                'src': getattr(inp, 'src', ''),
+            }
+            
+            # Add seq if present
+            if hasattr(inp, 'seq'):
+                clean_item['seq'] = getattr(inp, 'seq', 0)
+            
+            # Add type-specific fields
+            inp_type = clean_item['type']
+            
+            if inp_type == 'std.FileSet':
+                clean_item['filetype'] = getattr(inp, 'filetype', '')
+                clean_item['files'] = getattr(inp, 'files', [])
+                clean_item['basedir'] = getattr(inp, 'basedir', '')
+                # Only include non-empty optional fields
+                if incdirs := getattr(inp, 'incdirs', []):
+                    clean_item['incdirs'] = incdirs
+                if defines := getattr(inp, 'defines', []):
+                    clean_item['defines'] = defines
+                if attributes := getattr(inp, 'attributes', []):
+                    clean_item['attributes'] = attributes
+            else:
+                # For unknown types, try model_dump if available
+                if hasattr(inp, 'model_dump'):
+                    dumped = inp.model_dump()
+                    # Remove pydantic internals
+                    for key, value in dumped.items():
+                        if not key.startswith('model_') and key not in ['type', 'src', 'seq']:
+                            clean_item[key] = value
+                elif hasattr(inp, 'dict'):
+                    dumped = inp.dict()
+                    for key, value in dumped.items():
+                        if not key.startswith('model_') and key not in ['type', 'src', 'seq']:
+                            clean_item[key] = value
+                else:
+                    # Last resort - iterate attributes
+                    for attr in dir(inp):
+                        if attr.startswith('_') or attr in ['type', 'src', 'seq']:
+                            continue
+                        if attr.startswith('model_'):
+                            continue
+                        if callable(getattr(inp, attr, None)):
+                            continue
+                        value = getattr(inp, attr, None)
+                        if value is not None and value != '' and value != []:
+                            clean_item[attr] = value
+            
+            inputs_list.append(clean_item)
+        except Exception as e:
+            # If we can't serialize an input, raise with context
+            raise ValueError(f"Failed to serialize input: {e}") from e
+    
+    return json.dumps(inputs_list, indent=2)
+
+
 def _build_prompt(input) -> str:
     """Build the complete prompt from template and variables"""
     
     # Get system prompt template
-    # Note: ${{ inputs }}, ${{ name }} literals are preserved by loader
+    # Note: ${{ inputs }}, ${{ name }}, ${{ resources }} literals are preserved by loader
     # and need to be expanded at runtime here
     system_prompt = input.params.system_prompt if input.params.system_prompt else DEFAULT_SYSTEM_PROMPT
     
@@ -452,20 +763,18 @@ def _build_prompt(input) -> str:
     # Build variable context
     result_file = input.params.result_file if input.params.result_file else f"{input.name}.result.json"
     
-    # Convert inputs to JSON (runtime expansion)
-    inputs_list = []
-    for inp in input.inputs:
-        if hasattr(inp, 'model_dump'):
-            inputs_list.append(inp.model_dump())
-        elif hasattr(inp, 'dict'):
-            inputs_list.append(inp.dict())
-        else:
-            inp_dict = {k: v for k, v in inp.__dict__.items() if not k.startswith('_')}
-            inputs_list.append(inp_dict)
-    inputs_json = json.dumps(inputs_list, indent=2)
+    # Separate and format resources vs regular inputs
+    resources, regular_inputs = _build_prompt_context(input)
+    
+    # Format resources as human-readable documentation
+    resources_section = _format_resources_section(resources)
+    
+    # Format regular inputs cleanly (no pydantic metadata)
+    inputs_json = _format_inputs_section(regular_inputs)
     
     # Expand runtime variables in system prompt
     # These are runtime-only and preserved as literals by the loader
+    system_prompt = system_prompt.replace("${{ resources }}", resources_section)
     system_prompt = system_prompt.replace("${{ inputs }}", inputs_json)
     system_prompt = system_prompt.replace("${{ name }}", input.name)
     system_prompt = system_prompt.replace("${{ result_file }}", result_file)

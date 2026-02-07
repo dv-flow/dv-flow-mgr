@@ -157,6 +157,36 @@ class PackageProviderYaml(PackageProvider):
         if "package" not in doc.keys():
             raise Exception("Missing 'package' key in %s" % root)
         
+        # Validate root-level keys - only allow 'package' and 'fragment' at root level
+        # Also ignore metadata keys added by the YAML loader
+        valid_root_keys = {'package', 'fragment', '_field_srcinfo', 'srcinfo'}
+        invalid_keys = set(doc.keys()) - valid_root_keys
+        if invalid_keys:
+            for invalid_key in invalid_keys:
+                # Report error for each invalid root key
+                marker_loc = TaskMarkerLoc(path=root)
+                # Try to get location info for this key
+                if '_field_srcinfo' in doc and invalid_key in doc['_field_srcinfo']:
+                    field_loc = doc['_field_srcinfo'][invalid_key]
+                    if 'lineno' in field_loc:
+                        marker_loc.line = field_loc['lineno']
+                    if 'linepos' in field_loc:
+                        marker_loc.pos = field_loc['linepos']
+                
+                # Provide helpful suggestion
+                suggestion = ""
+                if invalid_key == 'tasks':
+                    suggestion = ". Tasks should be nested under 'package:' (e.g., package: { tasks: [...] })"
+                elif invalid_key in ['types', 'imports', 'configs', 'params', 'with']:
+                    suggestion = f". '{invalid_key}' should be nested under 'package:'"
+                
+                marker = TaskMarker(
+                    msg=f"Invalid root-level key '{invalid_key}'{suggestion}",
+                    severity=SeverityE.Error,
+                    loc=marker_loc
+                )
+                loader.marker(marker)
+        
         # Save _field_srcinfo before Pydantic validation (it's metadata, not schema)
         self._save_field_srcinfo(doc)
         

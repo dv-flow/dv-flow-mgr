@@ -119,6 +119,79 @@ package:
       Creates a list of include directories from a set of
       input files.
 
+  - name: AgentToolStdio
+    desc: |
+      Configures an MCP (Model Context Protocol) server that uses stdio transport.
+      This task validates the command, optionally installs dependencies, and outputs
+      an AgentTool data item that can be consumed by Agent tasks to enable MCP tools.
+      
+      Common use cases:
+      - @modelcontextprotocol/server-filesystem: File system access
+      - @modelcontextprotocol/server-github: GitHub API integration
+      - mcp-server-sqlite: SQLite database queries
+    shell: pytask
+    run: dv_flow.mgr.std.agent_tool_stdio.AgentToolStdio
+    with:
+      command:
+        type: str
+        value: ""
+        doc: |
+          Command to execute the MCP server (e.g., 'npx', 'node', 'python')
+      args:
+        type: list
+        value: []
+        doc: |
+          Arguments to pass to the command. For npx servers, typically:
+          ['-y', '@modelcontextprotocol/server-filesystem', '/allowed/path']
+      install_command:
+        type: str
+        value: ""
+        doc: |
+          Optional command to install server dependencies (e.g., 'npm install -g server-name').
+          Only runs once, tracked via memento.
+      env:
+        type: map
+        value: {}
+        doc: |
+          Environment variables to set when running the server
+
+  - name: AgentToolHttp
+    desc: |
+      Configures an MCP server that uses HTTP/SSE transport.
+      This task validates the URL, optionally checks accessibility, and outputs
+      an AgentTool data item for use by Agent tasks.
+      
+      Use for remote MCP services or local HTTP-based MCP servers.
+    shell: pytask
+    run: dv_flow.mgr.std.agent_tool_http.AgentToolHttp
+    with:
+      url:
+        type: str
+        value: ""
+        doc: |
+          Base URL of the MCP server (e.g., 'https://api.example.com/mcp' or 'http://localhost:8080')
+      validate:
+        type: bool
+        value: false
+        doc: |
+          Whether to validate that the URL is accessible. Set to true for remote servers.
+      health_check_path:
+        type: str
+        value: ""
+        doc: |
+          Optional path to append to URL for health check (e.g., '/health').
+          If specified and validate=true, performs GET request to this endpoint.
+      headers:
+        type: map
+        value: {}
+        doc: |
+          HTTP headers to include in requests (e.g., Authorization headers)
+      timeout:
+        type: int
+        value: 5
+        doc: |
+          Timeout in seconds for validation requests
+
   - name: Agent
     desc: |
       Executes an AI assistant with a specified prompt and collects 
@@ -234,6 +307,11 @@ package:
     with:
       type:
         type: str
+      desc:
+        type: str
+        value: ""
+        doc: |
+          Optional description for this data item
 
   - name: FileSet
     uses: std.DataItem

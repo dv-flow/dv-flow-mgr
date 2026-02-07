@@ -97,7 +97,7 @@ You have access to the `dfm` command-line tool with these commands:
 When running dfm commands, you can use parameter overrides with `-D NAME=VALUE`."""
     
     def _build_skills_section(self, skills: List[Dict[str, Any]]) -> str:
-        """Build skills section."""
+        """Build skills section with pointer-based approach."""
         lines = [
             "## Skills",
             "",
@@ -112,15 +112,17 @@ When running dfm commands, you can use parameter overrides with `-D NAME=VALUE`.
                 lines.append(f"{desc}")
                 lines.append("")
             
-            # Include file content
-            for file_info in skill.get('files', []):
-                lines.append(f"**Skill Documentation from {file_info['path']}:**")
-                lines.append("```")
-                lines.append(file_info['content'])
-                lines.append("```")
+            # Include file pointers (not content)
+            if files := skill.get('files'):
+                lines.append("**Skill documentation files:**")
+                for file_info in files:
+                    size_kb = file_info.get('size', 0) / 1024
+                    lines.append(f"- `{file_info['path']}` ({size_kb:.1f} KB)")
+                lines.append("")
+                lines.append("*Use the `view` tool to read these files when needed.*")
                 lines.append("")
             
-            # Include inline content
+            # Include inline content (only if provided)
             if content := skill.get('content'):
                 lines.append(f"**Skill Content:**")
                 lines.append("```")
@@ -157,7 +159,7 @@ When running dfm commands, you can use parameter overrides with `-D NAME=VALUE`.
         return "\n".join(lines)
     
     def _build_references_section(self, references: List[Dict[str, Any]]) -> str:
-        """Build references section."""
+        """Build references section with pointer-based approach."""
         lines = [
             "## Reference Documentation",
             "",
@@ -172,15 +174,17 @@ When running dfm commands, you can use parameter overrides with `-D NAME=VALUE`.
                 lines.append(f"{desc}")
                 lines.append("")
             
-            # Include file content
-            for file_info in ref.get('files', []):
-                lines.append(f"**From {file_info['path']}:**")
-                lines.append("```")
-                lines.append(file_info['content'])
-                lines.append("```")
+            # Include file pointers (not content)
+            if files := ref.get('files'):
+                lines.append("**Reference documentation files:**")
+                for file_info in files:
+                    size_kb = file_info.get('size', 0) / 1024
+                    lines.append(f"- `{file_info['path']}` ({size_kb:.1f} KB)")
+                lines.append("")
+                lines.append("*Use the `view` tool to read these files when needed.*")
                 lines.append("")
             
-            # Include inline content
+            # Include inline content (only if provided)
             if content := ref.get('content'):
                 lines.append(f"**Content:**")
                 lines.append("```")

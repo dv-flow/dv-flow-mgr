@@ -242,7 +242,7 @@ def test_agent_retry_logic(tmp_path):
         def __init__(self):
             self.call_count = 0
             
-        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+        async def execute(self, prompt: str, runner, model: str, config: dict, context=None) -> Tuple[int, str, str]:
             self.call_count += 1
             # Fail first 2 attempts, succeed on 3rd
             if self.call_count < 3:
@@ -290,7 +290,7 @@ def test_agent_max_retries_exceeded(tmp_path):
         def __init__(self):
             self.call_count = 0
             
-        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+        async def execute(self, prompt: str, runner, model: str, config: dict, context=None) -> Tuple[int, str, str]:
             self.call_count += 1
             return 1, f"Attempt {self.call_count} failed", "Always fails"
         
@@ -324,7 +324,7 @@ def test_agent_retry_on_empty_output_with_status_zero(tmp_path):
         def __init__(self):
             self.call_count = 0
             
-        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+        async def execute(self, prompt: str, runner, model: str, config: dict, context=None) -> Tuple[int, str, str]:
             self.call_count += 1
             
             # Create empty copilot_output.log file
@@ -376,7 +376,7 @@ def test_agent_fail_on_empty_output_after_max_retries(tmp_path):
         def __init__(self):
             self.call_count = 0
             
-        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+        async def execute(self, prompt: str, runner, model: str, config: dict, context=None) -> Tuple[int, str, str]:
             self.call_count += 1
             
             # Create empty copilot_output.log file

@@ -39,7 +39,7 @@ class AIAssistantBase(ABC):
     
     @abstractmethod
     async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
-                     model: str, config: dict) -> Tuple[int, str, str]:
+                     model: str, config: dict, context = None) -> Tuple[int, str, str]:
         """
         Execute assistant with prompt
         
@@ -48,6 +48,7 @@ class AIAssistantBase(ABC):
             runner: Task run context for executing subprocesses
             model: The model to use (empty string for default)
             config: Assistant-specific configuration
+            context: Agent context with tools, skills, personas (optional)
         
         Returns: 
             Tuple of (status_code, stdout, stderr)
@@ -69,7 +70,7 @@ class MockAssistant(AIAssistantBase):
     """Mock assistant for testing - generates simple responses based on prompt analysis"""
     
     async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
-                     model: str, config: dict) -> Tuple[int, str, str]:
+                     model: str, config: dict, context = None) -> Tuple[int, str, str]:
         """
         Execute mock assistant - parses prompt and generates appropriate response
         """
@@ -192,7 +193,7 @@ class CopilotAssistant(AIAssistantBase):
         return "copilot"
     
     async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
-                     model: str, config: dict) -> Tuple[int, str, str]:
+                     model: str, config: dict, context = None) -> Tuple[int, str, str]:
         """
         Execute GitHub Copilot CLI with prompt in non-interactive mode
         
@@ -216,6 +217,20 @@ class CopilotAssistant(AIAssistantBase):
             # Add allowed path for root rundir
             cmd.extend(['--add-dir', runner.root_rundir])
             
+            # Generate and add MCP server configuration if context has tools
+            if context and hasattr(context, 'tools') and context.tools:
+                mcp_config = self._generate_mcp_config(context.tools)
+                if mcp_config:
+                    # Write MCP config to file
+                    mcp_config_file = os.path.join(runner.rundir, "mcp-config.json")
+                    with open(mcp_config_file, 'w') as f:
+                        import json
+                        json.dump(mcp_config, f, indent=2)
+                    _log.info(f"Generated MCP config with {len(context.tools)} tool(s): {mcp_config_file}")
+                    
+                    # Pass config file to copilot
+                    cmd.extend(['--additional-mcp-config', f'@{mcp_config_file}'])
+            
             # Execute copilot in non-interactive mode
             status = await runner.exec(
                 cmd,
@@ -238,6 +253,45 @@ class CopilotAssistant(AIAssistantBase):
         except Exception as e:
             _log.error(f"Failed to execute copilot: {e}")
             raise
+    
+    def _generate_mcp_config(self, tools: list) -> dict:
+        """
+        Generate MCP server configuration from tool list.
+        
+        Args:
+            tools: List of tool dicts with 'name', 'command', 'args', 'url'
+        
+        Returns:
+            MCP config dict in format: {"mcpServers": {"name": {"command": "...", "args": [...]}}}
+        """
+        import re
+        mcp_servers = {}
+        
+        for tool in tools:
+            tool_name = tool.get('name', 'unknown')
+            
+            # Sanitize name: only alphanumeric, underscores, and hyphens allowed
+            # Replace dots and other invalid chars with underscores
+            sanitized_name = re.sub(r'[^a-zA-Z0-9_-]', '_', tool_name)
+            
+            # Stdio-based MCP server
+            if tool.get('command'):
+                mcp_servers[sanitized_name] = {
+                    "command": tool['command'],
+                    "args": tool.get('args', [])
+                }
+                _log.debug(f"Added stdio MCP server: {sanitized_name} (from {tool_name}) -> {tool['command']} {tool.get('args', [])}")
+            
+            # HTTP-based MCP server  
+            elif tool.get('url'):
+                mcp_servers[sanitized_name] = {
+                    "url": tool['url']
+                }
+                _log.debug(f"Added HTTP MCP server: {sanitized_name} (from {tool_name}) -> {tool['url']}")
+        
+        if mcp_servers:
+            return {"mcpServers": mcp_servers}
+        return {}
     
     def check_available(self) -> Tuple[bool, str]:
         """Check if GitHub Copilot CLI is available"""
@@ -282,7 +336,7 @@ class CodexAssistant(AIAssistantBase):
         return "codex"
     
     async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
-                     model: str, config: dict) -> Tuple[int, str, str]:
+                     model: str, config: dict, context = None) -> Tuple[int, str, str]:
         """
         Execute OpenAI Codex CLI with prompt in non-interactive mode
         
@@ -296,6 +350,11 @@ class CodexAssistant(AIAssistantBase):
         See 'codex exec --help' for full options.
         """
         _log.debug("Executing OpenAI Codex CLI")
+        
+        # TODO: Codex MCP integration - similar to Copilot
+        # For now, log a warning if context has tools
+        if context and hasattr(context, 'tools') and context.tools:
+            _log.warning(f"Codex MCP integration not yet implemented - {len(context.tools)} tool(s) will not be available")
         
         try:
             # Write prompt to a file for reference
