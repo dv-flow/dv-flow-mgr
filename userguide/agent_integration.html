@@ -14,7 +14,7 @@
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Flow-Spec Reference" href="../reference/index.html" />
+    <link rel="next" title="MCP Tool Support" href="mcp_tools.html" />
     <link rel="prev" title="LLM Integration" href="llm_integration.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -194,7 +194,7 @@ to combine capabilities with personality.</p>
 <p><strong>Definition:</strong></p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
 <span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">local</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FileSystemTool</span>
-<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentTool</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentToolStdio</span>
 <span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">File system operations via MCP</span>
 <span class="w">  </span><span class="nt">with</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">npx</span>
@@ -206,14 +206,18 @@ to combine capabilities with personality.</p>
 </div>
 <p><strong>MCP Server Integration:</strong></p>
 <p>Model Context Protocol (MCP) servers provide structured interfaces for tools.
-Popular MCP servers include:</p>
+DV Flow provides two task types for configuring MCP servers:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">std.AgentToolStdio</span></code> - For stdio-based MCP servers (command-line tools)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std.AgentToolHttp</span></code> - For HTTP/SSE-based MCP servers (remote services)</p></li>
+</ul>
+<p>Popular MCP servers include:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-filesystem</span></code> - File operations</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-git</span></code> - Git operations</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">&#64;modelcontextprotocol/server-sqlite</span></code> - Database queries</p></li>
 </ul>
-<p><strong>Note:</strong> MCP integration is currently in development. Tools are prepared for
-future use but may not be fully functional in all assistants yet.</p>
+<p>See <a class="reference internal" href="mcp_tools.html"><span class="doc">MCP Tool Support</span></a> for detailed documentation on configuring and using MCP tools.</p>
 </section>
 <section id="references-agentreference">
 <h3>References (AgentReference)<a class="headerlink" href="#references-agentreference" title="Link to this heading">¶</a></h3>
@@ -733,6 +737,7 @@ in the project directory. The system prompt includes available dfm commands and 
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mcp_tools.html">MCP Tool Support</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
@@ -750,7 +755,7 @@ in the project directory. The system prompt includes available dfm commands and 
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
       <li>Previous: <a href="llm_integration.html" title="previous chapter">LLM Integration</a></li>
-      <li>Next: <a href="../reference/index.html" title="next chapter">Flow-Spec Reference</a></li>
+      <li>Next: <a href="mcp_tools.html" title="next chapter">MCP Tool Support</a></li>
   </ul></li>
   </ul></li>
 </ul>

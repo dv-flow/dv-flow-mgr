@@ -496,7 +496,7 @@ Options:
 <section id="agent-resource-types">
 <h4>Agent Resource Types<a class="headerlink" href="#agent-resource-types" title="Link to this heading">¶</a></h4>
 <p>DV Flow provides four standard agent resource types that can be used with <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">agent</span></code>:</p>
-<dl class="simple">
+<dl>
 <dt><strong>AgentSkill</strong></dt><dd><p>Defines a capability or skill that the AI agent can use. Skills typically
 document how to accomplish specific tasks within your project.</p>
 <ul class="simple">
@@ -515,11 +515,12 @@ document how to accomplish specific tasks within your project.</p>
 </dd>
 <dt><strong>AgentTool</strong></dt><dd><p>Specifies external tools or MCP servers that the agent can invoke.</p>
 <ul class="simple">
-<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentTool</span></code></p></li>
+<li><p>Uses: <code class="docutils literal notranslate"><span class="pre">std.AgentToolStdio</span></code> or <code class="docutils literal notranslate"><span class="pre">std.AgentToolHttp</span></code></p></li>
 <li><p>Tag: <code class="docutils literal notranslate"><span class="pre">std.AgentToolTag</span></code></p></li>
 <li><p>Fields: <code class="docutils literal notranslate"><span class="pre">command</span></code> (str), <code class="docutils literal notranslate"><span class="pre">args</span></code> (list), <code class="docutils literal notranslate"><span class="pre">url</span></code> (str)</p></li>
 <li><p>Common uses: External APIs, command-line tools, MCP servers</p></li>
 </ul>
+<p>See <a class="reference internal" href="userguide/mcp_tools.html"><span class="doc">MCP Tool Support</span></a> for detailed documentation on configuring MCP tools.</p>
 </dd>
 <dt><strong>AgentReference</strong></dt><dd><p>Provides reference documentation or materials for the agent to consult.</p>
 <ul class="simple">
@@ -570,7 +571,7 @@ document how to accomplish specific tasks within your project.</p>
 <p><strong>AgentTool Example:</strong></p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WaveformViewer</span>
-<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentTool</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.AgentToolStdio</span>
 <span class="w">    </span><span class="nt">with</span><span class="p">:</span>
 <span class="w">      </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gtkwave&quot;</span>
 <span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;--script&quot;</span><span class="p p-Indicator">]</span>
