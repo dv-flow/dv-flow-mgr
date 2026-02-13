@@ -46,6 +46,8 @@ from .data_callable import DataCallable
 from .exec_callable import ExecCallable
 from .null_callable import NullCallable
 from .shell_callable import ShellCallable
+from .deferred_expr import DeferredExpr, references_runtime_data
+from .expr_parser import ExprParser
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -1237,6 +1239,29 @@ class TaskGraphBuilder(object):
         new_val = value
         if type(value) == str:
             if value.find("${{") != -1:
+                # Parse the expression to check for runtime references
+                parser = ExprParser()
+                try:
+                    ast = parser.parse(value)
+                    
+                    # Check if expression references runtime data (inputs, memento)
+                    if references_runtime_data(ast):
+                        # Capture static context for deferred evaluation
+                        static_context = {}
+                        if len(self._name_resolution_stack) > 0:
+                            # Capture current variable context
+                            # Note: This is a shallow copy; variables should be immutable
+                            static_context = dict(eval.variables)
+                        
+                        # Create deferred expression for runtime evaluation
+                        self._log.debug("Param: Deferring expression \"%s\" (references runtime data)" % value)
+                        return DeferredExpr(value, ast, static_context)
+                    
+                except Exception as e:
+                    # If parsing fails, fall through to normal evaluation
+                    self._log.debug("Failed to parse expression for deferred check: %s" % e)
+                
+                # Normal static evaluation
                 if len(self._name_resolution_stack) > 0:
                     eval.set_name_resolution(self._name_resolution_stack[-1])
                 new_val = eval.eval(value)
@@ -1246,6 +1271,17 @@ class TaskGraphBuilder(object):
             for i,elem in enumerate(value):
                 if isinstance(elem, str):
                     if elem.find("${{") != -1:
+                        # Check for runtime references
+                        parser = ExprParser()
+                        try:
+                            ast = parser.parse(elem)
+                            if references_runtime_data(ast):
+                                static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                new_val.append(DeferredExpr(elem, ast, static_context))
+                                continue
+                        except:
+                            pass  # Fall through to normal evaluation
+                        
                         if len(self._name_resolution_stack) > 0:
                             eval.set_name_resolution(self._name_resolution_stack[-1])
                         resolved = eval.eval(elem)
@@ -1256,6 +1292,17 @@ class TaskGraphBuilder(object):
                     for k, v in elem.items():
                         if isinstance(v, str):
                             if v.find("${{") != -1:
+                                # Check for runtime references
+                                parser = ExprParser()
+                                try:
+                                    ast = parser.parse(v)
+                                    if references_runtime_data(ast):
+                                        static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        new_val.append({k: DeferredExpr(v, ast, static_context)})
+                                        continue
+                                except:
+                                    pass
+                                
                                 if len(self._name_resolution_stack) > 0:
                                     eval.set_name_resolution(self._name_resolution_stack[-1])
                                 resolved = eval.eval(v)
@@ -1264,11 +1311,24 @@ class TaskGraphBuilder(object):
                                 new_val.append({k: v})
                         else:
                             new_val.append(elem)
+                else:
+                    new_val.append(elem)
         elif isinstance(value, dict):
             new_val = {}
             for k, v in value.items():
                 if isinstance(v, str):
                     if v.find("${{") != -1:
+                        # Check for runtime references
+                        parser = ExprParser()
+                        try:
+                            ast = parser.parse(v)
+                            if references_runtime_data(ast):
+                                static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                new_val[k] = DeferredExpr(v, ast, static_context)
+                                continue
+                        except:
+                            pass
+                        
                         if len(self._name_resolution_stack) > 0:
                             eval.set_name_resolution(self._name_resolution_stack[-1])
                             resolved = eval.eval(v)
@@ -1277,6 +1337,8 @@ class TaskGraphBuilder(object):
                             new_val[k] = v
                     else:
                         new_val[k] = v
+                else:
+                    new_val[k] = v
         return new_val
 
     def _gatherNeeds(self, task_t, node):
