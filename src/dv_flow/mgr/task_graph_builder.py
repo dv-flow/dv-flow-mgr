@@ -546,7 +546,10 @@ class TaskGraphBuilder(object):
 
         # Determine how to build this node
         if iff:
-            if task.strategy is not None:
+            if hasattr(task, 'control') and task.control is not None:
+                # Runtime control flow construct
+                ret = self._buildControlNode(task, name, srcdir, params, hierarchical, eval)
+            elif task.strategy is not None:
                 ret = self._applyStrategy(task, name, srcdir, params, hierarchical, eval)
             else:
                 if self._isCompound(task):
@@ -600,6 +603,96 @@ class TaskGraphBuilder(object):
             self._task_rundir_s.pop()
 
         return ret        
+    
+    def _buildControlNode(self, task, name, srcdir, params, hierarchical, eval):
+        """
+        Build a runtime control flow node (if, while, do-while, repeat, match).
+        
+        Args:
+            task: TaskDef with control field
+            name: Task name
+            srcdir: Source directory
+            params: Parameters
+            hierarchical: Whether to use hierarchical rundir
+            eval: ExprEval instance
+            
+        Returns:
+            TaskNodeControl subclass instance
+        """
+        from .task_node_if import TaskNodeIf
+        from .task_node_do_while import TaskNodeDoWhile
+        from .task_node_while import TaskNodeWhile
+        from .task_node_repeat import TaskNodeRepeat
+        from .task_node_match import TaskNodeMatch
+        
+        self._log.debug(f"--> _buildControlNode {task.name}, type={task.control.type}")
+        
+        if name is None:
+            name = task.name or task.root or task.export
+        
+        if srcdir is None and task.srcinfo:
+            srcdir = os.path.dirname(task.srcinfo.file)
+        
+        # Build parameters if needed
+        if params is None:
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
+        
+        # Create the appropriate control node type
+        if task.control.type == 'if':
+            node = TaskNodeIf(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body,
+                else_tasks=task.control.else_body
+            )
+        elif task.control.type == 'match':
+            node = TaskNodeMatch(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=[]  # Match uses cases, not body
+            )
+        elif task.control.type == 'while':
+            node = TaskNodeWhile(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        elif task.control.type == 'do-while':
+            node = TaskNodeDoWhile(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        elif task.control.type == 'repeat':
+            node = TaskNodeRepeat(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        else:
+            raise NotImplementedError(f"Control type '{task.control.type}' not yet implemented")
+        
+        self._log.debug(f"<-- _buildControlNode {task.name}")
+        return node
     
     def _applyStrategy(self, task, name, srcdir, params, hierarchical, eval):
         self._log.debug("--> _applyStrategy %s" % task.name)

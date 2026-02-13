@@ -25,7 +25,7 @@ import subprocess
 import re
 from typing import Any, Callable, Dict, List, Optional
 from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp
-from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt
+from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt, ExprUnary, ExprUnaryOp, ExprBool
 from .name_resolution import VarResolver
 
 @dc.dataclass
@@ -163,12 +163,54 @@ class ExprEval(ExprVisitor):
     
     def visitExprBin(self, e):
         e.lhs.accept(self)
+        lhs_val = self.value
+        
+        e.rhs.accept(self)
+        rhs_val = self.value
 
         if e.op == ExprBinOp.Pipe:
-            # Value just goes over to the rhs
-            e.rhs.accept(self)
-        elif e.op == ExprBinOp.Plus:
+            # Value from rhs is already in self.value
             pass
+        elif e.op == ExprBinOp.Plus:
+            self.value = lhs_val + rhs_val
+        elif e.op == ExprBinOp.Minus:
+            self.value = lhs_val - rhs_val
+        elif e.op == ExprBinOp.Times:
+            self.value = lhs_val * rhs_val
+        elif e.op == ExprBinOp.Divide:
+            self.value = lhs_val / rhs_val
+        # Comparison operators
+        elif e.op == ExprBinOp.Eq:
+            self.value = lhs_val == rhs_val
+        elif e.op == ExprBinOp.Ne:
+            self.value = lhs_val != rhs_val
+        elif e.op == ExprBinOp.Lt:
+            self.value = lhs_val < rhs_val
+        elif e.op == ExprBinOp.Le:
+            self.value = lhs_val <= rhs_val
+        elif e.op == ExprBinOp.Gt:
+            self.value = lhs_val > rhs_val
+        elif e.op == ExprBinOp.Ge:
+            self.value = lhs_val >= rhs_val
+        # Logical operators
+        elif e.op == ExprBinOp.And:
+            self.value = self._to_bool(lhs_val) and self._to_bool(rhs_val)
+        elif e.op == ExprBinOp.Or:
+            self.value = self._to_bool(lhs_val) or self._to_bool(rhs_val)
+    
+    def visitExprUnary(self, e):
+        e.expr.accept(self)
+        
+        if e.op == ExprUnaryOp.Not:
+            self.value = not self._to_bool(self.value)
+    
+    def _to_bool(self, val):
+        """Convert value to boolean using truthiness rules"""
+        if val is None or val is False:
+            return False
+        if val == "" or val == 0 or val == [] or val == {}:
+            return False
+        return True
     
     def visitExprCall(self, e: ExprCall):
         if e.id in self.methods:
@@ -185,6 +227,9 @@ class ExprEval(ExprVisitor):
             raise Exception("Method %s not found" % e.id)
         
     def visitExprInt(self, e: ExprInt):
+        self.value = e.value
+    
+    def visitExprBool(self, e: ExprBool):
         self.value = e.value
 
     def _builtin_shell(self, in_value, args):

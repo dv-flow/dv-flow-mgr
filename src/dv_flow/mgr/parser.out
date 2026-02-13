@@ -12,37 +12,55 @@ Rule 6     expression -> expression MINUS expression
 Rule 7     expression -> expression TIMES expression
 Rule 8     expression -> expression PIPE expression
 Rule 9     expression -> expression DIVIDE expression
-Rule 10    expression -> LPAREN expression RPAREN
-Rule 11    expression -> NUMBER
-Rule 12    expression -> ID
-Rule 13    expression -> hier_id
-Rule 14    hier_id -> ID DOT hier_id
-Rule 15    hier_id -> ID
-Rule 16    expression -> STRING1
-Rule 17    expression -> STRING2
+Rule 10    expression -> expression EQ expression
+Rule 11    expression -> expression NE expression
+Rule 12    expression -> expression LT expression
+Rule 13    expression -> expression LE expression
+Rule 14    expression -> expression GT expression
+Rule 15    expression -> expression GE expression
+Rule 16    expression -> expression AND expression
+Rule 17    expression -> expression OR expression
+Rule 18    expression -> NOT expression
+Rule 19    expression -> LPAREN expression RPAREN
+Rule 20    expression -> NUMBER
+Rule 21    expression -> ID
+Rule 22    expression -> hier_id
+Rule 23    hier_id -> ID DOT hier_id
+Rule 24    hier_id -> ID
+Rule 25    expression -> STRING1
+Rule 26    expression -> STRING2
 
 Terminals, with rules where they appear
 
+AND                  : 16
 COMMA                : 4
 DIVIDE               : 9
-DOT                  : 14
-ID                   : 1 2 12 14 15
-LPAREN               : 1 2 10
+DOT                  : 23
+EQ                   : 10
+GE                   : 15
+GT                   : 14
+ID                   : 1 2 21 23 24
+LE                   : 13
+LPAREN               : 1 2 19
+LT                   : 12
 MINUS                : 6
-NUMBER               : 11
+NE                   : 11
+NOT                  : 18
+NUMBER               : 20
+OR                   : 17
 PIPE                 : 8
 PLUS                 : 5
-RPAREN               : 1 2 10
-STRING1              : 16
-STRING2              : 17
+RPAREN               : 1 2 19
+STRING1              : 25
+STRING2              : 26
 TIMES                : 7
 error                : 
 
 Nonterminals, with rules where they appear
 
 args                 : 2 4
-expression           : 3 4 5 5 6 6 7 7 8 8 9 9 10 0
-hier_id              : 13 14
+expression           : 3 4 5 5 6 6 7 7 8 8 9 9 10 10 11 11 12 12 13 13 14 14 15 15 16 16 17 17 18 19 0
+hier_id              : 22 23
 
 Parsing method: LALR
 
@@ -56,23 +74,33 @@ state 0
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
     expression                     shift and go to state 1
-    hier_id                        shift and go to state 5
+    hier_id                        shift and go to state 6
 
 state 1
 
@@ -82,54 +110,94 @@ state 1
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
-    PLUS            shift and go to state 8
-    MINUS           shift and go to state 9
-    TIMES           shift and go to state 10
-    PIPE            shift and go to state 11
-    DIVIDE          shift and go to state 12
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+    AND             shift and go to state 20
+    OR              shift and go to state 21
 
 
 state 2
 
     (1) expression -> ID . LPAREN RPAREN
     (2) expression -> ID . LPAREN args RPAREN
-    (12) expression -> ID .
-    (14) hier_id -> ID . DOT hier_id
-    (15) hier_id -> ID .
+    (21) expression -> ID .
+    (23) hier_id -> ID . DOT hier_id
+    (24) hier_id -> ID .
 
-  ! reduce/reduce conflict for PLUS resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for MINUS resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for TIMES resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for PIPE resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for DIVIDE resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for $end resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for RPAREN resolved using rule 12 (expression -> ID .)
-  ! reduce/reduce conflict for COMMA resolved using rule 12 (expression -> ID .)
-    LPAREN          shift and go to state 13
-    PLUS            reduce using rule 12 (expression -> ID .)
-    MINUS           reduce using rule 12 (expression -> ID .)
-    TIMES           reduce using rule 12 (expression -> ID .)
-    PIPE            reduce using rule 12 (expression -> ID .)
-    DIVIDE          reduce using rule 12 (expression -> ID .)
-    $end            reduce using rule 12 (expression -> ID .)
-    RPAREN          reduce using rule 12 (expression -> ID .)
-    COMMA           reduce using rule 12 (expression -> ID .)
-    DOT             shift and go to state 14
+  ! reduce/reduce conflict for PLUS resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for MINUS resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for TIMES resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for PIPE resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for DIVIDE resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for EQ resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for NE resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for LT resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for LE resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for GT resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for GE resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for AND resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for OR resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for $end resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for RPAREN resolved using rule 21 (expression -> ID .)
+  ! reduce/reduce conflict for COMMA resolved using rule 21 (expression -> ID .)
+    LPAREN          shift and go to state 22
+    PLUS            reduce using rule 21 (expression -> ID .)
+    MINUS           reduce using rule 21 (expression -> ID .)
+    TIMES           reduce using rule 21 (expression -> ID .)
+    PIPE            reduce using rule 21 (expression -> ID .)
+    DIVIDE          reduce using rule 21 (expression -> ID .)
+    EQ              reduce using rule 21 (expression -> ID .)
+    NE              reduce using rule 21 (expression -> ID .)
+    LT              reduce using rule 21 (expression -> ID .)
+    LE              reduce using rule 21 (expression -> ID .)
+    GT              reduce using rule 21 (expression -> ID .)
+    GE              reduce using rule 21 (expression -> ID .)
+    AND             reduce using rule 21 (expression -> ID .)
+    OR              reduce using rule 21 (expression -> ID .)
+    $end            reduce using rule 21 (expression -> ID .)
+    RPAREN          reduce using rule 21 (expression -> ID .)
+    COMMA           reduce using rule 21 (expression -> ID .)
+    DOT             shift and go to state 23
 
-  ! PLUS            [ reduce using rule 15 (hier_id -> ID .) ]
-  ! MINUS           [ reduce using rule 15 (hier_id -> ID .) ]
-  ! TIMES           [ reduce using rule 15 (hier_id -> ID .) ]
-  ! PIPE            [ reduce using rule 15 (hier_id -> ID .) ]
-  ! DIVIDE          [ reduce using rule 15 (hier_id -> ID .) ]
-  ! $end            [ reduce using rule 15 (hier_id -> ID .) ]
-  ! RPAREN          [ reduce using rule 15 (hier_id -> ID .) ]
-  ! COMMA           [ reduce using rule 15 (hier_id -> ID .) ]
+  ! PLUS            [ reduce using rule 24 (hier_id -> ID .) ]
+  ! MINUS           [ reduce using rule 24 (hier_id -> ID .) ]
+  ! TIMES           [ reduce using rule 24 (hier_id -> ID .) ]
+  ! PIPE            [ reduce using rule 24 (hier_id -> ID .) ]
+  ! DIVIDE          [ reduce using rule 24 (hier_id -> ID .) ]
+  ! EQ              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! NE              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! LT              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! LE              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! GT              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! GE              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! AND             [ reduce using rule 24 (hier_id -> ID .) ]
+  ! OR              [ reduce using rule 24 (hier_id -> ID .) ]
+  ! $end            [ reduce using rule 24 (hier_id -> ID .) ]
+  ! RPAREN          [ reduce using rule 24 (hier_id -> ID .) ]
+  ! COMMA           [ reduce using rule 24 (hier_id -> ID .) ]
 
 
 state 3
 
-    (10) expression -> LPAREN . expression RPAREN
+    (19) expression -> LPAREN . expression RPAREN
     (1) expression -> . ID LPAREN RPAREN
     (2) expression -> . ID LPAREN args RPAREN
     (5) expression -> . expression PLUS expression
@@ -137,81 +205,161 @@ state 3
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 15
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 24
+    hier_id                        shift and go to state 6
 
 state 4
 
-    (11) expression -> NUMBER .
+    (18) expression -> NOT . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
-    PLUS            reduce using rule 11 (expression -> NUMBER .)
-    MINUS           reduce using rule 11 (expression -> NUMBER .)
-    TIMES           reduce using rule 11 (expression -> NUMBER .)
-    PIPE            reduce using rule 11 (expression -> NUMBER .)
-    DIVIDE          reduce using rule 11 (expression -> NUMBER .)
-    $end            reduce using rule 11 (expression -> NUMBER .)
-    RPAREN          reduce using rule 11 (expression -> NUMBER .)
-    COMMA           reduce using rule 11 (expression -> NUMBER .)
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
+    expression                     shift and go to state 25
+    hier_id                        shift and go to state 6
 
 state 5
 
-    (13) expression -> hier_id .
+    (20) expression -> NUMBER .
 
-    PLUS            reduce using rule 13 (expression -> hier_id .)
-    MINUS           reduce using rule 13 (expression -> hier_id .)
-    TIMES           reduce using rule 13 (expression -> hier_id .)
-    PIPE            reduce using rule 13 (expression -> hier_id .)
-    DIVIDE          reduce using rule 13 (expression -> hier_id .)
-    $end            reduce using rule 13 (expression -> hier_id .)
-    RPAREN          reduce using rule 13 (expression -> hier_id .)
-    COMMA           reduce using rule 13 (expression -> hier_id .)
+    PLUS            reduce using rule 20 (expression -> NUMBER .)
+    MINUS           reduce using rule 20 (expression -> NUMBER .)
+    TIMES           reduce using rule 20 (expression -> NUMBER .)
+    PIPE            reduce using rule 20 (expression -> NUMBER .)
+    DIVIDE          reduce using rule 20 (expression -> NUMBER .)
+    EQ              reduce using rule 20 (expression -> NUMBER .)
+    NE              reduce using rule 20 (expression -> NUMBER .)
+    LT              reduce using rule 20 (expression -> NUMBER .)
+    LE              reduce using rule 20 (expression -> NUMBER .)
+    GT              reduce using rule 20 (expression -> NUMBER .)
+    GE              reduce using rule 20 (expression -> NUMBER .)
+    AND             reduce using rule 20 (expression -> NUMBER .)
+    OR              reduce using rule 20 (expression -> NUMBER .)
+    $end            reduce using rule 20 (expression -> NUMBER .)
+    RPAREN          reduce using rule 20 (expression -> NUMBER .)
+    COMMA           reduce using rule 20 (expression -> NUMBER .)
 
 
 state 6
 
-    (16) expression -> STRING1 .
+    (22) expression -> hier_id .
 
-    PLUS            reduce using rule 16 (expression -> STRING1 .)
-    MINUS           reduce using rule 16 (expression -> STRING1 .)
-    TIMES           reduce using rule 16 (expression -> STRING1 .)
-    PIPE            reduce using rule 16 (expression -> STRING1 .)
-    DIVIDE          reduce using rule 16 (expression -> STRING1 .)
-    $end            reduce using rule 16 (expression -> STRING1 .)
-    RPAREN          reduce using rule 16 (expression -> STRING1 .)
-    COMMA           reduce using rule 16 (expression -> STRING1 .)
+    PLUS            reduce using rule 22 (expression -> hier_id .)
+    MINUS           reduce using rule 22 (expression -> hier_id .)
+    TIMES           reduce using rule 22 (expression -> hier_id .)
+    PIPE            reduce using rule 22 (expression -> hier_id .)
+    DIVIDE          reduce using rule 22 (expression -> hier_id .)
+    EQ              reduce using rule 22 (expression -> hier_id .)
+    NE              reduce using rule 22 (expression -> hier_id .)
+    LT              reduce using rule 22 (expression -> hier_id .)
+    LE              reduce using rule 22 (expression -> hier_id .)
+    GT              reduce using rule 22 (expression -> hier_id .)
+    GE              reduce using rule 22 (expression -> hier_id .)
+    AND             reduce using rule 22 (expression -> hier_id .)
+    OR              reduce using rule 22 (expression -> hier_id .)
+    $end            reduce using rule 22 (expression -> hier_id .)
+    RPAREN          reduce using rule 22 (expression -> hier_id .)
+    COMMA           reduce using rule 22 (expression -> hier_id .)
 
 
 state 7
 
-    (17) expression -> STRING2 .
+    (25) expression -> STRING1 .
 
-    PLUS            reduce using rule 17 (expression -> STRING2 .)
-    MINUS           reduce using rule 17 (expression -> STRING2 .)
-    TIMES           reduce using rule 17 (expression -> STRING2 .)
-    PIPE            reduce using rule 17 (expression -> STRING2 .)
-    DIVIDE          reduce using rule 17 (expression -> STRING2 .)
-    $end            reduce using rule 17 (expression -> STRING2 .)
-    RPAREN          reduce using rule 17 (expression -> STRING2 .)
-    COMMA           reduce using rule 17 (expression -> STRING2 .)
+    PLUS            reduce using rule 25 (expression -> STRING1 .)
+    MINUS           reduce using rule 25 (expression -> STRING1 .)
+    TIMES           reduce using rule 25 (expression -> STRING1 .)
+    PIPE            reduce using rule 25 (expression -> STRING1 .)
+    DIVIDE          reduce using rule 25 (expression -> STRING1 .)
+    EQ              reduce using rule 25 (expression -> STRING1 .)
+    NE              reduce using rule 25 (expression -> STRING1 .)
+    LT              reduce using rule 25 (expression -> STRING1 .)
+    LE              reduce using rule 25 (expression -> STRING1 .)
+    GT              reduce using rule 25 (expression -> STRING1 .)
+    GE              reduce using rule 25 (expression -> STRING1 .)
+    AND             reduce using rule 25 (expression -> STRING1 .)
+    OR              reduce using rule 25 (expression -> STRING1 .)
+    $end            reduce using rule 25 (expression -> STRING1 .)
+    RPAREN          reduce using rule 25 (expression -> STRING1 .)
+    COMMA           reduce using rule 25 (expression -> STRING1 .)
 
 
 state 8
+
+    (26) expression -> STRING2 .
+
+    PLUS            reduce using rule 26 (expression -> STRING2 .)
+    MINUS           reduce using rule 26 (expression -> STRING2 .)
+    TIMES           reduce using rule 26 (expression -> STRING2 .)
+    PIPE            reduce using rule 26 (expression -> STRING2 .)
+    DIVIDE          reduce using rule 26 (expression -> STRING2 .)
+    EQ              reduce using rule 26 (expression -> STRING2 .)
+    NE              reduce using rule 26 (expression -> STRING2 .)
+    LT              reduce using rule 26 (expression -> STRING2 .)
+    LE              reduce using rule 26 (expression -> STRING2 .)
+    GT              reduce using rule 26 (expression -> STRING2 .)
+    GE              reduce using rule 26 (expression -> STRING2 .)
+    AND             reduce using rule 26 (expression -> STRING2 .)
+    OR              reduce using rule 26 (expression -> STRING2 .)
+    $end            reduce using rule 26 (expression -> STRING2 .)
+    RPAREN          reduce using rule 26 (expression -> STRING2 .)
+    COMMA           reduce using rule 26 (expression -> STRING2 .)
+
+
+state 9
 
     (5) expression -> expression PLUS . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -221,25 +369,35 @@ state 8
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 16
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 26
+    hier_id                        shift and go to state 6
 
-state 9
+state 10
 
     (6) expression -> expression MINUS . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -249,25 +407,35 @@ state 9
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 17
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 27
+    hier_id                        shift and go to state 6
 
-state 10
+state 11
 
     (7) expression -> expression TIMES . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -277,25 +445,35 @@ state 10
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 18
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 28
+    hier_id                        shift and go to state 6
 
-state 11
+state 12
 
     (8) expression -> expression PIPE . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -305,25 +483,35 @@ state 11
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 19
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 29
+    hier_id                        shift and go to state 6
 
-state 12
+state 13
 
     (9) expression -> expression DIVIDE . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -333,25 +521,339 @@ state 12
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 20
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 30
+    hier_id                        shift and go to state 6
 
-state 13
+state 14
+
+    (10) expression -> expression EQ . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 31
+    hier_id                        shift and go to state 6
+
+state 15
+
+    (11) expression -> expression NE . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 32
+    hier_id                        shift and go to state 6
+
+state 16
+
+    (12) expression -> expression LT . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 33
+    hier_id                        shift and go to state 6
+
+state 17
+
+    (13) expression -> expression LE . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 34
+    hier_id                        shift and go to state 6
+
+state 18
+
+    (14) expression -> expression GT . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 35
+    hier_id                        shift and go to state 6
+
+state 19
+
+    (15) expression -> expression GE . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 36
+    hier_id                        shift and go to state 6
+
+state 20
+
+    (16) expression -> expression AND . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 37
+    hier_id                        shift and go to state 6
+
+state 21
+
+    (17) expression -> expression OR . expression
+    (1) expression -> . ID LPAREN RPAREN
+    (2) expression -> . ID LPAREN args RPAREN
+    (5) expression -> . expression PLUS expression
+    (6) expression -> . expression MINUS expression
+    (7) expression -> . expression TIMES expression
+    (8) expression -> . expression PIPE expression
+    (9) expression -> . expression DIVIDE expression
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
+
+    ID              shift and go to state 2
+    NOT             shift and go to state 4
+    LPAREN          shift and go to state 3
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
+
+    expression                     shift and go to state 38
+    hier_id                        shift and go to state 6
+
+state 22
 
     (1) expression -> ID LPAREN . RPAREN
     (2) expression -> ID LPAREN . args RPAREN
@@ -364,54 +866,129 @@ state 13
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
-    RPAREN          shift and go to state 21
+    RPAREN          shift and go to state 39
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    args                           shift and go to state 22
-    expression                     shift and go to state 23
-    hier_id                        shift and go to state 5
+    args                           shift and go to state 40
+    expression                     shift and go to state 41
+    hier_id                        shift and go to state 6
 
-state 14
+state 23
 
-    (14) hier_id -> ID DOT . hier_id
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (23) hier_id -> ID DOT . hier_id
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
-    ID              shift and go to state 24
+    ID              shift and go to state 42
 
-    hier_id                        shift and go to state 25
+    hier_id                        shift and go to state 43
 
-state 15
+state 24
 
-    (10) expression -> LPAREN expression . RPAREN
+    (19) expression -> LPAREN expression . RPAREN
     (5) expression -> expression . PLUS expression
     (6) expression -> expression . MINUS expression
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
-    RPAREN          shift and go to state 26
-    PLUS            shift and go to state 8
-    MINUS           shift and go to state 9
-    TIMES           shift and go to state 10
-    PIPE            shift and go to state 11
-    DIVIDE          shift and go to state 12
+    RPAREN          shift and go to state 44
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+    AND             shift and go to state 20
+    OR              shift and go to state 21
 
 
-state 16
+state 25
+
+    (18) expression -> NOT expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    AND             reduce using rule 18 (expression -> NOT expression .)
+    OR              reduce using rule 18 (expression -> NOT expression .)
+    $end            reduce using rule 18 (expression -> NOT expression .)
+    RPAREN          reduce using rule 18 (expression -> NOT expression .)
+    COMMA           reduce using rule 18 (expression -> NOT expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+
+  ! PLUS            [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! MINUS           [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! TIMES           [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! PIPE            [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! DIVIDE          [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! EQ              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! NE              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! LT              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! LE              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! GT              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! GE              [ reduce using rule 18 (expression -> NOT expression .) ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 26
 
     (5) expression -> expression PLUS expression .
     (5) expression -> expression . PLUS expression
@@ -419,24 +996,48 @@ state 16
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     PLUS            reduce using rule 5 (expression -> expression PLUS expression .)
     MINUS           reduce using rule 5 (expression -> expression PLUS expression .)
     PIPE            reduce using rule 5 (expression -> expression PLUS expression .)
+    EQ              reduce using rule 5 (expression -> expression PLUS expression .)
+    NE              reduce using rule 5 (expression -> expression PLUS expression .)
+    LT              reduce using rule 5 (expression -> expression PLUS expression .)
+    LE              reduce using rule 5 (expression -> expression PLUS expression .)
+    GT              reduce using rule 5 (expression -> expression PLUS expression .)
+    GE              reduce using rule 5 (expression -> expression PLUS expression .)
+    AND             reduce using rule 5 (expression -> expression PLUS expression .)
+    OR              reduce using rule 5 (expression -> expression PLUS expression .)
     $end            reduce using rule 5 (expression -> expression PLUS expression .)
     RPAREN          reduce using rule 5 (expression -> expression PLUS expression .)
     COMMA           reduce using rule 5 (expression -> expression PLUS expression .)
-    TIMES           shift and go to state 10
-    DIVIDE          shift and go to state 12
+    TIMES           shift and go to state 11
+    DIVIDE          shift and go to state 13
 
   ! TIMES           [ reduce using rule 5 (expression -> expression PLUS expression .) ]
   ! DIVIDE          [ reduce using rule 5 (expression -> expression PLUS expression .) ]
-  ! PLUS            [ shift and go to state 8 ]
-  ! MINUS           [ shift and go to state 9 ]
-  ! PIPE            [ shift and go to state 11 ]
+  ! PLUS            [ shift and go to state 9 ]
+  ! MINUS           [ shift and go to state 10 ]
+  ! PIPE            [ shift and go to state 12 ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
 
 
-state 17
+state 27
 
     (6) expression -> expression MINUS expression .
     (5) expression -> expression . PLUS expression
@@ -444,24 +1045,48 @@ state 17
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     PLUS            reduce using rule 6 (expression -> expression MINUS expression .)
     MINUS           reduce using rule 6 (expression -> expression MINUS expression .)
     PIPE            reduce using rule 6 (expression -> expression MINUS expression .)
+    EQ              reduce using rule 6 (expression -> expression MINUS expression .)
+    NE              reduce using rule 6 (expression -> expression MINUS expression .)
+    LT              reduce using rule 6 (expression -> expression MINUS expression .)
+    LE              reduce using rule 6 (expression -> expression MINUS expression .)
+    GT              reduce using rule 6 (expression -> expression MINUS expression .)
+    GE              reduce using rule 6 (expression -> expression MINUS expression .)
+    AND             reduce using rule 6 (expression -> expression MINUS expression .)
+    OR              reduce using rule 6 (expression -> expression MINUS expression .)
     $end            reduce using rule 6 (expression -> expression MINUS expression .)
     RPAREN          reduce using rule 6 (expression -> expression MINUS expression .)
     COMMA           reduce using rule 6 (expression -> expression MINUS expression .)
-    TIMES           shift and go to state 10
-    DIVIDE          shift and go to state 12
+    TIMES           shift and go to state 11
+    DIVIDE          shift and go to state 13
 
   ! TIMES           [ reduce using rule 6 (expression -> expression MINUS expression .) ]
   ! DIVIDE          [ reduce using rule 6 (expression -> expression MINUS expression .) ]
-  ! PLUS            [ shift and go to state 8 ]
-  ! MINUS           [ shift and go to state 9 ]
-  ! PIPE            [ shift and go to state 11 ]
+  ! PLUS            [ shift and go to state 9 ]
+  ! MINUS           [ shift and go to state 10 ]
+  ! PIPE            [ shift and go to state 12 ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
 
 
-state 18
+state 28
 
     (7) expression -> expression TIMES expression .
     (5) expression -> expression . PLUS expression
@@ -469,24 +1094,48 @@ state 18
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     PLUS            reduce using rule 7 (expression -> expression TIMES expression .)
     MINUS           reduce using rule 7 (expression -> expression TIMES expression .)
     TIMES           reduce using rule 7 (expression -> expression TIMES expression .)
     PIPE            reduce using rule 7 (expression -> expression TIMES expression .)
     DIVIDE          reduce using rule 7 (expression -> expression TIMES expression .)
+    EQ              reduce using rule 7 (expression -> expression TIMES expression .)
+    NE              reduce using rule 7 (expression -> expression TIMES expression .)
+    LT              reduce using rule 7 (expression -> expression TIMES expression .)
+    LE              reduce using rule 7 (expression -> expression TIMES expression .)
+    GT              reduce using rule 7 (expression -> expression TIMES expression .)
+    GE              reduce using rule 7 (expression -> expression TIMES expression .)
+    AND             reduce using rule 7 (expression -> expression TIMES expression .)
+    OR              reduce using rule 7 (expression -> expression TIMES expression .)
     $end            reduce using rule 7 (expression -> expression TIMES expression .)
     RPAREN          reduce using rule 7 (expression -> expression TIMES expression .)
     COMMA           reduce using rule 7 (expression -> expression TIMES expression .)
 
-  ! PLUS            [ shift and go to state 8 ]
-  ! MINUS           [ shift and go to state 9 ]
-  ! TIMES           [ shift and go to state 10 ]
-  ! PIPE            [ shift and go to state 11 ]
-  ! DIVIDE          [ shift and go to state 12 ]
+  ! PLUS            [ shift and go to state 9 ]
+  ! MINUS           [ shift and go to state 10 ]
+  ! TIMES           [ shift and go to state 11 ]
+  ! PIPE            [ shift and go to state 12 ]
+  ! DIVIDE          [ shift and go to state 13 ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
 
 
-state 19
+state 29
 
     (8) expression -> expression PIPE expression .
     (5) expression -> expression . PLUS expression
@@ -494,24 +1143,48 @@ state 19
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     PLUS            reduce using rule 8 (expression -> expression PIPE expression .)
     MINUS           reduce using rule 8 (expression -> expression PIPE expression .)
     PIPE            reduce using rule 8 (expression -> expression PIPE expression .)
+    EQ              reduce using rule 8 (expression -> expression PIPE expression .)
+    NE              reduce using rule 8 (expression -> expression PIPE expression .)
+    LT              reduce using rule 8 (expression -> expression PIPE expression .)
+    LE              reduce using rule 8 (expression -> expression PIPE expression .)
+    GT              reduce using rule 8 (expression -> expression PIPE expression .)
+    GE              reduce using rule 8 (expression -> expression PIPE expression .)
+    AND             reduce using rule 8 (expression -> expression PIPE expression .)
+    OR              reduce using rule 8 (expression -> expression PIPE expression .)
     $end            reduce using rule 8 (expression -> expression PIPE expression .)
     RPAREN          reduce using rule 8 (expression -> expression PIPE expression .)
     COMMA           reduce using rule 8 (expression -> expression PIPE expression .)
-    TIMES           shift and go to state 10
-    DIVIDE          shift and go to state 12
+    TIMES           shift and go to state 11
+    DIVIDE          shift and go to state 13
 
   ! TIMES           [ reduce using rule 8 (expression -> expression PIPE expression .) ]
   ! DIVIDE          [ reduce using rule 8 (expression -> expression PIPE expression .) ]
-  ! PLUS            [ shift and go to state 8 ]
-  ! MINUS           [ shift and go to state 9 ]
-  ! PIPE            [ shift and go to state 11 ]
+  ! PLUS            [ shift and go to state 9 ]
+  ! MINUS           [ shift and go to state 10 ]
+  ! PIPE            [ shift and go to state 12 ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
 
 
-state 20
+state 30
 
     (9) expression -> expression DIVIDE expression .
     (5) expression -> expression . PLUS expression
@@ -519,24 +1192,440 @@ state 20
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     PLUS            reduce using rule 9 (expression -> expression DIVIDE expression .)
     MINUS           reduce using rule 9 (expression -> expression DIVIDE expression .)
     TIMES           reduce using rule 9 (expression -> expression DIVIDE expression .)
     PIPE            reduce using rule 9 (expression -> expression DIVIDE expression .)
     DIVIDE          reduce using rule 9 (expression -> expression DIVIDE expression .)
+    EQ              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    NE              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    LT              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    LE              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    GT              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    GE              reduce using rule 9 (expression -> expression DIVIDE expression .)
+    AND             reduce using rule 9 (expression -> expression DIVIDE expression .)
+    OR              reduce using rule 9 (expression -> expression DIVIDE expression .)
     $end            reduce using rule 9 (expression -> expression DIVIDE expression .)
     RPAREN          reduce using rule 9 (expression -> expression DIVIDE expression .)
     COMMA           reduce using rule 9 (expression -> expression DIVIDE expression .)
 
-  ! PLUS            [ shift and go to state 8 ]
-  ! MINUS           [ shift and go to state 9 ]
-  ! TIMES           [ shift and go to state 10 ]
-  ! PIPE            [ shift and go to state 11 ]
-  ! DIVIDE          [ shift and go to state 12 ]
+  ! PLUS            [ shift and go to state 9 ]
+  ! MINUS           [ shift and go to state 10 ]
+  ! TIMES           [ shift and go to state 11 ]
+  ! PIPE            [ shift and go to state 12 ]
+  ! DIVIDE          [ shift and go to state 13 ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
 
 
-state 21
+state 31
+
+    (10) expression -> expression EQ expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 10 (expression -> expression EQ expression .)
+    NE              reduce using rule 10 (expression -> expression EQ expression .)
+    AND             reduce using rule 10 (expression -> expression EQ expression .)
+    OR              reduce using rule 10 (expression -> expression EQ expression .)
+    $end            reduce using rule 10 (expression -> expression EQ expression .)
+    RPAREN          reduce using rule 10 (expression -> expression EQ expression .)
+    COMMA           reduce using rule 10 (expression -> expression EQ expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+
+  ! PLUS            [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! MINUS           [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! TIMES           [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! PIPE            [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! DIVIDE          [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! LT              [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! LE              [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! GT              [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! GE              [ reduce using rule 10 (expression -> expression EQ expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 32
+
+    (11) expression -> expression NE expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 11 (expression -> expression NE expression .)
+    NE              reduce using rule 11 (expression -> expression NE expression .)
+    AND             reduce using rule 11 (expression -> expression NE expression .)
+    OR              reduce using rule 11 (expression -> expression NE expression .)
+    $end            reduce using rule 11 (expression -> expression NE expression .)
+    RPAREN          reduce using rule 11 (expression -> expression NE expression .)
+    COMMA           reduce using rule 11 (expression -> expression NE expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+
+  ! PLUS            [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! MINUS           [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! TIMES           [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! PIPE            [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! DIVIDE          [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! LT              [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! LE              [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! GT              [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! GE              [ reduce using rule 11 (expression -> expression NE expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 33
+
+    (12) expression -> expression LT expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 12 (expression -> expression LT expression .)
+    NE              reduce using rule 12 (expression -> expression LT expression .)
+    LT              reduce using rule 12 (expression -> expression LT expression .)
+    LE              reduce using rule 12 (expression -> expression LT expression .)
+    GT              reduce using rule 12 (expression -> expression LT expression .)
+    GE              reduce using rule 12 (expression -> expression LT expression .)
+    AND             reduce using rule 12 (expression -> expression LT expression .)
+    OR              reduce using rule 12 (expression -> expression LT expression .)
+    $end            reduce using rule 12 (expression -> expression LT expression .)
+    RPAREN          reduce using rule 12 (expression -> expression LT expression .)
+    COMMA           reduce using rule 12 (expression -> expression LT expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+
+  ! PLUS            [ reduce using rule 12 (expression -> expression LT expression .) ]
+  ! MINUS           [ reduce using rule 12 (expression -> expression LT expression .) ]
+  ! TIMES           [ reduce using rule 12 (expression -> expression LT expression .) ]
+  ! PIPE            [ reduce using rule 12 (expression -> expression LT expression .) ]
+  ! DIVIDE          [ reduce using rule 12 (expression -> expression LT expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 34
+
+    (13) expression -> expression LE expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 13 (expression -> expression LE expression .)
+    NE              reduce using rule 13 (expression -> expression LE expression .)
+    LT              reduce using rule 13 (expression -> expression LE expression .)
+    LE              reduce using rule 13 (expression -> expression LE expression .)
+    GT              reduce using rule 13 (expression -> expression LE expression .)
+    GE              reduce using rule 13 (expression -> expression LE expression .)
+    AND             reduce using rule 13 (expression -> expression LE expression .)
+    OR              reduce using rule 13 (expression -> expression LE expression .)
+    $end            reduce using rule 13 (expression -> expression LE expression .)
+    RPAREN          reduce using rule 13 (expression -> expression LE expression .)
+    COMMA           reduce using rule 13 (expression -> expression LE expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+
+  ! PLUS            [ reduce using rule 13 (expression -> expression LE expression .) ]
+  ! MINUS           [ reduce using rule 13 (expression -> expression LE expression .) ]
+  ! TIMES           [ reduce using rule 13 (expression -> expression LE expression .) ]
+  ! PIPE            [ reduce using rule 13 (expression -> expression LE expression .) ]
+  ! DIVIDE          [ reduce using rule 13 (expression -> expression LE expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 35
+
+    (14) expression -> expression GT expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 14 (expression -> expression GT expression .)
+    NE              reduce using rule 14 (expression -> expression GT expression .)
+    LT              reduce using rule 14 (expression -> expression GT expression .)
+    LE              reduce using rule 14 (expression -> expression GT expression .)
+    GT              reduce using rule 14 (expression -> expression GT expression .)
+    GE              reduce using rule 14 (expression -> expression GT expression .)
+    AND             reduce using rule 14 (expression -> expression GT expression .)
+    OR              reduce using rule 14 (expression -> expression GT expression .)
+    $end            reduce using rule 14 (expression -> expression GT expression .)
+    RPAREN          reduce using rule 14 (expression -> expression GT expression .)
+    COMMA           reduce using rule 14 (expression -> expression GT expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+
+  ! PLUS            [ reduce using rule 14 (expression -> expression GT expression .) ]
+  ! MINUS           [ reduce using rule 14 (expression -> expression GT expression .) ]
+  ! TIMES           [ reduce using rule 14 (expression -> expression GT expression .) ]
+  ! PIPE            [ reduce using rule 14 (expression -> expression GT expression .) ]
+  ! DIVIDE          [ reduce using rule 14 (expression -> expression GT expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 36
+
+    (15) expression -> expression GE expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    EQ              reduce using rule 15 (expression -> expression GE expression .)
+    NE              reduce using rule 15 (expression -> expression GE expression .)
+    LT              reduce using rule 15 (expression -> expression GE expression .)
+    LE              reduce using rule 15 (expression -> expression GE expression .)
+    GT              reduce using rule 15 (expression -> expression GE expression .)
+    GE              reduce using rule 15 (expression -> expression GE expression .)
+    AND             reduce using rule 15 (expression -> expression GE expression .)
+    OR              reduce using rule 15 (expression -> expression GE expression .)
+    $end            reduce using rule 15 (expression -> expression GE expression .)
+    RPAREN          reduce using rule 15 (expression -> expression GE expression .)
+    COMMA           reduce using rule 15 (expression -> expression GE expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+
+  ! PLUS            [ reduce using rule 15 (expression -> expression GE expression .) ]
+  ! MINUS           [ reduce using rule 15 (expression -> expression GE expression .) ]
+  ! TIMES           [ reduce using rule 15 (expression -> expression GE expression .) ]
+  ! PIPE            [ reduce using rule 15 (expression -> expression GE expression .) ]
+  ! DIVIDE          [ reduce using rule 15 (expression -> expression GE expression .) ]
+  ! EQ              [ shift and go to state 14 ]
+  ! NE              [ shift and go to state 15 ]
+  ! LT              [ shift and go to state 16 ]
+  ! LE              [ shift and go to state 17 ]
+  ! GT              [ shift and go to state 18 ]
+  ! GE              [ shift and go to state 19 ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 37
+
+    (16) expression -> expression AND expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    AND             reduce using rule 16 (expression -> expression AND expression .)
+    OR              reduce using rule 16 (expression -> expression AND expression .)
+    $end            reduce using rule 16 (expression -> expression AND expression .)
+    RPAREN          reduce using rule 16 (expression -> expression AND expression .)
+    COMMA           reduce using rule 16 (expression -> expression AND expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+
+  ! PLUS            [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! MINUS           [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! TIMES           [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! PIPE            [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! DIVIDE          [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! EQ              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! NE              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! LT              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! LE              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! GT              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! GE              [ reduce using rule 16 (expression -> expression AND expression .) ]
+  ! AND             [ shift and go to state 20 ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 38
+
+    (17) expression -> expression OR expression .
+    (5) expression -> expression . PLUS expression
+    (6) expression -> expression . MINUS expression
+    (7) expression -> expression . TIMES expression
+    (8) expression -> expression . PIPE expression
+    (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
+
+    OR              reduce using rule 17 (expression -> expression OR expression .)
+    $end            reduce using rule 17 (expression -> expression OR expression .)
+    RPAREN          reduce using rule 17 (expression -> expression OR expression .)
+    COMMA           reduce using rule 17 (expression -> expression OR expression .)
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+    AND             shift and go to state 20
+
+  ! PLUS            [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! MINUS           [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! TIMES           [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! PIPE            [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! DIVIDE          [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! EQ              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! NE              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! LT              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! LE              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! GT              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! GE              [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! AND             [ reduce using rule 17 (expression -> expression OR expression .) ]
+  ! OR              [ shift and go to state 21 ]
+
+
+state 39
 
     (1) expression -> ID LPAREN RPAREN .
 
@@ -545,21 +1634,29 @@ state 21
     TIMES           reduce using rule 1 (expression -> ID LPAREN RPAREN .)
     PIPE            reduce using rule 1 (expression -> ID LPAREN RPAREN .)
     DIVIDE          reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    EQ              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    NE              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    LT              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    LE              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    GT              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    GE              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    AND             reduce using rule 1 (expression -> ID LPAREN RPAREN .)
+    OR              reduce using rule 1 (expression -> ID LPAREN RPAREN .)
     $end            reduce using rule 1 (expression -> ID LPAREN RPAREN .)
     RPAREN          reduce using rule 1 (expression -> ID LPAREN RPAREN .)
     COMMA           reduce using rule 1 (expression -> ID LPAREN RPAREN .)
 
 
-state 22
+state 40
 
     (2) expression -> ID LPAREN args . RPAREN
     (4) args -> args . COMMA expression
 
-    RPAREN          shift and go to state 27
-    COMMA           shift and go to state 28
+    RPAREN          shift and go to state 45
+    COMMA           shift and go to state 46
 
 
-state 23
+state 41
 
     (3) args -> expression .
     (5) expression -> expression . PLUS expression
@@ -567,61 +1664,101 @@ state 23
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     RPAREN          reduce using rule 3 (args -> expression .)
     COMMA           reduce using rule 3 (args -> expression .)
-    PLUS            shift and go to state 8
-    MINUS           shift and go to state 9
-    TIMES           shift and go to state 10
-    PIPE            shift and go to state 11
-    DIVIDE          shift and go to state 12
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+    AND             shift and go to state 20
+    OR              shift and go to state 21
 
 
-state 24
+state 42
 
-    (14) hier_id -> ID . DOT hier_id
-    (15) hier_id -> ID .
+    (23) hier_id -> ID . DOT hier_id
+    (24) hier_id -> ID .
 
-    DOT             shift and go to state 14
-    PLUS            reduce using rule 15 (hier_id -> ID .)
-    MINUS           reduce using rule 15 (hier_id -> ID .)
-    TIMES           reduce using rule 15 (hier_id -> ID .)
-    PIPE            reduce using rule 15 (hier_id -> ID .)
-    DIVIDE          reduce using rule 15 (hier_id -> ID .)
-    $end            reduce using rule 15 (hier_id -> ID .)
-    RPAREN          reduce using rule 15 (hier_id -> ID .)
-    COMMA           reduce using rule 15 (hier_id -> ID .)
-
-
-state 25
-
-    (14) hier_id -> ID DOT hier_id .
-
-    PLUS            reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    MINUS           reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    TIMES           reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    PIPE            reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    DIVIDE          reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    $end            reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    RPAREN          reduce using rule 14 (hier_id -> ID DOT hier_id .)
-    COMMA           reduce using rule 14 (hier_id -> ID DOT hier_id .)
+    DOT             shift and go to state 23
+    PLUS            reduce using rule 24 (hier_id -> ID .)
+    MINUS           reduce using rule 24 (hier_id -> ID .)
+    TIMES           reduce using rule 24 (hier_id -> ID .)
+    PIPE            reduce using rule 24 (hier_id -> ID .)
+    DIVIDE          reduce using rule 24 (hier_id -> ID .)
+    EQ              reduce using rule 24 (hier_id -> ID .)
+    NE              reduce using rule 24 (hier_id -> ID .)
+    LT              reduce using rule 24 (hier_id -> ID .)
+    LE              reduce using rule 24 (hier_id -> ID .)
+    GT              reduce using rule 24 (hier_id -> ID .)
+    GE              reduce using rule 24 (hier_id -> ID .)
+    AND             reduce using rule 24 (hier_id -> ID .)
+    OR              reduce using rule 24 (hier_id -> ID .)
+    $end            reduce using rule 24 (hier_id -> ID .)
+    RPAREN          reduce using rule 24 (hier_id -> ID .)
+    COMMA           reduce using rule 24 (hier_id -> ID .)
 
 
-state 26
+state 43
 
-    (10) expression -> LPAREN expression RPAREN .
+    (23) hier_id -> ID DOT hier_id .
 
-    PLUS            reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    MINUS           reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    TIMES           reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    PIPE            reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    DIVIDE          reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    $end            reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    RPAREN          reduce using rule 10 (expression -> LPAREN expression RPAREN .)
-    COMMA           reduce using rule 10 (expression -> LPAREN expression RPAREN .)
+    PLUS            reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    MINUS           reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    TIMES           reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    PIPE            reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    DIVIDE          reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    EQ              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    NE              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    LT              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    LE              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    GT              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    GE              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    AND             reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    OR              reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    $end            reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    RPAREN          reduce using rule 23 (hier_id -> ID DOT hier_id .)
+    COMMA           reduce using rule 23 (hier_id -> ID DOT hier_id .)
 
 
-state 27
+state 44
+
+    (19) expression -> LPAREN expression RPAREN .
+
+    PLUS            reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    MINUS           reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    TIMES           reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    PIPE            reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    DIVIDE          reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    EQ              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    NE              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    LT              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    LE              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    GT              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    GE              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    AND             reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    OR              reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    $end            reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    RPAREN          reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+    COMMA           reduce using rule 19 (expression -> LPAREN expression RPAREN .)
+
+
+state 45
 
     (2) expression -> ID LPAREN args RPAREN .
 
@@ -630,12 +1767,20 @@ state 27
     TIMES           reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
     PIPE            reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
     DIVIDE          reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    EQ              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    NE              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    LT              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    LE              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    GT              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    GE              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    AND             reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
+    OR              reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
     $end            reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
     RPAREN          reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
     COMMA           reduce using rule 2 (expression -> ID LPAREN args RPAREN .)
 
 
-state 28
+state 46
 
     (4) args -> args COMMA . expression
     (1) expression -> . ID LPAREN RPAREN
@@ -645,25 +1790,35 @@ state 28
     (7) expression -> . expression TIMES expression
     (8) expression -> . expression PIPE expression
     (9) expression -> . expression DIVIDE expression
-    (10) expression -> . LPAREN expression RPAREN
-    (11) expression -> . NUMBER
-    (12) expression -> . ID
-    (13) expression -> . hier_id
-    (16) expression -> . STRING1
-    (17) expression -> . STRING2
-    (14) hier_id -> . ID DOT hier_id
-    (15) hier_id -> . ID
+    (10) expression -> . expression EQ expression
+    (11) expression -> . expression NE expression
+    (12) expression -> . expression LT expression
+    (13) expression -> . expression LE expression
+    (14) expression -> . expression GT expression
+    (15) expression -> . expression GE expression
+    (16) expression -> . expression AND expression
+    (17) expression -> . expression OR expression
+    (18) expression -> . NOT expression
+    (19) expression -> . LPAREN expression RPAREN
+    (20) expression -> . NUMBER
+    (21) expression -> . ID
+    (22) expression -> . hier_id
+    (25) expression -> . STRING1
+    (26) expression -> . STRING2
+    (23) hier_id -> . ID DOT hier_id
+    (24) hier_id -> . ID
 
     ID              shift and go to state 2
+    NOT             shift and go to state 4
     LPAREN          shift and go to state 3
-    NUMBER          shift and go to state 4
-    STRING1         shift and go to state 6
-    STRING2         shift and go to state 7
+    NUMBER          shift and go to state 5
+    STRING1         shift and go to state 7
+    STRING2         shift and go to state 8
 
-    expression                     shift and go to state 29
-    hier_id                        shift and go to state 5
+    expression                     shift and go to state 47
+    hier_id                        shift and go to state 6
 
-state 29
+state 47
 
     (4) args -> args COMMA expression .
     (5) expression -> expression . PLUS expression
@@ -671,14 +1826,30 @@ state 29
     (7) expression -> expression . TIMES expression
     (8) expression -> expression . PIPE expression
     (9) expression -> expression . DIVIDE expression
+    (10) expression -> expression . EQ expression
+    (11) expression -> expression . NE expression
+    (12) expression -> expression . LT expression
+    (13) expression -> expression . LE expression
+    (14) expression -> expression . GT expression
+    (15) expression -> expression . GE expression
+    (16) expression -> expression . AND expression
+    (17) expression -> expression . OR expression
 
     RPAREN          reduce using rule 4 (args -> args COMMA expression .)
     COMMA           reduce using rule 4 (args -> args COMMA expression .)
-    PLUS            shift and go to state 8
-    MINUS           shift and go to state 9
-    TIMES           shift and go to state 10
-    PIPE            shift and go to state 11
-    DIVIDE          shift and go to state 12
+    PLUS            shift and go to state 9
+    MINUS           shift and go to state 10
+    TIMES           shift and go to state 11
+    PIPE            shift and go to state 12
+    DIVIDE          shift and go to state 13
+    EQ              shift and go to state 14
+    NE              shift and go to state 15
+    LT              shift and go to state 16
+    LE              shift and go to state 17
+    GT              shift and go to state 18
+    GE              shift and go to state 19
+    AND             shift and go to state 20
+    OR              shift and go to state 21
 
 WARNING: 
 WARNING: Conflicts:

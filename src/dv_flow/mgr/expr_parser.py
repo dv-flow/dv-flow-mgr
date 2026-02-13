@@ -50,6 +50,27 @@ class ExprBinOp(enum.Enum):
     Minus = enum.auto()
     Times = enum.auto()
     Divide = enum.auto()
+    # Comparison operators
+    Eq = enum.auto()       # ==
+    Ne = enum.auto()       # !=
+    Lt = enum.auto()       # <
+    Le = enum.auto()       # <=
+    Gt = enum.auto()       # >
+    Ge = enum.auto()       # >=
+    # Logical operators
+    And = enum.auto()      # &&
+    Or = enum.auto()       # ||
+
+class ExprUnaryOp(enum.Enum):
+    Not = enum.auto()      # !
+
+@dc.dataclass
+class ExprUnary(Expr):
+    op : ExprUnaryOp
+    expr : Expr
+
+    def accept(self, v):
+        v.visitExprUnary(self)
 
 @dc.dataclass
 class ExprBin(Expr):
@@ -82,6 +103,13 @@ class ExprInt(Expr):
     def accept(self, v):
         v.visitExprInt(self)
 
+@dc.dataclass
+class ExprBool(Expr):
+    value : bool
+
+    def accept(self, v):
+        v.visitExprBool(self)
+
 class ExprVisitor(object):
     def visitExprHId(self, e : ExprId):
         pass
@@ -93,6 +121,9 @@ class ExprVisitor(object):
         e.lhs.accept(self)
         e.rhs.accept(self)
 
+    def visitExprUnary(self, e):
+        e.expr.accept(self)
+
     def visitExprCall(self, e : ExprCall):
         for arg in e.args:
             arg.accept(self)
@@ -101,6 +132,9 @@ class ExprVisitor(object):
         pass
 
     def visitExprInt(self, e : ExprInt):
+        pass
+
+    def visitExprBool(self, e):
         pass
 
 @dc.dataclass
@@ -160,21 +194,36 @@ class ExprParser(object):
     tokens = (
         'ID', 'DOT', 'NUMBER','COMMA',
         'PLUS','MINUS','TIMES','DIVIDE',
-        'LPAREN','RPAREN','PIPE','STRING1','STRING2'
+        'LPAREN','RPAREN','PIPE','STRING1','STRING2',
+        'EQ','NE','LT','LE','GT','GE',  # Comparison operators
+        'AND','OR','NOT'  # Logical operators
         )
     
-    # Tokens
-
-    t_COMMA   = r',' 
-    t_PLUS    = r'\+'
-    t_MINUS   = r'-'
-    t_TIMES   = r'\*'
-    t_DIVIDE  = r'/'
-    t_LPAREN  = r'\('
-    t_RPAREN  = r'\)'
-    t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*(:-.+)?'
-    t_DOT     = r'\.'
-    t_PIPE    = r'\|'
+    # Tokens - Define multi-character operators FIRST as functions with regex in docstring
+    
+    def t_AND(self, t):
+        r'&&'
+        return t
+    
+    def t_OR(self, t):
+        r'\|\|'
+        return t
+    
+    def t_EQ(self, t):
+        r'=='
+        return t
+    
+    def t_NE(self, t):
+        r'!='
+        return t
+    
+    def t_LE(self, t):
+        r'<='
+        return t
+    
+    def t_GE(self, t):
+        r'>='
+        return t
     
     def t_NUMBER(self, t):
         r'\d+'
@@ -193,10 +242,22 @@ class ExprParser(object):
     def t_STRING2(self, t):
         r'\'([^\'\\]*(\\.[^\'\\]*)*)\''
         t.value = t.value[1:-1].replace(r'\'', '"').replace(r'\\', '\\')
-
-#        r'(\'|\")([^\\\n]|(\\.))*?(\'|\")'
-#        t.value = t.value[1:-1].replace('\\"', '"').replace("\\'", "'").replace('\\n', '\n').replace('\\t', '\t').replace('\\\\', '\\')
         return t
+    
+    # Single character tokens
+    t_COMMA   = r',' 
+    t_PLUS    = r'\+'
+    t_MINUS   = r'-'
+    t_TIMES   = r'\*'
+    t_DIVIDE  = r'/'
+    t_LPAREN  = r'\('
+    t_RPAREN  = r'\)'
+    t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*(:-.+)?'
+    t_DOT     = r'\.'
+    t_LT      = r'<'
+    t_GT      = r'>'
+    t_NOT     = r'!'
+    t_PIPE    = r'\|'
     
     # Ignored characters
     t_ignore = " \t"
@@ -210,9 +271,13 @@ class ExprParser(object):
         t.lexer.skip(1)
         
     precedence = (
-        ('left','PLUS','MINUS','PIPE'),
-        ('left','TIMES','DIVIDE'),
-#        ('right','UMINUS'),
+        ('left', 'OR'),
+        ('left', 'AND'),
+        ('right', 'NOT'),
+        ('left', 'EQ', 'NE'),
+        ('left', 'LT', 'LE', 'GT', 'GE'),
+        ('left', 'PLUS', 'MINUS', 'PIPE'),
+        ('left', 'TIMES', 'DIVIDE'),
         )
     
     def p_call(self, t):
@@ -234,15 +299,35 @@ class ExprParser(object):
                       | expression MINUS expression
                       | expression TIMES expression
                       | expression PIPE expression
-                      | expression DIVIDE expression'''
+                      | expression DIVIDE expression
+                      | expression EQ expression
+                      | expression NE expression
+                      | expression LT expression
+                      | expression LE expression
+                      | expression GT expression
+                      | expression GE expression
+                      | expression AND expression
+                      | expression OR expression'''
         op_m = {
             '+' : ExprBinOp.Plus,
             '-' : ExprBinOp.Minus,
             '*' : ExprBinOp.Times,
             '|' : ExprBinOp.Pipe,
-            '/' : ExprBinOp.Divide
+            '/' : ExprBinOp.Divide,
+            '==' : ExprBinOp.Eq,
+            '!=' : ExprBinOp.Ne,
+            '<' : ExprBinOp.Lt,
+            '<=' : ExprBinOp.Le,
+            '>' : ExprBinOp.Gt,
+            '>=' : ExprBinOp.Ge,
+            '&&' : ExprBinOp.And,
+            '||' : ExprBinOp.Or,
         }
         t[0] = ExprBin(op_m[t[2]], t[1], t[3])
+    
+    def p_expression_unary(self, t):
+        '''expression : NOT expression'''
+        t[0] = ExprUnary(ExprUnaryOp.Not, t[2])
     
     def p_expression_group(self, t):
         'expression : LPAREN expression RPAREN'
@@ -254,7 +339,13 @@ class ExprParser(object):
     
     def p_expression_name(self, t):
         'expression : ID'
-        t[0] = ExprId(t[1])
+        # Handle boolean literals
+        if t[1] == 'true':
+            t[0] = ExprBool(True)
+        elif t[1] == 'false':
+            t[0] = ExprBool(False)
+        else:
+            t[0] = ExprId(t[1])
 
     def p_expression_hid(self, t):
         'expression : hier_id'
