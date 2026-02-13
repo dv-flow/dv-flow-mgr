@@ -38,6 +38,7 @@ from .param_def import ParamDef
 from .srcinfo import SrcInfo
 from .task_def import TaskDef
 from .type_def import TypeDef
+from .filter_def import FilterDef
 
 class Override(BaseModel):
     name : str = Field()
@@ -57,6 +58,9 @@ class PackageDef(BaseModel):
     tasks : List[TaskDef] = Field(
         default_factory=list,
         description="List of tasks defined in the package")
+    filters : List[FilterDef] = Field(
+        default_factory=list,
+        description="List of filters defined in the package. Filters are reusable data transformations usable in expressions")
     imports : List[Union[str,PackageImportSpec]] = Field(
         default_factory=list,
         description="List of packages to import. Can be package names (strings) or import specifications with configuration")

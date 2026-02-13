@@ -48,6 +48,7 @@ from .null_callable import NullCallable
 from .shell_callable import ShellCallable
 from .deferred_expr import DeferredExpr, references_runtime_data
 from .expr_parser import ExprParser
+from .filter_registry import FilterRegistry
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -89,6 +90,7 @@ class TaskGraphBuilder(object):
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
+    _filter_registry : FilterRegistry = dc.field(default_factory=FilterRegistry)
 
     _log : logging.Logger = None
 
@@ -164,6 +166,18 @@ class TaskGraphBuilder(object):
         setattr(params, name, value)
 
     def _addPackageTasks(self, pkg, pkg_s):
+        # Register filters from this package
+        if hasattr(pkg, 'filters') and pkg.filters:
+            # Get list of imported package names
+            imports = [imp if isinstance(imp, str) else imp.package for imp in (pkg.imports or [])]
+            self._filter_registry.register_package_filters(pkg.name, pkg.filters, imports)
+            self._log.debug(f"Registered {len(pkg.filters)} filters from package '{pkg.name}'")
+        
+        # Set root package for visibility checks
+        if self.root_pkg and pkg.name == self.root_pkg.name:
+            self._filter_registry.set_root_package(pkg.name)
+        
+        self._log.debug("--> _addPackageTasks: %s" % pkg.name)
 
         self._pkg_m[pkg.name] = pkg
 
