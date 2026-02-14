@@ -10,7 +10,13 @@ from .marker_collector import MarkerCollector
 
 
 def test_jobserver_propagates_to_subprocess(tmpdir):
-    """Test that MAKEFLAGS with jobserver is set in subprocess environment"""
+    """Test that jobserver is created but MAKEFLAGS is NOT set in subprocess environment
+    
+    NOTE: As of the FIFO jobserver compatibility fix, MAKEFLAGS is intentionally
+    not propagated because GNU Make 4.3's FIFO-based jobserver has issues when
+    the FIFO is created by external tools. A future enhancement may add proper
+    FD-based jobserver support with pass_fds.
+    """
     print(f"DEBUG: tmpdir type: {type(tmpdir)}")
     print(f"DEBUG: tmpdir value: {tmpdir}")
     print(f"DEBUG: tmpdir str: {str(tmpdir)}")
@@ -33,7 +39,7 @@ import subprocess
 from dv_flow.mgr import TaskDataResult
 
 async def CheckEnv(ctxt, input):
-    # Check that MAKEFLAGS is set in context environment
+    # Check that MAKEFLAGS is NOT set in context environment (by design)
     print(f"DEBUG: ctxt.env keys: {list(ctxt.env.keys())[:10]}")
     makeflags = ctxt.env.get('MAKEFLAGS', 'NOT_SET_IN_CTXT')
     print(f"DEBUG: MAKEFLAGS from ctxt.env: {makeflags}")
@@ -57,11 +63,15 @@ async def CheckEnv(ctxt, input):
         rundir=os.path.join(tmpdir, "rundir"))
     
     print(f"DEBUG: Before TaskSetRunner creation")
-    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"), nproc=4)
+    runner = TaskSetRunner(os.path.join(tmpdir, "rundir"), builder=builder, nproc=4)
     print(f"DEBUG: After TaskSetRunner creation")
     print(f"DEBUG: Runner has _jobserver: {hasattr(runner, '_jobserver')}")
     print(f"DEBUG: Runner._jobserver: {runner._jobserver}")
     print(f"DEBUG: Runner MAKEFLAGS: {runner.env.get('MAKEFLAGS', 'NOT SET')}")
+
+    # Verify jobserver was created (before running)
+    assert runner._jobserver is not None
+    assert runner._jobserver_owner is True
 
     task = builder.mkTaskNode("foo.check_env")
     print(f"DEBUG: Task has ctxt: {hasattr(task, 'ctxt')}")
@@ -72,20 +82,22 @@ async def CheckEnv(ctxt, input):
 
     assert runner.status == 0
     
-    # Verify MAKEFLAGS was set
+    # Note: jobserver is closed after run completes, so runner._jobserver will be None here
+    
+    # Verify MAKEFLAGS is NOT set in task environment (by design)
     rundir = os.path.join(tmpdir, "rundir/foo.check_env")
     with open(os.path.join(rundir, "parent_makeflags.txt"), "r") as f:
         parent_makeflags = f.read().strip()
     
     print(f"DEBUG: parent_makeflags from file: {parent_makeflags}")
-    assert "--jobserver-auth=fifo:" in parent_makeflags
+    assert parent_makeflags == "NOT_SET_IN_CTXT"
     
-    # Verify subprocess inherited it
+    # Verify subprocess didn't inherit it either
     with open(os.path.join(rundir, "subprocess_makeflags.txt"), "r") as f:
         subprocess_makeflags = f.read().strip()
     
     print(f"DEBUG: subprocess_makeflags from file: {subprocess_makeflags}")
-    assert "--jobserver-auth=fifo:" in subprocess_makeflags
+    assert subprocess_makeflags == "" or subprocess_makeflags == "NOT_SET_IN_CTXT"
 
 
 def test_nested_dfm_uses_parent_jobserver(tmpdir):

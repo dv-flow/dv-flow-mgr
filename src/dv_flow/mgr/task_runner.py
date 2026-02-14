@@ -124,13 +124,10 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             self._jobserver = JobServer(self.nproc)
             self._jobserver_owner = True
             
-            # Set MAKEFLAGS for children (--jobserver-auth=fifo:/path)
-            makeflags = self._jobserver.get_makeflags()
-            if 'MAKEFLAGS' in self.env:
-                # Append to existing MAKEFLAGS
-                self.env['MAKEFLAGS'] += ' ' + makeflags
-            else:
-                self.env['MAKEFLAGS'] = makeflags
+            # NOTE: We intentionally do NOT set MAKEFLAGS in the environment
+            # because GNU Make 4.3's FIFO-based jobserver has compatibility issues
+            # when the FIFO is created by external tools. A smarter solution can
+            # be added in the future (e.g., pipe-based jobserver with FD passing).
             
             self._log.info(f"Created jobserver: nproc={self.nproc}, fifo={self._jobserver.fifo_path}")
         else:

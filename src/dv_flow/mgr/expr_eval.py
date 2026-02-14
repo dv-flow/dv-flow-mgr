@@ -205,12 +205,17 @@ class ExprEval(ExprVisitor):
                 # Check if it's a builtin method first
                 if e.rhs.id in self.methods:
                     # Builtin method: value | method(args)
-                    # Evaluate arguments
-                    args = []
-                    for arg in e.rhs.args:
-                        self.value = None
-                        arg.accept(self)
-                        args.append(self.value)
+                    # Special handling for builtins that need AST nodes (map, select)
+                    if e.rhs.id in ['map', 'select']:
+                        # Pass AST nodes directly - these builtins evaluate per-item
+                        args = e.rhs.args
+                    else:
+                        # Evaluate arguments for regular builtins
+                        args = []
+                        for arg in e.rhs.args:
+                            self.value = None
+                            arg.accept(self)
+                            args.append(self.value)
                     # Call the builtin with lhs as input
                     self.value = self.methods[e.rhs.id](lhs_val, args)
                 else:
@@ -637,13 +642,12 @@ class ExprEval(ExprVisitor):
         if not isinstance(in_value, list):
             raise Exception(f"map() requires array input, got {type(in_value).__name__}")
         
-        # The argument is an expression AST node - we need to evaluate it for each element
-        # For now, we'll handle this as a string expression
-        expr_str = str(args[0])
+        # The argument is an AST node - evaluate it for each element
+        expr_ast = args[0]
         
         result = []
         for item in in_value:
-            # Create temporary evaluator with item as context
+            # Create temporary evaluator with item as "input" context
             temp_eval = ExprEval(
                 methods=self.methods.copy(),
                 name_resolution=self.name_resolution,
@@ -651,36 +655,67 @@ class ExprEval(ExprVisitor):
                 filter_registry=self.filter_registry,
                 current_package=self.current_package
             )
-            temp_eval.set("item", item)
-            temp_eval.value = item  # Set as current value
+            temp_eval.set("input", item)  # Set current item as "input"
+            temp_eval.set("item", item)   # Also as "item" for backward compat
+            temp_eval.value = item        # Set as current value
             
             # Evaluate expression for this item
-            result.append(temp_eval.eval(expr_str))
+            expr_ast.accept(temp_eval)
+            result.append(temp_eval.value)
         
         return result
     
     def _builtin_select(self, in_value, args):
-        """select(condition) - Filter elements by condition"""
+        """select(condition) - Filter elements by condition
+        
+        If in_value is an array (from input[] or similar), filters the array.
+        If in_value is a single item, returns it if condition is true, None otherwise.
+        """
         if len(args) != 1:
             raise Exception("select() requires exactly one argument (condition)")
         
-        # Evaluate condition with input as context
-        condition_str = str(args[0])
+        # The argument is an AST node - evaluate it with input as context
+        condition_ast = args[0]
         
-        temp_eval = ExprEval(
-            methods=self.methods.copy(),
-            name_resolution=self.name_resolution,
-            variables=self.variables.copy(),
-            filter_registry=self.filter_registry,
-            current_package=self.current_package
-        )
-        temp_eval.value = in_value
-        temp_eval.set("item", in_value)
-        
-        result = temp_eval.eval(condition_str)
-        
-        # Return input if condition is true, None otherwise
-        return in_value if self._to_bool(result) else None
+        # If input is an array, filter it item by item
+        if isinstance(in_value, list):
+            result = []
+            for item in in_value:
+                temp_eval = ExprEval(
+                    methods=self.methods.copy(),
+                    name_resolution=self.name_resolution,
+                    variables=self.variables.copy(),
+                    filter_registry=self.filter_registry,
+                    current_package=self.current_package
+                )
+                temp_eval.set("input", item)  # Set current item as "input"
+                temp_eval.set("item", item)   # Also as "item" for backward compat
+                temp_eval.value = item
+                
+                # Evaluate condition for this item
+                condition_ast.accept(temp_eval)
+                if self._to_bool(temp_eval.value):
+                    result.append(item)
+            return result
+        else:
+            # Single item - evaluate condition and return item or None
+            temp_eval = ExprEval(
+                methods=self.methods.copy(),
+                name_resolution=self.name_resolution,
+                variables=self.variables.copy(),
+                filter_registry=self.filter_registry,
+                current_package=self.current_package
+            )
+            temp_eval.set("input", in_value)  # Set current value as "input"
+            temp_eval.set("item", in_value)   # Also as "item" for backward compat
+            temp_eval.value = in_value
+            
+            # Evaluate condition for this item
+            condition_ast.accept(temp_eval)
+            result = temp_eval.value
+            
+            # Return input if condition is true, None otherwise
+            return in_value if self._to_bool(result) else None
     
     def _builtin_first(self, in_value, args):
         """first() - Get first element of array"""
