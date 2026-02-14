@@ -27,6 +27,9 @@ package:
   name: std
   desc: Standard library providing core tasks, types, and utilities for DV Flow workflows
 
+  fragments:
+    - filters.dv
+
   tasks:
   - name: Message
     shell: pytask

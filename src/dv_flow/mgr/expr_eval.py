@@ -27,7 +27,7 @@ import tempfile
 import os
 from typing import Any, Callable, Dict, List, Optional
 from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp
-from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt, ExprUnary, ExprUnaryOp, ExprBool
+from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt, ExprUnary, ExprUnaryOp, ExprBool, ExprVar
 from .name_resolution import VarResolver
 from .filter_registry import FilterRegistry
 
@@ -55,6 +55,8 @@ class ExprEval(ExprVisitor):
         self.methods['last'] = self._builtin_last
         self.methods['flatten'] = self._builtin_flatten
         self.methods['type'] = self._builtin_type
+        self.methods['split'] = self._builtin_split
+        self.methods['group_by'] = self._builtin_group_by
 
     def set(self, name: str, value: object):
         self.variables[name] = value
@@ -188,21 +190,38 @@ class ExprEval(ExprVisitor):
             # lhs_val is the input to the filter
             # rhs should be either an ID (filter name), HId (qualified filter name), or Call (filter with params)
             if isinstance(e.rhs, ExprId):
-                # Simple filter: value | filter_name
-                self.value = self._apply_filter(e.rhs.id, lhs_val, {})
+                # Check if it's a builtin method first
+                if e.rhs.id in self.methods:
+                    # Builtin method: value | method
+                    self.value = self.methods[e.rhs.id](lhs_val, [])
+                else:
+                    # Simple filter: value | filter_name
+                    self.value = self._apply_filter(e.rhs.id, lhs_val, {})
             elif isinstance(e.rhs, ExprHId):
                 # Qualified filter: value | pkg.filter_name
                 filter_name = ".".join(e.rhs.id)
                 self.value = self._apply_filter(filter_name, lhs_val, {})
             elif isinstance(e.rhs, ExprCall):
-                # Filter with params: value | filter_name(arg1, arg2)
-                # Evaluate arguments
-                args = {}
-                for i, arg in enumerate(e.rhs.args):
-                    self.value = None
-                    arg.accept(self)
-                    args[f"arg{i}"] = self.value
-                self.value = self._apply_filter(e.rhs.id, lhs_val, args)
+                # Check if it's a builtin method first
+                if e.rhs.id in self.methods:
+                    # Builtin method: value | method(args)
+                    # Evaluate arguments
+                    args = []
+                    for arg in e.rhs.args:
+                        self.value = None
+                        arg.accept(self)
+                        args.append(self.value)
+                    # Call the builtin with lhs as input
+                    self.value = self.methods[e.rhs.id](lhs_val, args)
+                else:
+                    # Filter with params: value | filter_name(arg1, arg2)
+                    # Evaluate arguments
+                    args = {}
+                    for i, arg in enumerate(e.rhs.args):
+                        self.value = None
+                        arg.accept(self)
+                        args[f"arg{i}"] = self.value
+                    self.value = self._apply_filter(e.rhs.id, lhs_val, args)
             else:
                 # For backward compatibility, evaluate RHS
                 e.rhs.accept(self)
@@ -272,6 +291,68 @@ class ExprEval(ExprVisitor):
     
     def visitExprBool(self, e: ExprBool):
         self.value = e.value
+    
+    def visitExprVar(self, e: ExprVar):
+        """Evaluate variable reference: $name"""
+        if e.name in self.variables:
+            self.value = self.variables[e.name]
+        else:
+            raise Exception(f"Variable '${e.name}' not found")
+    
+    def visitExprIndex(self, e):
+        """Evaluate array/object indexing: obj[index] or obj[start:end]"""
+        # Evaluate the object
+        e.obj.accept(self)
+        obj = self.value
+        
+        if e.is_slice:
+            # Handle slice: obj[start:end]
+            start = None
+            end = None
+            
+            if e.start:
+                e.start.accept(self)
+                start = self.value
+            
+            if e.end:
+                e.end.accept(self)
+                end = self.value
+            
+            # Python slice
+            try:
+                self.value = obj[start:end]
+            except (TypeError, KeyError, IndexError) as ex:
+                raise Exception(f"Cannot slice {type(obj).__name__}: {ex}")
+        else:
+            # Handle single index: obj[index]
+            e.index.accept(self)
+            index = self.value
+            
+            try:
+                if isinstance(obj, dict):
+                    # Dictionary access
+                    self.value = obj.get(index)
+                elif isinstance(obj, (list, tuple, str)):
+                    # Array/string access
+                    self.value = obj[index]
+                else:
+                    raise Exception(f"Cannot index {type(obj).__name__}")
+            except (KeyError, IndexError) as ex:
+                raise Exception(f"Index {index} not found in {type(obj).__name__}: {ex}")
+    
+    def visitExprIterator(self, e):
+        """Evaluate array iterator: obj[] - returns all elements"""
+        e.obj.accept(self)
+        obj = self.value
+        
+        if isinstance(obj, list):
+            # For arrays, return the list itself (jq .[] iterates, but we return the data)
+            self.value = obj
+        elif isinstance(obj, dict):
+            # For objects, return values
+            self.value = list(obj.values())
+        else:
+            raise Exception(f"Cannot iterate over {type(obj).__name__}")
 
     def _builtin_shell(self, in_value, args):
         """Execute shell command and return stdout"""
@@ -666,3 +747,55 @@ class ExprEval(ExprVisitor):
             return "object"
         else:
             return "unknown"
+    
+    def _builtin_split(self, in_value, args):
+        """split(sep) - Split string by separator"""
+        if len(args) != 1:
+            raise Exception("split() requires exactly one argument (separator)")
+        
+        if not isinstance(in_value, str):
+            raise Exception(f"split() can only be applied to strings, not {type(in_value).__name__}")
+        
+        separator = args[0]
+        if not isinstance(separator, str):
+            raise Exception(f"split() separator must be a string, not {type(separator).__name__}")
+        
+        return in_value.split(separator)
+    
+    def _builtin_group_by(self, in_value, args):
+        """group_by(expr) - Group array elements by expression result"""
+        if len(args) != 1:
+            raise Exception("group_by() requires exactly one argument (expression)")
+        
+        if not isinstance(in_value, list):
+            raise Exception(f"group_by() can only be applied to arrays, not {type(in_value).__name__}")
+        
+        expr = args[0]
+        
+        # Group items by the expression result
+        from collections import defaultdict
+        groups = defaultdict(list)
+        
+        for item in in_value:
+            # Create a temporary evaluator for this item
+            temp_eval = ExprEval(
+                methods=self.methods.copy(),
+                name_resolution=self.name_resolution,
+                variables=self.variables.copy(),
+                filter_registry=self.filter_registry,
+                current_package=self.current_package
+            )
+            temp_eval.set("input", item)
+            
+            # Evaluate the expression
+            expr.accept(temp_eval)
+            key = temp_eval.value
+            
+            # Convert unhashable types to strings for grouping
+            if isinstance(key, (list, dict)):
+                key = json.dumps(key, sort_keys=True)
+            
+            groups[key].append(item)
+        
+        # Return list of groups
+        return list(groups.values())

@@ -110,6 +110,34 @@ class ExprBool(Expr):
     def accept(self, v):
         v.visitExprBool(self)
 
+@dc.dataclass
+class ExprVar(Expr):
+    """Variable reference: $name"""
+    name : str
+
+    def accept(self, v):
+        v.visitExprVar(self)
+
+@dc.dataclass
+class ExprIndex(Expr):
+    """Array/object indexing: obj[index] or obj[start:end]"""
+    obj : Expr
+    index : Expr = None  # Single index
+    start : Expr = None  # Slice start
+    end : Expr = None    # Slice end
+    is_slice : bool = False
+    
+    def accept(self, v):
+        v.visitExprIndex(self)
+
+@dc.dataclass
+class ExprIterator(Expr):
+    """Array iterator: obj[] or .[]"""
+    obj : Expr
+    
+    def accept(self, v):
+        v.visitExprIterator(self)
+
 class ExprVisitor(object):
     def visitExprHId(self, e : ExprId):
         pass
@@ -136,6 +164,23 @@ class ExprVisitor(object):
 
     def visitExprBool(self, e):
         pass
+    
+    def visitExprVar(self, e: 'ExprVar'):
+        pass
+    
+    def visitExprIndex(self, e: 'ExprIndex'):
+        if e.obj:
+            e.obj.accept(self)
+        if e.index:
+            e.index.accept(self)
+        if e.start:
+            e.start.accept(self)
+        if e.end:
+            e.end.accept(self)
+    
+    def visitExprIterator(self, e: 'ExprIterator'):
+        if e.obj:
+            e.obj.accept(self)
 
 @dc.dataclass
 class ExprVisitor2String(ExprVisitor):
@@ -192,11 +237,12 @@ class ExprParser(object):
         return cls._inst
 
     tokens = (
-        'ID', 'DOT', 'NUMBER','COMMA',
+        'ID', 'DOT', 'NUMBER','COMMA','COLON',
         'PLUS','MINUS','TIMES','DIVIDE',
-        'LPAREN','RPAREN','PIPE','STRING1','STRING2',
+        'LPAREN','RPAREN','LBRACKET','RBRACKET','PIPE','STRING1','STRING2',
         'EQ','NE','LT','LE','GT','GE',  # Comparison operators
-        'AND','OR','NOT'  # Logical operators
+        'AND','OR','NOT',  # Logical operators
+        'DOLLAR'  # Variable reference
         )
     
     # Tokens - Define multi-character operators FIRST as functions with regex in docstring
@@ -244,14 +290,23 @@ class ExprParser(object):
         t.value = t.value[1:-1].replace(r'\'', '"').replace(r'\\', '\\')
         return t
     
+    def t_DOLLAR(self, t):
+        r'\$(?=[a-zA-Z_])'
+        # Only match $ when followed by a valid identifier character
+        # This prevents ${{ from being parsed as a DOLLAR token
+        return t
+    
     # Single character tokens
     t_COMMA   = r',' 
+    t_COLON   = r':'
     t_PLUS    = r'\+'
     t_MINUS   = r'-'
     t_TIMES   = r'\*'
     t_DIVIDE  = r'/'
     t_LPAREN  = r'\('
     t_RPAREN  = r'\)'
+    t_LBRACKET = r'\['
+    t_RBRACKET = r'\]'
     t_ID      = r'[a-zA-Z_][a-zA-Z0-9_]*(:-.+)?'
     t_DOT     = r'\.'
     t_LT      = r'<'
@@ -329,6 +384,30 @@ class ExprParser(object):
         '''expression : NOT expression'''
         t[0] = ExprUnary(ExprUnaryOp.Not, t[2])
     
+    def p_expression_index(self, t):
+        '''expression : expression LBRACKET expression RBRACKET
+                      | expression LBRACKET RBRACKET'''
+        if len(t) == 5:
+            # Regular indexing: obj[index]
+            t[0] = ExprIndex(obj=t[1], index=t[3], is_slice=False)
+        else:
+            # Iterator: obj[]
+            t[0] = ExprIterator(obj=t[1])
+    
+    def p_expression_slice(self, t):
+        '''expression : expression LBRACKET expression COLON expression RBRACKET
+                      | expression LBRACKET COLON expression RBRACKET
+                      | expression LBRACKET expression COLON RBRACKET'''
+        if len(t) == 7:
+            # Full slice: obj[start:end]
+            t[0] = ExprIndex(obj=t[1], start=t[3], end=t[5], is_slice=True)
+        elif t[3] == ':':
+            # obj[:end]
+            t[0] = ExprIndex(obj=t[1], start=None, end=t[4], is_slice=True)
+        else:
+            # obj[start:]
+            t[0] = ExprIndex(obj=t[1], start=t[3], end=None, is_slice=True)
+    
     def p_expression_group(self, t):
         'expression : LPAREN expression RPAREN'
         t[0] = t[2]
@@ -368,6 +447,10 @@ class ExprParser(object):
     def p_expression_string2(self, t):
         'expression : STRING2'
         t[0] = ExprString(t[1])
+    
+    def p_expression_var(self, t):
+        'expression : DOLLAR ID'
+        t[0] = ExprVar(t[2])
     
     def p_error(self, t):
         print("Syntax error at '%s'" % t.value)

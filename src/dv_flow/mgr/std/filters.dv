@@ -1,0 +1,81 @@
+
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+
+#****************************************************************************
+#* filters.dv
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may 
+#* not use this file except in compliance with the License.  
+#* You may obtain a copy of the License at:
+#*  
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*  
+#* Unless required by applicable law or agreed to in writing, software 
+#* distributed under the License is distributed on an "AS IS" BASIS, 
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
+#* See the License for the specific language governing permissions and 
+#* limitations under the License.
+#*
+#* Standard library filters for common data transformations
+#* Note: Filters use positional parameters ($arg0, $arg1, etc.) until
+#* keyword argument support is implemented
+#*
+#****************************************************************************
+
+fragment:
+  filters:
+    # File filtering
+    - export: by_filetype
+      desc: "Filter inputs by filetype field - useful for selecting specific file types from FileSet outputs"
+      with:
+        ft:
+          type: str
+          desc: "Filetype to match (e.g., 'systemVerilogSource', 'verilogSource')"
+      expr: "input[] | select(input.filetype == $arg0)"
+    
+    # Type filtering
+    - export: by_type
+      desc: "Filter inputs by type field - useful for selecting specific data types from mixed outputs"
+      with:
+        t:
+          type: str
+          desc: "Type to match"
+      expr: "input[] | select(input.type == $arg0)"
+    
+    # Field extraction
+    - export: pluck
+      desc: "Extract a specific field from all inputs - returns list of field values"
+      with:
+        field:
+          type: str
+          desc: "Field name to extract"
+      expr: "input | map(input[$arg0])"
+    
+    # First matching
+    - export: first_of_type
+      desc: "Get first input matching specified type - useful for finding single items"
+      with:
+        t:
+          type: str
+          desc: "Type to find"
+      expr: "input[] | select(input.type == $arg0) | first"
+    
+    # Path operations  
+    - export: basenames
+      desc: "Extract basenames from file paths - removes directory components"
+      expr: "input | map(input.path | split(\"/\") | last)"
+    
+    - export: extensions
+      desc: "Extract file extensions - returns extension including the dot"
+      expr: "input | map(input.path | split(\".\") | last)"
+    
+    # Aggregation helpers
+    - export: paths
+      desc: "Extract just the path field from all file inputs"
+      expr: "input | map(input.path)"
+    
+    - export: count_by_type
+      desc: "Count inputs grouped by type - returns object with type counts"
+      expr: "group_by(.type) | map({type: .[0].type, count: length})"

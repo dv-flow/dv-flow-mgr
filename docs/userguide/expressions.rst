@@ -299,15 +299,156 @@ This order ensures that:
 * Parameters are available when needed
 * Dependencies are properly evaluated
 
+Runtime Expressions
+===================
+
+Expressions can reference runtime data from task dependencies using special variables:
+
+* **inputs** - Outputs from dependency tasks (available at task runtime)
+* **memento** - Cached data from previous run (for incremental builds)
+
+These expressions are automatically **deferred** during graph construction and evaluated
+when the task executes.
+
+Example:
+
+.. code-block:: yaml
+
+    tasks:
+      - name: producer
+        scope: root
+        produces: [std.FileSet]
+        run: |
+          echo '{"type":"std.FileSet","files":["a.sv","b.sv"]}'
+        shell: bash
+        
+      - name: consumer
+        scope: root
+        needs: [producer]
+        consumes: [std.FileSet]
+        with:
+          file_count:
+            type: int
+            value: "${{ inputs | length }}"
+        run: |
+          echo "Received ${file_count} inputs"
+        shell: bash
+
+The expression ``${{ inputs | length }}`` cannot be evaluated during graph construction
+(inputs aren't known yet), so it's stored as a **deferred expression** and evaluated
+when ``consumer`` runs, after ``producer`` completes.
+
+Variable References
+-------------------
+
+Variables can be referenced using the ``$`` prefix for explicit variable references:
+
+.. code-block:: yaml
+
+    package:
+      with:
+        threshold:
+          type: int
+          value: 10
+      
+      tasks:
+        - name: check
+          with:
+            result:
+              value: "${{ $threshold * 2 }}"
+
+This is particularly useful when working with filter parameters.
+
+Array and Object Operations
+----------------------------
+
+Access array and object elements using indexing:
+
+.. code-block:: yaml
+
+    # Array indexing
+    first_item: "${{ my_array[0] }}"
+    second_item: "${{ my_array[1] }}"
+    
+    # Array slicing
+    first_three: "${{ my_array[:3] }}"
+    from_third: "${{ my_array[2:] }}"
+    middle: "${{ my_array[2:5] }}"
+    
+    # Object field access
+    value: "${{ config.settings.timeout }}"
+    by_key: "${{ data['key_name'] }}"
+    
+    # Array iteration
+    all_items: "${{ items[] }}"
+
+JQ-Style Builtins
+-----------------
+
+Expressions support JQ-style builtin functions for data transformation using
+the pipe operator ``|``:
+
+.. code-block:: yaml
+
+    # String operations
+    parts: "${{ path | split(\"/\") }}"
+    basename: "${{ path | split(\"/\") | last }}"
+    extension: "${{ filename | split(\".\") | last }}"
+    
+    # Array operations
+    count: "${{ items | length }}"
+    sorted: "${{ values | sort }}"
+    unique_vals: "${{ data | unique }}"
+    reversed: "${{ list | reverse }}"
+    first_val: "${{ items | first }}"
+    last_val: "${{ items | last }}"
+    
+    # Type checking
+    item_type: "${{ value | type }}"
+
+Available builtins:
+
+* ``length`` - Get length of array/object/string
+* ``keys`` - Get keys of object
+* ``values`` - Get values of object  
+* ``sort`` - Sort array
+* ``unique`` - Remove duplicates from array
+* ``reverse`` - Reverse array
+* ``first`` - Get first element
+* ``last`` - Get last element
+* ``flatten`` - Flatten nested arrays
+* ``type`` - Get type name ("array", "object", "string", "number", "boolean", "null")
+* ``split(sep)`` - Split string by separator
+
+Chaining Operations
+-------------------
+
+Chain multiple operations using the pipe operator:
+
+.. code-block:: yaml
+
+    # Multiple builtins
+    result: "${{ data | unique | sort | reverse }}"
+    
+    # Indexing with builtins
+    last_unique: "${{ items | unique | last }}"
+    
+    # Complex pipeline
+    filename: "${{ full_path | split(\"/\") | last }}"
+
 Limitations
 ===========
 
 Expressions have some limitations to maintain safety and predictability:
 
 * **No side effects**: Expressions cannot modify state
-* **No I/O**: Cannot read files or access network
+* **No I/O**: Cannot read files or access network  
 * **No arbitrary code**: Limited to safe expression subset
-* **Static evaluation**: Cannot depend on runtime task data
+
+**Evaluation Phases:**
+
+* **Static evaluation**: Most expressions evaluated during graph construction
+* **Runtime evaluation**: Expressions referencing ``inputs`` or ``memento`` deferred until task execution
 
 These limitations ensure that:
 

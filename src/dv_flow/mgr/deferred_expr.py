@@ -90,12 +90,15 @@ def references_runtime_data(expr_ast: Expr, runtime_vars: set = None) -> bool:
     if runtime_vars is None:
         runtime_vars = {'inputs', 'memento'}
     
-    from .expr_parser import ExprId, ExprHId, ExprBin, ExprUnary, ExprCall
+    from .expr_parser import ExprId, ExprHId, ExprBin, ExprUnary, ExprCall, ExprVar
     
     # Recursively check for runtime variable references
     def check(node):
         if isinstance(node, ExprId):
             return node.id in runtime_vars
+        elif isinstance(node, ExprVar):
+            # Variable reference: $name
+            return node.name in runtime_vars
         elif isinstance(node, ExprHId):
             # Check first identifier in hierarchical ID (e.g., 'inputs.field')
             return len(node.id) > 0 and node.id[0] in runtime_vars

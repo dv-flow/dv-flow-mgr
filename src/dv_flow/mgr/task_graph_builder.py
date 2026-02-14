@@ -1265,7 +1265,11 @@ class TaskGraphBuilder(object):
                         if len(self._name_resolution_stack) > 0:
                             # Capture current variable context
                             # Note: This is a shallow copy; variables should be immutable
-                            static_context = dict(eval.variables)
+                            # ParamRefEval has expr_eval.variables, not variables directly
+                            if hasattr(eval, 'variables'):
+                                static_context = dict(eval.variables)
+                            elif hasattr(eval, 'expr_eval'):
+                                static_context = dict(eval.expr_eval.variables)
                         
                         # Create deferred expression for runtime evaluation
                         self._log.debug("Param: Deferring expression \"%s\" (references runtime data)" % value)
@@ -1290,7 +1294,13 @@ class TaskGraphBuilder(object):
                         try:
                             ast = parser.parse(elem)
                             if references_runtime_data(ast):
-                                static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                # Handle both ExprEval and ParamRefEval
+                                if hasattr(eval, 'variables'):
+                                    static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                elif hasattr(eval, 'expr_eval'):
+                                    static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                else:
+                                    static_context = {}
                                 new_val.append(DeferredExpr(elem, ast, static_context))
                                 continue
                         except:
@@ -1311,7 +1321,13 @@ class TaskGraphBuilder(object):
                                 try:
                                     ast = parser.parse(v)
                                     if references_runtime_data(ast):
-                                        static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        # Handle both ExprEval and ParamRefEval
+                                        if hasattr(eval, 'variables'):
+                                            static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        elif hasattr(eval, 'expr_eval'):
+                                            static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        else:
+                                            static_context = {}
                                         new_val.append({k: DeferredExpr(v, ast, static_context)})
                                         continue
                                 except:
@@ -1337,7 +1353,13 @@ class TaskGraphBuilder(object):
                         try:
                             ast = parser.parse(v)
                             if references_runtime_data(ast):
-                                static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                # Handle both ExprEval and ParamRefEval
+                                if hasattr(eval, 'variables'):
+                                    static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                elif hasattr(eval, 'expr_eval'):
+                                    static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                else:
+                                    static_context = {}
                                 new_val[k] = DeferredExpr(v, ast, static_context)
                                 continue
                         except:

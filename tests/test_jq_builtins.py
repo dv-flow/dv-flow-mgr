@@ -2,7 +2,7 @@
 
 import pytest
 import json
-from src.dv_flow.mgr.expr_eval import ExprEval
+from dv_flow.mgr.expr_eval import ExprEval
 
 
 class TestBuiltinLength:
@@ -235,8 +235,8 @@ class TestBuiltinViaPipeOperator:
     
     def test_builtin_as_simple_filter(self):
         """Test that builtin functions work as expression filters"""
-        from src.dv_flow.mgr.filter_def import FilterDef
-        from src.dv_flow.mgr.filter_registry import FilterRegistry
+        from dv_flow.mgr.filter_def import FilterDef
+        from dv_flow.mgr.filter_registry import FilterRegistry
         
         # Create filter that uses builtin
         filter_def = FilterDef(

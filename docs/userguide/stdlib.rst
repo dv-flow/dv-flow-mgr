@@ -503,4 +503,160 @@ To use the default ``copilot`` assistant:
 OpenAI and Claude assistants are placeholders for future implementation. 
 Contributions are welcome!
 
+Standard Filters
+================
+
+The standard library provides filters for transforming and selecting data in
+expressions. Filters are used with the pipe operator ``|`` to process inputs
+or other data.
+
+by_filetype
+-----------
+
+Filter files by extension:
+
+.. code-block:: yaml
+
+    sv_files: "${{ inputs | by_filetype('.sv') }}"
+    verilog_files: "${{ inputs | by_filetype('.v') }}"
+
+**Parameters:**
+
+* ``ext`` - File extension to match (including the dot)
+
+**Returns:** Array of items where ``path`` ends with the specified extension
+
+by_type
+-------
+
+Filter items by data type:
+
+.. code-block:: yaml
+
+    filesets: "${{ inputs | by_type('std.FileSet') }}"
+    build_outputs: "${{ inputs | by_type('std.BuildOutput') }}"
+
+**Parameters:**
+
+* ``typename`` - Type name to match (e.g., "std.FileSet")
+
+**Returns:** Array of items where ``type`` matches the specified typename
+
+basenames
+---------
+
+Extract base filenames from paths:
+
+.. code-block:: yaml
+
+    names: "${{ inputs | paths | basenames }}"
+
+**Returns:** Array of filenames without directory paths
+
+extensions
+----------
+
+Extract file extensions:
+
+.. code-block:: yaml
+
+    exts: "${{ inputs | paths | extensions }}"
+
+**Returns:** Array of file extensions (including the dot)
+
+paths
+-----
+
+Extract all paths from FileSet items:
+
+.. code-block:: yaml
+
+    all_paths: "${{ inputs | paths }}"
+
+**Returns:** Flattened array of all file paths from FileSet inputs
+
+first_of_type
+-------------
+
+Get the first item of a specific type:
+
+.. code-block:: yaml
+
+    first_fileset: "${{ inputs | first_of_type('std.FileSet') }}"
+
+**Parameters:**
+
+* ``typename`` - Type name to match
+
+**Returns:** First item matching the type, or null if none found
+
+pluck
+-----
+
+Extract a specific field from all items:
+
+.. code-block:: yaml
+
+    all_types: "${{ inputs | pluck('type') }}"
+    all_paths: "${{ inputs | pluck('path') }}"
+
+**Parameters:**
+
+* ``field`` - Field name to extract
+
+**Returns:** Array of field values from all items
+
+count_by_type
+-------------
+
+Count items grouped by type:
+
+.. code-block:: yaml
+
+    type_counts: "${{ inputs | count_by_type }}"
+
+**Returns:** Object with type names as keys and counts as values
+
+Example:
+
+.. code-block:: json
+
+    {
+      "std.FileSet": 3,
+      "std.BuildOutput": 1
+    }
+
+Defining Custom Filters
+========================
+
+You can define custom filters in your package using JQ-style expressions:
+
+.. code-block:: yaml
+
+    package:
+      name: myproject
+      
+      filters:
+        - name: verilog_only
+          export: true
+          expr: |
+            input[]
+        
+        - name: large_files
+          export: true
+          with: [size_kb]
+          expr: |
+            input[] | select(input.size > ($arg0 * 1024))
+
+**Filter Properties:**
+
+* ``name`` - Filter name (required)
+* ``expr`` - JQ-style expression (for expression filters)
+* ``run`` - Shell or Python script (for executable filters)
+* ``with`` - Parameter names (positional, accessed as $arg0, $arg1, etc.)
+* ``export`` - Make filter visible to importing packages (default: false)
+* ``local`` - Hide filter from child packages (default: false)
+
+For detailed filter documentation, see :doc:`filters`.
+
 

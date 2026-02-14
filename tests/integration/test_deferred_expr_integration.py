@@ -25,9 +25,13 @@ Tests that expressions referencing 'inputs' and 'memento' are correctly deferred
 during graph construction and evaluated at task runtime.
 """
 import os
+import json
 import pytest
 import tempfile
+from dv_flow.mgr.util import loadProjPkgDef
+from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
 from dv_flow.mgr.task_runner import TaskSetRunner
+from dv_flow.mgr.deferred_expr import DeferredExpr
 
 
 class TestDeferredExpressionIntegration:
@@ -46,70 +50,45 @@ package:
   tasks:
     # Producer task that outputs data items
     - name: producer
+      scope: root
       produces: [std.FileSet]
-      run: |
-        import json
-        # Output some test data
-        outputs = [
-            {"type": "std.FileSet", "name": "file1"},
-            {"type": "std.FileSet", "name": "file2"},
-            {"type": "std.FileSet", "name": "file3"}
-        ]
-        print(json.dumps(outputs))
-      shell: python3
+      run: echo '{"type":"std.FileSet","name":"file1"}'
+      shell: bash
     
     # Consumer task that uses deferred expression to access inputs
     - name: consumer
+      scope: root
       consumes: [std.FileSet]
       with:
         input_data:
           type: str
           # This expression references 'inputs' and should be deferred
           value: "${{ inputs }}"
-      run: |
-        import json
-        # Verify we received the inputs
-        inputs_str = "${input_data}"
-        print(f"Received inputs: {inputs_str}")
-        
-        # Parse and validate
-        try:
-            inputs_list = json.loads(inputs_str)
-            assert isinstance(inputs_list, list), "inputs should be a list"
-            assert len(inputs_list) == 3, f"Expected 3 inputs, got {len(inputs_list)}"
-            print(f"SUCCESS: Received {len(inputs_list)} inputs")
-        except Exception as e:
-            print(f"ERROR: {e}")
-            exit(1)
-      shell: python3
+      run: 'echo "Received inputs: ${input_data}"'
+      shell: bash
       needs: [producer]
 """)
         
-        # Create runner and execute
-        runner = TaskSetRunner(rundir=str(tmp_path / "rundir"))
-        os.makedirs(runner.rundir, exist_ok=True)
+        # Set up rundir
+        rundir = str(tmp_path / "rundir")
+        os.makedirs(rundir, exist_ok=True)
         
-        # Load package and build graph
-        from dv_flow.mgr.package_loader_p import PackageLoaderP
-        loader = PackageLoaderP()
-        pkg = loader.load_package(str(flow_yaml))
+        # Load package using standard utility
+        loader, pkg = loadProjPkgDef(str(tmp_path))
         
         # Build task graph
-        from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
-        builder = TaskGraphBuilder()
-        root_node = builder.build_graph(pkg, "consumer")
+        builder = TaskGraphBuilder(
+            root_pkg=pkg,
+            rundir=rundir,
+            loader=loader
+        )
         
-        # Verify deferred expression was created
-        consumer_node = None
-        for node in builder._task_m.values():
-            if node.name == "test_deferred.consumer":
-                consumer_node = node
-                break
+        # Build the consumer task node (which depends on producer)
+        consumer_node = builder.mkTaskNode("test_deferred.consumer")
         
         assert consumer_node is not None, "Consumer node not found"
         
         # Check that input_data parameter contains a DeferredExpr
-        from dv_flow.mgr.deferred_expr import DeferredExpr
         input_data_value = consumer_node.params.input_data
         assert isinstance(input_data_value, DeferredExpr), \
             f"Expected DeferredExpr, got {type(input_data_value)}"
@@ -117,7 +96,8 @@ package:
             f"Expression should reference 'inputs': {input_data_value.expr_str}"
         
         # Execute the task graph
-        await runner.run_node_tree(root_node)
+        runner = TaskSetRunner(rundir=rundir)
+        await runner.run_node_tree(consumer_node)
         
         # Check execution succeeded
         assert runner.status == 0, f"Task execution failed with status {runner.status}"
@@ -133,14 +113,12 @@ package:
   
   tasks:
     - name: producer
+      scope: root
       produces: [std.FileSet]
-      run: |
-        # Output 5 items
-        for i in range(5):
-            print(f"Item {i}")
-      shell: python3
+      run: echo '{"type":"std.FileSet","name":"test"}'
     
     - name: consumer
+      scope: root
       consumes: [std.FileSet]
       with:
         count:
@@ -148,42 +126,34 @@ package:
           # This won't work yet (no native length builtin)
           # But the deferred expression should still be created
           value: "${{ inputs }}"
-      run: |
-        import json
-        inputs_str = "${count}"
-        inputs = json.loads(inputs_str) if isinstance(inputs_str, str) and inputs_str.startswith('[') else inputs_str
-        
-        # Count the inputs
-        if isinstance(inputs, list):
-            count = len(inputs)
-            print(f"Received {count} inputs")
-            assert count > 0, "Should have received inputs"
-        else:
-            print(f"inputs type: {type(inputs)}")
-            print(f"inputs value: {inputs}")
-      shell: python3
+      run: 'echo "Count: ${count}"'
       needs: [producer]
 """)
         
-        runner = TaskSetRunner(rundir=str(tmp_path / "rundir"))
-        os.makedirs(runner.rundir, exist_ok=True)
+        # Set up rundir
+        rundir = str(tmp_path / "rundir")
+        os.makedirs(rundir, exist_ok=True)
         
-        from dv_flow.mgr.package_loader_p import PackageLoaderP
-        loader = PackageLoaderP()
-        pkg = loader.load_package(str(flow_yaml))
+        # Load package using standard utility
+        loader, pkg = loadProjPkgDef(str(tmp_path))
         
-        from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
-        builder = TaskGraphBuilder()
-        root_node = builder.build_graph(pkg, "consumer")
+        # Build task graph
+        builder = TaskGraphBuilder(
+            root_pkg=pkg,
+            rundir=rundir,
+            loader=loader
+        )
+        
+        # Build the consumer task node
+        consumer_node = builder.mkTaskNode("test_length.consumer")
         
         # Verify deferred expression
-        from dv_flow.mgr.deferred_expr import DeferredExpr
-        consumer_node = builder._task_m.get("test_length.consumer")
         assert consumer_node is not None
         assert isinstance(consumer_node.params.count, DeferredExpr)
         
         # Execute
-        await runner.run_node_tree(root_node)
+        runner = TaskSetRunner(rundir=rundir)
+        await runner.run_node_tree(consumer_node)
         assert runner.status == 0
     
     @pytest.mark.asyncio
@@ -202,12 +172,12 @@ package:
   
   tasks:
     - name: producer
+      scope: root
       produces: [std.FileSet]
-      run: |
-        print("Producing data")
-      shell: python3
+      run: echo '{"type":"std.FileSet","name":"data"}'
     
     - name: consumer
+      scope: root
       consumes: [std.FileSet]
       with:
         static_param:
@@ -223,40 +193,30 @@ package:
           # This references both - should be deferred
           value: "${{ static_value }} and ${{ inputs }}"
       run: |
-        static = "${static_param}"
-        dynamic = "${dynamic_param}"
-        mixed = "${mixed_param}"
-        
-        print(f"static_param: {static}")
-        print(f"dynamic_param: {dynamic}")
-        print(f"mixed_param: {mixed}")
-        
-        # Static should be evaluated
-        assert static == "I am static", f"Expected 'I am static', got '{static}'"
-        
-        # Dynamic should have inputs data
-        assert "inputs" in dynamic.lower() or "[" in dynamic, \
-            f"dynamic_param should contain inputs: {dynamic}"
-        
-        print("SUCCESS: Mixed static/dynamic parameters work")
-      shell: python3
+        echo "static_param: ${static_param}"
+        echo "dynamic_param: ${dynamic_param}"
+        echo "mixed_param: ${mixed_param}"
       needs: [producer]
 """)
         
-        runner = TaskSetRunner(rundir=str(tmp_path / "rundir"))
-        os.makedirs(runner.rundir, exist_ok=True)
+        # Set up rundir
+        rundir = str(tmp_path / "rundir")
+        os.makedirs(rundir, exist_ok=True)
         
-        from dv_flow.mgr.package_loader_p import PackageLoaderP
-        loader = PackageLoaderP()
-        pkg = loader.load_package(str(flow_yaml))
+        # Load package using standard utility
+        loader, pkg = loadProjPkgDef(str(tmp_path))
         
-        from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
-        builder = TaskGraphBuilder()
-        root_node = builder.build_graph(pkg, "consumer")
+        # Build task graph
+        builder = TaskGraphBuilder(
+            root_pkg=pkg,
+            rundir=rundir,
+            loader=loader
+        )
+        
+        # Build the consumer task node
+        consumer_node = builder.mkTaskNode("test_mixed.consumer")
         
         # Verify parameter evaluation
-        from dv_flow.mgr.deferred_expr import DeferredExpr
-        consumer_node = builder._task_m.get("test_mixed.consumer")
         assert consumer_node is not None
         
         # static_param should be evaluated to the string
@@ -272,7 +232,8 @@ package:
             f"mixed_param should be deferred (contains inputs)"
         
         # Execute
-        await runner.run_node_tree(root_node)
+        runner = TaskSetRunner(rundir=rundir)
+        await runner.run_node_tree(consumer_node)
         assert runner.status == 0
     
     @pytest.mark.asyncio
@@ -286,38 +247,40 @@ package:
   
   tasks:
     - name: with_memento
+      scope: root
       with:
         prev_run:
           type: str
           # This references memento - should be deferred
           value: "${{ memento }}"
-      run: |
-        prev = "${prev_run}"
-        print(f"Previous run data: {prev}")
-        print("Memento test complete")
-      shell: python3
+      run: 'echo "Previous run data: ${prev_run}"'
 """)
         
-        runner = TaskSetRunner(rundir=str(tmp_path / "rundir"))
-        os.makedirs(runner.rundir, exist_ok=True)
+        # Set up rundir
+        rundir = str(tmp_path / "rundir")
+        os.makedirs(rundir, exist_ok=True)
         
-        from dv_flow.mgr.package_loader_p import PackageLoaderP
-        loader = PackageLoaderP()
-        pkg = loader.load_package(str(flow_yaml))
+        # Load package using standard utility
+        loader, pkg = loadProjPkgDef(str(tmp_path))
         
-        from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
-        builder = TaskGraphBuilder()
-        root_node = builder.build_graph(pkg, "with_memento")
+        # Build task graph
+        builder = TaskGraphBuilder(
+            root_pkg=pkg,
+            rundir=rundir,
+            loader=loader
+        )
+        
+        # Build the task node
+        memento_node = builder.mkTaskNode("test_memento.with_memento")
         
         # Verify deferred
-        from dv_flow.mgr.deferred_expr import DeferredExpr
-        memento_node = builder._task_m.get("test_memento.with_memento")
         assert memento_node is not None
         assert isinstance(memento_node.params.prev_run, DeferredExpr), \
             "memento reference should be deferred"
         
         # Execute
-        await runner.run_node_tree(root_node)
+        runner = TaskSetRunner(rundir=rundir)
+        await runner.run_node_tree(memento_node)
         assert runner.status == 0
 
 

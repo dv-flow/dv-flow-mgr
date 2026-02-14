@@ -96,21 +96,21 @@ class TestReferencesRuntimeData:
         parser = ExprParser()
         
         # Simple identifier
-        ast = parser.parse("${{ inputs }}")
+        ast = parser.parse("inputs")
         assert references_runtime_data(ast) is True
         
         # Hierarchical access
-        ast = parser.parse("${{ inputs.field }}")
+        ast = parser.parse("inputs.field")
         assert references_runtime_data(ast) is True
     
     def test_detects_memento_reference(self):
         """Test detection of 'memento' reference"""
         parser = ExprParser()
         
-        ast = parser.parse("${{ memento }}")
+        ast = parser.parse("memento")
         assert references_runtime_data(ast) is True
         
-        ast = parser.parse("${{ memento.cached_value }}")
+        ast = parser.parse("memento.cached_value")
         assert references_runtime_data(ast) is True
     
     def test_no_runtime_reference_for_static_vars(self):
@@ -118,11 +118,11 @@ class TestReferencesRuntimeData:
         parser = ExprParser()
         
         # Static variable
-        ast = parser.parse("${{ my_var }}")
+        ast = parser.parse("my_var")
         assert references_runtime_data(ast) is False
         
         # Hierarchical static var
-        ast = parser.parse("${{ pkg.param.value }}")
+        ast = parser.parse("pkg.param.value")
         assert references_runtime_data(ast) is False
     
     def test_detects_in_binary_expressions(self):
@@ -130,11 +130,11 @@ class TestReferencesRuntimeData:
         parser = ExprParser()
         
         # Arithmetic with inputs
-        ast = parser.parse("${{ inputs + 10 }}")
+        ast = parser.parse("inputs + 10")
         assert references_runtime_data(ast) is True
         
         # Comparison with static
-        ast = parser.parse("${{ my_var > 5 }}")
+        ast = parser.parse("my_var > 5")
         assert references_runtime_data(ast) is False
     
     def test_detects_in_function_calls(self):
@@ -142,18 +142,18 @@ class TestReferencesRuntimeData:
         parser = ExprParser()
         
         # Method call with inputs
-        ast = parser.parse("${{ shell(inputs) }}")
+        ast = parser.parse("shell(inputs)")
         assert references_runtime_data(ast) is True
         
         # Method call without runtime data
-        ast = parser.parse("${{ shell('echo hello') }}")
+        ast = parser.parse("shell('echo hello')")
         assert references_runtime_data(ast) is False
     
     def test_custom_runtime_vars(self):
         """Test detection with custom runtime variable set"""
         parser = ExprParser()
         
-        ast = parser.parse("${{ custom_runtime_var }}")
+        ast = parser.parse("custom_runtime_var")
         
         # Default runtime vars don't include 'custom_runtime_var'
         assert references_runtime_data(ast) is False
@@ -166,11 +166,11 @@ class TestReferencesRuntimeData:
         parser = ExprParser()
         
         # Expression mixing static and runtime
-        ast = parser.parse("${{ static_var + inputs.count }}")
+        ast = parser.parse("static_var + inputs.count")
         assert references_runtime_data(ast) is True
         
         # Pure static expression
-        ast = parser.parse("${{ var1 + var2 * 3 }}")
+        ast = parser.parse("var1 + var2 * 3")
         assert references_runtime_data(ast) is False
 
 

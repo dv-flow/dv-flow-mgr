@@ -2,9 +2,9 @@
 
 import pytest
 import json
-from src.dv_flow.mgr.expr_eval import ExprEval
-from src.dv_flow.mgr.filter_def import FilterDef
-from src.dv_flow.mgr.filter_registry import FilterRegistry
+from dv_flow.mgr.expr_eval import ExprEval
+from dv_flow.mgr.filter_def import FilterDef
+from dv_flow.mgr.filter_registry import FilterRegistry
 
 
 class TestBasicFilterEvaluation:
