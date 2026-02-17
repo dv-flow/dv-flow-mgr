@@ -578,10 +578,88 @@ Parameter Evaluation
         - type: std.FileSet
           filetype: "${{ params.output_type }}"
 
+Filtering Inputs
+================
+
+When a task consumes data from multiple producers, you can use **filters** to
+transform or select specific items from the inputs.
+
+Basic Filtering
+---------------
+
+Use the pipe operator ``|`` to apply filters to inputs:
+
+.. code-block:: yaml
+
+    tasks:
+      - name: compile_sv
+        scope: root
+        needs: [find_sources]
+        consumes: [std.FileSet]
+        with:
+          sv_files:
+            value: "${{ inputs | by_filetype('.sv') }}"
+        run: |
+          for file in ${sv_files}; do
+            echo "Compiling $file"
+          done
+        shell: bash
+
+The ``by_filetype`` filter selects only files with the ``.sv`` extension from
+the ``inputs`` array.
+
+Chaining Filters
+----------------
+
+Chain multiple filters for complex transformations:
+
+.. code-block:: yaml
+
+    # Extract just filenames without paths
+    basenames: "${{ inputs | by_filetype('.v') | basenames }}"
+    
+    # Get unique file extensions
+    extensions: "${{ inputs | extensions | unique | sort }}"
+    
+    # Count items by type
+    counts: "${{ inputs | count_by_type }}"
+
+Standard Filters
+----------------
+
+The standard library provides common filters:
+
+* ``by_filetype(ext)`` - Filter files by extension
+* ``by_type(typename)`` - Filter by data type
+* ``basenames`` - Extract basenames from paths
+* ``extensions`` - Extract file extensions
+* ``paths`` - Get all paths from FileSet items
+* ``first_of_type(typename)`` - Get first item of type
+* ``pluck(field)`` - Extract field values from objects
+* ``count_by_type`` - Count items grouped by type
+
+For complete filter documentation, see :doc:`filters`.
+
+Custom Filters
+--------------
+
+Define custom filters in your package:
+
+.. code-block:: yaml
+
+    filters:
+      - name: verilog_only
+        export: true
+        expr: |
+          input[] | select(input.path | split(".") | last | . == "v" or . == "sv")
+
+See :doc:`filters` for details on defining and using custom filters.
+
 See Also
 ========
 
 * :doc:`tasks_using` - Using and customizing tasks
 * :doc:`tasks_developing` - Creating new tasks
 * :doc:`expressions` - Parameter and expression syntax
+* :doc:`filters` - Filter reference and custom filter creation
 * :doc:`../cmdref` - Command reference for validate and show

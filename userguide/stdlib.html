@@ -501,6 +501,132 @@ the expected result or when result parsing fails.</p>
 Contributions are welcome!</p>
 </section>
 </section>
+<section id="standard-filters">
+<h2>Standard Filters<a class="headerlink" href="#standard-filters" title="Link to this heading">¶</a></h2>
+<p>The standard library provides filters for transforming and selecting data in
+expressions. Filters are used with the pipe operator <code class="docutils literal notranslate"><span class="pre">|</span></code> to process inputs
+or other data.</p>
+<section id="by-filetype">
+<h3>by_filetype<a class="headerlink" href="#by-filetype" title="Link to this heading">¶</a></h3>
+<p>Filter files by extension:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">sv_files</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.sv&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">verilog_files</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.v&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ext</span></code> - File extension to match (including the dot)</p></li>
+</ul>
+<p><strong>Returns:</strong> Array of items where <code class="docutils literal notranslate"><span class="pre">path</span></code> ends with the specified extension</p>
+</section>
+<section id="by-type">
+<h3>by_type<a class="headerlink" href="#by-type" title="Link to this heading">¶</a></h3>
+<p>Filter items by data type:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filesets</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_type(&#39;std.FileSet&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">build_outputs</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_type(&#39;std.BuildOutput&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">typename</span></code> - Type name to match (e.g., “std.FileSet”)</p></li>
+</ul>
+<p><strong>Returns:</strong> Array of items where <code class="docutils literal notranslate"><span class="pre">type</span></code> matches the specified typename</p>
+</section>
+<section id="basenames">
+<h3>basenames<a class="headerlink" href="#basenames" title="Link to this heading">¶</a></h3>
+<p>Extract base filenames from paths:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">names</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">paths</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">basenames</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Returns:</strong> Array of filenames without directory paths</p>
+</section>
+<section id="extensions">
+<h3>extensions<a class="headerlink" href="#extensions" title="Link to this heading">¶</a></h3>
+<p>Extract file extensions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">exts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">paths</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">extensions</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Returns:</strong> Array of file extensions (including the dot)</p>
+</section>
+<section id="paths">
+<h3>paths<a class="headerlink" href="#paths" title="Link to this heading">¶</a></h3>
+<p>Extract all paths from FileSet items:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">all_paths</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">paths</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Returns:</strong> Flattened array of all file paths from FileSet inputs</p>
+</section>
+<section id="first-of-type">
+<h3>first_of_type<a class="headerlink" href="#first-of-type" title="Link to this heading">¶</a></h3>
+<p>Get the first item of a specific type:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">first_fileset</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">first_of_type(&#39;std.FileSet&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">typename</span></code> - Type name to match</p></li>
+</ul>
+<p><strong>Returns:</strong> First item matching the type, or null if none found</p>
+</section>
+<section id="pluck">
+<h3>pluck<a class="headerlink" href="#pluck" title="Link to this heading">¶</a></h3>
+<p>Extract a specific field from all items:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">all_types</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">pluck(&#39;type&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">all_paths</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">pluck(&#39;path&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">field</span></code> - Field name to extract</p></li>
+</ul>
+<p><strong>Returns:</strong> Array of field values from all items</p>
+</section>
+<section id="count-by-type">
+<h3>count_by_type<a class="headerlink" href="#count-by-type" title="Link to this heading">¶</a></h3>
+<p>Count items grouped by type:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">type_counts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">count_by_type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p><strong>Returns:</strong> Object with type names as keys and counts as values</p>
+<p>Example:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;std.FileSet&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;std.BuildOutput&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="defining-custom-filters">
+<h2>Defining Custom Filters<a class="headerlink" href="#defining-custom-filters" title="Link to this heading">¶</a></h2>
+<p>You can define custom filters in your package using JQ-style expressions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myproject</span>
+
+<span class="w">  </span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog_only</span>
+<span class="w">      </span><span class="nt">export</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">input[]</span>
+
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">large_files</span>
+<span class="w">      </span><span class="nt">export</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">size_kb</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">input[] | select(input.size &gt; ($arg0 * 1024))</span>
+</pre></div>
+</div>
+<p><strong>Filter Properties:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - Filter name (required)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">expr</span></code> - JQ-style expression (for expression filters)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">run</span></code> - Shell or Python script (for executable filters)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">with</span></code> - Parameter names (positional, accessed as $arg0, $arg1, etc.)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">export</span></code> - Make filter visible to importing packages (default: false)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">local</span></code> - Hide filter from child packages (default: false)</p></li>
+</ul>
+<p>For detailed filter documentation, see <a class="reference internal" href="filters.html"><span class="doc">Filters</span></a>.</p>
+</section>
 </section>
 
 
@@ -542,6 +668,7 @@ Contributions are welcome!</p>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>

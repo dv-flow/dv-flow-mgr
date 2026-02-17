@@ -554,12 +554,80 @@ $<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>
 </div>
 </section>
 </section>
+<section id="filtering-inputs">
+<h2>Filtering Inputs<a class="headerlink" href="#filtering-inputs" title="Link to this heading">¶</a></h2>
+<p>When a task consumes data from multiple producers, you can use <strong>filters</strong> to
+transform or select specific items from the inputs.</p>
+<section id="basic-filtering">
+<h3>Basic Filtering<a class="headerlink" href="#basic-filtering" title="Link to this heading">¶</a></h3>
+<p>Use the pipe operator <code class="docutils literal notranslate"><span class="pre">|</span></code> to apply filters to inputs:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile_sv</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">find_sources</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">sv_files</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.sv&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">for file in ${sv_files}; do</span>
+<span class="w">        </span><span class="no">echo &quot;Compiling $file&quot;</span>
+<span class="w">      </span><span class="no">done</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">by_filetype</span></code> filter selects only files with the <code class="docutils literal notranslate"><span class="pre">.sv</span></code> extension from
+the <code class="docutils literal notranslate"><span class="pre">inputs</span></code> array.</p>
+</section>
+<section id="chaining-filters">
+<h3>Chaining Filters<a class="headerlink" href="#chaining-filters" title="Link to this heading">¶</a></h3>
+<p>Chain multiple filters for complex transformations:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extract just filenames without paths</span>
+<span class="nt">basenames</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.v&#39;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">basenames</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Get unique file extensions</span>
+<span class="nt">extensions</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">extensions</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Count items by type</span>
+<span class="nt">counts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">count_by_type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="standard-filters">
+<h3>Standard Filters<a class="headerlink" href="#standard-filters" title="Link to this heading">¶</a></h3>
+<p>The standard library provides common filters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">by_filetype(ext)</span></code> - Filter files by extension</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">by_type(typename)</span></code> - Filter by data type</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">basenames</span></code> - Extract basenames from paths</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">extensions</span></code> - Extract file extensions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">paths</span></code> - Get all paths from FileSet items</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">first_of_type(typename)</span></code> - Get first item of type</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pluck(field)</span></code> - Extract field values from objects</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">count_by_type</span></code> - Count items grouped by type</p></li>
+</ul>
+<p>For complete filter documentation, see <a class="reference internal" href="filters.html"><span class="doc">Filters</span></a>.</p>
+</section>
+<section id="custom-filters">
+<h3>Custom Filters<a class="headerlink" href="#custom-filters" title="Link to this heading">¶</a></h3>
+<p>Define custom filters in your package:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog_only</span>
+<span class="w">    </span><span class="nt">export</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">input[] | select(input.path | split(&quot;.&quot;) | last | . == &quot;v&quot; or . == &quot;sv&quot;)</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="filters.html"><span class="doc">Filters</span></a> for details on defining and using custom filters.</p>
+</section>
+</section>
 <section id="see-also">
 <h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="tasks_using.html"><span class="doc">Using Tasks</span></a> - Using and customizing tasks</p></li>
 <li><p><a class="reference internal" href="tasks_developing.html"><span class="doc">Developing Tasks</span></a> - Creating new tasks</p></li>
 <li><p><a class="reference internal" href="expressions.html"><span class="doc">Expressions</span></a> - Parameter and expression syntax</p></li>
+<li><p><a class="reference internal" href="filters.html"><span class="doc">Filters</span></a> - Filter reference and custom filter creation</p></li>
 <li><p><a class="reference internal" href="../cmdref.html"><span class="doc">Command reference</span></a> - Command reference for validate and show</p></li>
 </ul>
 </section>
@@ -604,6 +672,7 @@ $<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>

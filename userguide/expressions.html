@@ -14,7 +14,7 @@
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Advanced Features" href="advanced_features.html" />
+    <link rel="next" title="Filters" href="filters.html" />
     <link rel="prev" title="Parameters and Configuration" href="configuration.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -307,6 +307,130 @@ task graph elaboration, before any task execution begins.</p>
 <li><p>Dependencies are properly evaluated</p></li>
 </ul>
 </section>
+<section id="runtime-expressions">
+<h2>Runtime Expressions<a class="headerlink" href="#runtime-expressions" title="Link to this heading">¶</a></h2>
+<p>Expressions can reference runtime data from task dependencies using special variables:</p>
+<ul class="simple">
+<li><p><strong>inputs</strong> - Outputs from dependency tasks (available at task runtime)</p></li>
+<li><p><strong>memento</strong> - Cached data from previous run (for incremental builds)</p></li>
+</ul>
+<p>These expressions are automatically <strong>deferred</strong> during graph construction and evaluated
+when the task executes.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">producer</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">produces</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &#39;{&quot;type&quot;:&quot;std.FileSet&quot;,&quot;files&quot;:[&quot;a.sv&quot;,&quot;b.sv&quot;]}&#39;</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">consumer</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">producer</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">file_count</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">length</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &quot;Received ${file_count} inputs&quot;</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</pre></div>
+</div>
+<p>The expression <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">|</span> <span class="pre">length</span> <span class="pre">}}</span></code> cannot be evaluated during graph construction
+(inputs aren’t known yet), so it’s stored as a <strong>deferred expression</strong> and evaluated
+when <code class="docutils literal notranslate"><span class="pre">consumer</span></code> runs, after <code class="docutils literal notranslate"><span class="pre">producer</span></code> completes.</p>
+<section id="variable-references">
+<h3>Variable References<a class="headerlink" href="#variable-references" title="Link to this heading">¶</a></h3>
+<p>Variables can be referenced using the <code class="docutils literal notranslate"><span class="pre">$</span></code> prefix for explicit variable references:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">result</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">$threshold</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">2</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>This is particularly useful when working with filter parameters.</p>
+</section>
+<section id="array-and-object-operations">
+<h3>Array and Object Operations<a class="headerlink" href="#array-and-object-operations" title="Link to this heading">¶</a></h3>
+<p>Access array and object elements using indexing:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Array indexing</span>
+<span class="nt">first_item</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[0]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">second_item</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[1]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array slicing</span>
+<span class="nt">first_three</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[:3]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">from_third</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[2:]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">middle</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[2:5]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Object field access</span>
+<span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">config.settings.timeout</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">by_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data[&#39;key_name&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array iteration</span>
+<span class="nt">all_items</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items[]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="jq-style-builtins">
+<h3>JQ-Style Builtins<a class="headerlink" href="#jq-style-builtins" title="Link to this heading">¶</a></h3>
+<p>Expressions support JQ-style builtin functions for data transformation using
+the pipe operator <code class="docutils literal notranslate"><span class="pre">|</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># String operations</span>
+<span class="nt">parts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">basename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">extension</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">filename</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;.\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array operations</span>
+<span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">length</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">sorted</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">values</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">unique_vals</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">reversed</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">list</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">reverse</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">first_val</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">first</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">last_val</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Type checking</span>
+<span class="nt">item_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Available builtins:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">length</span></code> - Get length of array/object/string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">keys</span></code> - Get keys of object</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">values</span></code> - Get values of object</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sort</span></code> - Sort array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unique</span></code> - Remove duplicates from array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reverse</span></code> - Reverse array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">first</span></code> - Get first element</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">last</span></code> - Get last element</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">flatten</span></code> - Flatten nested arrays</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span></code> - Get type name (“array”, “object”, “string”, “number”, “boolean”, “null”)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">split(sep)</span></code> - Split string by separator</p></li>
+</ul>
+</section>
+<section id="chaining-operations">
+<h3>Chaining Operations<a class="headerlink" href="#chaining-operations" title="Link to this heading">¶</a></h3>
+<p>Chain multiple operations using the pipe operator:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Multiple builtins</span>
+<span class="nt">result</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">reverse</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Indexing with builtins</span>
+<span class="nt">last_unique</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Complex pipeline</span>
+<span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">full_path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
 <section id="limitations">
 <h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">¶</a></h2>
 <p>Expressions have some limitations to maintain safety and predictability:</p>
@@ -314,7 +438,11 @@ task graph elaboration, before any task execution begins.</p>
 <li><p><strong>No side effects</strong>: Expressions cannot modify state</p></li>
 <li><p><strong>No I/O</strong>: Cannot read files or access network</p></li>
 <li><p><strong>No arbitrary code</strong>: Limited to safe expression subset</p></li>
-<li><p><strong>Static evaluation</strong>: Cannot depend on runtime task data</p></li>
+</ul>
+<p><strong>Evaluation Phases:</strong></p>
+<ul class="simple">
+<li><p><strong>Static evaluation</strong>: Most expressions evaluated during graph construction</p></li>
+<li><p><strong>Runtime evaluation</strong>: Expressions referencing <code class="docutils literal notranslate"><span class="pre">inputs</span></code> or <code class="docutils literal notranslate"><span class="pre">memento</span></code> deferred until task execution</p></li>
 </ul>
 <p>These limitations ensure that:</p>
 <ul class="simple">
@@ -490,6 +618,7 @@ task graph elaboration, before any task execution begins.</p>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l2"><a class="reference internal" href="advanced_features.html">Advanced Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
@@ -511,7 +640,7 @@ task graph elaboration, before any task execution begins.</p>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
       <li>Previous: <a href="configuration.html" title="previous chapter">Parameters and Configuration</a></li>
-      <li>Next: <a href="advanced_features.html" title="next chapter">Advanced Features</a></li>
+      <li>Next: <a href="filters.html" title="next chapter">Filters</a></li>
   </ul></li>
   </ul></li>
 </ul>
