@@ -1,11 +1,45 @@
 import os
+import sys
 import asyncio
 import pytest
 from dv_flow.mgr import TaskGraphBuilder, PackageLoader
 from dv_flow.mgr.task_runner import TaskSetRunner
 from dv_flow.mgr.task_listener_log import TaskListenerLog
+from dv_flow.mgr.ext_rgy import ExtRgy
 from .task_listener_test import TaskListenerTest
 from .marker_collector import MarkerCollector
+
+
+@pytest.fixture(autouse=True)
+def reset_extrgy():
+    """Reset the ExtRgy singleton, sys.modules, sys.path, and MAKEFLAGS before each test to prevent state leakage"""
+    # Save original sys.modules keys and sys.path
+    original_modules = set(sys.modules.keys())
+    original_path = sys.path.copy()
+    
+    # Clear MAKEFLAGS to avoid jobserver issues - don't save/restore it
+    # because the jobserver FIFO may not exist anymore
+    if 'MAKEFLAGS' in os.environ:
+        del os.environ['MAKEFLAGS']
+    
+    # Reset the singleton instance
+    ExtRgy._inst = None
+    yield
+    # Clean up after test
+    ExtRgy._inst = None
+    
+    # Remove any modules that were added during the test
+    added_modules = set(sys.modules.keys()) - original_modules
+    for mod_name in added_modules:
+        del sys.modules[mod_name]
+    
+    # Restore sys.path
+    sys.path[:] = original_path
+    
+    # Clear MAKEFLAGS again after test to prevent FIFO references from leaking
+    if 'MAKEFLAGS' in os.environ:
+        del os.environ['MAKEFLAGS']
+
 
 def test_smoke(tmpdir):
     flow_dv = """

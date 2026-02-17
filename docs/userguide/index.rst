@@ -14,6 +14,7 @@ User Guide
    incremental
    configuration
    expressions
+   filters
    advanced_features
    stdlib
    llm_integration

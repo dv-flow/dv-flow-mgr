@@ -13,6 +13,8 @@ from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
 from .param import Param
 from . import cache_util
+from .deferred_expr import DeferredExpr
+from .expr_eval import ExprEval
 
 @dc.dataclass
 class TaskNodeLeaf(TaskNode):
@@ -331,12 +333,18 @@ class TaskNodeLeaf(TaskNode):
 
     async def _run_task(self, runner, rundir, inputs, changed, memento):
         """Actually execute the task"""
+        
+        # Evaluate any deferred expressions in params with runtime context
+        params = self.params
+        if params is not None:
+            params = self._evaluate_deferred_params(params, inputs, memento)
+        
         input = TaskDataInput(
             name=self.name,
             changed=changed,
             srcdir=self.srcdir,
             rundir=rundir,
-            params=self.params,
+            params=params,
             inputs=inputs,
             memento=memento)
         
@@ -605,3 +613,68 @@ class TaskNodeLeaf(TaskNode):
 
     def __hash__(self):
         return id(self)
+
+    def _evaluate_deferred_params(self, params, inputs, memento):
+        """
+        Evaluate any DeferredExpr instances in params with runtime context.
+        
+        Args:
+            params: Parameter object (may contain DeferredExpr instances)
+            inputs: List of input data items from dependencies
+            memento: Cached data from previous run
+            
+        Returns:
+            New parameter object with deferred expressions evaluated
+        """
+        # Create evaluator with runtime context
+        evaluator = ExprEval()
+        runtime_context = {
+            'inputs': inputs,
+            'memento': memento
+        }
+        
+        # Check if params object has any deferred expressions
+        has_deferred = False
+        for field_name in type(params).model_fields.keys():
+            value = getattr(params, field_name)
+            if self._has_deferred_expr(value):
+                has_deferred = True
+                break
+        
+        if not has_deferred:
+            # No deferred expressions, return params unchanged
+            return params
+        
+        # Clone params and evaluate deferred expressions
+        params_dict = {}
+        for field_name in type(params).model_fields.keys():
+            value = getattr(params, field_name)
+            params_dict[field_name] = self._eval_deferred_value(value, evaluator, runtime_context)
+        
+        # Create new params object with evaluated values
+        params_type = type(params)
+        return params_type(**params_dict)
+    
+    def _has_deferred_expr(self, value):
+        """Check if value contains any DeferredExpr instances"""
+        if isinstance(value, DeferredExpr):
+            return True
+        elif isinstance(value, list):
+            return any(self._has_deferred_expr(v) for v in value)
+        elif isinstance(value, dict):
+            return any(self._has_deferred_expr(v) for v in value.values())
+        return False
+    
+    def _eval_deferred_value(self, value, evaluator, runtime_context):
+        """Recursively evaluate DeferredExpr instances in a value"""
+        if isinstance(value, DeferredExpr):
+            # Evaluate the deferred expression
+            result = value.evaluate(evaluator, runtime_context)
+            self._log.debug(f"Evaluated deferred expression: {value.expr_str} => {result}")
+            return result
+        elif isinstance(value, list):
+            return [self._eval_deferred_value(v, evaluator, runtime_context) for v in value]
+        elif isinstance(value, dict):
+            return {k: self._eval_deferred_value(v, evaluator, runtime_context) for k, v in value.items()}
+        else:
+            return value

@@ -4,6 +4,8 @@ import subprocess
 import os
 import sys
 
+@pytest.mark.slow
+@pytest.mark.performance
 def test_parallel_task_launch_delay(tmpdir):
     """Measure launch delay between parallel tasks."""
     nproc = int(subprocess.check_output(["nproc"]).decode().strip())
@@ -122,6 +124,8 @@ package:
     assert len(start_times) == num_tasks, f"Expected {num_tasks} tasks, got {len(start_times)}"
 
 
+@pytest.mark.slow
+@pytest.mark.performance
 def test_parallel_task_launch_scaled(tmpdir):
     """Measure launch delay with scaled up task count."""
     nproc = int(subprocess.check_output(["nproc"]).decode().strip())
