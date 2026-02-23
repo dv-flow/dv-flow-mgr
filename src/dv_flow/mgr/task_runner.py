@@ -55,6 +55,10 @@ class TaskRunner(object):
     def __post_init__(self):
         if self.env is None:
             self.env = os.environ.copy()
+        # Do not propagate MAKEFLAGS to task child processes; the jobserver
+        # manages concurrency internally and leaking MAKEFLAGS can confuse
+        # sub-makes or other tools that honour it.
+        self.env.pop('MAKEFLAGS', None)
 
     def enter(self):
         for l in self.listeners:
