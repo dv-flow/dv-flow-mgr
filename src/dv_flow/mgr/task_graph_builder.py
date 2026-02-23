@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import os
+import re
 import dataclasses as dc
 import logging
 import pydantic
@@ -1249,17 +1250,33 @@ class TaskGraphBuilder(object):
             new_val = self._convertValueToType(new_val, expected_type)
             setattr(params, name, new_val)
 
+
+    _TMPL_EXPR_RE = re.compile(r'\$\{\{\s*(.*?)\s*\}\}')
+
+    def _check_runtime_ref(self, text):
+        """Extract expressions from ${{ }} delimiters, parse each, and
+        check whether any references runtime data (inputs, memento).
+        Returns (True, ast) for the first match, or (False, None)."""
+        parser = ExprParser()
+        for m in self._TMPL_EXPR_RE.finditer(text):
+            try:
+                ast = parser.parse(m.group(1))
+                if ast and references_runtime_data(ast):
+                    return True, ast
+            except:
+                pass
+        return False, None
+
     def _expandParam(self, value, eval):
         new_val = value
         if type(value) == str:
             if value.find("${{") != -1:
                 # Parse the expression to check for runtime references
-                parser = ExprParser()
                 try:
-                    ast = parser.parse(value)
+                    is_runtime, ast = self._check_runtime_ref(value)
                     
                     # Check if expression references runtime data (inputs, memento)
-                    if references_runtime_data(ast):
+                    if is_runtime:
                         # Capture static context for deferred evaluation
                         static_context = {}
                         if len(self._name_resolution_stack) > 0:
@@ -1290,10 +1307,9 @@ class TaskGraphBuilder(object):
                 if isinstance(elem, str):
                     if elem.find("${{") != -1:
                         # Check for runtime references
-                        parser = ExprParser()
                         try:
-                            ast = parser.parse(elem)
-                            if references_runtime_data(ast):
+                            is_runtime, ast = self._check_runtime_ref(elem)
+                            if is_runtime:
                                 # Handle both ExprEval and ParamRefEval
                                 if hasattr(eval, 'variables'):
                                     static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
@@ -1317,10 +1333,9 @@ class TaskGraphBuilder(object):
                         if isinstance(v, str):
                             if v.find("${{") != -1:
                                 # Check for runtime references
-                                parser = ExprParser()
                                 try:
-                                    ast = parser.parse(v)
-                                    if references_runtime_data(ast):
+                                    is_runtime, ast = self._check_runtime_ref(v)
+                                    if is_runtime:
                                         # Handle both ExprEval and ParamRefEval
                                         if hasattr(eval, 'variables'):
                                             static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
@@ -1349,10 +1364,9 @@ class TaskGraphBuilder(object):
                 if isinstance(v, str):
                     if v.find("${{") != -1:
                         # Check for runtime references
-                        parser = ExprParser()
                         try:
-                            ast = parser.parse(v)
-                            if references_runtime_data(ast):
+                            is_runtime, ast = self._check_runtime_ref(v)
+                            if is_runtime:
                                 # Handle both ExprEval and ParamRefEval
                                 if hasattr(eval, 'variables'):
                                     static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}

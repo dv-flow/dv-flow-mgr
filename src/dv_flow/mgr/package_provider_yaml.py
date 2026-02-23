@@ -1635,12 +1635,7 @@ class PackageProviderYaml(PackageProvider):
             if task.param_defs:
                 for pname, param_def in task.param_defs.definitions.items():
                     value = param_def.value
-                    # Evaluate if it has template expressions
-                    if isinstance(value, str) and "${{" in value:
-                        try:
-                            value = loader.evalExpr(value)
-                        except:
-                            pass  # Keep original if evaluation fails
+                    value = self._evalParamValue(loader, value)
                     this_vars[pname] = value
                     # Also make available as top-level variable
                     loader._eval.set(pname, value)
@@ -1653,12 +1648,7 @@ class PackageProviderYaml(PackageProvider):
             if st.param_defs:
                 for pname, param_def in st.param_defs.definitions.items():
                     value = param_def.value
-                    # Evaluate if it has template expressions
-                    if isinstance(value, str) and "${{" in value:
-                        try:
-                            value = loader.evalExpr(value)
-                        except:
-                            pass  # Keep original if evaluation fails
+                    value = self._evalParamValue(loader, value)
                     subtask_vars[pname] = value
                     # Make available as top-level variable for run command
                     loader._eval.set(pname, value)
@@ -1866,3 +1856,30 @@ class PackageProviderYaml(PackageProvider):
                 tag_instance.paramT = pydantic.create_model(typename, **field_m)()
         
         return tag_instance
+
+    def _evalParamValue(self, loader, value):
+        """Expand ${{ }} template references in a parameter value.
+
+        Handles str, list, and dict types -- mirroring the top-level
+        parameter expansion at ~line 1109.
+        """
+        if isinstance(value, list):
+            for i in range(len(value)):
+                if isinstance(value[i], str) and "${{" in value[i]:
+                    try:
+                        value[i] = loader.evalExpr(value[i])
+                    except:
+                        pass
+        elif isinstance(value, dict):
+            for k in value:
+                if isinstance(value[k], str) and "${{" in value[k]:
+                    try:
+                        value[k] = loader.evalExpr(value[k])
+                    except:
+                        pass
+        elif isinstance(value, str) and "${{" in value:
+            try:
+                value = loader.evalExpr(value)
+            except:
+                pass
+        return value
