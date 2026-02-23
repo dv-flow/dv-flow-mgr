@@ -46,6 +46,9 @@ from .data_callable import DataCallable
 from .exec_callable import ExecCallable
 from .null_callable import NullCallable
 from .shell_callable import ShellCallable
+from .deferred_expr import DeferredExpr, references_runtime_data
+from .expr_parser import ExprParser
+from .filter_registry import FilterRegistry
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -87,6 +90,7 @@ class TaskGraphBuilder(object):
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
+    _filter_registry : FilterRegistry = dc.field(default_factory=FilterRegistry)
 
     _log : logging.Logger = None
 
@@ -162,6 +166,18 @@ class TaskGraphBuilder(object):
         setattr(params, name, value)
 
     def _addPackageTasks(self, pkg, pkg_s):
+        # Register filters from this package
+        if hasattr(pkg, 'filters') and pkg.filters:
+            # Get list of imported package names
+            imports = [imp if isinstance(imp, str) else imp.package for imp in (pkg.imports or [])]
+            self._filter_registry.register_package_filters(pkg.name, pkg.filters, imports)
+            self._log.debug(f"Registered {len(pkg.filters)} filters from package '{pkg.name}'")
+        
+        # Set root package for visibility checks
+        if self.root_pkg and pkg.name == self.root_pkg.name:
+            self._filter_registry.set_root_package(pkg.name)
+        
+        self._log.debug("--> _addPackageTasks: %s" % pkg.name)
 
         self._pkg_m[pkg.name] = pkg
 
@@ -546,7 +562,10 @@ class TaskGraphBuilder(object):
 
         # Determine how to build this node
         if iff:
-            if task.strategy is not None:
+            if hasattr(task, 'control') and task.control is not None:
+                # Runtime control flow construct
+                ret = self._buildControlNode(task, name, srcdir, params, hierarchical, eval)
+            elif task.strategy is not None:
                 ret = self._applyStrategy(task, name, srcdir, params, hierarchical, eval)
             else:
                 if self._isCompound(task):
@@ -600,6 +619,96 @@ class TaskGraphBuilder(object):
             self._task_rundir_s.pop()
 
         return ret        
+    
+    def _buildControlNode(self, task, name, srcdir, params, hierarchical, eval):
+        """
+        Build a runtime control flow node (if, while, do-while, repeat, match).
+        
+        Args:
+            task: TaskDef with control field
+            name: Task name
+            srcdir: Source directory
+            params: Parameters
+            hierarchical: Whether to use hierarchical rundir
+            eval: ExprEval instance
+            
+        Returns:
+            TaskNodeControl subclass instance
+        """
+        from .task_node_if import TaskNodeIf
+        from .task_node_do_while import TaskNodeDoWhile
+        from .task_node_while import TaskNodeWhile
+        from .task_node_repeat import TaskNodeRepeat
+        from .task_node_match import TaskNodeMatch
+        
+        self._log.debug(f"--> _buildControlNode {task.name}, type={task.control.type}")
+        
+        if name is None:
+            name = task.name or task.root or task.export
+        
+        if srcdir is None and task.srcinfo:
+            srcdir = os.path.dirname(task.srcinfo.file)
+        
+        # Build parameters if needed
+        if params is None:
+            if task.paramT is None:
+                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    param_builder = ParamBuilder(eval or self._eval)
+                    task.paramT = param_builder.build_param_type(task)
+            params = task.paramT() if task.paramT else None
+        
+        # Create the appropriate control node type
+        if task.control.type == 'if':
+            node = TaskNodeIf(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body,
+                else_tasks=task.control.else_body
+            )
+        elif task.control.type == 'match':
+            node = TaskNodeMatch(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=[]  # Match uses cases, not body
+            )
+        elif task.control.type == 'while':
+            node = TaskNodeWhile(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        elif task.control.type == 'do-while':
+            node = TaskNodeDoWhile(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        elif task.control.type == 'repeat':
+            node = TaskNodeRepeat(
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                ctxt=self._ctxt,
+                control_def=task.control,
+                body_tasks=task.body
+            )
+        else:
+            raise NotImplementedError(f"Control type '{task.control.type}' not yet implemented")
+        
+        self._log.debug(f"<-- _buildControlNode {task.name}")
+        return node
     
     def _applyStrategy(self, task, name, srcdir, params, hierarchical, eval):
         self._log.debug("--> _applyStrategy %s" % task.name)
@@ -1144,6 +1253,33 @@ class TaskGraphBuilder(object):
         new_val = value
         if type(value) == str:
             if value.find("${{") != -1:
+                # Parse the expression to check for runtime references
+                parser = ExprParser()
+                try:
+                    ast = parser.parse(value)
+                    
+                    # Check if expression references runtime data (inputs, memento)
+                    if references_runtime_data(ast):
+                        # Capture static context for deferred evaluation
+                        static_context = {}
+                        if len(self._name_resolution_stack) > 0:
+                            # Capture current variable context
+                            # Note: This is a shallow copy; variables should be immutable
+                            # ParamRefEval has expr_eval.variables, not variables directly
+                            if hasattr(eval, 'variables'):
+                                static_context = dict(eval.variables)
+                            elif hasattr(eval, 'expr_eval'):
+                                static_context = dict(eval.expr_eval.variables)
+                        
+                        # Create deferred expression for runtime evaluation
+                        self._log.debug("Param: Deferring expression \"%s\" (references runtime data)" % value)
+                        return DeferredExpr(value, ast, static_context)
+                    
+                except Exception as e:
+                    # If parsing fails, fall through to normal evaluation
+                    self._log.debug("Failed to parse expression for deferred check: %s" % e)
+                
+                # Normal static evaluation
                 if len(self._name_resolution_stack) > 0:
                     eval.set_name_resolution(self._name_resolution_stack[-1])
                 new_val = eval.eval(value)
@@ -1153,6 +1289,23 @@ class TaskGraphBuilder(object):
             for i,elem in enumerate(value):
                 if isinstance(elem, str):
                     if elem.find("${{") != -1:
+                        # Check for runtime references
+                        parser = ExprParser()
+                        try:
+                            ast = parser.parse(elem)
+                            if references_runtime_data(ast):
+                                # Handle both ExprEval and ParamRefEval
+                                if hasattr(eval, 'variables'):
+                                    static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                elif hasattr(eval, 'expr_eval'):
+                                    static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                else:
+                                    static_context = {}
+                                new_val.append(DeferredExpr(elem, ast, static_context))
+                                continue
+                        except:
+                            pass  # Fall through to normal evaluation
+                        
                         if len(self._name_resolution_stack) > 0:
                             eval.set_name_resolution(self._name_resolution_stack[-1])
                         resolved = eval.eval(elem)
@@ -1163,6 +1316,23 @@ class TaskGraphBuilder(object):
                     for k, v in elem.items():
                         if isinstance(v, str):
                             if v.find("${{") != -1:
+                                # Check for runtime references
+                                parser = ExprParser()
+                                try:
+                                    ast = parser.parse(v)
+                                    if references_runtime_data(ast):
+                                        # Handle both ExprEval and ParamRefEval
+                                        if hasattr(eval, 'variables'):
+                                            static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        elif hasattr(eval, 'expr_eval'):
+                                            static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                        else:
+                                            static_context = {}
+                                        new_val.append({k: DeferredExpr(v, ast, static_context)})
+                                        continue
+                                except:
+                                    pass
+                                
                                 if len(self._name_resolution_stack) > 0:
                                     eval.set_name_resolution(self._name_resolution_stack[-1])
                                 resolved = eval.eval(v)
@@ -1171,11 +1341,30 @@ class TaskGraphBuilder(object):
                                 new_val.append({k: v})
                         else:
                             new_val.append(elem)
+                else:
+                    new_val.append(elem)
         elif isinstance(value, dict):
             new_val = {}
             for k, v in value.items():
                 if isinstance(v, str):
                     if v.find("${{") != -1:
+                        # Check for runtime references
+                        parser = ExprParser()
+                        try:
+                            ast = parser.parse(v)
+                            if references_runtime_data(ast):
+                                # Handle both ExprEval and ParamRefEval
+                                if hasattr(eval, 'variables'):
+                                    static_context = dict(eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                elif hasattr(eval, 'expr_eval'):
+                                    static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
+                                else:
+                                    static_context = {}
+                                new_val[k] = DeferredExpr(v, ast, static_context)
+                                continue
+                        except:
+                            pass
+                        
                         if len(self._name_resolution_stack) > 0:
                             eval.set_name_resolution(self._name_resolution_stack[-1])
                             resolved = eval.eval(v)
@@ -1184,6 +1373,8 @@ class TaskGraphBuilder(object):
                             new_val[k] = v
                     else:
                         new_val[k] = v
+                else:
+                    new_val[k] = v
         return new_val
 
     def _gatherNeeds(self, task_t, node):

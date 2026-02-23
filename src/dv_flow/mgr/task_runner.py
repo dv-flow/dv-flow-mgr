@@ -97,7 +97,8 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     enable_server : bool = True  # Enable DFM command server for LLM integration
 
     _anon_tid : int = 1
-    _exec_semaphore : asyncio.Semaphore = dc.field(default=None, init=False)
+    _jobserver : 'JobServer' = dc.field(default=None, init=False)
+    _jobserver_owner : bool = dc.field(default=False, init=False)
     
     # State tracking
     _task_state : Dict[TaskNode, TaskState] = dc.field(default_factory=dict, init=False)
@@ -111,11 +112,35 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
 
     def __post_init__(self):
         super().__post_init__()
-        if self.nproc == -1:
-            self.nproc = os.cpu_count()
         
-        # Initialize exec semaphore to gate process execution
-        self._exec_semaphore = asyncio.Semaphore(self.nproc)
+        # Check for existing jobserver in environment
+        from .jobserver import JobServer
+        self._jobserver = JobServer.from_environment()
+        
+        if self._jobserver is None:
+            # We are root - create new jobserver
+            if self.nproc == -1:
+                self.nproc = os.cpu_count()
+            self._jobserver = JobServer(self.nproc)
+            self._jobserver_owner = True
+            
+            # NOTE: We intentionally do NOT set MAKEFLAGS in the environment
+            # because GNU Make 4.3's FIFO-based jobserver has compatibility issues
+            # when the FIFO is created by external tools. A smarter solution can
+            # be added in the future (e.g., pipe-based jobserver with FD passing).
+            
+            self._log.info(f"Created jobserver: nproc={self.nproc}, fifo={self._jobserver.fifo_path}")
+        else:
+            # We are nested - use parent's jobserver
+            self._jobserver_owner = False
+            if self.nproc == -1:
+                self.nproc = os.cpu_count()
+            self._log.info(f"Using parent jobserver: fifo={self._jobserver.fifo_path}")
+        
+        # Update builder's context environment if builder exists
+        if self.builder is not None and hasattr(self.builder, '_ctxt') and self.builder._ctxt is not None:
+            self.builder._ctxt.env.update(self.env)
+            self._log.debug("Updated builder context with runner environment")
         
         # Initialize ready queue
         self._ready_queue = asyncio.Queue()
@@ -131,6 +156,17 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         return None
 
     async def run(self, task : Union[TaskNode,List[TaskNode]]):
+        # Synchronize environment with task graph context
+        # All tasks from the same builder share the same TaskNodeCtxt instance,
+        # so we only need to update it once
+        tasks = task if isinstance(task, list) else [task]
+        if tasks and hasattr(tasks[0], 'ctxt') and tasks[0].ctxt is not None:
+            self._log.debug(f"Before sync: task ctxt.env has MAKEFLAGS={tasks[0].ctxt.env.get('MAKEFLAGS', 'NOT SET')}")
+            self._log.debug(f"Runner env has MAKEFLAGS={self.env.get('MAKEFLAGS', 'NOT SET')}")
+            tasks[0].ctxt.env.update(self.env)
+            self._log.debug(f"After sync: task ctxt.env has MAKEFLAGS={tasks[0].ctxt.env.get('MAKEFLAGS', 'NOT SET')}")
+            self._log.debug("Synchronized runner env with task graph context")
+        
         # Ensure that the rundir exists or can be created
         if not os.path.isdir(self.rundir):
             os.makedirs(self.rundir)
@@ -220,6 +256,11 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             if self._command_server:
                 await self._command_server.stop()
                 self._command_server = None
+            
+            # Close jobserver if we own it
+            if self._jobserver_owner and self._jobserver:
+                self._jobserver.close()
+                self._jobserver = None
 
         with open(os.path.join(self.rundir, "cache", "mementos.json"), "w") as f:
             json.dump(dst_memento, f)
@@ -334,6 +375,9 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         # Check if this completes any sub-graphs
         for sg_id in list(self._active_subgraphs.keys()):
             self._complete_subgraph(sg_id, done_task_s)
+        
+        # Check if any dependents can now be enqueued (to be skipped)
+        self._check_and_enqueue_dependents(task)
     
     async def _process_ready_and_dynamic_tasks(
         self,
@@ -485,10 +529,10 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         self._log.debug("Task processor stopped")
     
     def _is_task_ready(self, task: TaskNode) -> bool:
-        """Check if all dependencies of a task are completed"""
+        """Check if all dependencies of a task are completed or skipped"""
         for dep, _ in task.needs:
             dep_state = self._task_state.get(dep, TaskState.NOT_STARTED)
-            if dep_state != TaskState.COMPLETED:
+            if dep_state not in (TaskState.COMPLETED, TaskState.SKIPPED):
                 return False
         return True
     
@@ -574,6 +618,13 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             dep_m[task] = set(task[0] for task in task.needs)
             for need,block in task.needs:
                 self._buildDepMap(dep_m, need)
+            
+            # For compound tasks, also add all subtasks to the dependency map
+            from .task_node_compound import TaskNodeCompound
+            if isinstance(task, TaskNodeCompound):
+                for subtask in task.tasks:
+                    if subtask != task:  # Don't recurse into self
+                        self._buildDepMap(dep_m, subtask)
 
 @dc.dataclass
 class SingleTaskRunner(TaskRunner):

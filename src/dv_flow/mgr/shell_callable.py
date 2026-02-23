@@ -54,19 +54,16 @@ class ShellCallable(object):
                 fp.write(cmd)
             os.chmod(cmd_f, 0o755)
 
-        fp = open(os.path.join(input.rundir, "%s.log" % input.name), "w")
-
-        proc = await asyncio.create_subprocess_shell(
-            cmd,
-            executable=shell,
-            env=env,
-            cwd=input.rundir,
-            stdout=fp,
-            stderr=asyncio.subprocess.STDOUT)
+        # Use ctxt.exec() to respect jobserver token management
+        logfile = os.path.join(input.rundir, "%s.log" % input.name)
         
-        status = await proc.wait()
-        
-        fp.close()
+        if cmd.find("\n") != -1:
+            # Multi-line command - already created script file above
+            cmd_script = os.path.join(input.rundir, "%s_cmd.sh" % input.name)
+            status = await ctxt.exec([shell, cmd_script], logfile=logfile, env=env, cwd=input.rundir)
+        else:
+            # Single-line command - use shell -c
+            status = await ctxt.exec([shell, "-c", cmd], logfile=logfile, env=env, cwd=input.rundir)
 
         return TaskDataResult(
             status=status

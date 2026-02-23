@@ -27,6 +27,9 @@ package:
   name: std
   desc: Standard library providing core tasks, types, and utilities for DV Flow workflows
 
+  fragments:
+    - filters.dv
+
   tasks:
   - name: Message
     shell: pytask
@@ -196,6 +199,26 @@ package:
           Additional assistant-specific configuration.
           For codex: sandbox_mode and approval_mode can also be set here.
 
+  - name: RunTasks
+    shell: pytask
+    run: dv_flow.mgr.std.run_tasks.RunTasks
+    doc: |
+      Dynamically executes tasks specified by TaskRunSpec input items.
+      Tasks are scheduled into the current execution with proper dependencies.
+      
+      Failure Handling: Uses fail-fast semantics. If any dynamic task fails,
+      execution stops immediately and the error is propagated.
+      
+      Dependencies: TaskRunSpec items can reference both other items in the 
+      same batch and currently-executing tasks by name.
+    consumes:
+    - type: std.TaskRunSpec
+    passthrough: all
+    with:
+      timeout:
+        type: float
+        doc: Optional timeout in seconds for all dynamic tasks
+
   types:
   - name: Tag
     doc: |
@@ -347,3 +370,27 @@ package:
     doc: |
       Specifies a set of files or URLs for an agent to use as reference
     tags: [std.AgentReferenceTag]
+
+  - name: TaskRunSpec
+    uses: std.DataItem
+    doc: |
+      Specification for dynamically executing a task during runtime.
+      Can be produced by tasks and consumed by std.RunTasks.
+      
+      Dependencies: The needs field can reference both batch-local tasks
+      (other TaskRunSpec items in the same batch) and inflight tasks 
+      (currently-executing tasks from the static graph).
+    with:
+      task_type:
+        type: str
+        doc: Task type name (e.g., "std.Message", "my_pkg.compile")
+      task_name:
+        type: str
+        value: ""
+        doc: Optional task name. If empty, auto-generated.
+      params:
+        type: map
+        doc: Parameter overrides for the task
+      needs:
+        type: list
+        doc: List of task names this task depends on (batch-local or inflight)

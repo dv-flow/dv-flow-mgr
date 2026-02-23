@@ -89,6 +89,83 @@ class CacheDef(BaseModel):
         default=CompressionType.No,
         description="Compression type for cached artifacts")
 
+class ControlCaseDef(BaseModel):
+    """Definition for a single case in a match control construct"""
+    when: Union[str, None] = dc.Field(
+        default=None,
+        description="Condition expression for this case")
+    default: Union[bool, None] = dc.Field(
+        default=None,
+        description="Mark this case as the default/fallback")
+    body: List['TaskDef'] = dc.Field(
+        default_factory=list,
+        description="Tasks to execute if this case matches")
+
+class ControlStateDef(BaseModel):
+    """Definition for loop state management"""
+    type: Union[str, None] = dc.Field(
+        default=None,
+        description="Type reference for state validation")
+    init: Dict[str, Any] = dc.Field(
+        default_factory=dict,
+        description="Initial state values for first iteration")
+    feedback: Union[str, None] = dc.Field(
+        default=None,
+        description="Expression to transform iteration output to next iteration input")
+
+class ControlDef(BaseModel):
+    """Runtime control flow definition"""
+    type: str = dc.Field(
+        description="Control flow type: if, match, while, do-while, or repeat")
+    cond: Union[str, None] = dc.Field(
+        default=None,
+        description="Condition expression for if/while constructs")
+    until: Union[str, None] = dc.Field(
+        default=None,
+        description="Early exit condition for do-while/repeat loops")
+    max_iter: Union[int, None] = dc.Field(
+        default=None,
+        description="Maximum iteration count for loops (safety bound)")
+    count: Union[int, None] = dc.Field(
+        default=None,
+        description="Exact iteration count for repeat loops")
+    cases: List[ControlCaseDef] = dc.Field(
+        default_factory=list,
+        description="Cases for match construct")
+    else_body: List['TaskDef'] = dc.Field(
+        default_factory=list,
+        alias="else",
+        description="Tasks to execute for else branch of if construct")
+    state: Union[ControlStateDef, None] = dc.Field(
+        default=None,
+        description="State management configuration for loops")
+    
+    @model_validator(mode='after')
+    def validate_control_type(self):
+        """Validate that required fields are present for each control type"""
+        if self.type == 'if':
+            if self.cond is None:
+                raise ValueError("'if' control type requires 'cond' field")
+        elif self.type == 'match':
+            if not self.cases:
+                raise ValueError("'match' control type requires at least one 'cases' entry")
+        elif self.type == 'while':
+            if self.cond is None:
+                raise ValueError("'while' control type requires 'cond' field")
+            if self.max_iter is None:
+                raise ValueError("'while' control type requires 'max_iter' field")
+        elif self.type == 'do-while':
+            if self.until is None:
+                raise ValueError("'do-while' control type requires 'until' field")
+            if self.max_iter is None:
+                raise ValueError("'do-while' control type requires 'max_iter' field")
+        elif self.type == 'repeat':
+            if self.count is None:
+                raise ValueError("'repeat' control type requires 'count' field")
+        else:
+            raise ValueError(f"Unknown control type: {self.type}. Must be one of: if, match, while, do-while, repeat")
+        return self
+
 class TaskBodyDef(BaseModel):
     model_config = ConfigDict(extra='forbid')
     pytask : Union[str, None] = dc.Field(
@@ -170,6 +247,9 @@ class TaskDef(BaseModel):
         description="Shell to use for shell-based implementation")
     strategy : StrategyDef = dc.Field(
         default=None)
+    control : Union[ControlDef, None] = dc.Field(
+        default=None,
+        description="Runtime control flow definition (mutually exclusive with strategy)")
     desc : str = dc.Field(
         default="",
         title="Task description",
@@ -256,5 +336,12 @@ class TaskDef(BaseModel):
                 data['scope'] = [existing_scope, field]
         
         return data
+    
+    @model_validator(mode='after')
+    def validate_control_strategy_exclusion(self):
+        """Ensure control and strategy are mutually exclusive"""
+        if self.control is not None and self.strategy is not None:
+            raise ValueError("Task cannot have both 'control' and 'strategy' fields. They are mutually exclusive.")
+        return self
 
 TaskDef.model_rebuild()

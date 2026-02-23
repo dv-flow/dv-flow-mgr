@@ -27,6 +27,7 @@ from .package_import_spec import PackageImportSpec
 from .srcinfo import SrcInfo
 from .task_def import TaskDef
 from .type_def import TypeDef
+from .filter_def import FilterDef
 
 class FragmentDef(BaseModel):
     model_config = {"extra": "forbid"}
@@ -37,6 +38,9 @@ class FragmentDef(BaseModel):
     tasks : List[TaskDef] = dc.Field(
         default_factory=list,
         description="List of tasks defined in this fragment")
+    filters : List[FilterDef] = dc.Field(
+        default_factory=list,
+        description="List of filters defined in this fragment")
     imports : List[Union[str,PackageImportSpec]] = dc.Field(
         default_factory=list, 
         alias="imports",
