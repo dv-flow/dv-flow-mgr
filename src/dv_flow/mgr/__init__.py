@@ -44,10 +44,25 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
     def wrapper(T):
         from dv_flow.mgr.task_node_leaf import TaskNodeLeaf
         from .param import Param
+        import typing
         task_mname = T.__module__
         task_module = sys.modules[task_mname]
         task_passthrough = passthrough
         task_consumes = consumes
+
+        def _coerce_param(obj, key, value):
+            """Coerce a scalar str to a list when the field type expects a list."""
+            if not isinstance(value, str):
+                return value
+            model_fields = getattr(obj.__class__, 'model_fields', None)
+            if model_fields is None or key not in model_fields:
+                return value
+            ann = model_fields[key].annotation
+            args = typing.get_args(ann) if typing.get_origin(ann) is typing.Union else [ann]
+            for arg in args:
+                if typing.get_origin(arg) is list:
+                    return [value]
+            return value
 
         def mkTaskParams(params : Dict) -> Any:
             obj = paramT()
@@ -75,7 +90,7 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                             else:
                                 raise Exception("Unhandled value spec: %s" % str(value))
                         else:
-                            setattr(obj, key, value)
+                            setattr(obj, key, _coerce_param(obj, key, value))
             return obj
 
         def ctor(

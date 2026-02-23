@@ -1012,7 +1012,7 @@ class PackageProviderYaml(PackageProvider):
             "int" : int,
             "float" : float,
             "bool" : bool,
-            "list" : List,
+            "list" : Union[str, List],
             "map" : Dict
         }
         pdflt_m = {
@@ -1175,7 +1175,7 @@ class PackageProviderYaml(PackageProvider):
             "int" : int,
             "float" : float,
             "bool" : bool,
-            "list" : List,
+            "list" : Union[str, List],
             "map" : Dict
         }
         pdflt_m = {

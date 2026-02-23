@@ -1506,6 +1506,16 @@ class TaskGraphBuilder(object):
             else:
                 return [str(value)]
         
+        elif origin is typing.Union:
+            # Union type: check if it contains a list member (e.g. Union[str, List])
+            args = typing.get_args(param_type)
+            if any(typing.get_origin(a) is list or a is list for a in args):
+                # CLI overrides: wrap str in a list (consistent with plain list behaviour)
+                if isinstance(value, str):
+                    return [value]
+                return value
+            # Otherwise fall through to the else branch below
+        
         elif param_type is bool:
             if isinstance(value, bool):
                 return value
