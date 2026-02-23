@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Incremental Builds &#8212; DV Flow Manager  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
     <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
     <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
@@ -95,13 +95,13 @@ definition accepts one of three values:</p>
 <p>A custom up-to-date method is an async Python function that receives an
 <code class="docutils literal notranslate"><span class="pre">UpToDateCtxt</span></code> object and returns a boolean indicating whether the task
 is up-to-date:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">check_deps_uptodate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">check_deps_uptodate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Custom up-to-date check that verifies external dependencies.</span>
 
 <span class="sd">    Returns True if task is up-to-date, False if it needs to run.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">import</span> <span class="nn">os</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 
     <span class="c1"># Check if a specific file has been modified since last run</span>
     <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;external_dep.txt&quot;</span><span class="p">)</span>
@@ -154,7 +154,7 @@ execution, which is used to determine if re-execution is needed.</p>
 <section id="creating-mementos">
 <h3>Creating Mementos<a class="headerlink" href="#creating-mementos" title="Link to this heading">¶</a></h3>
 <p>Task implementations return mementos in the TaskDataResult:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TaskDataResult</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TaskDataResult</span><span class="p">:</span>
     <span class="c1"># Perform work</span>
     <span class="n">result_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.txt&quot;</span><span class="p">)</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">result_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -181,7 +181,7 @@ comparison with current state.</p>
 <section id="accessing-mementos">
 <h3>Accessing Mementos<a class="headerlink" href="#accessing-mementos" title="Link to this heading">¶</a></h3>
 <p>In up-to-date checks:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">CheckUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">CheckUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># No previous execution</span>
 
@@ -286,7 +286,7 @@ structure:</p>
 <li><p><strong>Testing</strong>: Verify task behavior and outputs</p></li>
 </ul>
 <p>Example: Reading exec data:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">json</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;rundir/my_task/my_task.exec_data.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
     <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
@@ -305,16 +305,16 @@ structure:</p>
 <section id="content-based-detection">
 <h3>Content-Based Detection<a class="headerlink" href="#content-based-detection" title="Link to this heading">¶</a></h3>
 <p>Instead of timestamps, use content hashes for more reliable detection:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">hashlib</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
 
-<span class="k">async</span> <span class="k">def</span> <span class="nf">ComputeHash</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ComputeHash</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
     <span class="n">hasher</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="nb">iter</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">),</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
             <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
 
-<span class="k">async</span> <span class="k">def</span> <span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
     <span class="c1"># Process files</span>
     <span class="n">output_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.dat&quot;</span><span class="p">)</span>
     <span class="c1"># ... create output ...</span>
@@ -331,7 +331,7 @@ structure:</p>
 <section id="dependency-tracking">
 <h3>Dependency Tracking<a class="headerlink" href="#dependency-tracking" title="Link to this heading">¶</a></h3>
 <p>Track external dependencies explicitly:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">TrackDependencies</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">TrackDependencies</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="c1"># Read dependency file</span>
     <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">srcdir</span><span class="p">,</span> <span class="s2">&quot;dependencies.txt&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
@@ -363,7 +363,7 @@ structure:</p>
 <section id="multi-stage-checking">
 <h3>Multi-Stage Checking<a class="headerlink" href="#multi-stage-checking" title="Link to this heading">¶</a></h3>
 <p>Combine multiple checks for accuracy:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span> <span class="nf">ComplexUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ComplexUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="c1"># Quick check: parameters changed?</span>
     <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;params&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">model_dump</span><span class="p">():</span>
         <span class="k">return</span> <span class="kc">False</span>
