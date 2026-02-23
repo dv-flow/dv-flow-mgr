@@ -25,7 +25,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from .cache_provider import CacheEntry, CompressionType
-from .expr_eval import ExprEval
+from .param_ref_eval import ParamRefEval
 from .fileset import FileSet
 
 
@@ -115,7 +115,7 @@ async def compute_cache_key(
     
     # Hash extra cache.hash expressions
     if cache_config and cache_config.hash:
-        expr_eval = ExprEval()
+        expr_eval = ParamRefEval()
         # TODO: Set up proper variable resolution context
         
         for hash_expr in cache_config.hash:

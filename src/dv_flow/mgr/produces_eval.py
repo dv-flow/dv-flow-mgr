@@ -19,15 +19,21 @@
 import logging
 from typing import Any, Dict, List, Optional
 from .expr_eval import ExprEval
+from .param_ref_eval import ParamRefEval
 
 class ProducesEvaluator:
     """Evaluates produces patterns by resolving parameter references."""
     
     _log = logging.getLogger("ProducesEvaluator")
     
-    def __init__(self, expr_eval: Optional[ExprEval] = None):
-        """Initialize with optional ExprEval instance."""
-        self._expr_eval = expr_eval or ExprEval()
+    def __init__(self, expr_eval=None):
+        """Initialize with optional evaluator instance.
+        
+        Accepts a ParamRefEval (default) or any evaluator with an .eval() method.
+        ParamRefEval correctly strips ${{ }} delimiters before parsing expressions,
+        avoiding spurious "Illegal character" warnings from ExprParser.
+        """
+        self._expr_eval = expr_eval or ParamRefEval()
     
     def evaluate(self, 
                  produces_patterns: List[Dict[str, Any]], 
