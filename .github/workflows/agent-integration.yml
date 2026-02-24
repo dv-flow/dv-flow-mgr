@@ -1,0 +1,45 @@
+name: Agent Integration Test
+
+on:
+  push:
+    branches:
+      - mballance/native-agent
+      - main
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "LiteLLM model to test (default: openai/gpt-4o-mini via GitHub Models)"
+        required: false
+        default: "openai/gpt-4o-mini"
+
+# models: read allows the GITHUB_TOKEN to call the GitHub Models API
+# (https://models.inference.ai.azure.com) — free tier, no Copilot subscription needed.
+permissions:
+  contents: read
+  models: read
+
+jobs:
+  agent-integration:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AGENT_TEST_MODEL: ${{ inputs.model || 'openai/gpt-4o-mini' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install base dependencies
+        run: |
+          python3 -m venv py
+          ./py/bin/pip install --upgrade --pre ivpm
+          ./py/bin/ivpm update -a -d default-dev
+
+      - name: Install agent dependencies
+        run: |
+          ./packages/python/bin/pip install 'openai-agents[litellm]' prompt_toolkit
+
+      - name: Run live agent integration test
+        run: |
+          export PYTHONPATH=$(pwd)/src
+          ./packages/python/bin/pytest tests/unit/test_native_agent_live.py -v

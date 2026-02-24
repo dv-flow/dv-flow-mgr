@@ -39,6 +39,40 @@ from .cmds.show import (
 )
 from .ext_rgy import ExtRgy
 
+
+class _CmdMcp:
+    """Start DFM as an MCP server on stdio."""
+
+    def __call__(self, args):
+        import asyncio, sys
+        from .cmds.util import get_rootdir
+        from .util import loadProjPkgDef
+        from .task_listener_log import TaskListenerLog
+        from .task_data import SeverityE
+
+        listener = TaskListenerLog()
+        try:
+            loader, pkg = loadProjPkgDef(
+                get_rootdir(args),
+                listener=listener.marker,
+                config=getattr(args, 'config', None),
+            )
+        except Exception as e:
+            print(f"Error loading project: {e}", file=sys.stderr)
+            return 1
+        if listener.has_severity[SeverityE.Error] > 0 or pkg is None:
+            print("Error loading project.", file=sys.stderr)
+            return 1
+
+        try:
+            from .cmds.agent.dfm_mcp_server import run_mcp_server
+        except ImportError as e:
+            print(f"MCP server requires: pip install dv-flow-mgr[agent]\n({e})", file=sys.stderr)
+            return 1
+
+        asyncio.run(run_mcp_server(pkg, loader))
+        return 0
+
 def _get_skill_path():
     """Get the absolute path to the skill.md file."""
     import dv_flow.mgr
@@ -406,8 +440,8 @@ def get_parser():
         nargs='*',
         help='Task references to use as context (skills, personas, tools, references)')
     agent_parser.add_argument('-a', '--assistant',
-        choices=['copilot', 'codex', 'mock'],
-        help='Specify which assistant to use (auto-detected by default)')
+        choices=['copilot', 'codex', 'mock', 'native'],
+        help='Specify which assistant to use (default: native if no subprocess CLI detected)')
     agent_parser.add_argument('-m', '--model',
         help='Specify the AI model to use')
     agent_parser.add_argument('--root',
@@ -431,7 +465,25 @@ def get_parser():
     agent_parser.add_argument('--ui',
         choices=['log', 'progress', 'progressbar', 'tui'],
         help='Select UI mode for task execution')
+    agent_parser.add_argument('--approval-mode',
+        dest='approval_mode',
+        choices=['never', 'auto', 'write'],
+        help='Tool approval mode: never (run all), auto/write (prompt before write/shell tools)')
+    agent_parser.add_argument('--trace',
+        action='store_true',
+        help='Enable agent tracing to ~/.dfm/traces/ (or trace_dir in config)')
     agent_parser.set_defaults(func=CmdAgent())
+
+    mcp_parser = subparsers.add_parser('mcp',
+        help='Start DFM as an MCP server (stdio) for Claude Desktop, Cursor, VS Code, etc.')
+    mcp_parser.add_argument('tasks',
+        nargs='*',
+        help='Task references to use as context (skills, personas, tools, references)')
+    mcp_parser.add_argument('--root',
+        help='Specifies the root directory for the flow')
+    mcp_parser.add_argument('-c', '--config',
+        help='Specifies the active configuration for the root package')
+    mcp_parser.set_defaults(func=_CmdMcp())
 
     util_parser = subparsers.add_parser('util',
         help="Internal utility command")

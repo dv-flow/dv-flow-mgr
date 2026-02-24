@@ -1,3 +1,4 @@
+import asyncio
 """
 Test cache utility functions
 """
@@ -26,136 +27,136 @@ def temp_dir():
         yield Path(tmpdir)
 
 
-@pytest.mark.asyncio
-async def test_compute_cache_key_no_cache(temp_dir):
-    """Test cache key computation for task without cache config"""
-    task = TaskDef(name='test')
-    registry = ExtRgy.inst()
-    
-    key = await compute_cache_key(
-        'test',
-        task,
-        None,
-        [],
-        str(temp_dir),
-        registry
-    )
-    
-    assert key is None
+def test_compute_cache_key_no_cache(temp_dir):
+    async def _impl():
+        """Test cache key computation for task without cache config"""
+        task = TaskDef(name='test')
+        registry = ExtRgy.inst()
+        
+        key = await compute_cache_key(
+            'test',
+            task,
+            None,
+            [],
+            str(temp_dir),
+            registry
+        )
+        
+        assert key is None
+    asyncio.run(_impl())
 
+def test_compute_cache_key_disabled(temp_dir):
+    async def _impl():
+        """Test cache key computation for task with caching disabled"""
+        task = TaskDef(name='test', cache={'enabled': False})
+        registry = ExtRgy.inst()
+        
+        key = await compute_cache_key(
+            'test',
+            task,
+            None,
+            [],
+            str(temp_dir),
+            registry
+        )
+        
+        assert key is None
+    asyncio.run(_impl())
 
-@pytest.mark.asyncio
-async def test_compute_cache_key_disabled(temp_dir):
-    """Test cache key computation for task with caching disabled"""
-    task = TaskDef(name='test', cache={'enabled': False})
-    registry = ExtRgy.inst()
-    
-    key = await compute_cache_key(
-        'test',
-        task,
-        None,
-        [],
-        str(temp_dir),
-        registry
-    )
-    
-    assert key is None
+def test_compute_cache_key_enabled(temp_dir):
+    async def _impl():
+        """Test cache key computation for task with caching enabled"""
+        task = TaskDef(name='test', cache=True)
+        registry = ExtRgy.inst()
+        
+        key = await compute_cache_key(
+            'test',
+            task,
+            None,
+            [],
+            str(temp_dir),
+            registry
+        )
+        
+        assert key is not None
+        assert key.startswith('test:')
+        assert len(key.split(':')[1]) == 32  # MD5 hash
+    asyncio.run(_impl())
 
+def test_check_cache_miss(temp_dir):
+    async def _impl():
+        """Test cache check with no providers"""
+        entry = await check_cache('test:abc123', [])
+        assert entry is None
+    asyncio.run(_impl())
 
-@pytest.mark.asyncio
-async def test_compute_cache_key_enabled(temp_dir):
-    """Test cache key computation for task with caching enabled"""
-    task = TaskDef(name='test', cache=True)
-    registry = ExtRgy.inst()
-    
-    key = await compute_cache_key(
-        'test',
-        task,
-        None,
-        [],
-        str(temp_dir),
-        registry
-    )
-    
-    assert key is not None
-    assert key.startswith('test:')
-    assert len(key.split(':')[1]) == 32  # MD5 hash
+def test_check_cache_hit(temp_dir):
+    async def _impl():
+        """Test cache check with existing entry"""
+        cache_dir = temp_dir / "cache"
+        provider = DirectoryCacheProvider(cache_dir, writable=True)
+        
+        # Store an entry
+        entry = CacheEntry(
+            key='test:abc123',
+            output_template={'result': 'ok'},
+            metadata={}
+        )
+        await provider.put('test:abc123', entry)
+        
+        # Check cache
+        found = await check_cache('test:abc123', [provider])
+        assert found is not None
+        assert found.key == 'test:abc123'
+    asyncio.run(_impl())
 
+def test_store_in_cache_no_artifacts(temp_dir):
+    async def _impl():
+        """Test storing cache entry without artifacts"""
+        cache_dir = temp_dir / "cache"
+        provider = DirectoryCacheProvider(cache_dir, writable=True)
+        
+        success = await store_in_cache(
+            'test:abc123',
+            {'output': []},
+            None,
+            [provider],
+            CompressionType.No
+        )
+        
+        assert success
+        
+        # Verify stored
+        entry = await provider.get('test:abc123')
+        assert entry is not None
+    asyncio.run(_impl())
 
-@pytest.mark.asyncio
-async def test_check_cache_miss(temp_dir):
-    """Test cache check with no providers"""
-    entry = await check_cache('test:abc123', [])
-    assert entry is None
-
-
-@pytest.mark.asyncio
-async def test_check_cache_hit(temp_dir):
-    """Test cache check with existing entry"""
-    cache_dir = temp_dir / "cache"
-    provider = DirectoryCacheProvider(cache_dir, writable=True)
-    
-    # Store an entry
-    entry = CacheEntry(
-        key='test:abc123',
-        output_template={'result': 'ok'},
-        metadata={}
-    )
-    await provider.put('test:abc123', entry)
-    
-    # Check cache
-    found = await check_cache('test:abc123', [provider])
-    assert found is not None
-    assert found.key == 'test:abc123'
-
-
-@pytest.mark.asyncio
-async def test_store_in_cache_no_artifacts(temp_dir):
-    """Test storing cache entry without artifacts"""
-    cache_dir = temp_dir / "cache"
-    provider = DirectoryCacheProvider(cache_dir, writable=True)
-    
-    success = await store_in_cache(
-        'test:abc123',
-        {'output': []},
-        None,
-        [provider],
-        CompressionType.No
-    )
-    
-    assert success
-    
-    # Verify stored
-    entry = await provider.get('test:abc123')
-    assert entry is not None
-
-
-@pytest.mark.asyncio
-async def test_store_in_cache_with_artifacts(temp_dir):
-    """Test storing cache entry with artifacts"""
-    cache_dir = temp_dir / "cache"
-    provider = DirectoryCacheProvider(cache_dir, writable=True)
-    
-    # Create artifacts
-    artifacts_dir = temp_dir / "artifacts"
-    artifacts_dir.mkdir()
-    (artifacts_dir / "file1.txt").write_text("content")
-    
-    success = await store_in_cache(
-        'test:abc123',
-        {'output': []},
-        artifacts_dir,
-        [provider],
-        CompressionType.No
-    )
-    
-    assert success
-    
-    # Verify stored with artifacts
-    entry = await provider.get('test:abc123')
-    assert entry is not None
-    assert entry.artifacts_path == "artifacts"
-
+def test_store_in_cache_with_artifacts(temp_dir):
+    async def _impl():
+        """Test storing cache entry with artifacts"""
+        cache_dir = temp_dir / "cache"
+        provider = DirectoryCacheProvider(cache_dir, writable=True)
+        
+        # Create artifacts
+        artifacts_dir = temp_dir / "artifacts"
+        artifacts_dir.mkdir()
+        (artifacts_dir / "file1.txt").write_text("content")
+        
+        success = await store_in_cache(
+            'test:abc123',
+            {'output': []},
+            artifacts_dir,
+            [provider],
+            CompressionType.No
+        )
+        
+        assert success
+        
+        # Verify stored with artifacts
+        entry = await provider.get('test:abc123')
+        assert entry is not None
+        assert entry.artifacts_path == "artifacts"
+    asyncio.run(_impl())
 
 def test_validate_output_paths_valid(temp_dir):
     """Test validating output paths within rundir"""
