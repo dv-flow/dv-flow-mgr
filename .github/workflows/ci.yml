@@ -28,7 +28,6 @@ jobs:
         run: |
           export PYTHONPATH=$(pwd)/src
           ./packages/python/bin/pytest tests --ctrf test-results.json
-        continue-on-error: true
 
       - name: Publish Test Results
         if: always()
