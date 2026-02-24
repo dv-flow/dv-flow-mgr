@@ -71,6 +71,13 @@ class TaskListenerProgressBar(object):
             # Check if runner has total task count
             if hasattr(task, 'total_task_count'):
                 self._total_tasks = task.total_task_count
+            if hasattr(task, 'cache_providers') and task.cache_providers:
+                import os
+                cache_path = os.environ.get('DV_FLOW_CACHE', '')
+                if not cache_path:
+                    p = task.cache_providers[0]
+                    cache_path = str(getattr(p, 'cache_dir', getattr(p, 'path', '')))
+                self.console.print(f"[cyan]DV_FLOW_CACHE: {cache_path}[/cyan]")
             self.enter()
             return
         if reason == 'end':

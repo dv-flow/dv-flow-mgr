@@ -139,11 +139,12 @@ class TaskNodeLeaf(TaskNode):
                 cache_key = None
             
             if cache_key:
+                self._log.info(f"Cache: enabled for task {self.name}")
                 self._log.debug(f"Checking cache for {cache_key}")
                 cache_entry = await cache_util.check_cache(cache_key, runner.cache_providers)
                 
                 if cache_entry:
-                    self._log.info(f"Cache hit for task {self.name}")
+                    self._log.info(f"Cache: hit for task {self.name}")
                     runner._notify(self, "cache_hit")
                     
                     # Restore output from cache entry
@@ -237,6 +238,10 @@ class TaskNodeLeaf(TaskNode):
                         
                         self._log.debug(f"<-- do_run (cache hit): {self.name}")
                         return self.result
+                else:
+                    self._log.info(f"Cache: miss for task {self.name}")
+            else:
+                self._log.info(f"Cache: not enabled for task {self.name}")
 
         # Check if task is up-to-date (unless force_run is set)
         if not force_run:

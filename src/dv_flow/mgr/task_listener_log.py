@@ -119,7 +119,16 @@ class TaskListenerLog(object):
                 else:
                     self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
             self.level -= 1
-        elif reason in ("start", "end"):
+        elif reason == 'start':
+            if hasattr(task, 'cache_providers') and task.cache_providers:
+                import os
+                cache_path = os.environ.get('DV_FLOW_CACHE', '')
+                if not cache_path:
+                    # Fall back to provider's path
+                    p = task.cache_providers[0]
+                    cache_path = str(getattr(p, 'cache_dir', getattr(p, 'path', '')))
+                self.console.print(f"[cyan]DV_FLOW_CACHE: {cache_path}[/cyan]")
+        elif reason == 'end':
             pass
         else:
             self.console.print("[red]-[/red] Task %s" % task.name)

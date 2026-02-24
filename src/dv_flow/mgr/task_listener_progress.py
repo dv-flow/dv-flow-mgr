@@ -98,6 +98,13 @@ class TaskListenerProgress(object):
             # task is actually the runner when reason is 'start'
             if hasattr(task, 'cache_providers'):
                 self._cache_enabled = bool(task.cache_providers)
+            if self._cache_enabled:
+                import os
+                cache_path = os.environ.get('DV_FLOW_CACHE', '')
+                if not cache_path:
+                    p = task.cache_providers[0]
+                    cache_path = str(getattr(p, 'cache_dir', getattr(p, 'path', '')))
+                self.console.print(f"[cyan]DV_FLOW_CACHE: {cache_path}[/cyan]")
             self.enter()
             return
         if reason == 'end':
