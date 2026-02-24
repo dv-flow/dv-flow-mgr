@@ -1411,6 +1411,12 @@ class PackageProviderYaml(PackageProvider):
         task.rundir = rundir
         task.uptodate = uptodate
 
+        # Propagate cache: taskdef overrides; fall back to base task
+        if taskdef.cache is not None:
+            task.cache = taskdef.cache
+        elif task.uses is not None and isinstance(task.uses, Task) and task.uses.cache is not None:
+            task.cache = task.uses.cache
+
         # NEW: Collect parameter definitions without evaluating
         task.param_defs = self._collectParamDefs(
             loader,
@@ -1602,6 +1608,12 @@ class PackageProviderYaml(PackageProvider):
             st.produces = produces
             st.rundir = rundir
             st.uptodate = uptodate
+
+            # Propagate cache: taskdef overrides; fall back to base task
+            if td.cache is not None:
+                st.cache = td.cache
+            elif st.uses is not None and isinstance(st.uses, Task) and st.uses.cache is not None:
+                st.cache = st.uses.cache
 
             for need in td.needs:
                 nn = None

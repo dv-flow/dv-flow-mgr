@@ -44,6 +44,7 @@ class Task(object):
     passthrough : Union[PassthroughE, List[Dict[str, Any]]] = dc.field(default=None)
     rundir : RundirE = None
     uptodate : Union[bool, str, None] = None
+    cache : Any = None
     # TODO: strategy / matrix
     subtasks : List['Task'] = dc.field(default_factory=list)
     is_root : bool = False
