@@ -126,9 +126,11 @@ class TaskNodeLeaf(TaskNode):
         force_run = getattr(runner, 'force_run', False)
         if not force_run and self.uptodate is not False and hasattr(runner, 'cache_providers') and runner.cache_providers:
             try:
+                # self.taskdef is a Task; the cache config lives in Task.taskdef (TaskDef)
+                _taskdef_for_cache = getattr(self.taskdef, 'taskdef', self.taskdef)
                 cache_key = await cache_util.compute_cache_key(
                 self.name,
-                self.taskdef,  # Pass task definition for cache settings
+                _taskdef_for_cache,
                 self.params,
                 inputs,
                 rundir,
@@ -476,9 +478,10 @@ class TaskNodeLeaf(TaskNode):
                 from pathlib import Path
                 if cache_util.validate_output_paths(output, rundir):
                     # Compute cache key (returns None if caching disabled)
+                    _taskdef_for_cache = getattr(self.taskdef, 'taskdef', self.taskdef)
                     cache_key = await cache_util.compute_cache_key(
                         self.name,
-                        None,  # taskdef not available in TaskNode
+                        _taskdef_for_cache,
                         self.params,
                         inputs,
                         rundir,
