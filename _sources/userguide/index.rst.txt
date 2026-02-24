@@ -19,6 +19,7 @@ User Guide
    stdlib
    llm_integration
    agent_integration
+   native_agent
 
 DV Flow input specification builds on three key concepts:
 
