@@ -31,13 +31,9 @@ jobs:
 
       - name: Install base dependencies
         run: |
-          python3 -m venv py
-          ./py/bin/pip install --upgrade --pre ivpm
-          ./py/bin/ivpm update -a -d default-dev
-
-      - name: Install agent dependencies
-        run: |
-          ./packages/python/bin/pip install 'openai-agents[litellm]' prompt_toolkit
+          python3 -m venv packages/python
+          ./packages/python/bin/pip install --upgrade pip
+          ./packages/python/bin/pip install -e ".[agent]" pytest pyyaml
 
       - name: Run live agent integration test
         run: |
