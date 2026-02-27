@@ -14,7 +14,7 @@
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Flow-Spec Reference" href="../reference/index.html" />
+    <link rel="next" title="Native AI Agent (dfm agent)" href="native_agent.html" />
     <link rel="prev" title="LLM Integration" href="llm_integration.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -35,21 +35,29 @@
             
   <section id="ai-agent-integration">
 <h1>AI Agent Integration<a class="headerlink" href="#ai-agent-integration" title="Link to this heading">¶</a></h1>
-<p>This guide explains how to integrate AI assistants with DV Flow Manager using the
-<code class="docutils literal notranslate"><span class="pre">agent</span></code> command. By defining skills, personas, tools, and references in your flow,
-you can create context-aware AI assistants that understand your project and workflows.</p>
+<p>This guide explains how to define skills, personas, tools, and references in
+your DV Flow project to create context-aware AI agent sessions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>DV Flow Manager now includes a <strong>built-in native agent</strong> that requires no
+external CLI tools.  It supports GitHub Copilot, OpenAI, Anthropic, Ollama,
+and any OpenAI-compatible provider.  See <a class="reference internal" href="native_agent.html"><span class="doc">Native AI Agent (dfm agent)</span></a> for setup and
+provider configuration.</p>
+<p>The original subprocess-based agents (GitHub Copilot CLI, Codex CLI) remain
+available via <code class="docutils literal notranslate"><span class="pre">-a</span> <span class="pre">copilot</span></code> / <code class="docutils literal notranslate"><span class="pre">-a</span> <span class="pre">codex</span></code>.</p>
+</div>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
 <p>DV Flow Manager’s agent integration allows you to:</p>
 <ul class="simple">
-<li><p>Launch AI assistants (GitHub Copilot CLI, OpenAI Codex) with project-specific context</p></li>
+<li><p>Launch the built-in native AI agent or an external subprocess assistant with project-specific context</p></li>
 <li><p>Define reusable skills that describe capabilities and knowledge domains</p></li>
 <li><p>Create personas that combine skills with specific roles or personalities</p></li>
 <li><p>Provide reference documentation directly to the AI</p></li>
 <li><p>Configure external tools and MCP servers for the AI to use</p></li>
 </ul>
 <p>The agent command evaluates task definitions to collect these resources, generates
-a comprehensive system prompt, and launches the AI assistant in interactive mode.</p>
+a comprehensive system prompt, and launches the agent in interactive mode.</p>
 </section>
 <section id="quick-start">
 <h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
@@ -90,13 +98,15 @@ dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</spa
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
-<li><p><strong>Launch the agent</strong>:</p></li>
+<li><p><strong>Launch the agent</strong> (native agent runs automatically when no subprocess CLI is found):</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>agent<span class="w"> </span>DVFlowSkill
+
+<span class="c1"># Or explicitly select the native agent and a specific provider:</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native<span class="w"> </span>-m<span class="w"> </span>openai/gpt-4o<span class="w"> </span>DVFlowSkill
 </pre></div>
 </div>
-<p>The AI assistant will launch with knowledge of DV Flow Manager commands and your
-project structure.</p>
+<p>See <a class="reference internal" href="native_agent.html"><span class="doc">Native AI Agent (dfm agent)</span></a> for full provider configuration options.</p>
 </section>
 <section id="agent-resources">
 <h2>Agent Resources<a class="headerlink" href="#agent-resources" title="Link to this heading">¶</a></h2>
@@ -325,12 +335,24 @@ dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"
 </section>
 <section id="custom-models">
 <h3>Custom Models<a class="headerlink" href="#custom-models" title="Link to this heading">¶</a></h3>
-<p>Use specific AI models:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># With Copilot</span>
-dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--assistant<span class="w"> </span>copilot<span class="w"> </span>--model<span class="w"> </span>gpt-4
+<p>The native agent accepts any LiteLLM model name via <code class="docutils literal notranslate"><span class="pre">-m</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># GitHub Copilot (default)</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native<span class="w"> </span>-m<span class="w"> </span>github_copilot/gpt-4.1
 
-<span class="c1"># With Codex</span>
-dfm<span class="w"> </span>agent<span class="w"> </span>MyPersona<span class="w"> </span>--assistant<span class="w"> </span>codex<span class="w"> </span>--model<span class="w"> </span>code-davinci-002
+<span class="c1"># OpenAI</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native<span class="w"> </span>-m<span class="w"> </span>openai/gpt-4o
+
+<span class="c1"># Anthropic</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native<span class="w"> </span>-m<span class="w"> </span>anthropic/claude-3-5-sonnet-20241022
+
+<span class="c1"># Local model via Ollama</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native<span class="w"> </span>-m<span class="w"> </span>ollama/llama3.2
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="native_agent.html"><span class="doc">Native AI Agent (dfm agent)</span></a> for environment variable setup and a full provider list.</p>
+<p>Subprocess assistants can also specify a model:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># With Copilot CLI</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>copilot<span class="w"> </span>--model<span class="w"> </span>gpt-4
 </pre></div>
 </div>
 </section>
@@ -601,17 +623,24 @@ dfm<span class="w"> </span>agent<span class="w"> </span>ProjectSkill<span class=
 <h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
 <section id="agent-not-launching">
 <h3>Agent Not Launching<a class="headerlink" href="#agent-not-launching" title="Link to this heading">¶</a></h3>
-<p><strong>Error:</strong> “No AI assistant available”</p>
-<p><strong>Solution:</strong> Install an AI assistant:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># For GitHub Copilot CLI</span>
-npm<span class="w"> </span>install<span class="w"> </span>-g<span class="w"> </span>@github/copilot-cli
-
-<span class="c1"># Verify installation</span>
-copilot<span class="w"> </span>--version
+<p><strong>Error:</strong> “No module named ‘agents’”</p>
+<p>The native agent optional dependencies are not installed:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>dv-flow-mgr<span class="o">[</span>agent<span class="o">]</span>
 </pre></div>
 </div>
-<p><strong>Error:</strong> “Assistant ‘copilot’ not available”</p>
-<p><strong>Solution:</strong> Ensure the assistant is in your PATH and properly configured.</p>
+<p><strong>Error:</strong> “No AI assistant available” (subprocess path)</p>
+<p>A subprocess CLI assistant was requested but is not in PATH.  Either install
+it or use the native agent instead:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use the native agent (no external tools needed)</span>
+dfm<span class="w"> </span>agent<span class="w"> </span>-a<span class="w"> </span>native
+
+<span class="c1"># Or install the Copilot CLI</span>
+npm<span class="w"> </span>install<span class="w"> </span>-g<span class="w"> </span>@github/copilot-cli
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="native_agent.html"><span class="doc">Native AI Agent (dfm agent)</span></a> for native agent authentication and provider
+configuration, including troubleshooting common errors such as rate limits,
+OAuth prompts, and Ollama connectivity.</p>
 </section>
 <section id="tasks-not-evaluating">
 <h3>Tasks Not Evaluating<a class="headerlink" href="#tasks-not-evaluating" title="Link to this heading">¶</a></h3>
@@ -682,6 +711,7 @@ in the project directory. The system prompt includes available dfm commands and 
 <section id="see-also">
 <h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
 <ul class="simple">
+<li><p><a class="reference internal" href="native_agent.html"><span class="doc">Native AI Agent (dfm agent)</span></a> — Native agent setup, provider configuration, and TUI reference</p></li>
 <li><p><a class="reference internal" href="llm_integration.html"><span class="doc">LLM Integration</span></a> - General LLM integration guide</p></li>
 <li><p><a class="reference internal" href="tasks_developing.html"><span class="doc">Developing Tasks</span></a> - Creating tasks</p></li>
 <li><p><a class="reference internal" href="../cmdref.html"><span class="doc">Command reference</span></a> - Command reference</p></li>
@@ -734,6 +764,7 @@ in the project directory. The system prompt includes available dfm commands and 
 <li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
 <li class="toctree-l2"><a class="reference internal" href="llm_integration.html">LLM Integration</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="native_agent.html">Native AI Agent (dfm agent)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="index.html#dataflow">Dataflow</a></li>
 </ul>
 </li>
@@ -751,7 +782,7 @@ in the project directory. The system prompt includes available dfm commands and 
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
       <li>Previous: <a href="llm_integration.html" title="previous chapter">LLM Integration</a></li>
-      <li>Next: <a href="../reference/index.html" title="next chapter">Flow-Spec Reference</a></li>
+      <li>Next: <a href="native_agent.html" title="next chapter">Native AI Agent (dfm agent)</a></li>
   </ul></li>
   </ul></li>
 </ul>

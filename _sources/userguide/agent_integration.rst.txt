@@ -2,23 +2,32 @@
 AI Agent Integration
 #######################
 
-This guide explains how to integrate AI assistants with DV Flow Manager using the
-``agent`` command. By defining skills, personas, tools, and references in your flow,
-you can create context-aware AI assistants that understand your project and workflows.
+This guide explains how to define skills, personas, tools, and references in
+your DV Flow project to create context-aware AI agent sessions.
+
+.. note::
+
+   DV Flow Manager now includes a **built-in native agent** that requires no
+   external CLI tools.  It supports GitHub Copilot, OpenAI, Anthropic, Ollama,
+   and any OpenAI-compatible provider.  See :doc:`native_agent` for setup and
+   provider configuration.
+
+   The original subprocess-based agents (GitHub Copilot CLI, Codex CLI) remain
+   available via ``-a copilot`` / ``-a codex``.
 
 Overview
 ========
 
 DV Flow Manager's agent integration allows you to:
 
-* Launch AI assistants (GitHub Copilot CLI, OpenAI Codex) with project-specific context
+* Launch the built-in native AI agent or an external subprocess assistant with project-specific context
 * Define reusable skills that describe capabilities and knowledge domains
 * Create personas that combine skills with specific roles or personalities
 * Provide reference documentation directly to the AI
 * Configure external tools and MCP servers for the AI to use
 
 The agent command evaluates task definitions to collect these resources, generates
-a comprehensive system prompt, and launches the AI assistant in interactive mode.
+a comprehensive system prompt, and launches the agent in interactive mode.
 
 Quick Start
 ===========
@@ -59,14 +68,16 @@ Quick Start
     dfm run test
     ```
 
-3. **Launch the agent**:
+3. **Launch the agent** (native agent runs automatically when no subprocess CLI is found):
 
 .. code-block:: bash
 
     dfm agent DVFlowSkill
 
-The AI assistant will launch with knowledge of DV Flow Manager commands and your
-project structure.
+    # Or explicitly select the native agent and a specific provider:
+    dfm agent -a native -m openai/gpt-4o DVFlowSkill
+
+See :doc:`native_agent` for full provider configuration options.
 
 Agent Resources
 ===============
@@ -332,15 +343,30 @@ Preview what context will be sent to the agent:
 Custom Models
 -------------
 
-Use specific AI models:
+The native agent accepts any LiteLLM model name via ``-m``:
 
 .. code-block:: bash
 
-    # With Copilot
-    dfm agent MyPersona --assistant copilot --model gpt-4
-    
-    # With Codex
-    dfm agent MyPersona --assistant codex --model code-davinci-002
+    # GitHub Copilot (default)
+    dfm agent -a native -m github_copilot/gpt-4.1
+
+    # OpenAI
+    dfm agent -a native -m openai/gpt-4o
+
+    # Anthropic
+    dfm agent -a native -m anthropic/claude-3-5-sonnet-20241022
+
+    # Local model via Ollama
+    dfm agent -a native -m ollama/llama3.2
+
+See :doc:`native_agent` for environment variable setup and a full provider list.
+
+Subprocess assistants can also specify a model:
+
+.. code-block:: bash
+
+    # With Copilot CLI
+    dfm agent -a copilot --model gpt-4
 
 Fresh Context
 -------------
@@ -635,21 +661,30 @@ Troubleshooting
 Agent Not Launching
 -------------------
 
-**Error:** "No AI assistant available"
+**Error:** "No module named 'agents'"
 
-**Solution:** Install an AI assistant:
+The native agent optional dependencies are not installed:
 
 .. code-block:: bash
 
-    # For GitHub Copilot CLI
+    pip install dv-flow-mgr[agent]
+
+**Error:** "No AI assistant available" (subprocess path)
+
+A subprocess CLI assistant was requested but is not in PATH.  Either install
+it or use the native agent instead:
+
+.. code-block:: bash
+
+    # Use the native agent (no external tools needed)
+    dfm agent -a native
+
+    # Or install the Copilot CLI
     npm install -g @github/copilot-cli
-    
-    # Verify installation
-    copilot --version
 
-**Error:** "Assistant 'copilot' not available"
-
-**Solution:** Ensure the assistant is in your PATH and properly configured.
+See :doc:`native_agent` for native agent authentication and provider
+configuration, including troubleshooting common errors such as rate limits,
+OAuth prompts, and Ollama connectivity.
 
 Tasks Not Evaluating
 --------------------
@@ -738,6 +773,7 @@ in the project directory. The system prompt includes available dfm commands and 
 See Also
 ========
 
+* :doc:`native_agent` — Native agent setup, provider configuration, and TUI reference
 * :doc:`llm_integration` - General LLM integration guide
 * :doc:`tasks_developing` - Creating tasks
 * :doc:`../cmdref` - Command reference
