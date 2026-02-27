@@ -72,10 +72,10 @@ package:
     if result.stderr:
         print(f"Stderr: {result.stderr}")
     
-    # Read all start times - files are created in the cwd where dfm was invoked
+    # Read all start times - files are created in each task's rundir subdir
     start_times = []
     for i in range(num_tasks):
-        start_file = os.path.join(rundir, f"start_{i}.txt")
+        start_file = os.path.join(rundir, "rundir", f"perftest.task_{i}", f"start_{i}.txt")
         if os.path.exists(start_file):
             with open(start_file, "r") as f:
                 timestamp = float(f.read().strip())
@@ -188,10 +188,10 @@ package:
     
     print(f"\nFlow execution completed with return code: {result.returncode}")
     
-    # Read all start times - files are created in the cwd where dfm was invoked
+    # Read all start times - files are created in each task's rundir subdir
     start_times = []
     for i in range(num_tasks):
-        start_file = os.path.join(rundir, f"start_{i}.txt")
+        start_file = os.path.join(rundir, "rundir", f"perftest_scaled.task_{i}", f"start_{i}.txt")
         if os.path.exists(start_file):
             with open(start_file, "r") as f:
                 timestamp = float(f.read().strip())

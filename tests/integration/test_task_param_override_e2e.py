@@ -7,8 +7,7 @@ from dv_flow.mgr.task_graph_builder import TaskGraphBuilder
 from dv_flow.mgr.task_runner import TaskSetRunner
 
 
-@pytest.mark.asyncio
-async def test_e2e_task_param_override_from_docs_example(tmpdir):
+def test_e2e_task_param_override_from_docs_example(tmpdir):
     """Test the example from docs: dfm run build -D include=*.sv"""
     flow_dv = """
 package:
@@ -61,8 +60,8 @@ package:
     assert task_node.params.include == ["*.v"]  # Changed from "counter.sv"
 
 
-@pytest.mark.asyncio  
-async def test_e2e_multiple_task_params(tmpdir):
+
+def test_e2e_multiple_task_params(tmpdir):
     """Test multiple parameter overrides on same task"""
     flow_dv = """
 package:
@@ -105,8 +104,8 @@ package:
     assert task_node.params.include == ["*.sv"]
 
 
-@pytest.mark.asyncio
-async def test_e2e_qualified_vs_unqualified(tmpdir):
+
+def test_e2e_qualified_vs_unqualified(tmpdir):
     """Test that qualified override takes precedence over unqualified"""
     flow_dv = """
 package:
@@ -154,8 +153,8 @@ package:
     assert task2.params.msg == "global_override"
 
 
-@pytest.mark.asyncio
-async def test_e2e_inline_json_string(tmpdir):
+
+def test_e2e_inline_json_string(tmpdir):
     """Test inline JSON string with -P option"""
     flow_dv = """
 package:

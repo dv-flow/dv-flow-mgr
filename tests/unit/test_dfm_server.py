@@ -36,15 +36,13 @@ from pathlib import Path
 class TestDfmServerBasic:
     """Basic tests for server startup and communication"""
     
-    @pytest.mark.asyncio
-    async def test_server_starts_and_stops(self, tmp_path):
+    def test_server_starts_and_stops(self, tmp_path):
         """Test that server can start and stop cleanly"""
         from dv_flow.mgr.dfm_server import DfmCommandServer
-        
-        # Create minimal mock objects
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -53,30 +51,23 @@ class TestDfmServerBasic:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        # Verify socket exists
-        assert os.path.exists(server.socket_path)
-        
-        await server.stop()
-        
-        # Verify socket is cleaned up
-        assert not os.path.exists(server.socket_path)
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            assert os.path.exists(server.socket_path)
+            await server.stop()
+            assert not os.path.exists(server.socket_path)
+
+        asyncio.run(_run())
     
-    @pytest.mark.asyncio
-    async def test_ping_command(self, tmp_path):
+    def test_ping_command(self, tmp_path):
         """Test ping command for health checks"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -85,32 +76,28 @@ class TestDfmServerBasic:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.ping()
-            
-            assert result["status"] == "ok"
-            assert result["server"] == "dfm"
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.ping()
+                assert result["status"] == "ok"
+                assert result["server"] == "dfm"
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
     
-    @pytest.mark.asyncio
-    async def test_invalid_method_returns_error(self, tmp_path):
+    def test_invalid_method_returns_error(self, tmp_path):
         """Test that invalid method names return proper error"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -119,37 +106,32 @@ class TestDfmServerBasic:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            
-            with pytest.raises(Exception) as exc_info:
-                await client.call("nonexistent_method")
-            
-            assert "Unknown method" in str(exc_info.value)
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                with pytest.raises(Exception) as exc_info:
+                    await client.call("nonexistent_method")
+                assert "Unknown method" in str(exc_info.value)
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
 
 
 class TestShowCommands:
     """Tests for show.* commands"""
     
-    @pytest.mark.asyncio
-    async def test_show_tasks_empty(self, tmp_path):
+    def test_show_tasks_empty(self, tmp_path):
         """Test show.tasks with no tasks defined"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -158,41 +140,37 @@ class TestShowCommands:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.show_tasks()
-            
-            assert "results" in result
-            assert "count" in result
-            assert result["count"] == 0
-            assert result["results"] == []
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.show_tasks()
+                assert "results" in result
+                assert "count" in result
+                assert result["count"] == 0
+                assert result["results"] == []
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
     
-    @pytest.mark.asyncio
-    async def test_show_tasks_with_tasks(self, tmp_path):
+    def test_show_tasks_with_tasks(self, tmp_path):
         """Test show.tasks with tasks defined"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockTask:
             def __init__(self, name, desc="", is_root=False, uses=None):
                 self.name = name
                 self.desc = desc
                 self.is_root = is_root
                 self.uses = uses
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -205,43 +183,35 @@ class TestShowCommands:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.show_tasks()
-            
-            assert result["count"] == 3
-            
-            # Check task names are present
-            task_names = [t["name"] for t in result["results"]]
-            assert "test_pkg.build" in task_names
-            assert "test_pkg.test" in task_names
-            assert "test_pkg.internal" in task_names
-            
-            # Test scope filter
-            result = await client.show_tasks(scope="root")
-            assert result["count"] == 2
-            
-            # Test search filter
-            result = await client.show_tasks(search="build")
-            assert result["count"] == 1
-            assert result["results"][0]["name"] == "test_pkg.build"
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.show_tasks()
+                assert result["count"] == 3
+                task_names = [t["name"] for t in result["results"]]
+                assert "test_pkg.build" in task_names
+                assert "test_pkg.test" in task_names
+                assert "test_pkg.internal" in task_names
+
+                result = await client.show_tasks(scope="root")
+                assert result["count"] == 2
+
+                result = await client.show_tasks(search="build")
+                assert result["count"] == 1
+                assert result["results"][0]["name"] == "test_pkg.build"
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
     
-    @pytest.mark.asyncio
-    async def test_show_task_details(self, tmp_path):
+    def test_show_task_details(self, tmp_path):
         """Test show.task for specific task details"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockTask:
             def __init__(self, name, desc="", is_root=False, uses=None, doc=None, params=None, needs=None):
                 self.name = name
@@ -251,10 +221,10 @@ class TestShowCommands:
                 self.doc = doc
                 self.params = params or []
                 self.needs = needs or []
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -271,35 +241,31 @@ class TestShowCommands:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.show_task("test_pkg.build")
-            
-            assert result["name"] == "test_pkg.build"
-            assert result["desc"] == "Build the project"
-            assert result["scope"] == "root"
-            assert result["uses"] == "std.Message"
-            assert result["doc"] == "Builds all RTL and runs compilation"
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.show_task("test_pkg.build")
+                assert result["name"] == "test_pkg.build"
+                assert result["desc"] == "Build the project"
+                assert result["scope"] == "root"
+                assert result["uses"] == "std.Message"
+                assert result["doc"] == "Builds all RTL and runs compilation"
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
     
-    @pytest.mark.asyncio
-    async def test_show_task_not_found(self, tmp_path):
+    def test_show_task_not_found(self, tmp_path):
         """Test show.task returns error for unknown task"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -308,49 +274,44 @@ class TestShowCommands:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            
-            with pytest.raises(Exception) as exc_info:
-                await client.show_task("nonexistent")
-            
-            assert "not found" in str(exc_info.value).lower()
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                with pytest.raises(Exception) as exc_info:
+                    await client.show_task("nonexistent")
+                assert "not found" in str(exc_info.value).lower()
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
 
 
 class TestContextCommand:
     """Tests for context command"""
     
-    @pytest.mark.asyncio
-    async def test_context_returns_project_info(self, tmp_path):
+    def test_context_returns_project_info(self, tmp_path):
         """Test that context returns complete project information"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockTask:
             def __init__(self, name, desc="", is_root=False, uses=None):
                 self.name = name
                 self.desc = desc
                 self.is_root = is_root
                 self.uses = uses
-        
+
         class MockType:
             def __init__(self, name, desc=""):
                 self.name = name
                 self.desc = desc
-        
+
         class MockRunner:
             rundir = str(tmp_path / "rundir")
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "my_project"
@@ -363,50 +324,39 @@ class TestContextCommand:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.context()
-            
-            # Check project section
-            assert "project" in result
-            assert result["project"]["name"] == "my_project"
-            
-            # Check tasks section
-            assert "tasks" in result
-            assert len(result["tasks"]) == 1
-            assert result["tasks"][0]["name"] == "my_project.build"
-            
-            # Check types section
-            assert "types" in result
-            assert len(result["types"]) == 1
-            assert result["types"][0]["name"] == "my_project.MyType"
-            
-            # Check skills section exists
-            assert "skills" in result
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.context()
+                assert "project" in result
+                assert result["project"]["name"] == "my_project"
+                assert "tasks" in result
+                assert len(result["tasks"]) == 1
+                assert result["tasks"][0]["name"] == "my_project.build"
+                assert "types" in result
+                assert len(result["types"]) == 1
+                assert result["types"][0]["name"] == "my_project.MyType"
+                assert "skills" in result
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
 
 
 class TestValidateCommand:
     """Tests for validate command"""
     
-    @pytest.mark.asyncio
-    async def test_validate_returns_valid_for_good_config(self, tmp_path):
+    def test_validate_returns_valid_for_good_config(self, tmp_path):
         """Test validate returns valid=true for good configuration"""
         from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
+
         class MockRunner:
             rundir = str(tmp_path)
-        
+
         class MockBuilder:
             class MockPkg:
                 name = "test_pkg"
@@ -415,24 +365,21 @@ class TestValidateCommand:
                 pkg_m = {}
                 basedir = str(tmp_path)
             root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            client = DfmClient(server.socket_path)
-            result = await client.validate()
-            
-            assert result["valid"] == True
-            assert result["error_count"] == 0
-            assert result["errors"] == []
-        finally:
-            await client.disconnect()
-            await server.stop()
+
+        async def _run():
+            server = DfmCommandServer(runner=MockRunner(), builder=MockBuilder())
+            await server.start()
+            try:
+                client = DfmClient(server.socket_path)
+                result = await client.validate()
+                assert result["valid"] == True
+                assert result["error_count"] == 0
+                assert result["errors"] == []
+            finally:
+                await client.disconnect()
+                await server.stop()
+
+        asyncio.run(_run())
 
 
 class TestClientMode:

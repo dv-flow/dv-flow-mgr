@@ -102,23 +102,23 @@ def test_claude_check_available():
     assert isinstance(error_msg, str)
 
 
-@pytest.mark.asyncio
-async def test_openai_not_implemented():
-    """Test that OpenAI execute raises NotImplementedError"""
-    assistant = OpenAIAssistant()
-    
-    with pytest.raises(NotImplementedError):
-        await assistant.execute("test prompt", "/tmp", "", {})
+def test_openai_not_implemented():
+    async def _impl():
+        """Test that OpenAI execute raises NotImplementedError"""
+        assistant = OpenAIAssistant()
+        
+        with pytest.raises(NotImplementedError):
+            await assistant.execute("test prompt", "/tmp", "", {})
+    asyncio.run(_impl())
 
-
-@pytest.mark.asyncio
-async def test_claude_not_implemented():
-    """Test that Claude execute raises NotImplementedError"""
-    assistant = ClaudeAssistant()
-    
-    with pytest.raises(NotImplementedError):
-        await assistant.execute("test prompt", "/tmp", "", {})
-
+def test_claude_not_implemented():
+    async def _impl():
+        """Test that Claude execute raises NotImplementedError"""
+        assistant = ClaudeAssistant()
+        
+        with pytest.raises(NotImplementedError):
+            await assistant.execute("test prompt", "/tmp", "", {})
+    asyncio.run(_impl())
 
 def test_probe_available_assistant():
     """Test auto-probe for available assistant"""

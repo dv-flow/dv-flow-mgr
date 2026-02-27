@@ -164,8 +164,8 @@ async def Agent(runner, input) -> TaskDataResult:
     Parameters:
     - system_prompt: Template for system instructions
     - user_prompt: User's prompt content
-    - result_file: Name of output JSON file (REQUIRED)
-    - assistant: Override default assistant (optional)
+    - result_file: Name of output JSON file (REQUIRED for subprocess assistants)
+    - assistant: Override default assistant (optional); use "native" for DfmAgentCore
     - model: Specify the model to use (optional)
     - assistant_config: Assistant-specific configuration (optional)
     - max_retries: Maximum number of retry attempts on failure (default: 10)
@@ -173,15 +173,102 @@ async def Agent(runner, input) -> TaskDataResult:
     Returns TaskDataResult with status=1 if result file is missing or invalid.
     """
     _log.debug(f"Agent task: {input.name}")
-    
+
+    assistant_name = input.params.assistant if input.params.assistant else None
+
+    # ------------------------------------------------------------------ #
+    # Native path: DfmAgentCore.run_once()
+    # Used when assistant is None (and no subprocess CLI detected) or "native"
+    # ------------------------------------------------------------------ #
+    _use_native = assistant_name == "native"
+    if not _use_native and assistant_name is None:
+        # Auto-detect: prefer native when no subprocess CLI available
+        available = get_available_assistant_name()
+        _use_native = not available
+
+    if _use_native:
+        return await _run_native_agent(input)
+
+    # ------------------------------------------------------------------ #
+    # Subprocess path: copilot / codex / mock (preserved as-is)
+    # ------------------------------------------------------------------ #
+    return await _run_subprocess_agent(runner, input, assistant_name)
+
+
+async def _run_native_agent(input) -> TaskDataResult:
+    """Execute the agent task using DfmAgentCore.run_once() (native path)."""
+    markers = []
+
+    try:
+        from ..cmds.agent.agent_core import DfmAgentCore
+    except ImportError:
+        markers.append(TaskMarker(
+            msg="Native agent requires: pip install dv-flow-mgr[agent]",
+            severity=SeverityE.Error
+        ))
+        return TaskDataResult(status=1, markers=markers, changed=False)
+
+    model = input.params.model if hasattr(input.params, 'model') and input.params.model else None
+
+    try:
+        full_prompt = _build_prompt(input)
+    except Exception as e:
+        markers.append(TaskMarker(msg=f"Failed to build prompt: {e}", severity=SeverityE.Error))
+        return TaskDataResult(status=1, markers=markers, changed=False)
+
+    # Write prompt for debugging (same as subprocess path)
+    prompt_file = os.path.join(input.rundir, f"{input.name}.prompt.txt")
+    try:
+        with open(prompt_file, "w") as f:
+            f.write(full_prompt)
+    except IOError as e:
+        markers.append(TaskMarker(msg=f"Failed to write prompt file: {e}", severity=SeverityE.Warning))
+
+    user_prompt = input.params.user_prompt if input.params.user_prompt else ""
+
+    try:
+        core = DfmAgentCore(
+            context=None,
+            system_prompt=full_prompt,
+            model_name=model,
+        )
+        result = await core.run_once(user_prompt)
+    except Exception as e:
+        _log.exception("Native agent execution failed")
+        markers.append(TaskMarker(msg=f"Agent execution failed: {e}", severity=SeverityE.Error))
+        return TaskDataResult(status=1, markers=markers, changed=False)
+
+    # Extract the final text output from the run result
+    try:
+        from agents.items import ItemHelpers
+        final_text = ItemHelpers.text_message_outputs(result.new_items)
+    except Exception:
+        final_text = str(result.final_output) if result.final_output else ""
+
+    # Write output log for traceability
+    output_log = os.path.join(input.rundir, "agent_native_output.log")
+    try:
+        with open(output_log, "w") as f:
+            f.write(final_text)
+    except IOError:
+        pass
+
+    _log.debug(f"Native agent task complete for {input.name}")
+    return TaskDataResult(
+        status=0,
+        changed=True,
+        output=[],
+        markers=markers,
+    )
+
+
+async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult:
+    """Execute the agent task via subprocess (copilot/codex/mock path — preserved as-is)."""
     status = 0
     markers = []
     changed = False
     output = []
-    
-    # Step 1: Determine which assistant to use
-    assistant_name = input.params.assistant if input.params.assistant else None
-    
+
     # Auto-probe for available assistant if none specified
     if not assistant_name:
         assistant_name = get_available_assistant_name()

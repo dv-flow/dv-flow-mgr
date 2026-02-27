@@ -31,7 +31,6 @@ from ..task_data import SeverityE
 from .util import get_rootdir
 from .agent.context_builder import AgentContextBuilder
 from .agent.prompt_builder import SystemPromptBuilder
-from .agent.assistant_launcher import AssistantLauncher
 
 
 class CmdAgent:
@@ -152,6 +151,48 @@ class CmdAgent:
         model = getattr(args, 'model', None)
         
         self._log.debug(f"Launching assistant (name={assistant_name}, model={model})")
+        
+        # Use native agent when explicitly requested or when no subprocess assistant available
+        from .agent.assistant_launcher import AssistantLauncher
+        from ..std.ai_assistant import get_available_assistant_name
+        use_native = (assistant_name == 'native') or (
+            assistant_name is None and not get_available_assistant_name()
+        )
+        
+        if use_native:
+            try:
+                from .agent.agent_core import DfmAgentCore
+                from .agent.tui import AgentTUI
+                from .agent.config import load_config
+            except ImportError as exc:
+                print(
+                    f"Native agent requires: pip install dv-flow-mgr[agent]\n({exc})",
+                    file=sys.stderr,
+                )
+                return 1
+
+            try:
+                # Load config files, then apply CLI flags on top
+                agent_cfg = load_config(cwd=os.getcwd()).apply_cli(args)
+
+                core = DfmAgentCore(
+                    context=context,
+                    system_prompt=system_prompt,
+                    model_name=agent_cfg.model or model,
+                    pkg=pkg,
+                    loader=loader,
+                    working_dir=os.getcwd(),
+                    approval_mode=agent_cfg.approval_mode,
+                    trace=agent_cfg.trace,
+                    system_prompt_extra=agent_cfg.system_prompt_extra,
+                    model_settings=agent_cfg.model_settings,
+                )
+                tui = AgentTUI(core, pkg=pkg, context=context, loader=loader)
+                return asyncio.run(tui.run())
+            except Exception as e:
+                self._log.error(f"Native agent failed: {e}", exc_info=True)
+                print(f"Error running native agent: {e}", file=sys.stderr)
+                return 1
         
         try:
             launcher = AssistantLauncher(

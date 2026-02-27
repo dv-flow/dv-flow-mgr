@@ -15,8 +15,6 @@ package:
     deps:
     - name: pytest
       src: pypi
-    - name: pytest-asyncio
-      src: pypi
     - name: pydantic
       src: pypi
     - name: pyyaml
@@ -45,5 +43,13 @@ package:
       src: pypi
     - name: dv-flow-libhdlsim
       url: https://github.com/dv-flow/dv-flow-libhdlsim.git
+
+  - name: agent
+    deps:
+    - name: openai-agents
+      src: pypi
+      extras: [litellm]
+    - name: prompt_toolkit
+      src: pypi
 
 

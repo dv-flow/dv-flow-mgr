@@ -1,3 +1,4 @@
+import asyncio
 """
 Test the hash provider registry in ExtRgy
 """
@@ -121,29 +122,30 @@ def test_copy_preserves_providers():
     assert isinstance(provider, DefaultHashProvider)
 
 
-@pytest.mark.asyncio
-async def test_provider_integration():
-    """Integration test using actual hash computation"""
-    import tempfile
-    from pathlib import Path
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        test_file = tmpdir / "test.txt"
-        test_file.write_text("Test content")
+def test_provider_integration():
+    async def _impl():
+        """Integration test using actual hash computation"""
+        import tempfile
+        from pathlib import Path
         
-        fileset = FileSet(
-            filetype='text',
-            basedir=str(tmpdir),
-            files=['test.txt']
-        )
-        
-        registry = ExtRgy.inst()
-        provider = registry.get_hash_provider('text')
-        
-        assert provider is not None
-        hash_value = await provider.compute_hash(fileset, str(tmpdir))
-        
-        # Should be a valid MD5 hash
-        assert len(hash_value) == 32
-        assert all(c in '0123456789abcdef' for c in hash_value)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            test_file = tmpdir / "test.txt"
+            test_file.write_text("Test content")
+            
+            fileset = FileSet(
+                filetype='text',
+                basedir=str(tmpdir),
+                files=['test.txt']
+            )
+            
+            registry = ExtRgy.inst()
+            provider = registry.get_hash_provider('text')
+            
+            assert provider is not None
+            hash_value = await provider.compute_hash(fileset, str(tmpdir))
+            
+            # Should be a valid MD5 hash
+            assert len(hash_value) == 32
+            assert all(c in '0123456789abcdef' for c in hash_value)
+    asyncio.run(_impl())

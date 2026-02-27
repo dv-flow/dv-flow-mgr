@@ -40,14 +40,14 @@ from pathlib import Path
 class TestServerIntegrationWithRealProject:
     """Integration tests with actual DFM projects"""
     
-    @pytest.mark.asyncio
-    async def test_server_runs_with_real_task(self, tmp_path):
+    def test_server_runs_with_real_task(self, tmp_path):
         """Test server running actual tasks through dynamic scheduling"""
-        from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner
-        from dv_flow.mgr.dfm_server import DfmClient
-        
-        # Create a simple project
-        flow_content = """
+        async def _impl():
+            from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner
+            from dv_flow.mgr.dfm_server import DfmClient
+            
+            # Create a simple project
+            flow_content = """
 package:
   name: test_project
   
@@ -65,39 +65,40 @@ package:
         type: text
         include: "*.txt"
 """
-        flow_file = tmp_path / 'flow.dv'
-        flow_file.write_text(flow_content)
-        (tmp_path / 'test.txt').write_text("Test file content")
-        
-        rundir = tmp_path / 'rundir'
-        rundir.mkdir()
-        
-        # Load the package
-        loader = PackageLoader()
-        pkg = loader.load(str(flow_file))
-        
-        # Build runner with server
-        builder = TaskGraphBuilder(root_pkg=pkg, rundir=str(rundir), loader=loader)
-        runner = TaskSetRunner(str(rundir), builder=builder, enable_server=True)
-        
-        # Run the task
-        task = builder.mkTaskNode("test_project.hello")
-        result = await runner.run(task)
-        
-        # Verify task completed successfully
-        assert result is not None
-        
-        # Verify env was set during run
-        assert "DFM_SERVER_SOCKET" in runner.env
-        assert "DFM_SESSION_RUNDIR" in runner.env
-    
-    @pytest.mark.asyncio
-    async def test_environment_variable_is_set(self, tmp_path):
+            flow_file = tmp_path / 'flow.dv'
+            flow_file.write_text(flow_content)
+            (tmp_path / 'test.txt').write_text("Test file content")
+            
+            rundir = tmp_path / 'rundir'
+            rundir.mkdir()
+            
+            # Load the package
+            loader = PackageLoader()
+            pkg = loader.load(str(flow_file))
+            
+            # Build runner with server
+            builder = TaskGraphBuilder(root_pkg=pkg, rundir=str(rundir), loader=loader)
+            runner = TaskSetRunner(str(rundir), builder=builder, enable_server=True)
+            
+            # Run the task
+            task = builder.mkTaskNode("test_project.hello")
+            result = await runner.run(task)
+            
+            # Verify task completed successfully
+            assert result is not None
+            
+            # Verify env was set during run
+            assert "DFM_SERVER_SOCKET" in runner.env
+            assert "DFM_SESSION_RUNDIR" in runner.env
+        asyncio.run(_impl())
+
+    def test_environment_variable_is_set(self, tmp_path):
         """Test that DFM_SERVER_SOCKET is set in runner environment"""
-        from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner
-        
-        # Create a simple project
-        flow_content = """
+        async def _impl():
+            from dv_flow.mgr import PackageLoader, TaskGraphBuilder, TaskSetRunner
+            
+            # Create a simple project
+            flow_content = """
 package:
   name: env_test
   
@@ -108,32 +109,33 @@ package:
       with:
         msg: "Check env"
 """
-        flow_file = tmp_path / 'flow.dv'
-        flow_file.write_text(flow_content)
-        
-        rundir = tmp_path / 'rundir'
-        rundir.mkdir()
-        
-        # Load the package
-        loader = PackageLoader()
-        pkg = loader.load(str(flow_file))
-        
-        # Build runner
-        builder = TaskGraphBuilder(root_pkg=pkg, rundir=str(rundir), loader=loader)
-        runner = TaskSetRunner(str(rundir), builder=builder, enable_server=True)
-        
-        # Initially no socket path
-        assert runner.server_socket_path is None
-        
-        # Create and run a task
-        task = builder.mkTaskNode("env_test.check")
-        await runner.run(task)
-        
-        # After run, server should have been started and env set
-        # Note: server stops after run completes
-        assert "DFM_SERVER_SOCKET" in runner.env
-        assert "DFM_SESSION_RUNDIR" in runner.env
-        assert runner.env["DFM_SESSION_RUNDIR"] == str(rundir)
+            flow_file = tmp_path / 'flow.dv'
+            flow_file.write_text(flow_content)
+            
+            rundir = tmp_path / 'rundir'
+            rundir.mkdir()
+            
+            # Load the package
+            loader = PackageLoader()
+            pkg = loader.load(str(flow_file))
+            
+            # Build runner
+            builder = TaskGraphBuilder(root_pkg=pkg, rundir=str(rundir), loader=loader)
+            runner = TaskSetRunner(str(rundir), builder=builder, enable_server=True)
+            
+            # Initially no socket path
+            assert runner.server_socket_path is None
+            
+            # Create and run a task
+            task = builder.mkTaskNode("env_test.check")
+            await runner.run(task)
+            
+            # After run, server should have been started and env set
+            # Note: server stops after run completes
+            assert "DFM_SERVER_SOCKET" in runner.env
+            assert "DFM_SESSION_RUNDIR" in runner.env
+            assert runner.env["DFM_SESSION_RUNDIR"] == str(rundir)
+        asyncio.run(_impl())
 
 
 class TestClientCliIntegration:
@@ -172,91 +174,93 @@ class TestClientCliIntegration:
 class TestServerProtocol:
     """Tests for the JSON-RPC protocol"""
     
-    @pytest.mark.asyncio
-    async def test_malformed_json_handled(self, tmp_path):
+    def test_malformed_json_handled(self, tmp_path):
         """Test that server handles malformed JSON gracefully"""
-        from dv_flow.mgr.dfm_server import DfmCommandServer
-        
-        class MockRunner:
-            rundir = str(tmp_path)
-        
-        class MockBuilder:
-            class MockPkg:
-                name = "test_pkg"
-                task_m = {}
-                type_m = {}
-                pkg_m = {}
-                basedir = str(tmp_path)
-            root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            # Connect directly and send malformed JSON
-            reader, writer = await asyncio.open_unix_connection(server.socket_path)
+        async def _impl():
+            from dv_flow.mgr.dfm_server import DfmCommandServer
             
-            # Send invalid JSON
-            writer.write(b'{"invalid json\n')
-            await writer.drain()
+            class MockRunner:
+                rundir = str(tmp_path)
             
-            # Read response
-            response_line = await reader.readline()
-            response = json.loads(response_line)
+            class MockBuilder:
+                class MockPkg:
+                    name = "test_pkg"
+                    task_m = {}
+                    type_m = {}
+                    pkg_m = {}
+                    basedir = str(tmp_path)
+                root_pkg = MockPkg()
             
-            # Should return JSON-RPC error
-            assert "error" in response
-            assert response["error"]["code"] == -32700  # Parse error
+            server = DfmCommandServer(
+                runner=MockRunner(),
+                builder=MockBuilder()
+            )
             
-            writer.close()
-            await writer.wait_closed()
-        finally:
-            await server.stop()
-    
-    @pytest.mark.asyncio
-    async def test_concurrent_requests(self, tmp_path):
+            await server.start()
+            
+            try:
+                # Connect directly and send malformed JSON
+                reader, writer = await asyncio.open_unix_connection(server.socket_path)
+                
+                # Send invalid JSON
+                writer.write(b'{"invalid json\n')
+                await writer.drain()
+                
+                # Read response
+                response_line = await reader.readline()
+                response = json.loads(response_line)
+                
+                # Should return JSON-RPC error
+                assert "error" in response
+                assert response["error"]["code"] == -32700  # Parse error
+                
+                writer.close()
+                await writer.wait_closed()
+            finally:
+                await server.stop()
+        asyncio.run(_impl())
+
+    def test_concurrent_requests(self, tmp_path):
         """Test that server handles concurrent requests"""
-        from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
-        
-        class MockRunner:
-            rundir = str(tmp_path)
-        
-        class MockBuilder:
-            class MockPkg:
-                name = "test_pkg"
-                task_m = {}
-                type_m = {}
-                pkg_m = {}
-                basedir = str(tmp_path)
-            root_pkg = MockPkg()
-        
-        server = DfmCommandServer(
-            runner=MockRunner(),
-            builder=MockBuilder()
-        )
-        
-        await server.start()
-        
-        try:
-            # Create multiple clients
-            clients = [DfmClient(server.socket_path) for _ in range(3)]
+        async def _impl():
+            from dv_flow.mgr.dfm_server import DfmCommandServer, DfmClient
             
-            # Send concurrent ping requests
-            async def ping_client(client):
-                result = await client.ping()
-                return result["status"]
+            class MockRunner:
+                rundir = str(tmp_path)
             
-            results = await asyncio.gather(*[ping_client(c) for c in clients])
+            class MockBuilder:
+                class MockPkg:
+                    name = "test_pkg"
+                    task_m = {}
+                    type_m = {}
+                    pkg_m = {}
+                    basedir = str(tmp_path)
+                root_pkg = MockPkg()
             
-            # All should succeed
-            assert all(r == "ok" for r in results)
+            server = DfmCommandServer(
+                runner=MockRunner(),
+                builder=MockBuilder()
+            )
             
-            # Cleanup
-            for client in clients:
-                await client.disconnect()
-        finally:
-            await server.stop()
+            await server.start()
+            
+            try:
+                # Create multiple clients
+                clients = [DfmClient(server.socket_path) for _ in range(3)]
+                
+                # Send concurrent ping requests
+                async def ping_client(client):
+                    result = await client.ping()
+                    return result["status"]
+                
+                results = await asyncio.gather(*[ping_client(c) for c in clients])
+                
+                # All should succeed
+                assert all(r == "ok" for r in results)
+                
+                # Cleanup
+                for client in clients:
+                    await client.disconnect()
+            finally:
+                await server.stop()
+        asyncio.run(_impl())

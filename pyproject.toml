@@ -21,6 +21,12 @@ authors = [
 description = "DV Flow Manager - Data-driven, parameterizable workflow orchestration"
 license = {file = "LICENSE" }
 
+[project.optional-dependencies]
+agent = [
+    "openai-agents[litellm]>=0.9.0",
+    "prompt_toolkit>=3.0",
+]
+
 [project.scripts]
 dfm = "dv_flow.mgr.__main__:main"
 
