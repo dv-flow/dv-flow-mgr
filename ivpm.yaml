@@ -43,13 +43,11 @@ package:
       src: pypi
     - name: setuptools-scm
       src: pypi
-
-  - name: agent
-    deps:
     - name: openai-agents
       src: pypi
       extras: [litellm]
     - name: prompt_toolkit
       src: pypi
+
 
 
