@@ -54,6 +54,8 @@ class Task(object):
     run : str = None
     shell : str = "bash"
     tags : List['Type'] = dc.field(default_factory=list)
+    max_failures : int = -1
+    on_error : str = None
     srcinfo : SrcInfo = None
     taskdef : 'TaskDef' = None
 

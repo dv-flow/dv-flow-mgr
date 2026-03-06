@@ -4,13 +4,6 @@ package:
 
   dep-sets:
 
-  - name: default
-    deps:
-    - name: pytest
-      src: pypi
-    - name: svdep
-      url: https://github.com/fvutils/svdep.git
-
   - name: default-dev
     deps:
     - name: pytest
@@ -48,6 +41,13 @@ package:
       extras: [litellm]
     - name: prompt_toolkit
       src: pypi
+
+  - name: default
+    deps:
+    - name: pytest
+      src: pypi
+    - name: svdep
+      url: https://github.com/fvutils/svdep.git
 
 
 

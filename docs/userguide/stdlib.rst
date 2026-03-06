@@ -2,6 +2,40 @@
 Standard Library
 ################
 
+std.TaskFailure
+===============
+
+A framework-emitted data item that records a subtask failure.  ``std.TaskFailure``
+is **never declared or produced directly by user tasks**; the framework appends
+it to a leaf task's output whenever that task exits with a non-zero status.
+
+``std.TaskFailure`` items propagate through skipped tasks so that an enclosing
+compound task can observe all failures in its subtask graph via its
+:class:`~dv_flow.mgr.task_data.CompoundRunInput`.
+
+Fields
+------
+
+* **task_name** — Fully-qualified name of the task that failed
+* **status** — The non-zero exit code returned by the task
+* **markers** — Diagnostic markers (errors/warnings) produced by the task
+
+Usage
+-----
+
+In an ``on_error`` handler, filter ``std.TaskFailure`` items from
+``input.inputs`` to separate failure records from regular output:
+
+.. code-block:: python
+
+    failures = [i for i in input.inputs
+                if getattr(i, "type", None) == "std.TaskFailure"]
+    other    = [i for i in input.inputs
+                if getattr(i, "type", None) != "std.TaskFailure"]
+
+See :doc:`error_handling` for full details on compound task error handling.
+
+
 std.CreateFile
 ==============
 Example 

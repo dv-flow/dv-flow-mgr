@@ -56,7 +56,8 @@ class DynamicScheduler:
         self,
         tasks: Union[TaskNode, List[TaskNode]],
         name: str = None,
-        timeout: float = None
+        timeout: float = None,
+        max_failures: int = -1
     ) -> Union[TaskDataOutput, List[TaskDataOutput]]:
         """
         Dynamically schedule a sub-graph into the current execution.
@@ -114,7 +115,8 @@ class DynamicScheduler:
             'id': subgraph_id,
             'tasks': task_list,
             'dep_map': sub_dep_map,
-            'future': future
+            'future': future,
+            'max_failures': max_failures,
         })
         
         self._dynamic_log.debug("Sub-graph %d queued, waiting for completion" % subgraph_id)

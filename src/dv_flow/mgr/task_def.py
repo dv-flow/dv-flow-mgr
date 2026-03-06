@@ -289,6 +289,14 @@ class TaskDef(BaseModel):
     tags : List[Union[str, Dict[str, Any]]] = dc.Field(
         default_factory=list,
         description="Tags as type references with optional parameter overrides")
+    max_failures : int = dc.Field(
+        default=-1,
+        description="Max direct-subtask failures before independent subtasks are skipped. "
+                    "-1 or 0 = run all; 1 = stop on first; N > 1 = stop after N.")
+    on_error : Union[str, None] = dc.Field(
+        default=None,
+        description="Python callable (module:function) invoked as the compound's run hook "
+                    "when all direct subtasks complete.")
     srcinfo : SrcInfo = dc.Field(default=None)
     
     @model_validator(mode='before')

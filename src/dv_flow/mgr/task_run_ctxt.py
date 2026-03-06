@@ -255,7 +255,8 @@ class TaskRunCtxt(object):
         self, 
         tasks: Union['TaskNode', List['TaskNode']],
         name: str = None,
-        timeout: float = None
+        timeout: float = None,
+        max_failures: int = -1
     ) -> Union[TaskDataOutput, List[TaskDataOutput]]:
         """
         Execute a sub-graph of tasks dynamically during task execution.
@@ -268,6 +269,8 @@ class TaskRunCtxt(object):
             tasks: TaskNode or list of TaskNodes to execute
             name: Optional name prefix for sub-tasks (for debugging)
             timeout: Optional timeout in seconds (None = no timeout)
+            max_failures: -1/0 = run all independent tasks even after failures;
+                          1 = stop on first failure; N > 1 = stop after N failures.
             
         Returns:
             TaskDataOutput or list of TaskDataOutput from terminal tasks
@@ -293,7 +296,7 @@ class TaskRunCtxt(object):
         # Check if runner supports dynamic scheduling
         if hasattr(self.runner, 'schedule_subgraph'):
             try:
-                return await self.runner.schedule_subgraph(tasks, name, timeout)
+                return await self.runner.schedule_subgraph(tasks, name, timeout, max_failures)
             except RuntimeError as e:
                 # Fall through to fallback
                 self._log.debug("Dynamic scheduling not available: %s" % str(e))

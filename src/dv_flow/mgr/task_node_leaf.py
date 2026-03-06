@@ -7,7 +7,7 @@ import pydantic.dataclasses as pdc
 import logging
 import toposort
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Tuple, Union
-from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskMarker, SeverityE
+from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult, TaskFailure, TaskMarker, SeverityE
 from .task_def import ConsumesE, PassthroughE
 from .task_node import TaskNode
 from .task_run_ctxt import TaskRunCtxt
@@ -458,6 +458,18 @@ class TaskNodeLeaf(TaskNode):
 
         self._log.debug("output dep_m: %s %s" % (self.name, str(dep_m)))
         self._log.debug("output[2]: %s" % str(output))
+
+        # On failure, append a TaskFailure item so downstream tasks and enclosing
+        # compounds can inspect and aggregate the failure via the data pipeline.
+        if self.result.status != 0:
+            failure_item = TaskFailure(
+                task_name=self.name,
+                status=self.result.status,
+                markers=self.result.markers.copy()
+            )
+            failure_item.src = self.name
+            failure_item.seq = len(output)
+            output.append(failure_item)
 
         # Store the result
         self.output = TaskDataOutput(
