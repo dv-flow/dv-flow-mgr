@@ -164,6 +164,27 @@ See the :doc:`../pytask_api` documentation
 for more information about the Python task-graph generation API.
 
 
+Task-Graph Generation and Error Handling
+-----------------------------------------
+
+Dynamically-generated subgraphs support the same ``max_failures`` control as
+static compound tasks.  Pass ``max_failures`` to
+:meth:`~dv_flow.mgr.TaskRunCtxt.run_subgraph` to control how many subtask
+failures are tolerated before remaining independent siblings are skipped:
+
+.. code-block:: python
+
+    async def run_tests(ctxt, input):
+        # Build test task nodes dynamically …
+        tasks = [build_test_node(ctxt, seed) for seed in seeds]
+
+        # Run all; failures do not abort siblings.
+        await ctxt.run_subgraph(tasks, max_failures=-1)
+        return TaskDataResult(status=0, output=[])
+
+See :doc:`error_handling` for the full ``max_failures`` semantics.
+
+
 PyTask Class-Based API
 ======================
 

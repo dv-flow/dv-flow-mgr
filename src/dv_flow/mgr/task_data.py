@@ -127,6 +127,36 @@ class TaskDataItem(BaseModel):
     src : str = None
     seq : int = -1
 
+class TaskFailure(TaskDataItem):
+    """
+    Data item emitted by a task that fails (status != 0).
+    Skipped tasks pass this item through unchanged so failures propagate
+    to the nearest enclosing compound's run callable.
+    """
+    type      : str = "std.TaskFailure"
+    task_name : str
+    status    : int
+    markers   : List[TaskMarker] = dc.Field(default_factory=list)
+
+
+class SubtaskSummary(BaseModel):
+    """Summary of one direct subtask's outcome, passed to a compound's run callable."""
+    name    : str
+    status  : int
+    skipped : bool
+
+
+class CompoundRunInput(TaskDataInput):
+    """
+    Input delivered to a compound's 'run' callable.
+
+    'inputs' (from base class) contains all data items that flowed out of the subgraph,
+    including any std.TaskFailure items.  'subtasks' is a convenience per-direct-subtask
+    summary.
+    """
+    subtasks : List[SubtaskSummary] = dc.Field(default_factory=list)
+
+
 class TaskData(BaseModel):
     src : str = None
     deps : Dict[str,Set[str]] = dc.Field(default_factory=dict)

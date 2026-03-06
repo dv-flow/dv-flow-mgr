@@ -108,6 +108,11 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     _task_state : Dict[TaskNode, TaskState] = dc.field(default_factory=dict, init=False)
     _ready_queue : asyncio.Queue = dc.field(default=None, init=False)
     _dep_map : Dict[TaskNode, Set[TaskNode]] = dc.field(default_factory=dict, init=False)
+
+    # Scoped execution policy: map each direct subtask to its enclosing compound.
+    _task_to_compound : Dict = dc.field(default_factory=dict, init=False)
+    # Per-compound failure count (direct subtask failures only).
+    _compound_failures : Dict = dc.field(default_factory=dict, init=False)
     
     # Command server for LLM integration
     _command_server : 'DfmCommandServer' = dc.field(default=None, init=False)
@@ -220,6 +225,16 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                 self._log.debug("  Task: %s", str(t.name))
                 for v in value:
                     self._log.debug("  - %s", str(v.name))
+
+        # Build reverse lookup: direct subtask → enclosing compound (for scoped policy).
+        self._task_to_compound = {}
+        self._compound_failures = {}
+        from .task_node_compound import TaskNodeCompound as _TNC
+        for t in self._dep_map:
+            if isinstance(t, _TNC):
+                for subtask in t.tasks:
+                    if subtask is not t.input:
+                        self._task_to_compound[subtask] = t
 
         # Initialize state for all tasks
         for t in self._dep_map.keys():
@@ -359,16 +374,27 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         active_task_l.append((t, coro))
     
     def _skip_task(self, task: TaskNode, done_task_s: Set[TaskNode]):
-        """Mark a task as skipped (not executed due to failure)"""
+        """Mark a task as skipped (not executed due to failure).
+        
+        Collects upstream output items (including TaskFailure items) and passes
+        them through so failures propagate to enclosing compound run callables.
+        """
         self._log.debug("Skipping task %s" % task.name)
         
         # Mark as skipped
         done_task_s.add(task)
         self._task_state[task] = TaskState.SKIPPED
-        
-        # Create dummy result
-        task.result = TaskDataResult(status=1, output=[], changed=False)
-        task.output = TaskDataOutput(changed=False, dep_m={}, output=[])
+
+        # Pass through upstream items so TaskFailure items reach the compound boundary.
+        passthrough = []
+        for dep, block in task.needs:
+            if not block and dep.output is not None:
+                for item in dep.output.output:
+                    if getattr(item, "type", None) != "std.Env":
+                        passthrough.append(item)
+
+        task.result = TaskDataResult(status=1, output=passthrough, changed=False)
+        task.output = TaskDataOutput(changed=False, dep_m={}, output=passthrough)
         
         # Signal completion event so dependent tasks can proceed
         if task.name in self._task_completion_events:
@@ -490,7 +516,16 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                         self._log.warning("Task %s in ready queue but state is %s" % 
                                          (ready_task.name, self._task_state.get(ready_task)))
                     else:
-                        if self.status == 0:
+                        # Decide whether to launch or skip.
+                        # Tasks inside a compound with a run callable are governed by
+                        # that compound's max_failures threshold (scoped policy).
+                        # All other tasks are governed by the global self.status.
+                        rt_compound = self._task_to_compound.get(ready_task)
+                        if rt_compound is not None and rt_compound.run is not None:
+                            should_launch = self._parent_allows_continue(ready_task)
+                        else:
+                            should_launch = (self.status == 0)
+                        if should_launch:
                             self._task_state[ready_task] = TaskState.SCHEDULED
                             await self._launch_task(ready_task, active_task_l, src_memento, dst_memento)
                         else:
@@ -504,6 +539,22 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                     if item is not None:  # Not a sentinel
                         subgraph_id = item['id']
                         self._dynamic_log.debug("Processing sub-graph %d from queue" % subgraph_id)
+
+                        # Always create a scope for dynamic sub-graph tasks so that
+                        # sibling tasks can run even after a failure (the scope's
+                        # max_failures controls how many failures are tolerated).
+                        # When max_failures==-1 (default), failures still propagate
+                        # to the global status but independent siblings keep running.
+                        # When max_failures>=1, failures are scoped (no global
+                        # propagation) and siblings stop once the limit is reached.
+                        sg_max_failures = item.get('max_failures', -1)
+                        class _DynScope:
+                            run = True  # non-None: scoped launch decision enabled
+                        sg_scope = _DynScope()
+                        sg_scope.max_failures = sg_max_failures
+                        sg_scope.name = item.get('name', 'subgraph_%d' % subgraph_id)
+                        # propagate_failures=True → failure updates global self.status
+                        sg_scope.propagate_failures = (sg_max_failures == -1)
                         
                         for task, deps in item['dep_map'].items():
                             if task not in self._task_state:
@@ -512,6 +563,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                                 self._pending_tasks[task.name] = task
                                 self._task_completion_events[task.name] = asyncio.Event()
                                 self._dynamic_log.debug("  Added dynamic task %s" % task.name)
+                                self._task_to_compound[task] = sg_scope
                                 
                                 if self._is_task_ready(task):
                                     self._task_state[task] = TaskState.READY
@@ -540,6 +592,16 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                 return False
         return True
     
+    def _parent_allows_continue(self, task: TaskNode) -> bool:
+        """Return True if the task's enclosing compound permits further execution."""
+        compound = self._task_to_compound.get(task)
+        if compound is None:
+            return False
+        mf = compound.max_failures
+        if mf == -1:   # -1: no limit — run all independent tasks
+            return True
+        return self._compound_failures.get(compound, 0) < mf
+
     def _handle_completions(self, active_task_l, done_task_s, done_l, dst_memento):
         """
         Handle completed tasks and check if any dependents become ready.
@@ -572,9 +634,36 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                         dst_memento[completed_task.name] = completed_task.result.memento.model_dump()
                     else:
                         dst_memento[completed_task.name] = None
-                    self.status |= completed_task.result.status 
-                    if self.status:
-                        self._log.debug("Task %s failed with status %d" % (completed_task.name, completed_task.result.status))
+
+                    task_status = completed_task.result.status
+                    if task_status != 0:
+                        compound = self._task_to_compound.get(completed_task)
+                        if compound is not None and compound.run is not None:
+                            # Track failure count for max_failures threshold.
+                            self._compound_failures[compound] = (
+                                self._compound_failures.get(compound, 0) + 1
+                            )
+                            # When propagate_failures is True (default for dynamic
+                            # sub-graphs with no limit), still update global status.
+                            if getattr(compound, 'propagate_failures', False):
+                                self.status |= task_status
+                                self._log.debug(
+                                    "Task %s failed (status %d) inside compound %s "
+                                    "(propagated, compound_failures=%d)" % (
+                                        completed_task.name, task_status,
+                                        compound.name,
+                                        self._compound_failures[compound]))
+                            else:
+                                self._log.debug(
+                                    "Task %s failed (status %d) inside compound %s "
+                                    "(scoped, compound_failures=%d)" % (
+                                        completed_task.name, task_status,
+                                        compound.name,
+                                        self._compound_failures[compound]))
+                        else:
+                            self.status |= task_status
+                            self._log.debug("Task %s failed with status %d" % (
+                                completed_task.name, task_status))
                     self._notify(completed_task, "leave")
                     active_task_l.pop(i)
                     
