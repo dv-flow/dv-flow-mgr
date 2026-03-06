@@ -212,6 +212,60 @@ This is accomplished by:
 
 
 
+Compound Task Error Handling
+-----------------------------
+
+By default a compound task stops launching new subtasks as soon as one fails.
+Two fields change this behaviour.
+
+**max_failures** controls how many subtask failures are tolerated before
+remaining independent siblings are skipped:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: RunTests
+      max_failures: -1   # -1 = run all tests regardless of failures
+      body:
+      - name: test1
+        uses: mytools.RunTest
+      - name: test2
+        uses: mytools.RunTest
+      - name: test3
+        uses: mytools.RunTest
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Value
+     - Behaviour
+   * - ``-1`` *(default)*
+     - No limit; all independent subtasks run even after failures.
+   * - ``N > 0``
+     - Stop after *N* failures have accumulated.
+
+**on_error** specifies a Python callable (``module.function``) that is
+invoked when the compound finishes to produce the compound's final status and
+output.  It receives a :class:`~dv_flow.mgr.task_data.CompoundRunInput`
+containing all subtask output items and per-subtask summaries:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: RunTests
+      max_failures: -1
+      on_error: myproject.utils.collect_results
+      body:
+      - name: test1
+        uses: mytools.RunTest
+      - name: test2
+        uses: mytools.RunTest
+
+See :doc:`error_handling` for a full description including a worked example
+and the ``on_error`` callable API.
+
+
 Conditional Tasks
 =================
 

@@ -446,10 +446,11 @@ mermaid.initialize(
     }
 );
 
-window.addEventListener("load", load);</script>
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Incremental Builds" href="incremental.html" />
+    <link rel="next" title="Error Handling" href="error_handling.html" />
     <link rel="prev" title="Task Visibility" href="visibility.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -595,6 +596,23 @@ be specified externally in a Python module or inline.</p>
 </div>
 <p>See the <a class="reference internal" href="../pytask_api.html"><span class="doc">Python Task API</span></a> documentation
 for more information about the Python task-graph generation API.</p>
+<section id="task-graph-generation-and-error-handling">
+<h3>Task-Graph Generation and Error Handling<a class="headerlink" href="#task-graph-generation-and-error-handling" title="Link to this heading">¶</a></h3>
+<p>Dynamically-generated subgraphs support the same <code class="docutils literal notranslate"><span class="pre">max_failures</span></code> control as
+static compound tasks.  Pass <code class="docutils literal notranslate"><span class="pre">max_failures</span></code> to
+<a class="reference internal" href="../pytask_api.html#dv_flow.mgr.TaskRunCtxt.run_subgraph" title="dv_flow.mgr.TaskRunCtxt.run_subgraph"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run_subgraph()</span></code></a> to control how many subtask
+failures are tolerated before remaining independent siblings are skipped:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run_tests</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+    <span class="c1"># Build test task nodes dynamically …</span>
+    <span class="n">tasks</span> <span class="o">=</span> <span class="p">[</span><span class="n">build_test_node</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span> <span class="k">for</span> <span class="n">seed</span> <span class="ow">in</span> <span class="n">seeds</span><span class="p">]</span>
+
+    <span class="c1"># Run all; failures do not abort siblings.</span>
+    <span class="k">await</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">run_subgraph</span><span class="p">(</span><span class="n">tasks</span><span class="p">,</span> <span class="n">max_failures</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="p">[])</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="error_handling.html"><span class="doc">Error Handling</span></a> for the full <code class="docutils literal notranslate"><span class="pre">max_failures</span></code> semantics.</p>
+</section>
 </section>
 <section id="pytask-class-based-api">
 <h2>PyTask Class-Based API<a class="headerlink" href="#pytask-class-based-api" title="Link to this heading">¶</a></h2>
@@ -786,6 +804,7 @@ simplicity and power.</p>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
@@ -812,7 +831,7 @@ simplicity and power.</p>
   <li><a href="../index.html">Documentation overview</a><ul>
   <li><a href="index.html">User Guide</a><ul>
       <li>Previous: <a href="visibility.html" title="previous chapter">Task Visibility</a></li>
-      <li>Next: <a href="incremental.html" title="next chapter">Incremental Builds</a></li>
+      <li>Next: <a href="error_handling.html" title="next chapter">Error Handling</a></li>
   </ul></li>
   </ul></li>
 </ul>

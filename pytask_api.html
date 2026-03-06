@@ -169,15 +169,19 @@ task’s implementation.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dv_flow.mgr.TaskRunCtxt.run_subgraph">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run_subgraph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TaskNode</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">TaskNode</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TaskDataOutput</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">TaskDataOutput</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.run_subgraph" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run_subgraph</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TaskNode</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">TaskNode</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_failures</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">TaskDataOutput</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">TaskDataOutput</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#dv_flow.mgr.TaskRunCtxt.run_subgraph" title="Link to this definition">¶</a></dt>
 <dd><p>Execute a sub-graph of tasks dynamically during task execution.</p>
 <p>This schedules the tasks into the current execution schedule,
 respecting dependencies and resource constraints. The call
 blocks until all tasks complete.</p>
-<dl class="simple">
+<dl>
 <dt>Args:</dt><dd><p>tasks: TaskNode or list of TaskNodes to execute
 name: Optional name prefix for sub-tasks (for debugging)
-timeout: Optional timeout in seconds (None = no timeout)</p>
+timeout: Optional timeout in seconds (None = no timeout)
+max_failures: -1/0 = run all independent tasks even after failures;</p>
+<blockquote>
+<div><p>1 = stop on first failure; N &gt; 1 = stop after N failures.</p>
+</div></blockquote>
 </dd>
 <dt>Returns:</dt><dd><p>TaskDataOutput or list of TaskDataOutput from terminal tasks</p>
 </dd>
@@ -244,10 +248,67 @@ an associated severity level (error, warning, info).</p>
 
 </section>
 </section>
+<section id="error-handling-api">
+<h2>Error Handling API<a class="headerlink" href="#error-handling-api" title="Link to this heading">¶</a></h2>
+<p>These types are used by <code class="docutils literal notranslate"><span class="pre">on_error</span></code> handler callables attached to compound
+tasks.  See <a class="reference internal" href="userguide/error_handling.html"><span class="doc">Error Handling</span></a> for usage examples.</p>
+<section id="taskfailure">
+<h3>TaskFailure<a class="headerlink" href="#taskfailure" title="Link to this heading">¶</a></h3>
+<p>A <code class="docutils literal notranslate"><span class="pre">TaskDataItem</span></code>-derived object automatically appended to a leaf task’s
+output when that task exits with a non-zero status.</p>
+<p>Fields:</p>
+<ul class="simple">
+<li><p><strong>task_name</strong> (<code class="docutils literal notranslate"><span class="pre">str</span></code>) — Fully-qualified name of the failing task</p></li>
+<li><p><strong>status</strong> (<code class="docutils literal notranslate"><span class="pre">int</span></code>) — Non-zero exit code</p></li>
+<li><p><strong>markers</strong> (<code class="docutils literal notranslate"><span class="pre">List[TaskMarker]</span></code>) — Diagnostic markers the task produced</p></li>
+</ul>
+</section>
+<section id="subtasksummary">
+<h3>SubtaskSummary<a class="headerlink" href="#subtasksummary" title="Link to this heading">¶</a></h3>
+<p>A lightweight record describing one subtask within a compound.  Passed
+as part of <code class="xref py py-class docutils literal notranslate"><span class="pre">CompoundRunInput</span></code>.</p>
+<p>Fields:</p>
+<ul class="simple">
+<li><p><strong>name</strong> (<code class="docutils literal notranslate"><span class="pre">str</span></code>) — Fully-qualified subtask name</p></li>
+<li><p><strong>status</strong> (<code class="docutils literal notranslate"><span class="pre">int</span></code>) — Exit status (0 = success)</p></li>
+<li><p><strong>skipped</strong> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>) — <code class="docutils literal notranslate"><span class="pre">True</span></code> if the subtask was not executed</p></li>
+</ul>
+</section>
+<section id="compoundruninput">
+<h3>CompoundRunInput<a class="headerlink" href="#compoundruninput" title="Link to this heading">¶</a></h3>
+<p>Passed as the <code class="docutils literal notranslate"><span class="pre">input</span></code> argument to an <code class="docutils literal notranslate"><span class="pre">on_error</span></code> callable.  Contains all
+data items produced by the compound’s subtasks plus per-subtask summaries.</p>
+<p>Fields:</p>
+<ul class="simple">
+<li><p><strong>name</strong> (<code class="docutils literal notranslate"><span class="pre">str</span></code>) — Compound task name</p></li>
+<li><p><strong>inputs</strong> (<code class="docutils literal notranslate"><span class="pre">List[TaskDataItem]</span></code>) — All output items from all subtasks,
+including any <code class="docutils literal notranslate"><span class="pre">std.TaskFailure</span></code> items</p></li>
+<li><p><strong>subtasks</strong> (<code class="docutils literal notranslate"><span class="pre">List[SubtaskSummary]</span></code>) — Per-subtask status records</p></li>
+<li><p><strong>params</strong> — Task parameter object</p></li>
+<li><p><strong>rundir</strong> (<code class="docutils literal notranslate"><span class="pre">str</span></code>) — Task run directory</p></li>
+<li><p><strong>srcdir</strong> (<code class="docutils literal notranslate"><span class="pre">str</span></code>) — Task source directory</p></li>
+<li><p><strong>changed</strong> (<code class="docutils literal notranslate"><span class="pre">bool</span></code>) — <code class="docutils literal notranslate"><span class="pre">True</span></code> if any subtask reported changed output</p></li>
+<li><p><strong>memento</strong> — Previous-run memento data (for incremental builds)</p></li>
+</ul>
+</section>
+<section id="on-error-callable-signature">
+<h3>on_error Callable Signature<a class="headerlink" href="#on-error-callable-signature" title="Link to this heading">¶</a></h3>
+<p>An <code class="docutils literal notranslate"><span class="pre">on_error</span></code> handler must be an <code class="docutils literal notranslate"><span class="pre">async</span></code> function with this signature:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">my_handler</span><span class="p">(</span>
+    <span class="n">ctxt</span><span class="p">:</span> <span class="n">TaskRunCtxt</span><span class="p">,</span>
+    <span class="nb">input</span><span class="p">:</span> <span class="n">CompoundRunInput</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TaskDataResult</span><span class="p">:</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>The returned <code class="xref py py-class docutils literal notranslate"><span class="pre">TaskDataResult</span></code> <code class="docutils literal notranslate"><span class="pre">status</span></code> becomes the compound task’s
+own exit status, and its <code class="docutils literal notranslate"><span class="pre">output</span></code> list becomes the compound’s dataflow
+output to downstream tasks.</p>
+</section>
+</section>
 <section id="task-graph-generation-api">
 <h2>Task-Graph Generation API<a class="headerlink" href="#task-graph-generation-api" title="Link to this heading">¶</a></h2>
-<p>DV flow manager supports the <cite>generate</cite> strategy by calling a Python
-task that is responsible for building the body of the compound task.</p>
+<p>task that is responsible for building the body of the compound task.</p>
 <p>A graph-building method has the following signature:</p>
 <div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">build_graph</span><span class="p">(</span><span class="n">ctxt</span> <span class="p">:</span> <span class="n">TaskGenCtxt</span><span class="p">,</span> <span class="nb">input</span> <span class="p">:</span> <span class="n">TaskGenInputData</span><span class="p">):</span>
     <span class="k">pass</span>
@@ -692,6 +753,7 @@ each command to execute:</p>
 <li class="toctree-l1"><a class="reference internal" href="llms.html">LLM Agent Integration</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Python Task API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#leaf-task-implementation-api">Leaf-Task Implementation API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#error-handling-api">Error Handling API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#task-graph-generation-api">Task-Graph Generation API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#custom-up-to-date-check-api">Custom Up-to-Date Check API</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#pytask-class-api-reference">PyTask Class API Reference</a></li>

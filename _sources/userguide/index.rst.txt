@@ -11,6 +11,7 @@ User Guide
    dataflow
    visibility
    tasks_developing
+   error_handling
    incremental
    configuration
    expressions

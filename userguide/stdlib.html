@@ -35,6 +35,35 @@
             
   <section id="standard-library">
 <h1>Standard Library<a class="headerlink" href="#standard-library" title="Link to this heading">¶</a></h1>
+<section id="std-taskfailure">
+<h2>std.TaskFailure<a class="headerlink" href="#std-taskfailure" title="Link to this heading">¶</a></h2>
+<p>A framework-emitted data item that records a subtask failure.  <code class="docutils literal notranslate"><span class="pre">std.TaskFailure</span></code>
+is <strong>never declared or produced directly by user tasks</strong>; the framework appends
+it to a leaf task’s output whenever that task exits with a non-zero status.</p>
+<p><code class="docutils literal notranslate"><span class="pre">std.TaskFailure</span></code> items propagate through skipped tasks so that an enclosing
+compound task can observe all failures in its subtask graph via its
+<code class="xref py py-class docutils literal notranslate"><span class="pre">CompoundRunInput</span></code>.</p>
+<section id="fields">
+<h3>Fields<a class="headerlink" href="#fields" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>task_name</strong> — Fully-qualified name of the task that failed</p></li>
+<li><p><strong>status</strong> — The non-zero exit code returned by the task</p></li>
+<li><p><strong>markers</strong> — Diagnostic markers (errors/warnings) produced by the task</p></li>
+</ul>
+</section>
+<section id="usage">
+<h3>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h3>
+<p>In an <code class="docutils literal notranslate"><span class="pre">on_error</span></code> handler, filter <code class="docutils literal notranslate"><span class="pre">std.TaskFailure</span></code> items from
+<code class="docutils literal notranslate"><span class="pre">input.inputs</span></code> to separate failure records from regular output:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">failures</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">input</span><span class="o">.</span><span class="n">inputs</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;std.TaskFailure&quot;</span><span class="p">]</span>
+<span class="n">other</span>    <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">input</span><span class="o">.</span><span class="n">inputs</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;std.TaskFailure&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="error_handling.html"><span class="doc">Error Handling</span></a> for full details on compound task error handling.</p>
+</section>
+</section>
 <section id="std-createfile">
 <h2>std.CreateFile<a class="headerlink" href="#std-createfile" title="Link to this heading">¶</a></h2>
 <section id="example">
@@ -665,6 +694,7 @@ or other data.</p>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>

@@ -76,10 +76,74 @@ an associated severity level (error, warning, info).
    :members:
    :exclude-members: model_config
 
+Error Handling API
+==================
+
+These types are used by ``on_error`` handler callables attached to compound
+tasks.  See :doc:`userguide/error_handling` for usage examples.
+
+TaskFailure
+-----------
+
+A ``TaskDataItem``-derived object automatically appended to a leaf task's
+output when that task exits with a non-zero status.
+
+Fields:
+
+* **task_name** (``str``) — Fully-qualified name of the failing task
+* **status** (``int``) — Non-zero exit code
+* **markers** (``List[TaskMarker]``) — Diagnostic markers the task produced
+
+SubtaskSummary
+--------------
+
+A lightweight record describing one subtask within a compound.  Passed
+as part of :class:`CompoundRunInput`.
+
+Fields:
+
+* **name** (``str``) — Fully-qualified subtask name
+* **status** (``int``) — Exit status (0 = success)
+* **skipped** (``bool``) — ``True`` if the subtask was not executed
+
+CompoundRunInput
+----------------
+
+Passed as the ``input`` argument to an ``on_error`` callable.  Contains all
+data items produced by the compound's subtasks plus per-subtask summaries.
+
+Fields:
+
+* **name** (``str``) — Compound task name
+* **inputs** (``List[TaskDataItem]``) — All output items from all subtasks,
+  including any ``std.TaskFailure`` items
+* **subtasks** (``List[SubtaskSummary]``) — Per-subtask status records
+* **params** — Task parameter object
+* **rundir** (``str``) — Task run directory
+* **srcdir** (``str``) — Task source directory
+* **changed** (``bool``) — ``True`` if any subtask reported changed output
+* **memento** — Previous-run memento data (for incremental builds)
+
+on_error Callable Signature
+----------------------------
+
+An ``on_error`` handler must be an ``async`` function with this signature:
+
+.. code-block:: python
+
+    async def my_handler(
+        ctxt: TaskRunCtxt,
+        input: CompoundRunInput,
+    ) -> TaskDataResult:
+        ...
+
+The returned :class:`TaskDataResult` ``status`` becomes the compound task's
+own exit status, and its ``output`` list becomes the compound's dataflow
+output to downstream tasks.
+
+
 Task-Graph Generation API
 =========================
-
-DV flow manager supports the `generate` strategy by calling a Python
 task that is responsible for building the body of the compound task.
 
 A graph-building method has the following signature:

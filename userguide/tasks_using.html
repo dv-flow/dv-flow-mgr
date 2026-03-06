@@ -230,6 +230,61 @@ all tasks that depend on CreateSVFiles.</p>
 </li>
 <li><p>Causing the <cite>getFiles</cite> to depend on the file-creation tasks</p></li>
 </ul>
+<section id="compound-task-error-handling">
+<h3>Compound Task Error Handling<a class="headerlink" href="#compound-task-error-handling" title="Link to this heading">¶</a></h3>
+<p>By default a compound task stops launching new subtasks as soon as one fails.
+Two fields change this behaviour.</p>
+<p><strong>max_failures</strong> controls how many subtask failures are tolerated before
+remaining independent siblings are skipped:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RunTests</span>
+<span class="w">  </span><span class="nt">max_failures</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span><span class="w">   </span><span class="c1"># -1 = run all tests regardless of failures</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytools.RunTest</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test2</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytools.RunTest</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test3</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytools.RunTest</span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 80.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Behaviour</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">-1</span></code> <em>(default)</em></p></td>
+<td><p>No limit; all independent subtasks run even after failures.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">&gt;</span> <span class="pre">0</span></code></p></td>
+<td><p>Stop after <em>N</em> failures have accumulated.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>on_error</strong> specifies a Python callable (<code class="docutils literal notranslate"><span class="pre">module.function</span></code>) that is
+invoked when the compound finishes to produce the compound’s final status and
+output.  It receives a <code class="xref py py-class docutils literal notranslate"><span class="pre">CompoundRunInput</span></code>
+containing all subtask output items and per-subtask summaries:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RunTests</span>
+<span class="w">  </span><span class="nt">max_failures</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1</span>
+<span class="w">  </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myproject.utils.collect_results</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytools.RunTest</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test2</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mytools.RunTest</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="error_handling.html"><span class="doc">Error Handling</span></a> for a full description including a worked example
+and the <code class="docutils literal notranslate"><span class="pre">on_error</span></code> callable API.</p>
+</section>
 </section>
 <section id="conditional-tasks">
 <h2>Conditional Tasks<a class="headerlink" href="#conditional-tasks" title="Link to this heading">¶</a></h2>
@@ -452,6 +507,7 @@ find both created files.</p>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
 <li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
 <li class="toctree-l2"><a class="reference internal" href="configuration.html">Parameters and Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
