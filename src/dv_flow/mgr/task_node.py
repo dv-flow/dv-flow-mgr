@@ -162,17 +162,17 @@ class TaskNode(object):
             "name": self.name,
             "srcdir": self.srcdir,
             "rundir": rundir,
-            "params": self.params.model_dump() if hasattr(self.params, 'model_dump') else {},
+            "params": self.params.model_dump(mode='json') if hasattr(self.params, 'model_dump') else {},
             "inputs_signature": inputs_signature,
-            "input": input.model_dump(warnings=False),
+            "input": input.model_dump(mode='json', warnings=False),
             "needs": [need[0].name for need in self.needs],
-            "commands": [cmd.model_dump() for cmd in ctxt._exec_info],
+            "commands": [cmd.model_dump(mode='json') for cmd in ctxt._exec_info],
             "result": {
                 "status": self.result.status,
                 "changed": self.result.changed,
-                "memento": self.result.memento.model_dump() if self.result.memento else None,
+                "memento": self.result.memento.model_dump(mode='json') if self.result.memento else None,
             },
-            "output": self.output.model_dump(),
+            "output": self.output.model_dump(mode='json'),
         }
 
         if isinstance(self.consumes, list):
