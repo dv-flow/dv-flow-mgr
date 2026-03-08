@@ -20,7 +20,38 @@ package:
     - name: sphinx-argparse
       src: pypi
     - name: sphinx-jsonschema
-#      src: pypi
+      url: https://github.com/lnoor/sphinx-jsonschema.git
+    - name: sphinxcontrib-mermaid
+      src: pypi
+    - name: sphinxcontrib-dv-flow
+      url: https://github.com/dv-flow/sphinxcontrib-dv-flow.git
+    - name: jq
+      src: pypi
+    - name: toposort
+      src: pypi
+    - name: ply
+      src: pypi
+    - name: rich
+      src: pypi
+    - name: setuptools-scm
+      src: pypi
+
+  - name: default-dev-all
+    deps:
+    - name: pytest
+      src: pypi
+    - name: pydantic
+      src: pypi
+    - name: pyyaml
+      src: pypi
+    - name: tomli
+      src: pypi
+    - name: sphinx
+      src: pypi
+      version: 8.2.3
+    - name: sphinx-argparse
+      src: pypi
+    - name: sphinx-jsonschema
       url: https://github.com/lnoor/sphinx-jsonschema.git
     - name: sphinxcontrib-mermaid
       src: pypi
