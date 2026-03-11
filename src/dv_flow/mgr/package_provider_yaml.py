@@ -413,11 +413,25 @@ class PackageProviderYaml(PackageProvider):
             self._loadTypes(pkg, loader, typedefs)
             self._loadTasks(pkg, loader, taskdefs, pkg.basedir)
             
-            # Validate feeds references after all tasks are loaded
+            # Apply feeds and validate references after all tasks are loaded.
+            # This is the authoritative application point: _applyConfig runs before
+            # _loadTasks so its feedsMap loop is a no-op (map is still empty then).
+            # Cross-package feeds (e.g. from an imported package feeding a task in the
+            # root package) will not resolve at the imported-package level; they are
+            # silently deferred and resolved here at the root level.
+            is_root = len(loader.pathStack()) <= 1
             for fed_name, feeding_tasks in loader.feedsMap().items():
                 fed_task = self._findTask(fed_name, loader)
-                if fed_task is None:
-                    # Task referenced in feeds does not exist - report error
+                if fed_task is not None:
+                    for feeding_task in feeding_tasks:
+                        # Only add if not already present (idempotent for nested packages)
+                        if all(
+                            not (isinstance(n, tuple) and n[0] == feeding_task) and n != feeding_task
+                            for n in fed_task.needs):
+                            fed_task.needs.append(feeding_task)
+                elif is_root:
+                    # Only report an error at the root package level; cross-package feeds
+                    # targeting tasks in the importer are not resolvable during import loading.
                     if feeding_tasks:
                         feeding_task = feeding_tasks[0]
                         if hasattr(feeding_task, 'srcinfo') and feeding_task.srcinfo is not None:
@@ -947,8 +961,16 @@ class PackageProviderYaml(PackageProvider):
         # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
         for taskdef, task in tasks:
             for fed_name in getattr(taskdef, "feeds", []):
-                # Qualify unqualified feed names with current package
-                qname = fed_name if '.' in fed_name else f"{pkg.name}.{fed_name}"
+                # Resolve feed names using the same task-lookup logic as needs resolution.
+                # This handles fragment-qualified names (e.g. "sim.smoke-sim") that are
+                # registered in the package scope but need the package prefix to be fully
+                # qualified (e.g. "p1.sim.smoke-sim").
+                resolved = self._findTask(fed_name, loader)
+                if resolved is not None:
+                    qname = resolved.name
+                else:
+                    # Fall back: qualify unqualified names with current package
+                    qname = fed_name if '.' in fed_name else f"{pkg.name}.{fed_name}"
                 loader.addFeed(task, qname)
 
         # Now, build out tasks
