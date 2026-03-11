@@ -67,7 +67,7 @@ def test_fileset_input_1(tmpdir):
 
     class ConsumeFilesParams(BaseModel):
         files : Union[str,List[Any]] = """
-        ${{ in | jq('[ .[] | select(.type == "std.FileSet") ]') }}
+        ${{ in | select(.type == "std.FileSet") }}
         """
 
     @task(ConsumeFilesParams)
