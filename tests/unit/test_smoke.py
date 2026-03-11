@@ -3,7 +3,6 @@ import io
 import os
 import dataclasses as dc
 import pytest
-import jq
 from typing import List
 import yaml
 from dv_flow.mgr import TaskSetRunner, PackageLoader, TaskGraphBuilder
@@ -32,39 +31,6 @@ package:
     task = builder.mkTaskNode("my_pkg.entry")
 
     assert task is not None
-
-def test_jq():
-    data = [
-        {
-            "type": "FileSet",
-            "kind": "systemVerilogSource"
-        },
-        {
-            "type": "FileSet",
-            "kind": "vhdlSource"
-        },
-        {
-            "type": "FileSet",
-            "kind": "verilogSource"
-        }
-    ]
-
-    result = jq.compile(""".[] | 
-                        select(
-                            .kind == "systemVerilogSource" 
-                            or .kind == "verilogSource")
-                        """).input(data).all()
-    value = """
-    with:
-    - name: files
-      list-append: |
-      ${{ 
-      in | jq('.[] | select(
-        .kind == "systemVerilogSource" 
-        or .kind == "verilogSource")')
-      }}
-"""
-    print("result: %s" % str(result))
 
 
 

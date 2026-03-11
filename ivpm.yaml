@@ -25,8 +25,6 @@ package:
       src: pypi
     - name: sphinxcontrib-dv-flow
       url: https://github.com/dv-flow/sphinxcontrib-dv-flow.git
-    - name: jq
-      src: pypi
     - name: toposort
       src: pypi
     - name: ply

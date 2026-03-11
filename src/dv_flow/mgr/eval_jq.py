@@ -20,20 +20,7 @@
 #*
 #****************************************************************************
 def eval_jq(input, args):
-    try:
-        import jq
-    except ImportError:
-        raise ImportError("The 'jq' package is required to use jq expressions. Install it with: pip install jq")
-
-    if len(args) != 1:
-        raise Exception("jq requires a single argument")
-
-    filt = jq.compile(args[0])
-
-    if type(input) == str:
-        ret = filt.input_text(input).text()
-    else:
-        ret = filt.input_value(input).text()
-
-
-    return ret
+    raise NotImplementedError(
+        "The jq() expression function is no longer supported. "
+        "Use the built-in expression syntax instead (e.g. '.[] | select(...)')."
+    )
