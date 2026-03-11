@@ -1439,6 +1439,14 @@ class PackageProviderYaml(PackageProvider):
         elif task.uses is not None and isinstance(task.uses, Task) and task.uses.cache is not None:
             task.cache = task.uses.cache
 
+        # Propagate compound execution policy fields.
+        task.max_failures = taskdef.max_failures if taskdef.max_failures != -1 else (
+            task.uses.max_failures if task.uses is not None and isinstance(task.uses, Task) else -1)
+        if taskdef.on_error is not None:
+            task.on_error = taskdef.on_error
+        elif task.uses is not None and isinstance(task.uses, Task) and task.uses.on_error is not None:
+            task.on_error = task.uses.on_error
+
         # NEW: Collect parameter definitions without evaluating
         task.param_defs = self._collectParamDefs(
             loader,

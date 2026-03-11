@@ -538,6 +538,23 @@ class TaskGraphBuilder(object):
                     break
         return task
     
+    def _resolve_on_error(self, task, srcdir=None):
+        """Resolve the task.on_error string (module:function) to a Python callable.
+        
+        Returns None if task.on_error is None or empty.
+        """
+        on_error = getattr(task, 'on_error', None)
+        if not on_error:
+            return None
+        if ':' in on_error:
+            module_name, func_name = on_error.rsplit(':', 1)
+        else:
+            raise ValueError(
+                "on_error '%s' must be in 'module:function' form" % on_error)
+        import importlib
+        mod = importlib.import_module(module_name)
+        return getattr(mod, func_name)
+
     def _mkTaskNode(self, 
                     task : Task, 
                     name=None, 
@@ -732,7 +749,9 @@ class TaskGraphBuilder(object):
             name=name,
             srcdir=srcdir,
             params=params,
-            ctxt=self._ctxt)
+            ctxt=self._ctxt,
+            max_failures=getattr(task, 'max_failures', -1),
+            run=self._resolve_on_error(task, srcdir))
 
         if ret.input is None:
             raise Exception("Task %s does not have an input" % task.name)
@@ -1078,7 +1097,9 @@ class TaskGraphBuilder(object):
             name=name,
             srcdir=srcdir,
             params=params,
-            ctxt=self._ctxt)
+            ctxt=self._ctxt,
+            max_failures=getattr(task, 'max_failures', -1),
+            run=self._resolve_on_error(task, srcdir))
         
         # Restore previous srcdir after all parameter evaluation
         self._eval.set("srcdir", prev_srcdir)
