@@ -8,6 +8,7 @@ Run explicitly in CI via the `agent-integration` workflow, or locally:
     GITHUB_TOKEN=$(gh auth token) pytest tests/unit/test_native_agent_live.py -v
 """
 import asyncio
+import importlib.util
 import os
 import pytest
 
@@ -16,11 +17,18 @@ import pytest
 os.environ.setdefault("DFM_AGENT_MCP_SHELL", "0")
 os.environ.setdefault("DFM_AGENT_MCP_FS", "0")
 
-# Skip the whole module when no provider credentials are available.
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("GITHUB_TOKEN"),
-    reason="GITHUB_TOKEN not set — skipping live agent integration test",
-)
+# Skip the whole module when no provider credentials are available,
+# or when the optional 'agents' package is not installed.
+pytestmark = [
+    pytest.mark.skipif(
+        not os.environ.get("GITHUB_TOKEN"),
+        reason="GITHUB_TOKEN not set — skipping live agent integration test",
+    ),
+    pytest.mark.skipif(
+        importlib.util.find_spec("agents") is None,
+        reason="'agents' package not installed — skipping live agent integration test",
+    ),
+]
 
 # Use GitHub Models (free, 0 premium requests, no Copilot subscription needed).
 # Requires GITHUB_TOKEN with `models: read` permission (auto-granted in Actions).
