@@ -19,9 +19,12 @@
 #*     Author: 
 #*
 #****************************************************************************
-import jq
-
 def eval_jq(input, args):
+    try:
+        import jq
+    except ImportError:
+        raise ImportError("The 'jq' package is required to use jq expressions. Install it with: pip install jq")
+
     if len(args) != 1:
         raise Exception("jq requires a single argument")
 
