@@ -289,10 +289,13 @@ class CodexAssistant(AIAssistantBase):
         Config options:
             sandbox_mode: read-only | workspace-write | danger-full-access 
                          (default: workspace-write)
-            approval_mode: untrusted | on-failure | on-request | never
+            approval_mode: on-request | full-auto | never
                           (default: never for automated execution)
         
         Note: Uses 'codex exec' subcommand for non-interactive execution.
+        The CLI no longer accepts a standalone -a flag.  Approval behaviour
+        is controlled via --full-auto or
+        --dangerously-bypass-approvals-and-sandbox.
         See 'codex exec --help' for full options.
         """
         _log.debug("Executing OpenAI Codex CLI")
@@ -308,14 +311,27 @@ class CodexAssistant(AIAssistantBase):
             
             # Get sandbox mode from config (default: workspace-write for safety)
             sandbox_mode = config.get('sandbox_mode', 'workspace-write') if config else 'workspace-write'
-            cmd.extend(['-s', sandbox_mode])
-            
-            # Get approval mode from config (default: never for automated execution)
-            approval_mode = config.get('approval_mode', 'never') if config else 'never'
-            cmd.extend(['-a', approval_mode])
+
+            # Valid codex --sandbox values; 'off' means "don't pass -s at all"
+            _VALID_SANDBOX = ('read-only', 'workspace-write', 'danger-full-access')
+
+            # Get approval mode from config (default: full-auto for workflow execution)
+            approval_mode = config.get('approval_mode', 'full-auto') if config else 'full-auto'
+
+            if approval_mode == 'never' or sandbox_mode == 'off':
+                # Bypass all approval prompts and sandboxing
+                cmd.append('--dangerously-bypass-approvals-and-sandbox')
+            elif approval_mode in ('full-auto', 'on-request'):
+                # Sandboxed auto-execution
+                cmd.append('--full-auto')
+                if sandbox_mode in _VALID_SANDBOX:
+                    cmd.extend(['-s', sandbox_mode])
+            else:
+                if sandbox_mode in _VALID_SANDBOX:
+                    cmd.extend(['-s', sandbox_mode])
             
             # Change to run directory
-            cmd.extend(['-C', runner.root_rundir])
+            cmd.extend(['-C', runner.rundir])
             
             # Add model parameter if specified
             if model:

@@ -84,6 +84,7 @@ class JobServer:
         self._closed = False
         self._acquire_queue = asyncio.Queue()  # Queue for pending acquire requests
         self._reader_task = None  # Background task reading from FIFO
+        self._reader_active = False  # Whether the FIFO reader callback is registered
         
         # Create the FIFO
         try:
@@ -165,6 +166,7 @@ class JobServer:
         js.nproc = -1  # Unknown (inherited)
         js._acquire_queue = asyncio.Queue()
         js._reader_task = None
+        js._reader_active = False
         
         # Open existing FIFO
         try:
@@ -221,6 +223,9 @@ class JobServer:
         future = asyncio.Future()
         await self._acquire_queue.put(future)
         
+        # Ensure the FIFO reader callback is active now that a waiter exists
+        self._activate_reader()
+        
         try:
             # Wait for token with timeout
             await asyncio.wait_for(future, timeout=timeout)
@@ -238,60 +243,71 @@ class JobServer:
     
     async def _read_tokens_loop(self):
         """
-        Background task that reads tokens from FIFO and distributes to waiting acquirers.
+        Background task that manages the FIFO reader callback lifecycle.
+        
+        The actual token reading is done by _on_token_ready, registered via
+        loop.add_reader.  This coroutine simply keeps the task alive so we
+        can cancel it on close.
         """
-        loop = asyncio.get_event_loop()
-        
-        def token_ready():
-            """Called when FIFO has data available to read"""
-            # Check if closed before attempting to read
-            if self._closed or self._fifo_fd is None:
-                return
-                
-            try:
-                # Read 1 byte (1 token)
-                token = os.read(self._fifo_fd, 1)
-                if len(token) == 1:
-                    # Token available - give it to next waiter
-                    if not self._acquire_queue.empty():
-                        future = self._acquire_queue.get_nowait()
-                        if not future.done():
-                            future.set_result(None)
-                    else:
-                        # No one waiting - write token back
-                        # This can happen during cleanup when tokens are being returned
-                        try:
-                            if self._fifo_fd is not None and not self._closed:
-                                os.write(self._fifo_fd, b'T')
-                        except (OSError, TypeError):
-                            pass  # FD closed or invalid, ignore
-                else:
-                    # EOF or error
-                    _log.warning("Token read returned empty, jobserver may be closed")
-            except BlockingIOError:
-                # No data available yet, will be called again
-                pass
-            except (OSError, TypeError) as e:
-                # FD closed or invalid
-                if not self._closed:
-                    _log.error(f"Error reading token: {e}")
-        
-        # Register callback for when data is available
-        if self._fifo_fd is not None:
-            loop.add_reader(self._fifo_fd, token_ready)
+        self._activate_reader()
         
         try:
-            # Run until jobserver is closed
             while not self._closed:
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(1.0)
         finally:
-            # Only remove reader if FD is still valid
-            if self._fifo_fd is not None:
-                try:
-                    loop.remove_reader(self._fifo_fd)
-                except (ValueError, OSError):
-                    # FD already closed or invalid, ignore
-                    pass
+            self._deactivate_reader()
+    
+    def _on_token_ready(self):
+        """Called by the event loop when the FIFO has data available to read."""
+        if self._closed or self._fifo_fd is None:
+            return
+        
+        try:
+            token = os.read(self._fifo_fd, 1)
+            if len(token) == 1:
+                if not self._acquire_queue.empty():
+                    future = self._acquire_queue.get_nowait()
+                    if not future.done():
+                        future.set_result(None)
+                    else:
+                        try:
+                            os.write(self._fifo_fd, b'T')
+                        except (OSError, TypeError):
+                            pass
+                else:
+                    try:
+                        if self._fifo_fd is not None and not self._closed:
+                            os.write(self._fifo_fd, b'T')
+                    except (OSError, TypeError):
+                        pass
+                    self._deactivate_reader()
+            else:
+                _log.warning("Token read returned empty, jobserver may be closed")
+        except BlockingIOError:
+            pass
+        except (OSError, TypeError) as e:
+            if not self._closed:
+                _log.error(f"Error reading token: {e}")
+    
+    def _activate_reader(self):
+        """Register the FIFO reader callback if not already active."""
+        if not self._reader_active and self._fifo_fd is not None and not self._closed:
+            try:
+                loop = asyncio.get_event_loop()
+                loop.add_reader(self._fifo_fd, self._on_token_ready)
+                self._reader_active = True
+            except (ValueError, OSError, RuntimeError):
+                pass
+    
+    def _deactivate_reader(self):
+        """Remove the FIFO reader callback to prevent busy-waiting."""
+        if self._reader_active:
+            try:
+                loop = asyncio.get_event_loop()
+                loop.remove_reader(self._fifo_fd)
+            except (ValueError, OSError, RuntimeError):
+                pass
+            self._reader_active = False
     
     def release(self):
         """
@@ -339,13 +355,7 @@ class JobServer:
         self._closed = True
         
         # Remove the reader callback before closing FD
-        if self._fifo_fd is not None:
-            try:
-                loop = asyncio.get_event_loop()
-                loop.remove_reader(self._fifo_fd)
-            except (ValueError, OSError, RuntimeError):
-                # FD already removed, invalid, or no event loop - ignore
-                pass
+        self._deactivate_reader()
         
         # Cancel background reader task
         if self._reader_task and not self._reader_task.done():
