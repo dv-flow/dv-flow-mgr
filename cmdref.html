@@ -39,7 +39,8 @@
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
            <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span>
-           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">agent</span><span class="p">,</span><span class="n">mcp</span><span class="p">,</span><span class="n">util</span><span class="p">}</span> <span class="o">...</span>
+           <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">complete</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">agent</span><span class="p">,</span><span class="n">mcp</span><span class="p">,</span><span class="n">daemon</span><span class="p">,</span><span class="n">worker</span><span class="p">,</span><span class="n">util</span><span class="p">}</span>
+           <span class="o">...</span>
 </pre></div>
 </div>
 <section id="dv_flow.mgr.__main__-get_parser-named-arguments">
@@ -113,6 +114,7 @@
 <p>run a flow</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span>
         <span class="p">[</span><span class="o">-</span><span class="n">u</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">progressbar</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span>
+        <span class="p">[</span><span class="o">--</span><span class="n">runner</span> <span class="n">RUNNER</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">runner</span><span class="o">-</span><span class="n">opt</span> <span class="n">KEY</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
         <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -160,6 +162,40 @@
 <dt><kbd>-P, --param-file</kbd></dt>
 <dd><p>JSON file or inline JSON string (e.g., ‘{“tasks”: {…}}’)</p>
 </dd>
+<dt><kbd>--runner</kbd></dt>
+<dd><p>Runner backend to use (e.g. local, lsf). Default: from config or ‘local’</p>
+</dd>
+<dt><kbd>--runner-opt</kbd></dt>
+<dd><p>Runner backend option (key=value). May be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="complete">
+<h3>complete<a class="headerlink" href="#complete" title="Link to this heading">¶</a></h3>
+<p>Print tab-completion candidates for task names</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">complete</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="n">prefix</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat2">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat2" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>prefix</kbd></dt>
+<dd><p>Partial task name to complete</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">''</span></code></p>
+</dd>
+</dl>
+</section>
+<section id="named-arguments_repeat2">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat2" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>--root</kbd></dt>
+<dd><p>Specifies the root directory for the flow</p>
+</dd>
+<dt><kbd>-c, --config</kbd></dt>
+<dd><p>Specifies the active configuration for the root package</p>
+</dd>
 </dl>
 </section>
 </section>
@@ -169,8 +205,8 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">show</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">{</span><span class="n">packages</span><span class="p">,</span><span class="n">tasks</span><span class="p">,</span><span class="n">task</span><span class="p">,</span><span class="n">types</span><span class="p">,</span><span class="n">tags</span><span class="p">,</span><span class="n">package</span><span class="p">,</span><span class="n">project</span><span class="p">,</span><span class="n">skills</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat2">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat2" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat3">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat3" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>show_subcommand</kbd></dt>
 <dd><p>Possible choices: packages, tasks, task, types, tags, package, project, skills</p>
@@ -186,8 +222,8 @@
                   <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat2">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat2" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat3">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat3" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--search</kbd></dt>
 <dd><p>Search by keyword in name, desc, and doc</p>
@@ -228,8 +264,8 @@
                <span class="p">[</span><span class="o">--</span><span class="n">produces</span> <span class="n">PRODUCES</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat3">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat3" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat4">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat4" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--search</kbd></dt>
 <dd><p>Search by keyword in name, desc, and doc</p>
@@ -279,16 +315,16 @@
               <span class="n">name</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat3">
-<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat3" title="Link to this heading">¶</a></h6>
+<section id="positional-arguments_repeat4">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat4" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>name</kbd></dt>
 <dd><p>Task name (e.g., std.FileSet)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat4">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat4" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat5">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat5" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--needs</kbd></dt>
 <dd><p>Show dependency chain. Optional DEPTH limits levels (-1=unlimited)</p>
@@ -322,8 +358,8 @@
                <span class="p">[</span><span class="o">--</span><span class="n">package</span> <span class="n">PACKAGE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tags</span><span class="o">-</span><span class="n">only</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">data</span><span class="o">-</span><span class="n">items</span><span class="o">-</span><span class="n">only</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat5">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat5" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat6">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat6" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--search</kbd></dt>
 <dd><p>Search by keyword in name, desc, and doc</p>
@@ -373,8 +409,8 @@
               <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat6">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat6" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat7">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat7" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--search</kbd></dt>
 <dd><p>Search tag types by keyword</p>
@@ -407,16 +443,16 @@
                  <span class="n">name</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat4">
-<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat4" title="Link to this heading">¶</a></h6>
+<section id="positional-arguments_repeat5">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat5" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>name</kbd></dt>
 <dd><p>Package name (e.g., std)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat7">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat7" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat8">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat8" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--json</kbd></dt>
 <dd><p>Output in JSON format</p>
@@ -446,8 +482,8 @@
                  <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat8">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat8" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat9">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat9" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--imports</kbd></dt>
 <dd><p>Show imported packages</p>
@@ -486,16 +522,16 @@
                 <span class="p">[</span><span class="n">name</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat5">
-<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat5" title="Link to this heading">¶</a></h6>
+<section id="positional-arguments_repeat6">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat6" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>name</kbd></dt>
 <dd><p>Skill name to show details for (e.g., std.AgentSkill)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat9">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat9" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat10">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat10" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--search</kbd></dt>
 <dd><p>Search skills by keyword in name, desc, and skill_doc</p>
@@ -536,8 +572,8 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">cache</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">{</span><span class="n">init</span><span class="p">}</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat6">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat6" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat7">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat7" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>cache_subcommand</kbd></dt>
 <dd><p>Possible choices: init</p>
@@ -552,16 +588,16 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">cache</span> <span class="n">init</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">shared</span><span class="p">]</span> <span class="n">cache_dir</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat7">
-<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat7" title="Link to this heading">¶</a></h6>
+<section id="positional-arguments_repeat8">
+<h6>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat8" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>cache_dir</kbd></dt>
 <dd><p>Path to cache directory</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat10">
-<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat10" title="Link to this heading">¶</a></h6>
+<section id="named-arguments_repeat11">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat11" title="Link to this heading">¶</a></h6>
 <dl class="option-list">
 <dt><kbd>--shared</kbd></dt>
 <dd><p>Create a shared cache for team use with group permissions</p>
@@ -579,16 +615,16 @@
              <span class="p">[</span><span class="n">flow_file</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat8">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat8" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat9">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat9" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>flow_file</kbd></dt>
 <dd><p>Flow file to validate (default: auto-detect)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat11">
-<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat11" title="Link to this heading">¶</a></h4>
+<section id="named-arguments_repeat12">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat12" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>--json</kbd></dt>
 <dd><p>Output in JSON format for programmatic consumption</p>
@@ -614,8 +650,8 @@
             <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="named-arguments_repeat12">
-<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat12" title="Link to this heading">¶</a></h4>
+<section id="named-arguments_repeat13">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat13" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>--json</kbd></dt>
 <dd><p>Output in JSON format (default)</p>
@@ -656,16 +692,16 @@
           <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat9">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat9" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat10">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat10" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>tasks</kbd></dt>
 <dd><p>Task references to use as context (skills, personas, tools, references)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat13">
-<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat13" title="Link to this heading">¶</a></h4>
+<section id="named-arguments_repeat14">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat14" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>-a, --assistant</kbd></dt>
 <dd><p>Possible choices: copilot, codex, mock, native</p>
@@ -716,16 +752,16 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">mcp</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat10">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat10" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat11">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat11" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>tasks</kbd></dt>
 <dd><p>Task references to use as context (skills, personas, tools, references)</p>
 </dd>
 </dl>
 </section>
-<section id="named-arguments_repeat14">
-<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat14" title="Link to this heading">¶</a></h4>
+<section id="named-arguments_repeat15">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat15" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>--root</kbd></dt>
 <dd><p>Specifies the root directory for the flow</p>
@@ -736,14 +772,123 @@
 </dl>
 </section>
 </section>
+<section id="daemon">
+<h3>daemon<a class="headerlink" href="#daemon" title="Link to this heading">¶</a></h3>
+<p>Manage the background daemon (worker pool manager)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">daemon</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">{</span><span class="n">start</span><span class="p">,</span><span class="n">stop</span><span class="p">,</span><span class="n">status</span><span class="p">}</span> <span class="o">...</span>
+</pre></div>
+</div>
+<section id="positional-arguments_repeat12">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat12" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>daemon_subcmd</kbd></dt>
+<dd><p>Possible choices: start, stop, status</p>
+</dd>
+</dl>
+</section>
+<section id="Sub-commands_repeat3">
+<h4>Sub-commands<a class="headerlink" href="#Sub-commands_repeat3" title="Link to this heading">¶</a></h4>
+<section id="start">
+<h5>start<a class="headerlink" href="#start" title="Link to this heading">¶</a></h5>
+<p>Start the daemon</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">daemon</span> <span class="n">start</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">runner</span> <span class="n">RUNNER</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pool</span><span class="o">-</span><span class="n">size</span> <span class="n">POOL_SIZE</span><span class="p">]</span>
+                 <span class="p">[</span><span class="o">--</span><span class="n">monitor</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">foreground</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat16">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat16" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--root</kbd></dt>
+<dd><p>Project root directory</p>
+</dd>
+<dt><kbd>--runner</kbd></dt>
+<dd><p>Runner backend (e.g. local, lsf)</p>
+</dd>
+<dt><kbd>--pool-size</kbd></dt>
+<dd><p>Maximum number of workers</p>
+</dd>
+<dt><kbd>--monitor</kbd></dt>
+<dd><p>Attach monitor TUI after starting</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--foreground</kbd></dt>
+<dd><p>Run daemon in foreground (default is background)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="stop">
+<h5>stop<a class="headerlink" href="#stop" title="Link to this heading">¶</a></h5>
+<p>Stop the daemon</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">daemon</span> <span class="n">stop</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat17">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat17" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--root</kbd></dt>
+<dd><p>Project root directory</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="status">
+<h5>status<a class="headerlink" href="#status" title="Link to this heading">¶</a></h5>
+<p>Show daemon status</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">daemon</span> <span class="n">status</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">json</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat18">
+<h6>Named Arguments<a class="headerlink" href="#named-arguments_repeat18" title="Link to this heading">¶</a></h6>
+<dl class="option-list">
+<dt><kbd>--root</kbd></dt>
+<dd><p>Project root directory</p>
+</dd>
+<dt><kbd>--json</kbd></dt>
+<dd><p>Output in JSON format</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+</dl>
+</section>
+</section>
+</section>
+</section>
+<section id="worker">
+<h3>worker<a class="headerlink" href="#worker" title="Link to this heading">¶</a></h3>
+<p>Run as a worker process (internal, used by daemon)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">worker</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="o">--</span><span class="n">connect</span> <span class="n">CONNECT</span> <span class="p">[</span><span class="o">--</span><span class="n">worker</span><span class="o">-</span><span class="nb">id</span> <span class="n">WORKER_ID</span><span class="p">]</span>
+           <span class="p">[</span><span class="o">--</span><span class="n">resource</span><span class="o">-</span><span class="k">class</span><span class="w"> </span><span class="nc">RESOURCE_CLASS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">lsf</span><span class="o">-</span><span class="n">job</span><span class="o">-</span><span class="nb">id</span> <span class="n">LSF_JOB_ID</span><span class="p">]</span>
+</pre></div>
+</div>
+<section id="named-arguments_repeat19">
+<h4>Named Arguments<a class="headerlink" href="#named-arguments_repeat19" title="Link to this heading">¶</a></h4>
+<dl class="option-list">
+<dt><kbd>--connect</kbd></dt>
+<dd><p>Daemon address to connect to (host:port)</p>
+</dd>
+<dt><kbd>--worker-id</kbd></dt>
+<dd><p>Worker ID (auto-generated if not specified)</p>
+</dd>
+<dt><kbd>--resource-class</kbd></dt>
+<dd><p>Resource class this worker provides</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">''</span></code></p>
+</dd>
+<dt><kbd>--lsf-job-id</kbd></dt>
+<dd><p>LSF job ID (if launched via bsub)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">''</span></code></p>
+</dd>
+</dl>
+</section>
+</section>
 <section id="util">
 <h3>util<a class="headerlink" href="#util" title="Link to this heading">¶</a></h3>
 <p>Internal utility command</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">util</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="n">cmd</span> <span class="o">...</span>
 </pre></div>
 </div>
-<section id="positional-arguments_repeat11">
-<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat11" title="Link to this heading">¶</a></h4>
+<section id="positional-arguments_repeat13">
+<h4>Positional Arguments<a class="headerlink" href="#positional-arguments_repeat13" title="Link to this heading">¶</a></h4>
 <dl class="option-list">
 <dt><kbd>cmd</kbd></dt>
 <dd></dd>

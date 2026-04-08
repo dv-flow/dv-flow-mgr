@@ -37,22 +37,122 @@
 <p>Task graphs defined by DV Flow can be run in many ways. Because the topology
 of task graphs is known before execution, task graphs can be evaluated
 both statically and dynamically.</p>
-<p>DV Flow Manager defines the TaskRunner interface to enable support for
+<p>DV Flow Manager defines the <code class="docutils literal notranslate"><span class="pre">RunnerBackend</span></code> interface to enable support for
 multiple mechanisms to dynamically execute task graphs.</p>
-<p>Currently, DV Flow Manager implements a single-machine runner that
-schedules tasks across the available cores.</p>
+<section id="runner-backends">
+<h2>Runner Backends<a class="headerlink" href="#runner-backends" title="Link to this heading">¶</a></h2>
+<p>DFM ships with a <strong>local</strong> runner that schedules tasks across the available
+cores on a single machine. Additional backends can dispatch tasks to remote
+workers on LSF or SLURM clusters.</p>
+<p>See the <a class="reference internal" href="userguide/runners.html"><span class="doc">Task Runners</span></a> user guide for details on selecting and
+configuring runners, and <a class="reference internal" href="reference/runner_config.html"><span class="doc">Runner Config</span></a> for the full
+configuration reference.</p>
 <dl class="py class">
-<dt class="sig sig-object py" id="dv_flow.mgr.TaskRunner">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.</span></span><span class="sig-name descname"><span class="pre">TaskRunner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">rundir:</span> <span class="pre">str,</span> <span class="pre">env:</span> <span class="pre">Dict[str,</span> <span class="pre">str]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">listeners:</span> <span class="pre">List[Tuple[Callable[[ForwardRef('Task')],</span> <span class="pre">ForwardRef('Reason')],</span> <span class="pre">bool]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;</span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.TaskRunner" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.runner_backend.</span></span><span class="sig-name descname"><span class="pre">RunnerBackend</span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend" title="Link to this definition">¶</a></dt>
+<dd><p>Abstract execution backend.</p>
+<p>Implementations provide different strategies for executing tasks:
+local (in-process via jobserver), LSF, SLURM, etc.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.acquire_slot">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">acquire_slot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.acquire_slot" title="Link to this definition">¶</a></dt>
+<dd><p>Acquire an execution slot (analogous to jobserver token).</p>
+<p>Blocks if the backend is at capacity.</p>
+</dd></dl>
 
-<p>DV Flow Manager may provide the following runner options in the future:</p>
-<ul class="simple">
-<li><p>Statically split the task graph such that the sub-graphs can be run
-by another graph-execution tools</p></li>
-<li><p>Dynamically distribute nodes in the task graph across multiple machines
-in a SLURM- or LSF-like cluster.</p></li>
-</ul>
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.cancel_inflight">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cancel_inflight</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.cancel_inflight" title="Link to this definition">¶</a></dt>
+<dd><p>Cancel all tasks currently in flight.</p>
+<p>Called during cleanup (e.g. SIGINT) to inform the backend that
+any outstanding tasks should be aborted.  The default is a no-op;
+remote backends override this to notify the daemon.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.execute_task">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TaskExecRequest</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pytask_api.html#dv_flow.mgr.TaskDataResult" title="dv_flow.mgr.TaskDataResult"><span class="pre">TaskDataResult</span></a></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.execute_task" title="Link to this definition">¶</a></dt>
+<dd><p>Execute a single task. Blocks until the task completes.</p>
+<p>The backend is responsible for:
+- Selecting or launching an appropriate worker
+- Transmitting the request
+- Waiting for and returning the result
+- Handling worker failures (retry on a different worker)</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.is_remote">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_remote</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.is_remote" title="Link to this definition">¶</a></dt>
+<dd><p>True if this backend dispatches tasks to remote workers.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.release_slot">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">release_slot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.release_slot" title="Link to this definition">¶</a></dt>
+<dd><p>Release an execution slot.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.start">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.start" title="Link to this definition">¶</a></dt>
+<dd><p>Initialize backend (connect to daemon, start pool, etc.).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend.RunnerBackend.stop">
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend.RunnerBackend.stop" title="Link to this definition">¶</a></dt>
+<dd><p>Shutdown backend (drain workers, release resources).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dv_flow.mgr.runner_backend_local.</span></span><span class="sig-name descname"><span class="pre">LocalBackend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jobserver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">JobServer</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend" title="Link to this definition">¶</a></dt>
+<dd><p>Execute tasks locally using the existing jobserver.</p>
+<p>For LocalBackend, TaskNodeLeaf._run_task continues to call the
+callable directly (no serialization overhead). The backend is only
+consulted for slot acquisition.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.acquire_slot">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">acquire_slot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.acquire_slot" title="Link to this definition">¶</a></dt>
+<dd><p>Acquire a jobserver token.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.execute_task">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">execute_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">TaskExecRequest</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="pytask_api.html#dv_flow.mgr.TaskDataResult" title="dv_flow.mgr.task_data.TaskDataResult"><span class="pre">TaskDataResult</span></a></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.execute_task" title="Link to this definition">¶</a></dt>
+<dd><p>LocalBackend uses in-process execution; this should not be called.</p>
+<p>The local path goes through TaskNodeLeaf._run_task directly.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.is_remote">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">is_remote</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.is_remote" title="Link to this definition">¶</a></dt>
+<dd><p>True if this backend dispatches tasks to remote workers.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.release_slot">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">release_slot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.release_slot" title="Link to this definition">¶</a></dt>
+<dd><p>Release a jobserver token.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.start">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.start" title="Link to this definition">¶</a></dt>
+<dd><p>No-op for local execution.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dv_flow.mgr.runner_backend_local.LocalBackend.stop">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">stop</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#dv_flow.mgr.runner_backend_local.LocalBackend.stop" title="Link to this definition">¶</a></dt>
+<dd><p>No-op for local execution.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
 </section>
 
 
@@ -91,7 +191,7 @@ in a SLURM- or LSF-like cluster.</p></li>
 <li class="toctree-l1"><a class="reference internal" href="llms.html">LLM Agent Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pytask_api.html">Python Task API</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Task Runners</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#dv_flow.mgr.TaskRunner"><code class="docutils literal notranslate"><span class="pre">TaskRunner</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#runner-backends">Runner Backends</a></li>
 </ul>
 </li>
 </ul>
