@@ -38,6 +38,7 @@ class LsfConfig:
     project: str = ""
     resource_select: List[str] = dc.field(default_factory=list)
     bsub_extra: List[str] = dc.field(default_factory=list)
+    worker_dfm_path: str = "dfm"
 
 
 @dc.dataclass
