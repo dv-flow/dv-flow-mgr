@@ -5,6 +5,7 @@ import os
 from typing import ClassVar, List
 from .task_data import TaskDataResult
 from .exec_callable import _merge_env_filesets
+from .naming_scheme import TaskNamingContext
 
 @dc.dataclass
 class ShellCallable(object):
@@ -12,6 +13,24 @@ class ShellCallable(object):
     srcdir : str
     shell : str
     _log : ClassVar = logging.getLogger("ShellCallable")
+
+    def _get_filenames(self, ctxt, input):
+        """Get log and script filenames using the naming scheme if available."""
+        naming = getattr(ctxt.ctxt, 'naming_scheme', None) if ctxt.ctxt else None
+        if naming is not None:
+            root_pkg = getattr(ctxt.ctxt, 'root_package_name', "")
+            fq_name = input.name
+            leaf = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
+            inherits = getattr(input, 'inherits_rundir', False)
+            ctx = TaskNamingContext(
+                fq_name=fq_name,
+                leaf_name=leaf,
+                package_name="",
+                root_package_name=root_pkg,
+                inherits_rundir=inherits,
+            )
+            return naming.log_filename(ctx), naming.script_filename(ctx)
+        return "%s.log" % input.name, "%s_cmd.sh" % input.name
 
     async def __call__(self, ctxt, input):
 
@@ -45,21 +64,23 @@ class ShellCallable(object):
         self._log.debug("Shell command: %s" % cmd)
         self._log.debug("self.body: %s" % self.body)
 
+        log_fname, script_fname = self._get_filenames(ctxt, input)
+
         if cmd.find("\n") != -1:
             # This is an inline command. Create a script
             # file so env vars are expanded
-            cmd_f = os.path.join(input.rundir, "%s_cmd.sh" % input.name)
+            cmd_f = os.path.join(input.rundir, script_fname)
             with open(cmd_f, "w") as fp:
                 fp.write("#!/bin/%s\n" % (self.shell if self.shell != "shell" else "bash"))
                 fp.write(cmd)
             os.chmod(cmd_f, 0o755)
 
         # Use ctxt.exec() to respect jobserver token management
-        logfile = os.path.join(input.rundir, "%s.log" % input.name)
+        logfile = os.path.join(input.rundir, log_fname)
         
         if cmd.find("\n") != -1:
             # Multi-line command - already created script file above
-            cmd_script = os.path.join(input.rundir, "%s_cmd.sh" % input.name)
+            cmd_script = os.path.join(input.rundir, script_fname)
             status = await ctxt.exec([shell, cmd_script], logfile=logfile, env=env, cwd=input.rundir)
         else:
             # Single-line command - use shell -c

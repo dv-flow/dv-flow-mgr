@@ -26,7 +26,7 @@ from ..util import loadProjPkgDef, parse_parameter_overrides
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_data import SeverityE, TaskMarker
 from ..marker_listener import MarkerListener
-from .util import get_rootdir
+from .util import get_rootdir, get_naming_scheme
 
 
 class ValidationMarkerListener:
@@ -339,10 +339,10 @@ class CmdValidate:
                 builder = TaskGraphBuilder(
                     root_pkg=pkg, 
                     rundir=os.path.join(root, ".validate_tmp"),
-                    loader=loader
+                    loader=loader,
+                    naming_scheme=get_naming_scheme(),
                 )
-                # CLI usage: allow root package prefix
-                root_node = builder.mkTaskNode(root_task_name, allow_root_prefix=True)
+                root_node = builder.mkTaskNode(root_task_name)
                 
                 # Traverse task graph and check all dependencies
                 warnings.extend(self._check_node_dataflow(root_node, matcher))

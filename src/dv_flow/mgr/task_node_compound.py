@@ -51,7 +51,7 @@ async def _default_compound_run(ctxt, input: CompoundRunInput) -> TaskDataResult
             status |= item.status
         else:
             output.append(item)
-    return TaskDataResult(status=status, output=output)
+    return TaskDataResult(status=status, output=output, changed=input.changed)
 
 
 @dc.dataclass
@@ -154,4 +154,3 @@ class TaskNodeCompound(TaskNode):
 
     def __hash__(self):
         return id(self)
-

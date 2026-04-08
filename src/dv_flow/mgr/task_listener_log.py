@@ -65,7 +65,7 @@ class TaskListenerLog(object):
             self.level += 1
             # In verbose mode, show immediately; in non-verbose mode, defer until we know if it runs
             if self.verbose and not self.quiet:
-                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
+                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task._get_display_name()))
         elif reason == 'uptodate':
             # Task is up-to-date - in non-verbose mode, don't show it
             # In verbose mode, it was already shown in 'enter'
@@ -77,7 +77,7 @@ class TaskListenerLog(object):
         elif reason == 'run':
             # Task will actually run - show it now in non-verbose mode
             if not self.verbose and not self.quiet:
-                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task.name))
+                self.console.print("[green]>> [%d][/green] Task %s" % (self.level, task._get_display_name()))
         elif reason == 'leave':
             # Check if task was up-to-date (not changed) or cache hit
             is_uptodate = not task.result.changed if task.result else False
@@ -90,7 +90,7 @@ class TaskListenerLog(object):
             
             if self.quiet:
                 if task.result.changed:
-                    self.console.print("[green]Done:[/green] %s" % (task.name,))
+                    self.console.print("[green]Done:[/green] %s" % (task._get_display_name(),))
             else:
                 delta_s = None
                 if task.start is not None and task.end is not None:
@@ -101,7 +101,7 @@ class TaskListenerLog(object):
                         delta_s = " %0.2fmS" % (1000*delta.total_seconds())
 
                 for m in task.result.markers:
-                    self.show_marker(m, task.name, task.rundir)
+                    self.show_marker(m, task._get_display_name(), task.rundir)
 
                 if task.result.status == 0:
                     # Determine status suffix
@@ -113,11 +113,11 @@ class TaskListenerLog(object):
                     
                     self.console.print("[green]<< [%d][/green] Task %s%s%s" % (
                         self.level, 
-                        task.name,
+                        task._get_display_name(),
                         status_suffix,
                         (delta_s if delta_s is not None else "")))
                 else:
-                    self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task.name))
+                    self.console.print("[red]<< [%d][/red] Task %s" % (self.level, task._get_display_name()))
             self.level -= 1
         elif reason == 'start':
             if hasattr(task, 'cache_providers') and task.cache_providers:
@@ -130,8 +130,10 @@ class TaskListenerLog(object):
                 self.console.print(f"[cyan]DV_FLOW_CACHE: {cache_path}[/cyan]")
         elif reason == 'end':
             pass
+        elif reason == 'checking':
+            pass
         else:
-            self.console.print("[red]-[/red] Task %s" % task.name)
+            self.console.print("[red]-[/red] Task %s" % task._get_display_name())
         pass
 
     def show_marker(self, m, name=None, rundir=None):
@@ -175,4 +177,3 @@ class TaskListenerLog(object):
                 self._log.error("Problem displaying message \"%s\" to the console: %s" % (msg, e))
 
         pass
-

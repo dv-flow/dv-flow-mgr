@@ -23,21 +23,21 @@ import argparse
 import json
 import logging
 import os
-from .cmds.cmd_graph import CmdGraph
-from .cmds.cmd_run import CmdRun
-from .cmds.cmd_show import CmdShow
-from .cmds.cmd_util import CmdUtil
-from .cmds.cmd_cache import CmdCache
-from .cmds.cmd_validate import CmdValidate
-from .cmds.cmd_context import CmdContext
-from .cmds.cmd_agent import CmdAgent
-from .cmds.cache.cmd_init import CmdCacheInit
-from .cmds.show import (
-    CmdShowPackages, CmdShowTasks, CmdShowTask,
-    CmdShowTypes, CmdShowTags, CmdShowPackage, CmdShowProject,
-    CmdShowSkills
-)
-from .ext_rgy import ExtRgy
+class _LazyCmd:
+    """Wrapper that defers importing a command class until it's called."""
+    def __init__(self, module_path, class_name):
+        self._module_path = module_path
+        self._class_name = class_name
+        self._instance = None
+    def __call__(self, *args, **kwargs):
+        if self._instance is None:
+            import importlib
+            mod = importlib.import_module(self._module_path, __package__)
+            self._instance = getattr(mod, self._class_name)()
+        return self._instance(*args, **kwargs)
+
+def _lazy(module_path, class_name):
+    return _LazyCmd(module_path, class_name)
 
 
 class _CmdMcp:
@@ -71,6 +71,21 @@ class _CmdMcp:
             return 1
 
         asyncio.run(run_mcp_server(pkg, loader))
+        return 0
+
+class _CmdWorker:
+    """Run as a worker process, connecting to a daemon."""
+
+    def __call__(self, args):
+        import asyncio
+        from .worker import run_worker
+
+        asyncio.run(run_worker(
+            connect_addr=args.connect,
+            worker_id=args.worker_id,
+            resource_class=args.resource_class,
+            lsf_job_id=args.lsf_job_id,
+        ))
         return 0
 
 def _get_skill_path():
@@ -135,7 +150,7 @@ def get_parser():
     graph_parser.add_argument("--json",
                         action="store_true",
                         help="Output graph wrapped in JSON with markers for programmatic consumption")
-    graph_parser.set_defaults(func=CmdGraph())
+    graph_parser.set_defaults(func=_lazy(".cmds.cmd_graph", "CmdGraph"))
 
     run_parser = subparsers.add_parser('run', help='run a flow')
     run_parser.add_argument("tasks", nargs='*', help="tasks to run")
@@ -171,11 +186,31 @@ def get_parser():
                         dest="param_file",
                         metavar="FILE_OR_JSON",
                         help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
-    run_parser.set_defaults(func=CmdRun())
+    run_parser.add_argument("--runner",
+                        help="Runner backend to use (e.g. local, lsf). Default: from config or 'local'",
+                        default=None)
+    run_parser.add_argument("--runner-opt",
+                        dest="runner_opts",
+                        action="append",
+                        default=[],
+                        metavar="KEY=VALUE",
+                        help="Runner backend option (key=value). May be used multiple times")
+    run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"))
+
+    # Completion command
+    complete_parser = subparsers.add_parser('complete',
+        help='Print tab-completion candidates for task names')
+    complete_parser.add_argument('prefix', nargs='?', default='',
+        help='Partial task name to complete')
+    complete_parser.add_argument('--root',
+        help='Specifies the root directory for the flow')
+    complete_parser.add_argument('-c', '--config',
+        help='Specifies the active configuration for the root package')
+    complete_parser.set_defaults(func=_lazy(".cmds.cmd_complete", "CmdComplete"))
 
     show_parser = subparsers.add_parser('show', 
                                         help='Display and search packages, tasks, types, and tags')
-    show_parser.set_defaults(func=CmdShow())
+    show_parser.set_defaults(func=_lazy(".cmds.cmd_show", "CmdShow"))
 
     # Show sub-commands
     show_subparsers = show_parser.add_subparsers(dest='show_subcommand')
@@ -209,7 +244,7 @@ def get_parser():
     show_packages_parser = show_subparsers.add_parser('packages',
                                                        help='List and search available packages')
     add_common_show_args(show_packages_parser)
-    show_packages_parser.set_defaults(func=CmdShowPackages())
+    show_packages_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowPackages"))
 
     # show tasks
     show_tasks_parser = show_subparsers.add_parser('tasks',
@@ -222,7 +257,7 @@ def get_parser():
                                    help="Filter tasks by visibility scope")
     show_tasks_parser.add_argument("--produces",
                                    help="Filter tasks by produces pattern (e.g., 'type=std.FileSet,filetype=verilog')")
-    show_tasks_parser.set_defaults(func=CmdShowTasks())
+    show_tasks_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowTasks"))
 
     # show task <name>
     show_task_parser = show_subparsers.add_parser('task',
@@ -250,7 +285,7 @@ def get_parser():
                                   help="Specifies the active configuration")
     show_task_parser.add_argument("--root",
                                   help="Specifies the root directory for the flow")
-    show_task_parser.set_defaults(func=CmdShowTask())
+    show_task_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowTask"))
 
     # show types
     show_types_parser = show_subparsers.add_parser('types',
@@ -264,7 +299,7 @@ def get_parser():
     show_types_parser.add_argument("--data-items-only",
                                    action="store_true",
                                    help="Show only data item types (deriving from std.DataItem)")
-    show_types_parser.set_defaults(func=CmdShowTypes())
+    show_types_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowTypes"))
 
     # show tags
     show_tags_parser = show_subparsers.add_parser('tags',
@@ -287,7 +322,7 @@ def get_parser():
                                   help="Specifies the active configuration")
     show_tags_parser.add_argument("--root",
                                   help="Specifies the root directory for the flow")
-    show_tags_parser.set_defaults(func=CmdShowTags())
+    show_tags_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowTags"))
 
     # show package <name>
     show_package_parser = show_subparsers.add_parser('package',
@@ -309,7 +344,7 @@ def get_parser():
                                      help="Specifies the active configuration")
     show_package_parser.add_argument("--root",
                                      help="Specifies the root directory for the flow")
-    show_package_parser.set_defaults(func=CmdShowPackage())
+    show_package_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowPackage"))
 
     # show project
     show_project_parser = show_subparsers.add_parser('project',
@@ -336,7 +371,7 @@ def get_parser():
                                      help="Specifies the active configuration")
     show_project_parser.add_argument("--root",
                                      help="Specifies the root directory for the flow")
-    show_project_parser.set_defaults(func=CmdShowProject())
+    show_project_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowProject"))
 
     # show skills
     show_skills_parser = show_subparsers.add_parser('skills',
@@ -367,7 +402,7 @@ def get_parser():
                                     help="Specifies the active configuration")
     show_skills_parser.add_argument("--root",
                                     help="Specifies the root directory for the flow")
-    show_skills_parser.set_defaults(func=CmdShowSkills())
+    show_skills_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowSkills"))
 
     # Cache management commands
     cache_parser = subparsers.add_parser('cache',
@@ -382,9 +417,9 @@ def get_parser():
     cache_init_parser.add_argument('--shared',
         action='store_true',
         help='Create a shared cache for team use with group permissions')
-    cache_init_parser.set_defaults(cache_func=CmdCacheInit())
+    cache_init_parser.set_defaults(cache_func=_lazy(".cmds.cache.cmd_init", "CmdCacheInit"))
     
-    cache_parser.set_defaults(func=CmdCache())
+    cache_parser.set_defaults(func=_lazy(".cmds.cmd_cache", "CmdCache"))
 
     # Validate command
     validate_parser = subparsers.add_parser('validate',
@@ -405,7 +440,7 @@ def get_parser():
                                  help="Specifies the active configuration")
     validate_parser.add_argument("--root",
                                  help="Specifies the root directory for the flow")
-    validate_parser.set_defaults(func=CmdValidate())
+    validate_parser.set_defaults(func=_lazy(".cmds.cmd_validate", "CmdValidate"))
 
     # Context command
     context_parser = subparsers.add_parser('context',
@@ -432,7 +467,7 @@ def get_parser():
                                 help="Specifies the active configuration")
     context_parser.add_argument("--root",
                                 help="Specifies the root directory for the flow")
-    context_parser.set_defaults(func=CmdContext())
+    context_parser.set_defaults(func=_lazy(".cmds.cmd_context", "CmdContext"))
 
     agent_parser = subparsers.add_parser('agent',
         help='Launch an AI assistant with DV Flow context')
@@ -472,7 +507,7 @@ def get_parser():
     agent_parser.add_argument('--trace',
         action='store_true',
         help='Enable agent tracing to ~/.dfm/traces/ (or trace_dir in config)')
-    agent_parser.set_defaults(func=CmdAgent())
+    agent_parser.set_defaults(func=_lazy(".cmds.cmd_agent", "CmdAgent"))
 
     mcp_parser = subparsers.add_parser('mcp',
         help='Start DFM as an MCP server (stdio) for Claude Desktop, Cursor, VS Code, etc.')
@@ -483,13 +518,64 @@ def get_parser():
         help='Specifies the root directory for the flow')
     mcp_parser.add_argument('-c', '--config',
         help='Specifies the active configuration for the root package')
-    mcp_parser.set_defaults(func=_CmdMcp())
+    mcp_parser.set_defaults(func=_lazy(".__main__", "_CmdMcp"))
+
+    daemon_parser = subparsers.add_parser('daemon',
+        help='Manage the background daemon (worker pool manager)')
+    daemon_subparsers = daemon_parser.add_subparsers(dest='daemon_subcmd')
+
+    daemon_start_parser = daemon_subparsers.add_parser('start',
+        help='Start the daemon')
+    daemon_start_parser.add_argument('--root',
+        help='Project root directory')
+    daemon_start_parser.add_argument('--runner',
+        help='Runner backend (e.g. local, lsf)')
+    daemon_start_parser.add_argument('--pool-size',
+        type=int, default=None,
+        help='Maximum number of workers')
+    daemon_start_parser.add_argument('--monitor',
+        action='store_true',
+        help='Attach monitor TUI after starting')
+    daemon_start_parser.add_argument('--foreground',
+        action='store_true',
+        help='Run daemon in foreground (default is background)')
+
+    daemon_stop_parser = daemon_subparsers.add_parser('stop',
+        help='Stop the daemon')
+    daemon_stop_parser.add_argument('--root',
+        help='Project root directory')
+
+    daemon_status_parser = daemon_subparsers.add_parser('status',
+        help='Show daemon status')
+    daemon_status_parser.add_argument('--root',
+        help='Project root directory')
+    daemon_status_parser.add_argument('--json',
+        action='store_true',
+        help='Output in JSON format')
+
+    daemon_parser.set_defaults(func=_lazy(".cmds.cmd_daemon", "CmdDaemon"))
+
+    worker_parser = subparsers.add_parser('worker',
+        help='Run as a worker process (internal, used by daemon)')
+    worker_parser.add_argument('--connect',
+        required=True,
+        help='Daemon address to connect to (host:port)')
+    worker_parser.add_argument('--worker-id',
+        default=None,
+        help='Worker ID (auto-generated if not specified)')
+    worker_parser.add_argument('--resource-class',
+        default='',
+        help='Resource class this worker provides')
+    worker_parser.add_argument('--lsf-job-id',
+        default='',
+        help='LSF job ID (if launched via bsub)')
+    worker_parser.set_defaults(func=_lazy(".__main__", "_CmdWorker"))
 
     util_parser = subparsers.add_parser('util',
         help="Internal utility command")
     util_parser.add_argument("cmd")
     util_parser.add_argument("args", nargs=argparse.REMAINDER)
-    util_parser.set_defaults(func=CmdUtil())
+    util_parser.set_defaults(func=_lazy(".cmds.cmd_util", "CmdUtil"))
 
     return parser
 

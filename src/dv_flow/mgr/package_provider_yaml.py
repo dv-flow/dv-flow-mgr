@@ -1620,6 +1620,10 @@ class PackageProviderYaml(PackageProvider):
             self._pkg_s[-1].add(st, td.name)
 
         # Now, resolve references
+        # Get the fragment name from the enclosing compound task so that
+        # unqualified uses/needs in body tasks can be resolved against
+        # sibling tasks defined in the same named fragment.
+        fragment_name = getattr(taskdef, "_fragment_name", None)
         for td, st in subtasks:
             if td.uses is not None:
                 if st.uses is None:
@@ -1627,6 +1631,8 @@ class PackageProviderYaml(PackageProvider):
                     if "${{" in uses_name:
                         uses_name = loader.evalExpr(uses_name)
                     st.uses = self._findTask(uses_name, loader)
+                    if st.uses is None and fragment_name and '.' not in uses_name:
+                        st.uses = self._findTask(f"{fragment_name}.{uses_name}", loader)
                     if st.uses is None:
                         loader.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % uses_name)
@@ -1652,6 +1658,8 @@ class PackageProviderYaml(PackageProvider):
                     if "${{" in need_name:
                         need_name = loader.evalExpr(need_name)
                     nn = self._findTask(need_name, loader)
+                    if nn is None and fragment_name and '.' not in need_name:
+                        nn = self._findTask(f"{fragment_name}.{need_name}", loader)
                 elif isinstance(need, TaskDef):
                     nn = self._findTask(need.name, loader)
                 else:

@@ -68,6 +68,7 @@ class TaskDataInput(BaseModel, Generic[T]):
     params : Any # Type[T]
     inputs : List[Any]
     memento : Any
+    inherits_rundir : bool = False
 
 class TaskDataResult(BaseModel):
     """

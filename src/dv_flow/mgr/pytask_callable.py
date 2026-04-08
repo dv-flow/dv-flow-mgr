@@ -22,9 +22,9 @@ class PytaskCallable(object):
 
         method = "async def pytask(ctxt, input):\n" + "\n".join(["    %s" % l for l in self.body])
 
-        exec(method)
-
-        result = await locals()['pytask'](ctxt, input)
+        _ns = {}
+        exec(method, _ns)
+        result = await _ns['pytask'](ctxt, input)
 
         if result is None:
             result = TaskDataResult()

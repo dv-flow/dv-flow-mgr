@@ -208,12 +208,11 @@ async def _dispatch(name: str, args: Dict[str, Any], pkg, builder, runner) -> st
 
     elif name == "dfm_show_task":
         task_name = args.get("name", "")
-        resolved = task_name if '.' in task_name else f"{pkg.name}.{task_name}"
-        task = pkg.task_m.get(resolved) or next(
-            (t for t in pkg.task_m.values() if t.name.endswith("." + task_name)), None
-        )
-        if not task:
-            return json.dumps({"error": f"Task not found: {task_name}"})
+        resolver = CLITaskResolver.from_package(pkg)
+        try:
+            task = resolver.resolve(task_name)
+        except TaskResolutionError as e:
+            return json.dumps({"error": str(e)})
         result: Dict[str, Any] = {
             "name": task.name, "desc": task.desc or "",
             "scope": "root" if getattr(task, 'is_root', False) else "local",
@@ -340,3 +339,4 @@ async def run_mcp_server(pkg, loader, builder=None, runner=None):
     init_opts = server.create_initialization_options()
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, init_opts, raise_exceptions=True)
+from ...cli_task_resolver import CLITaskResolver, TaskResolutionError

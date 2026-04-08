@@ -14,6 +14,8 @@ User Guide
    error_handling
    incremental
    configuration
+   runners
+   daemon
    expressions
    filters
    advanced_features

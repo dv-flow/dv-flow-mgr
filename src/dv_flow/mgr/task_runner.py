@@ -32,6 +32,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Set, Tuple, Union
 from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node import TaskNode, RundirE
 from .dynamic_scheduler import DynamicScheduler
+from .runner_backend import RunnerBackend
 
 class TaskState(enum.Enum):
     """State of a task in the execution pipeline"""
@@ -99,6 +100,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     cache_providers : List = dc.field(default_factory=list)
     hash_registry : 'ExtRgy' = None
     enable_server : bool = True  # Enable DFM command server for LLM integration
+    backend : RunnerBackend = None  # Optional runner backend (None or LocalBackend = local execution)
 
     _anon_tid : int = 1
     _jobserver : 'JobServer' = dc.field(default=None, init=False)
@@ -197,6 +199,11 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             self.env["DFM_SESSION_RUNDIR"] = self.rundir
             self._log.info(f"Command server started at {self._command_server.socket_path}")
 
+        # Start remote backend if present
+        if self.backend is not None and self.backend.is_remote:
+            self._log.info("Starting remote backend")
+            await self.backend.start()
+
         # Enable dynamic scheduling
         self._dynamic_enabled = True
         
@@ -275,7 +282,12 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             if self._command_server:
                 await self._command_server.stop()
                 self._command_server = None
-            
+
+            # Cancel inflight tasks and stop remote backend
+            if self.backend is not None and self.backend.is_remote:
+                await self.backend.cancel_inflight()
+                await self.backend.stop()
+
             # Close jobserver if we own it
             if self._jobserver_owner and self._jobserver:
                 self._jobserver.close()
@@ -365,14 +377,266 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         self._log.debug("Launching task %s" % t.name)
         self._notify(t, "enter")
         t.start = datetime.now()
-        # Track current task for logging context
         setattr(self, '_current_task', t)
-        coro = asyncio.Task(t.do_run(
-            self,
-            rundir,
-            memento)) 
+
+        # Dispatch via remote backend for leaf tasks that have a real
+        # callable (taskdef.run or shell body).  Compound nodes, their
+        # .in passthrough nodes, and other graph-internal nodes run locally.
+        from .task_node_leaf import TaskNodeLeaf
+        from .task_node_compound import TaskNodeCompound
+        use_remote = False
+        if (self.backend is not None
+                and self.backend.is_remote
+                and isinstance(t, TaskNodeLeaf)
+                and not isinstance(t, TaskNodeCompound)):
+            taskdef = getattr(t, 'taskdef', None)
+            has_run = taskdef is not None and getattr(taskdef, 'run', None)
+            task_callable = getattr(t, 'task', None)
+            has_body = task_callable is not None and getattr(task_callable, 'body', None)
+            use_remote = bool(has_run or has_body)
+
+        if use_remote:
+            coro = asyncio.Task(self._execute_via_backend(t, rundir, memento))
+        else:
+            coro = asyncio.Task(t.do_run(self, rundir, memento))
         active_task_l.append((t, coro))
     
+    async def _execute_via_backend(self, t: TaskNode, rundir: str, memento):
+        """Serialize a leaf task and dispatch it to the remote backend.
+
+        Mirrors the local TaskNodeLeaf._do_run / _run_task path:
+        1. Compute changed from dependency outputs
+        2. Gather upstream inputs and compute consumed subset
+        3. Check up-to-date status locally (skip dispatch if up-to-date)
+        4. Serialize and dispatch to backend
+        5. Reconstruct output items from dicts
+        6. Handle passthrough (propagate upstream items to output)
+        7. Save exec_data for future uptodate checks
+        """
+        from .task_exec_serialize import serialize_task
+        from .runner_config import RunnerConfig
+        from .task_data import TaskDataResult, TaskDataOutput, TaskMarker, SeverityE
+        from .task_node_leaf import TaskNodeLeaf
+        from .task_def import ConsumesE, PassthroughE
+
+        self._log.info("Dispatching task %s via remote backend" % t.name)
+
+        # 1. Compute changed from dependency outputs
+        changed = False
+        for dep, _ in t.needs:
+            changed |= dep.output.changed
+
+        # 2. Gather upstream inputs
+        in_params = await t.get_in_params(rundir, self)
+        self._log.debug("Remote task %s: %d input items from %d deps" % (
+            t.name, len(in_params), len(t.needs)))
+
+        # Compute consumed inputs (same logic as TaskNodeLeaf._do_run)
+        inputs = []
+        if isinstance(t.consumes, list) and len(t.consumes):
+            for in_p in in_params:
+                if t._matches(in_p, t.consumes) or getattr(in_p, "type", None) == "std.Env":
+                    inputs.append(in_p)
+        elif t.consumes == ConsumesE.All:
+            inputs = in_params.copy()
+        else:
+            for in_p in in_params:
+                if getattr(in_p, "type", None) == "std.Env":
+                    inputs.append(in_p)
+
+        # 3. Check up-to-date status locally (unless force_run is set)
+        force_run = getattr(self, 'force_run', False)
+        if not force_run and isinstance(t, TaskNodeLeaf):
+            self._notify(t, "checking")
+            is_uptodate, exec_data = await t._check_uptodate(rundir, inputs, changed)
+            self._notify(t, "uptodate" if is_uptodate else "run")
+
+            if is_uptodate and exec_data is not None:
+                self._log.debug("Task %s is up-to-date, skipping remote dispatch" % t.name)
+
+                result_data = exec_data.get("result", {})
+                t.result = TaskDataResult(
+                    status=result_data.get("status", 0),
+                    changed=False,
+                    output=[],
+                    markers=[],
+                    memento=None
+                )
+
+                output = []
+                dep_m = {t.name: list(need.name for need, _ in t.needs)}
+
+                # Handle passthrough (same logic used below for dispatched tasks)
+                if isinstance(t.passthrough, list):
+                    pass
+                elif t.passthrough == PassthroughE.All:
+                    for need, block in t.needs:
+                        if not block and need.output is not None:
+                            for out in need.output.output:
+                                if getattr(out, "type", None) != "std.Env":
+                                    output.append(out)
+                elif t.passthrough == PassthroughE.Unused:
+                    if t.consumes == ConsumesE.No or (isinstance(t.consumes, list) and len(t.consumes) == 0):
+                        for need, block in t.needs:
+                            if not block and need.output is not None:
+                                for out in need.output.output:
+                                    if getattr(out, "type", None) != "std.Env":
+                                        output.append(out)
+                    elif isinstance(t.consumes, list):
+                        for need, block in t.needs:
+                            if not block and need.output is not None:
+                                for out in need.output.output:
+                                    if getattr(out, "type", None) != "std.Env":
+                                        if not t._matches(out, t.consumes):
+                                            output.append(out)
+
+                # Restore local outputs from saved exec_data
+                output_data = exec_data.get("output", {})
+                saved_output = output_data.get("output", [])
+                restoration_ok = True
+                for i, out_data in enumerate(saved_output):
+                    if out_data.get("src") == t.name:
+                        excluded_fields = ("type", "src", "seq", "name", "params")
+                        try:
+                            item_type = out_data.get("type") or "std.FileSet"
+                            item = self.mkDataItem(item_type, **{
+                                k: v for k, v in out_data.items()
+                                if k not in excluded_fields
+                            })
+                            item.src = t.name
+                            item.seq = out_data.get("seq", i)
+                            output.append(item)
+                        except Exception as e:
+                            self._log.warning("Failed to restore exec_data output for %s: %s" % (t.name, e))
+                            restoration_ok = False
+                            break
+
+                if restoration_ok:
+                    t.output = TaskDataOutput(changed=False, dep_m=dep_m, output=output)
+                    t.rundir = rundir
+                    return t.result
+
+                # Restoration failed, fall through to remote dispatch
+                self._log.debug("Output restoration failed for %s, dispatching to daemon" % t.name)
+        else:
+            self._notify(t, "run")
+
+        # 4. Serialize and dispatch to backend
+        config = RunnerConfig()
+        request = serialize_task(t, config, env=self.env)
+        request.rundir = rundir
+
+        try:
+            result = await self.backend.execute_task(request)
+        except Exception as e:
+            self._log.error("Remote execution of %s failed: %s" % (t.name, e))
+            result = TaskDataResult(
+                status=1, changed=False, output=[],
+                markers=[TaskMarker(
+                    msg="Remote execution failed: %s" % str(e),
+                    severity=SeverityE.Error)],
+            )
+
+        t.result = result
+        t.rundir = rundir
+
+        # 5. Reconstruct local output items from dicts
+        dep_m = {t.name: [need.name for need, _ in t.needs]}
+        local_output = []
+        for i, item_data in enumerate(result.output or []):
+            if isinstance(item_data, dict):
+                item_type = item_data.get("type", "std.FileSet")
+                excluded = ("type", "src", "seq", "name", "params")
+                try:
+                    item = self.mkDataItem(
+                        item_type,
+                        **{k: v for k, v in item_data.items() if k not in excluded}
+                    )
+                    # Match the local execution path (task_node_leaf.py):
+                    # always set src to the task name and seq to the item index
+                    item.src = t.name
+                    item.seq = i
+                    local_output.append(item)
+                except Exception as e:
+                    self._log.warning("Failed to reconstruct output item from %s: %s" % (t.name, e))
+            else:
+                local_output.append(item_data)
+
+        # 6. Handle passthrough -- propagate upstream items just like
+        #    TaskNodeLeaf._run_task does
+        output = []
+        passthrough = getattr(t, 'passthrough', False)
+        consumes = getattr(t, 'consumes', [])
+
+        if isinstance(passthrough, list):
+            pass  # not yet supported
+        elif passthrough == PassthroughE.All:
+            for need, block in t.needs:
+                if not block and need.output is not None:
+                    for out in need.output.output:
+                        if getattr(out, "type", None) != "std.Env":
+                            output.append(out)
+        elif passthrough == PassthroughE.Unused:
+            if consumes == ConsumesE.No or (isinstance(consumes, list) and len(consumes) == 0):
+                for need, block in t.needs:
+                    if not block and need.output is not None:
+                        for out in need.output.output:
+                            if getattr(out, "type", None) != "std.Env":
+                                output.append(out)
+            elif isinstance(consumes, list):
+                for need, block in t.needs:
+                    if not block and need.output is not None:
+                        for out in need.output.output:
+                            if getattr(out, "type", None) != "std.Env":
+                                if not t._matches(out, consumes):
+                                    output.append(out)
+
+        # Add our own output items
+        output.extend(local_output)
+
+
+        t.output = TaskDataOutput(
+            changed=result.changed,
+            dep_m=dep_m,
+            output=output,
+        )
+
+        # 7. Save exec_data for future uptodate checks
+        if t.save_exec_data and t.result.status == 0:
+            inputs_signature = [
+                {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
+                for item in inputs
+            ]
+            memento_data = None
+            if t.result.memento is not None:
+                if hasattr(t.result.memento, 'model_dump'):
+                    memento_data = t.result.memento.model_dump(mode='json')
+                else:
+                    memento_data = t.result.memento
+
+            save_data = {
+                "name": t.name,
+                "srcdir": t.srcdir,
+                "rundir": rundir,
+                "params": t.params.model_dump(mode='json') if hasattr(t.params, 'model_dump') else {},
+                "inputs_signature": inputs_signature,
+                "result": {
+                    "status": t.result.status,
+                    "changed": t.result.changed,
+                    "memento": memento_data,
+                },
+                "output": t.output.model_dump(mode='json'),
+            }
+            try:
+                exec_file = os.path.join(rundir, t._get_exec_data_filename())
+                with open(exec_file, "w") as f:
+                    json.dump(save_data, f, indent=2)
+                    f.write("\n")
+            except Exception as e:
+                self._log.warning("Failed to save exec_data for %s: %s" % (t.name, e))
+
+        return result
+
     def _skip_task(self, task: TaskNode, done_task_s: Set[TaskNode]):
         """Mark a task as skipped (not executed due to failure).
         
@@ -631,7 +895,8 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                     if completed_task.result is None:
                         raise Exception("Task %s did not produce a result" % completed_task.name)
                     if completed_task.result.memento is not None:
-                        dst_memento[completed_task.name] = completed_task.result.memento.model_dump()
+                        m = completed_task.result.memento
+                        dst_memento[completed_task.name] = m.model_dump() if hasattr(m, 'model_dump') else m
                     else:
                         dst_memento[completed_task.name] = None
 

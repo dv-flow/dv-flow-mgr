@@ -75,9 +75,9 @@ class ExecGenCallable(object):
 
             method = "def pytask(ctxt, input):\n" + "\n".join(["    %s" % l for l in text_lines])
 
-            exec(method)
-
-            callable = locals()['pytask']
+            _ns = {}
+            exec(method, _ns)
+            callable = _ns['pytask']
 
         result = callable(ctxt, input)
 

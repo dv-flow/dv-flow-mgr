@@ -44,6 +44,7 @@ class ExtRgy(PackageProvider):
         self._pkgpath = []
         self._pkg_m : Dict[str, str] = {}
         self._shell_m : Dict[str, Callable] = {}
+        self._runner_m : Dict[str, type] = {}
         self._override_m : Dict[str,str] = {}
         # Hash provider registry: List of (priority, provider) tuples
         # Higher priority providers are checked first
@@ -154,6 +155,12 @@ class ExtRgy(PackageProvider):
         self._shell_m["tcsh"] = ShellCallable
         self._shell_m["pytask"] = ExecCallable
         
+        # Register built-in runner backends
+        from .runner_backend_local import LocalBackend
+        self._runner_m["local"] = LocalBackend
+        from .lsf_backend import LsfBackend
+        self._runner_m["lsf"] = LsfBackend
+
         # Register hash providers
         # SV provider has higher priority than default
         self.register_hash_provider(SVHashProvider(), priority=10)
@@ -187,6 +194,16 @@ class ExtRgy(PackageProvider):
                                 name, self._pkg_m[name][0], path))
                         else:
                             self._pkg_m[name] = PackageProviderYaml(path=path)
+                # Discover runner backends
+                if hasattr(mod, "dfm_runners"):
+                    runner_m = mod.dfm_runners()
+                    for name, cls in runner_m.items():
+                        self._log.debug("Registering runner %s" % name)
+                        if name in self._runner_m:
+                            self._log.debug("Runner %s already registered" % name)
+                        else:
+                            self._runner_m[name] = cls
+
                 if hasattr(mod, "dvfm_shells") or hasattr(mod, "dfm_shells"):
                     if hasattr(mod, "dvfm_shells"):
                         shell_m = mod.dvfm_shells()
@@ -210,10 +227,19 @@ class ExtRgy(PackageProvider):
         #     self._pkgs[pkg.name] = pkg
         self._log.debug("<-- discover_plugins")
 
+    def findRunner(self, name: str) -> 'Optional[type]':
+        """Look up a registered runner backend class by name."""
+        return self._runner_m.get(name)
+
+    def getRunnerNames(self) -> 'List[str]':
+        """Return list of registered runner backend names."""
+        return list(self._runner_m.keys())
+
     def copy(self):
         ret = ExtRgy()
         ret._pkgpath = self._pkgpath.copy()
         ret._pkg_m = self._pkg_m.copy()
+        ret._runner_m = self._runner_m.copy()
         ret._hash_providers = self._hash_providers.copy()
         return ret
 

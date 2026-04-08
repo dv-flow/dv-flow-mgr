@@ -23,8 +23,9 @@ import logging
 import os
 from typing import ClassVar, Optional, Dict, Any, List, Set
 from .formatters import DetailFormatter
-from ..util import get_rootdir
+from ..util import get_rootdir, get_naming_scheme
 from ...util import loadProjPkgDef, parse_parameter_overrides
+from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
 from ...ext_rgy import ExtRgy
 
 
@@ -72,35 +73,29 @@ class CmdShowTask:
     
     def _find_task(self, task_name: str, pkg, loader) -> Optional[Dict[str, Any]]:
         """Find a task by name."""
-        # Parse task name
+        # Use CLITaskResolver for flexible suffix matching when project pkg available
+        if pkg:
+            resolver = CLITaskResolver.from_package(pkg)
+            try:
+                task = resolver.resolve(task_name)
+                pkg_name = task.package.name if hasattr(task, 'package') and task.package else pkg.name
+                return self._task_to_info(task, pkg_name)
+            except TaskResolutionError:
+                pass
+
+        # Fallback: exact lookup in installed packages by parsing the name
         if '.' in task_name:
             pkg_name, short_name = task_name.rsplit('.', 1)
         else:
-            # Assume project package
-            if pkg:
-                pkg_name = pkg.name
-                short_name = task_name
-            else:
-                return None
-        
-        # Search in project package (Package object with task_m)
-        if pkg and pkg.name == pkg_name:
-            if hasattr(pkg, 'task_m') and pkg.task_m:
-                full_task_name = f"{pkg_name}.{short_name}"
-                if full_task_name in pkg.task_m:
-                    task = pkg.task_m[full_task_name]
-                    return self._task_to_info(task, pkg_name)
-        
-        # Search in installed packages
+            return None
+
         rgy = ExtRgy.inst()
         if pkg_name in rgy._pkg_m:
             try:
                 provider = rgy._pkg_m[pkg_name]
-                # Create loader if needed
                 if loader is None:
                     from ...package_loader import PackageLoader
                     loader = PackageLoader(marker_listeners=[], param_overrides={})
-                
                 loaded_pkg = provider.findPackage(pkg_name, loader)
                 if loaded_pkg and hasattr(loaded_pkg, 'task_m') and loaded_pkg.task_m:
                     full_task_name = f"{pkg_name}.{short_name}"
@@ -109,7 +104,7 @@ class CmdShowTask:
                         return self._task_to_info(task, pkg_name)
             except Exception as e:
                 self._log.debug(f"Could not load package {pkg_name}: {e}")
-        
+
         return None
     
     def _task_to_info(self, task, pkg_name: str) -> Dict[str, Any]:
@@ -194,10 +189,18 @@ class CmdShowTask:
         
         try:
             rundir = os.path.join(pkg.basedir, "rundir")
-            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
+            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader,
+                                       naming_scheme=get_naming_scheme())
             
             # Build the task node (CLI usage: allow root package prefix)
-            task_node = builder.mkTaskNode(task_name, allow_root_prefix=True)
+            # Resolve the task name using CLITaskResolver for flexible matching
+            resolver = CLITaskResolver.from_package(pkg)
+            try:
+                resolved = resolver.resolve(task_name)
+                resolved_name = resolved.name
+            except TaskResolutionError:
+                resolved_name = task_name
+            task_node = builder.mkTaskNode(resolved_name)
             
             # Collect needs recursively
             needs_chain = []
