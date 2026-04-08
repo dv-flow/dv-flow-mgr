@@ -246,6 +246,7 @@ class TaskNodeLeaf(TaskNode):
 
         # Check if task is up-to-date (unless force_run is set)
         if not force_run:
+            runner._notify(self, "checking")
             is_uptodate, exec_data = await self._check_uptodate(rundir, inputs, changed)
             # Notify listeners of up-to-date status
             runner._notify(self, "uptodate" if is_uptodate else "run")
@@ -559,7 +560,7 @@ class TaskNodeLeaf(TaskNode):
             return (False, None)
         
         # Check if exec_data file exists
-        exec_file = os.path.join(rundir, "%s.exec_data.json" % self.name)
+        exec_file = os.path.join(rundir, self._get_exec_data_filename())
         if not os.path.exists(exec_file):
             self._log.debug("Task %s: no exec_data file, not up-to-date" % self.name)
             return (False, None)

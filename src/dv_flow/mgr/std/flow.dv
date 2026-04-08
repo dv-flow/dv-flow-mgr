@@ -253,6 +253,34 @@ package:
     doc: |
       Tag that marks datasets as containing references
 
+  - name: ResourceTag
+    uses: std.Tag
+    doc: |
+      Declares compute resource requirements for a task.
+      Used by cluster runners (LSF, SLURM) to select appropriate
+      worker nodes. Ignored by the local runner.
+    with:
+      cores:
+        type: int
+        value: 1
+        doc: Number of CPU cores required
+      memory:
+        type: str
+        value: "1G"
+        doc: Memory requirement with unit suffix (e.g. "512M", "2G", "32G")
+      queue:
+        type: str
+        value: ""
+        doc: Target queue name (empty = use default)
+      walltime:
+        type: str
+        value: "1:00"
+        doc: Maximum walltime (HH:MM format)
+      resource_class:
+        type: str
+        value: ""
+        doc: Named resource class (overrides cores/memory if set)
+
   - name: DataItem
     with:
       type:

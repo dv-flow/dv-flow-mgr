@@ -30,7 +30,8 @@ from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
 from ..task_graph_dot_writer import TaskGraphDotWriter
-from .util import get_rootdir
+from ..cli_task_resolver import CLITaskResolver, TaskResolutionError
+from .util import get_rootdir, get_naming_scheme
 
 # Markers for programmatic extraction of graph content
 DFM_GRAPH_BEGIN = "<<<DFM_GRAPH_BEGIN>>>"
@@ -77,19 +78,17 @@ class CmdGraph(object):
         else:
             rundir = os.path.join(pkg.basedir, "rundir")
 
-            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
+            builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader,
+                                       naming_scheme=get_naming_scheme())
+            resolver = CLITaskResolver.from_package(pkg)
 
-            for pref in ("", "%s." % pkg.name):
-                name = "%s%s" % (pref, args.task)
-                task = builder.findTask(name)
-                if task is not None:
-                    break
+            try:
+                resolved_task = resolver.resolve(args.task)
+            except TaskResolutionError as e:
+                print("Error: %s" % str(e), file=sys.stderr)
+                return 1
 
-            if task is None:
-                raise Exception("Task '%s' not found in package '%s'" % (args.task, pkg.name))
-
-            # CLI usage: allow root package prefix
-            t = builder.mkTaskNode(task.name, allow_root_prefix=True)
+            t = builder.mkTaskNode(resolved_task.name)
 
             output = getattr(args, "output", "-")
             if output is None:

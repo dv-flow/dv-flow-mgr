@@ -21,6 +21,7 @@ import logging
 from typing import Any
 from .task_node_control import TaskNodeControl
 from .task_data import TaskDataResult, TaskDataOutput
+from .naming_scheme import IterationNamingContext
 
 
 @dc.dataclass
@@ -151,7 +152,8 @@ class TaskNodeRepeat(TaskNodeControl):
             
             if task_node:
                 task_node.parent = self
-                task_node.rundir = [self.name, f"iter_{iteration}"] + task_node.rundir
+                iter_segment = self._get_iteration_segment(iteration, state)
+                task_node.rundir = [self.name, iter_segment] + task_node.rundir
                 body_nodes.append(task_node)
         
         if not body_nodes:

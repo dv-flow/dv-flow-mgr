@@ -83,11 +83,11 @@ class TaskListenerTui(object):
     def event(self, task : 'Task', reason : 'Reason'):
         if reason == 'enter':
             self.level += 1
-            self._tasks.append((task.name, "[green]Running"))
+            self._tasks.append((task._get_display_name(), "[green]Running"))
         elif reason == 'leave':
             if self.quiet:
                 if task.result.changed:
-                    self.console.print("[green]Done:[/green] %s" % (task.name,))
+                    self.console.print("[green]Done:[/green] %s" % (task._get_display_name(),))
             else:
                 delta_s = None
                 if task.start is not None and task.end is not None:
@@ -98,18 +98,18 @@ class TaskListenerTui(object):
                         delta_s = " %0.2fmS" % (1000*delta.total_seconds())
 
                 for m in task.result.markers:
-                    self.show_marker(m, task.name, task.rundir)
+                    self.show_marker(m, task._get_display_name(), task.rundir)
 
                 idx = -1
                 for i,t in enumerate(self._tasks):
-                    if t[0] == task.name:
+                    if t[0] == task._get_display_name():
                         idx = i
                         break
 
                 if task.result.status == 0:
-                    self._tasks[idx] = (task.name, "[green]Success")
+                    self._tasks[idx] = (task._get_display_name(), "[green]Success")
                 else:
-                    self._tasks[idx] = (task.name, "[red]Fail")
+                    self._tasks[idx] = (task._get_display_name(), "[red]Fail")
 
             self._live.update(self._create())
             self.level -= 1
@@ -118,7 +118,7 @@ class TaskListenerTui(object):
         elif reason == "end":
             self.leave()
         else:
-            self.console.print("[red]-[/red] Task %s" % task.name)
+            self.console.print("[red]-[/red] Task %s" % task._get_display_name())
         pass
 
     def show_marker(self, m, name=None, rundir=None):
@@ -162,4 +162,3 @@ class TaskListenerTui(object):
                 self._log.error("Problem displaying message \"%s\" to the console: %s" % (msg, e))
 
         pass
-

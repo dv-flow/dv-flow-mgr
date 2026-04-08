@@ -28,6 +28,26 @@ from typing import Any, Dict, List, Optional, Tuple
 from dv_flow.mgr import TaskDataResult, TaskMarker, SeverityE
 from .ai_assistant import get_assistant, get_available_assistant_name
 
+
+def _agent_filenames(ctxt, input):
+    """Compute prompt and result filenames using the naming scheme if available."""
+    naming = None
+    if ctxt is not None:
+        node_ctxt = getattr(ctxt, 'ctxt', None)
+        if node_ctxt is not None:
+            naming = getattr(node_ctxt, 'naming_scheme', None)
+    if naming is not None:
+        from dv_flow.mgr.naming_scheme import TaskNamingContext
+        root_pkg = getattr(ctxt.ctxt, 'root_package_name', "")
+        fq = input.name
+        leaf = fq.rsplit(".", 1)[-1] if "." in fq else fq
+        inherits = getattr(input, 'inherits_rundir', False)
+        ctx = TaskNamingContext(
+            fq_name=fq, leaf_name=leaf, package_name="",
+            root_package_name=root_pkg, inherits_rundir=inherits)
+        return naming.prompt_filename(ctx), naming.result_filename(ctx)
+    return f"{input.name}.prompt.txt", f"{input.name}.result.json"
+
 _log = logging.getLogger("Agent")
 
 class DuckTypedOutput(BaseModel):
@@ -217,7 +237,8 @@ async def _run_native_agent(input) -> TaskDataResult:
         return TaskDataResult(status=1, markers=markers, changed=False)
 
     # Write prompt for debugging (same as subprocess path)
-    prompt_file = os.path.join(input.rundir, f"{input.name}.prompt.txt")
+    prompt_fname, _ = _agent_filenames(None, input)
+    prompt_file = os.path.join(input.rundir, prompt_fname)
     try:
         with open(prompt_file, "w") as f:
             f.write(full_prompt)
@@ -324,7 +345,8 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
         return TaskDataResult(status=1, markers=markers, changed=False)
     
     # Step 4: Write prompt to file for debugging
-    prompt_file = os.path.join(input.rundir, f"{input.name}.prompt.txt")
+    prompt_fname2, _ = _agent_filenames(runner, input)
+    prompt_file = os.path.join(input.rundir, prompt_fname2)
     try:
         with open(prompt_file, "w") as f:
             f.write(full_prompt)
@@ -385,7 +407,8 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
             else:
                 # Status is 0, but check if result was actually produced
                 # Check if result file exists and output log is not empty
-                result_file = input.params.result_file or f"{input.name}.result.json"
+                _, result_fname = _agent_filenames(runner, input)
+                result_file = input.params.result_file or result_fname
                 result_path = os.path.join(input.rundir, result_file)
                 
                 # Check copilot_output.log for emptiness
@@ -429,7 +452,8 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
                 return TaskDataResult(status=1, markers=markers, changed=False)
     
     # Step 6: Parse result file (REQUIRED - failure if missing/invalid)
-    result_file = input.params.result_file or f"{input.name}.result.json"
+    _, result_fname6 = _agent_filenames(runner, input)
+    result_file = input.params.result_file or result_fname6
     result_path = os.path.join(input.rundir, result_file)
     
     result_data, parse_status = _parse_result_file(result_path, markers)
@@ -526,7 +550,14 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
 
 
 def _build_prompt(input) -> str:
-    """Build the complete prompt from template and variables"""
+    """Build the complete prompt from template and variables.
+    
+    If user_prompt is a single-line string (no newline characters), it is
+    treated as a file path relative to srcdir and its contents are read.
+    Any ${{ param }} references in the file are expanded using the task's
+    parameter values.  Multi-line strings are used as literal prompt text
+    (parameter references will already have been expanded by the YAML loader).
+    """
     
     # Get system prompt template
     # Note: ${{ inputs }}, ${{ name }} literals are preserved by loader
@@ -536,8 +567,29 @@ def _build_prompt(input) -> str:
     # Get user prompt
     user_prompt = input.params.user_prompt if input.params.user_prompt else ""
     
+    # If user_prompt is a single line, treat it as a file path relative to srcdir
+    if user_prompt and '\n' not in user_prompt:
+        prompt_path = os.path.join(input.srcdir, user_prompt)
+        if os.path.isfile(prompt_path):
+            _log.debug(f"Reading user_prompt from file: {prompt_path}")
+            with open(prompt_path, "r") as f:
+                user_prompt = f.read()
+            # Expand ${{ param }} references that the YAML loader would
+            # normally handle for inline strings.
+            for field_name in type(input.params).model_fields.keys():
+                value = getattr(input.params, field_name)
+                if isinstance(value, str):
+                    user_prompt = user_prompt.replace(
+                        f"${{{{ {field_name} }}}}", value)
+        else:
+            _log.debug(f"user_prompt is single-line but not a file: {user_prompt}")
+
     # Build variable context
-    result_file = input.params.result_file if input.params.result_file else f"{input.name}.result.json"
+    _default_result = f"{input.name}.result.json"
+    if getattr(input, 'inherits_rundir', False):
+        leaf = input.name.rsplit(".", 1)[-1] if "." in input.name else input.name
+        _default_result = f"{leaf}.result.json"
+    result_file = input.params.result_file if input.params.result_file else _default_result
     
     # Convert inputs to JSON (runtime expansion)
     inputs_list = []

@@ -26,6 +26,8 @@ import sys
 from typing import List, Set, Dict, Any, Optional
 from dataclasses import dataclass, field
 from ...task_graph_builder import TaskGraphBuilder
+from ..util import get_naming_scheme
+from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
 from ...task_runner import TaskSetRunner
 from ...task_listener_log import TaskListenerLog
 from ...task_listener_progress import TaskListenerProgress
@@ -122,31 +124,14 @@ class AgentContextBuilder:
             List of full task names
         """
         resolved = []
-        
+        resolver = CLITaskResolver.from_package(self.pkg)
+
         for ref in task_refs:
-            # Try to find the task
-            task_name = None
-            
-            # Check if it's already a full name
-            if ref in self.pkg.task_m:
-                task_name = ref
-            else:
-                # Try as short name in root package
-                full_name = f"{self.pkg.name}.{ref}"
-                if full_name in self.pkg.task_m:
-                    task_name = full_name
-                else:
-                    # Search for task with matching short name
-                    for tn, task in self.pkg.task_m.items():
-                        short = tn.split('.')[-1]
-                        if short == ref:
-                            task_name = tn
-                            break
-            
-            if task_name:
-                resolved.append(task_name)
-            else:
-                raise ValueError(f"Task not found: {ref}")
+            try:
+                task = resolver.resolve(ref)
+                resolved.append(task.name)
+            except TaskResolutionError as e:
+                raise ValueError(str(e))
         
         return resolved
     
@@ -181,7 +166,8 @@ class AgentContextBuilder:
             root_pkg=self.pkg,
             rundir=self.rundir,
             loader=self.loader,
-            marker_l=listener.marker
+            marker_l=listener.marker,
+            naming_scheme=get_naming_scheme(),
         )
         
         # Create runner
@@ -191,12 +177,7 @@ class AgentContextBuilder:
         # Build task nodes
         task_nodes = []
         for task_name in task_names:
-            # Ensure full task name
-            if '.' not in task_name:
-                task_name = f"{self.pkg.name}.{task_name}"
-            
-            # CLI/Agent usage: allow root package prefix
-            task_node = builder.mkTaskNode(task_name, allow_root_prefix=True)
+            task_node = builder.mkTaskNode(task_name)
             task_nodes.append(task_node)
         
         self._log.debug(f"Executing {len(task_nodes)} task node(s)")
