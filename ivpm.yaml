@@ -31,8 +31,6 @@ package:
       src: pypi
     - name: setuptools-scm
       src: pypi
-    - name: sphinxcontrib-dv-flow
-      url: https://github.com/dv-flow/sphinxcontrib-dv-flow.git
 
   - name: default-dev-all
     deps:
@@ -66,8 +64,6 @@ package:
       extras: [litellm]
     - name: prompt_toolkit
       src: pypi
-    - name: sphinxcontrib-dv-flow
-      url: https://github.com/dv-flow/sphinxcontrib-dv-flow.git
 
   - name: default
     deps:
