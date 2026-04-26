@@ -38,6 +38,7 @@ class LsfConfig:
     project: str = ""
     resource_select: List[str] = dc.field(default_factory=list)
     bsub_extra: List[str] = dc.field(default_factory=list)
+    worker_dfm_path: str = "dfm"
 
 
 @dc.dataclass
@@ -152,6 +153,8 @@ def _merge_lsf(base: LsfConfig, overlay: Dict[str, Any]) -> LsfConfig:
             result.bsub_extra = result.bsub_extra + items
         elif isinstance(items, str):
             result.bsub_extra = result.bsub_extra + [items]
+    if "worker_dfm_path" in overlay:
+        result.worker_dfm_path = overlay["worker_dfm_path"]
     return result
 
 
