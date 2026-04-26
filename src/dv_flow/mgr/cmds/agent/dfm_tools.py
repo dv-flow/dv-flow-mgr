@@ -94,19 +94,11 @@ def build_dfm_tools(pkg, loader, builder=None, runner=None):
         Returns:
             JSON string with task details.
         """
-        resolved = name
-        if '.' not in name:
-            resolved = f"{pkg.name}.{name}"
-
-        task = pkg.task_m.get(resolved)
-        if not task:
-            for t in pkg.task_m.values():
-                if t.name.endswith("." + name):
-                    task = t
-                    break
-
-        if not task:
-            return json.dumps({"error": f"Task not found: {name}"})
+        resolver = CLITaskResolver.from_package(pkg)
+        try:
+            task = resolver.resolve(name)
+        except TaskResolutionError as e:
+            return json.dumps({"error": str(e)})
 
         result = {
             "name": task.name,
@@ -359,3 +351,4 @@ def build_dfm_tools(pkg, loader, builder=None, runner=None):
         tools.append(dfm_run_tasks)
 
     return tools
+from ...cli_task_resolver import CLITaskResolver, TaskResolutionError

@@ -129,7 +129,8 @@ class TaskNodeIf(TaskNodeControl):
             
             if task_node:
                 task_node.parent = self
-                task_node.rundir = [self.name, branch_name] + task_node.rundir
+                branch_segment = self._get_branch_segment(branch_name, "if")
+                task_node.rundir = [self.name, branch_segment] + task_node.rundir
                 branch_nodes.append(task_node)
         
         if not branch_nodes:

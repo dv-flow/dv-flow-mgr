@@ -12,3 +12,7 @@ def get_rootdir(args):
     rootdir = os.path.abspath(rootdir)
 
     return rootdir
+
+def get_naming_scheme():
+    """Return the naming scheme string from DV_FLOW_RUNDIR_LAYOUT (default: 'legacy')."""
+    return os.environ.get("DV_FLOW_RUNDIR_LAYOUT", "legacy")

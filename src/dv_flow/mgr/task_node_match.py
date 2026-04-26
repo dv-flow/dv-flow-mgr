@@ -140,7 +140,8 @@ class TaskNodeMatch(TaskNodeControl):
             
             if task_node:
                 task_node.parent = self
-                task_node.rundir = [self.name, case_name] + task_node.rundir
+                case_segment = self._get_branch_segment(case_name, "match")
+                task_node.rundir = [self.name, case_segment] + task_node.rundir
                 case_nodes.append(task_node)
         
         if not case_nodes:

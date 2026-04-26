@@ -23,6 +23,7 @@ from .task_node_compound import TaskNodeCompound
 from .task_def import ControlDef, TaskDef
 from .task_data import TaskDataResult
 from .expr_eval import ExprEval
+from .naming_scheme import IterationNamingContext, BranchNamingContext
 
 
 @dc.dataclass
@@ -192,7 +193,37 @@ class TaskNodeControl(TaskNodeCompound):
             TaskDataResult from body execution
         """
         raise NotImplementedError(f"{self.__class__.__name__} must implement _build_and_run_body")
-    
+
+    def _get_iteration_segment(self, iteration, state=None):
+        """Get the rundir segment name for a loop iteration using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            label = state.get("_label") if state else None
+            ctx = IterationNamingContext(
+                fq_name=self.name,
+                leaf_name=self.name.rsplit(".", 1)[-1] if "." in self.name else self.name,
+                package_name="",
+                root_package_name=self.ctxt.root_package_name if self.ctxt else "",
+                iteration=iteration,
+                iteration_label=label,
+                control_type=self.control_def.type if self.control_def else None,
+            )
+            return self.ctxt.naming_scheme.iteration_rundir_segment(ctx)
+        return "iter_%d" % iteration
+
+    def _get_branch_segment(self, branch, control_type=None):
+        """Get the rundir segment name for a branch using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            ctx = BranchNamingContext(
+                fq_name=self.name,
+                leaf_name=self.name.rsplit(".", 1)[-1] if "." in self.name else self.name,
+                package_name="",
+                root_package_name=self.ctxt.root_package_name if self.ctxt else "",
+                branch=branch,
+                control_type=control_type or (self.control_def.type if self.control_def else None),
+            )
+            return self.ctxt.naming_scheme.branch_rundir_segment(ctx)
+        return branch
+
     async def do_run(self, runner, rundir, memento=None) -> TaskDataResult:
         """
         Execute the control flow construct.

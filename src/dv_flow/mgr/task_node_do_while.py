@@ -159,7 +159,8 @@ class TaskNodeDoWhile(TaskNodeControl):
                 # Set parent relationship
                 task_node.parent = self
                 # Set rundir to be under our iteration directory
-                task_node.rundir = [self.name, f"iter_{iteration}"] + task_node.rundir
+                iter_segment = self._get_iteration_segment(iteration, state)
+                task_node.rundir = [self.name, iter_segment] + task_node.rundir
                 body_nodes.append(task_node)
         
         if not body_nodes:

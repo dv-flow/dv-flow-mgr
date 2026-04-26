@@ -21,6 +21,7 @@
 #****************************************************************************
 import os
 import re
+import difflib
 import dataclasses as dc
 import logging
 import pydantic
@@ -50,6 +51,7 @@ from .shell_callable import ShellCallable
 from .deferred_expr import DeferredExpr, references_runtime_data
 from .expr_parser import ExprParser
 from .filter_registry import FilterRegistry
+from .naming_scheme import NamingScheme, NamingSchemeRegistry, TaskNamingContext, MatrixNamingContext
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -74,6 +76,7 @@ class TaskGraphBuilder(object):
     env : Dict[str, str] = dc.field(default=None)
     task_param_overrides : Dict[str, Dict[str, Any]] = dc.field(default_factory=dict)  # task name → {param: value}
     leaf_param_overrides : Dict[str, Any] = dc.field(default_factory=dict)  # NEW: leaf param names to try on tasks
+    naming_scheme : Union[str, NamingScheme] = "legacy"
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -101,6 +104,12 @@ class TaskGraphBuilder(object):
         self._shell_m.update(ExtRgy.inst()._shell_m)
         self._task_rundir_s.append([self.rundir])
 
+        # Resolve naming scheme from string or instance
+        if isinstance(self.naming_scheme, str):
+            self._naming_scheme = NamingSchemeRegistry.get(self.naming_scheme)
+        else:
+            self._naming_scheme = self.naming_scheme
+
         if self.env is None:
             self.env = os.environ.copy()
 
@@ -120,7 +129,9 @@ class TaskGraphBuilder(object):
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=self.root_pkg.basedir,
                 root_rundir=self.rundir,
-                env=self.env)
+                env=self.env,
+                naming_scheme=self._naming_scheme,
+                root_package_name=self.root_pkg.name)
 
             # Set built-in directory variables for task graph building
             # root: full path to the package file
@@ -148,7 +159,9 @@ class TaskGraphBuilder(object):
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=None,
                 root_rundir=self.rundir,
-                env=self.env)
+                env=self.env,
+                naming_scheme=self._naming_scheme,
+                root_package_name="")
 
 
     def setEnv(self, env):
@@ -406,7 +419,7 @@ class TaskGraphBuilder(object):
                         task=DataCallable(type.paramT))
                     self._task_node_m[name] = ret
                 else:
-                    raise Exception("task_t (%s) is neither a task nor type" % str(task_t))
+                    raise Exception(self._task_not_found_message(task_t))
 
         elif task_t in self._type_m.keys():
             # Create a task around the type
@@ -426,7 +439,7 @@ class TaskGraphBuilder(object):
 
         if ret is None:
             if task is None:
-                raise Exception("task_t (%s) not present" % str(task_t))
+                raise Exception(self._task_not_found_message(task_t))
 
             self.push_name_resolution_context(task.package)
 
@@ -898,17 +911,34 @@ class TaskGraphBuilder(object):
                 this_vars.update(matrix_dict)
                 eval_ctx.expr_eval.variables['this'] = this_vars
                 
+                # Also expose under 'matrix' so ${{ matrix.key }} works
+                eval_ctx.expr_eval.variables['matrix'] = dict(matrix_dict)
+
                 # Build params with matrix-specific eval context
                 param_builder = ParamBuilder(eval_ctx)
                 paramT = param_builder.build_param_type(subtask)
                 params = paramT()
                 
                 # Generate unique name using indices
-                suffix = "_".join(str(idx) for idx in indices)
+                matrix_bindings = tuple(zip(keys, combo_values))
+                matrix_indices = tuple(zip(keys, indices))
+                pkg_name = subtask.package.name if hasattr(subtask, 'package') and subtask.package else ""
+                root_pkg_name = self.root_pkg.name if self.root_pkg else ""
+                parent_leaf = None
+                parent_fq = parent_name
                 if parent_name:
-                    name = f"{parent_name}.{subtask.leafname}_{suffix}"
-                else:
-                    name = f"{subtask.leafname}_{suffix}"
+                    parent_leaf = parent_name.rsplit(".", 1)[-1] if "." in parent_name else parent_name
+                matrix_ctx = MatrixNamingContext(
+                    fq_name=subtask.name,
+                    leaf_name=subtask.leafname,
+                    package_name=pkg_name,
+                    root_package_name=root_pkg_name,
+                    parent_leaf=parent_leaf,
+                    parent_fq=parent_fq,
+                    matrix_bindings=matrix_bindings,
+                    matrix_indices=matrix_indices,
+                )
+                name = self._naming_scheme.matrix_task_node_name(matrix_ctx)
                 
                 # Build the task node with matrix-specific params
                 node = self._mkTaskNode(
@@ -958,24 +988,36 @@ class TaskGraphBuilder(object):
         self._eval.set("srcdir", srcdir)
         
         if params is None:
-            # NEW: Build paramT lazily if not already built
-            if task.paramT is None:
+            # Build paramT lazily if not already built.
+            # When a non-default eval context is provided (e.g. from a
+            # matrix strategy), always rebuild so that ${{ }} references
+            # are expanded with the current iteration's variables instead
+            # of reusing stale defaults cached on the shared Task object.
+            needs_rebuild = task.paramT is None or (eval is not None and eval is not self._eval)
+            if needs_rebuild:
                 if task.param_defs is not None:
                     self._log.debug(f"Building paramT for {task.name} from param_defs")
                     param_builder = ParamBuilder(eval or self._eval)
-                    task.paramT = param_builder.build_param_type(task)
+                    paramT = param_builder.build_param_type(task)
                 elif task.uses and (task.uses.paramT or task.uses.param_defs):
                     # Task has no param_defs but uses another task with params
                     # Build paramT from the uses chain
                     self._log.debug(f"Building paramT for {task.name} from uses chain")
                     param_builder = ParamBuilder(eval or self._eval)
-                    task.paramT = param_builder.build_param_type(task)
+                    paramT = param_builder.build_param_type(task)
                 else:
                     self._log.warning(f"Task {task.name} has no paramT or param_defs")
                     # Create empty paramT
-                    task.paramT = pydantic.create_model(f"Task{task.name}Params")
+                    paramT = pydantic.create_model(f"Task{task.name}Params")
+                # Only cache on the Task object when using the default
+                # eval context; matrix iterations must not pollute the
+                # shared definition.
+                if eval is None or eval is self._eval:
+                    task.paramT = paramT
+            else:
+                paramT = task.paramT
             
-            params = task.paramT()
+            params = paramT()
 
         # Create and push task scope for parameter resolution
         node = TaskNodeLeaf(
@@ -988,7 +1030,8 @@ class TaskGraphBuilder(object):
             produces=task.produces,
             uptodate=task.uptodate,
             taskdef=task,
-            task=None)  # We'll set this later
+            task=None,
+            inherits_rundir=(task.rundir == RundirE.Inherit))
             
         self.push_task_scope(node)
 
@@ -1010,7 +1053,10 @@ class TaskGraphBuilder(object):
 
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(name)
+            _leaf_ctx = self._build_task_naming_context(task, name)
+            _leaf_segment = self._naming_scheme.rundir_segment(_leaf_ctx)
+            if _leaf_segment is not None:
+                self.enter_rundir(_leaf_segment)
 
         # TODO: handle callable in light of overrides
 
@@ -1057,7 +1103,7 @@ class TaskGraphBuilder(object):
 
         # Clean up
         self.pop_task_scope()
-        
+
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
@@ -1081,12 +1127,21 @@ class TaskGraphBuilder(object):
         self._eval.set("srcdir", srcdir)
 
         if params is None:
-            # Build paramT lazily
-            if task.paramT is None:
+            # Build paramT lazily.  Same rebuild-vs-cache logic as
+            # _mkTaskLeafNode: avoid reusing stale cached paramT when
+            # a matrix-specific eval context is active.
+            needs_rebuild = task.paramT is None or (eval is not None and eval is not self._eval)
+            if needs_rebuild:
                 if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
                     param_builder = ParamBuilder(eval or self._eval)
-                    task.paramT = param_builder.build_param_type(task)
-            params = task.paramT() if task.paramT else None
+                    paramT = param_builder.build_param_type(task)
+                else:
+                    paramT = None
+                if eval is None or eval is self._eval:
+                    task.paramT = paramT
+            else:
+                paramT = task.paramT
+            params = paramT() if paramT else None
 
         # expand any variable references (runtime-only variables like rundir)
         if params:
@@ -1105,7 +1160,10 @@ class TaskGraphBuilder(object):
         self._eval.set("srcdir", prev_srcdir)
 
         if task.rundir == RundirE.Unique:
-            self.enter_rundir(name)
+            _compound_ctx = self._build_task_naming_context(task, name)
+            _compound_segment = self._naming_scheme.rundir_segment(_compound_ctx)
+            if _compound_segment is not None:
+                self.enter_rundir(_compound_segment)
 
         if task.uses is not None:
             # This is a compound task that is based on
@@ -1149,9 +1207,15 @@ class TaskGraphBuilder(object):
         node.rundir = self.get_rundir()
 
         # Put the input node inside the compound task's rundir
-        self.enter_rundir(task.name + ".in")
-        node.input.rundir = self.get_rundir()
-        self.leave_rundir()
+        _sentinel_ctx = self._build_task_naming_context(task, name, is_sentinel=True)
+        _sentinel_segment = self._naming_scheme.sentinel_rundir_segment(_sentinel_ctx)
+        if _sentinel_segment is not None:
+            self.enter_rundir(_sentinel_segment)
+            node.input.rundir = self.get_rundir()
+            self.leave_rundir()
+        else:
+            node.input.rundir = self.get_rundir()
+            node.input.save_exec_data = False
 
         self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
         for need in task.needs:
@@ -1171,10 +1235,27 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
 
+        # Inject compound task params into eval context so body tasks
+        # can reference them via ${{ param_name }}.
+        eval_ctx = eval if eval is not None else self._eval
+        saved_vars = {}
+        if params is not None:
+            for field_name in type(params).model_fields.keys():
+                value = getattr(params, field_name)
+                saved_vars[field_name] = eval_ctx.expr_eval.variables.get(field_name)
+                eval_ctx.set(field_name, value)
+
         for t in task.subtasks:
             nn = self._mkTaskNode(t, hierarchical=True, eval=eval)
             node.tasks.append(nn)
             tasks.append((t, nn))
+
+        # Restore previous eval context variables
+        for field_name, prev_val in saved_vars.items():
+            if prev_val is None:
+                eval_ctx.expr_eval.variables.pop(field_name, None)
+            else:
+                eval_ctx.set(field_name, prev_val)
 
         # Pop the node stack, since we're done constructing the body
         self._task_node_s.pop()
@@ -1424,6 +1505,33 @@ class TaskGraphBuilder(object):
             node.needs.append((need_n, False))
         self._log.debug("<-- _gatherNeeds %s (%d)" % (task_t.name, len(node.needs)))
         
+
+    def _task_not_found_message(self, task_t):
+        """Build a user-friendly error message when a task/type cannot be found."""
+        all_names = sorted(self._task_m.keys())
+        type_names = sorted(self._type_m.keys())
+
+        suggestions = difflib.get_close_matches(task_t, all_names + type_names, n=5, cutoff=0.5)
+
+        if not suggestions and self.loader is not None and hasattr(self.loader, "getSimilarNamesError"):
+            loader_hint = self.loader.getSimilarNamesError(task_t, only_tasks=True)
+            if loader_hint:
+                return "Task '%s' not found.%s" % (task_t, loader_hint)
+
+        msg = "Task '%s' not found." % task_t
+
+        if suggestions:
+            msg += " Did you mean: %s?" % ", ".join("'%s'" % s for s in suggestions)
+        elif all_names:
+            shown = all_names[:10]
+            msg += " Available tasks: %s" % ", ".join("'%s'" % n for n in shown)
+            if len(all_names) > 10:
+                msg += " (and %d more \u2014 run 'dfm run' with no arguments to list all)" % (len(all_names) - 10)
+        else:
+            msg += " No tasks are registered in the current package."
+
+        return msg
+
     def error(self, msg, loc=None):
         if loc is not None:
             marker = TaskMarker(msg=msg, severity=SeverityE.Error, loc=loc)
@@ -1436,7 +1544,38 @@ class TaskGraphBuilder(object):
 
     def _findOverride(self, task):
         return task
-    
+
+    def _build_task_naming_context(self, task, name, is_sentinel=False):
+        """Build a TaskNamingContext for the given task."""
+        fq_name = name if name else task.name
+        leaf_name = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
+        pkg_name = task.package.name if hasattr(task, 'package') and task.package else ""
+        root_pkg_name = self.root_pkg.name if self.root_pkg else ""
+        parent_leaf = None
+        parent_fq = None
+        if len(self._task_node_s) > 0:
+            parent = self._task_node_s[-1]
+            parent_fq = parent.name
+            parent_leaf = parent.name.rsplit(".", 1)[-1] if "." in parent.name else parent.name
+        inherits_rundir = (task.rundir == RundirE.Inherit) if hasattr(task, 'rundir') else False
+        sibling_leaves = ()
+        if len(self._compound_task_ctxt_s) > 0:
+            existing = self._compound_task_ctxt_s[-1].task_m
+            sibling_leaves = tuple(
+                k.rsplit(".", 1)[-1] if "." in k else k for k in existing.keys()
+            )
+        return TaskNamingContext(
+            fq_name=fq_name,
+            leaf_name=leaf_name,
+            package_name=pkg_name,
+            root_package_name=root_pkg_name,
+            parent_leaf=parent_leaf,
+            parent_fq=parent_fq,
+            inherits_rundir=inherits_rundir,
+            is_sentinel=is_sentinel,
+            sibling_leaves=sibling_leaves,
+        )
+
     def _apply_task_param_overrides(self, task_node, task):
         """Apply parameter overrides from -D/-P to a task node.
         

@@ -31,12 +31,14 @@ from ..task_data import SeverityE
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
+from ..cli_task_resolver import CLITaskResolver, TaskResolutionError
 from ..task_listener_tui import TaskListenerTui
 from ..task_listener_progress import TaskListenerProgress
 from ..task_listener_progress_bar import TaskListenerProgressBar
 from ..task_listener_trace import TaskListenerTrace
 from ..cache_config import load_cache_providers
-from .util import get_rootdir
+from .util import get_rootdir, get_naming_scheme
+from ..runner_config import load_runner_config
 
 
 class CmdRun(object):
@@ -127,13 +129,6 @@ class CmdRun(object):
             # Root package tasks
             for task in pkg.task_m.values():
                 tasks.append(task)
-            # Imported/base package tasks are no longer listed; only root package tasks are shown
-            # for subpkg in pkg.pkg_m.values():
-            #     for task in subpkg.task_m.values():
-            #         leaf = task.name.split('.', 1)[1] if '.' in task.name else task.name
-            #         if leaf in override_targets:
-            #             continue
-            #         tasks.append(task)
             # De-duplicate and sort
             tasks = sorted({t.name: t for t in tasks}.values(), key=lambda x: x.name)
 
@@ -157,11 +152,6 @@ class CmdRun(object):
 
             pass
 
-        # Create a session around <pkg>
-        # Need to select a backend
-        # Need somewhere to store project config data
-        # Maybe separate into a task-graph builder and a task-graph runner
-
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
         rundir = os.path.join(os.getcwd(), "rundir")
 
@@ -172,13 +162,62 @@ class CmdRun(object):
                 shutil.rmtree(rundir)
             os.makedirs(rundir)
 
+        # Load runner configuration and resolve backend
+        cli_runner = getattr(args, 'runner', None)
+        cli_runner_opts = {}
+        for opt in getattr(args, 'runner_opts', []):
+            if '=' in opt:
+                k, v = opt.split('=', 1)
+                cli_runner_opts[k] = v
+            else:
+                self._log.warning("Ignoring malformed --runner-opt: %s" % opt)
+
+        # The project root is the directory containing the flow file.
+        # The daemon writes .dfm/daemon.json here; we look for it to
+        # decide whether to delegate to a running daemon.
+        project_root = get_rootdir(args)
+
+        runner_config = load_runner_config(
+            project_root=project_root,
+            cli_runner=cli_runner,
+            cli_opts=cli_runner_opts if cli_runner_opts else None,
+        )
+
+        # Resolve backend class from registry
+        runner_cls = rgy.findRunner(runner_config.type)
+        if runner_cls is None:
+            available = ', '.join(rgy.getRunnerNames())
+            print("Error: unknown runner '%s'. Available runners: %s" % (
+                runner_config.type, available), file=sys.stderr)
+            return 1
+
+        # Discover a running daemon next to the root flow file.
+        # If .dfm/daemon.json exists with a live PID, connect to it
+        # instead of running tasks locally.
+        backend = None
+        from ..daemon_client import DaemonClientBackend
+        daemon_client = DaemonClientBackend.discover(project_root)
+        if daemon_client is not None:
+            backend = daemon_client
+            self._log.info("Discovered running daemon at %s", project_root)
+        elif runner_config.type != "local":
+            # Non-local runner requested but no daemon running
+            print(
+                "Error: runner '%s' requires a running daemon.\n"
+                "Start one with: dfm daemon start" % runner_config.type,
+                file=sys.stderr,
+            )
+            return 1
+
         builder = TaskGraphBuilder(
             root_pkg=pkg, 
             rundir=rundir, 
             loader=loader,
             task_param_overrides=task_overrides,
-            leaf_param_overrides=leaf_overrides)  # Pass leaf parameter overrides
-        runner = TaskSetRunner(rundir, builder=builder)
+            leaf_param_overrides=leaf_overrides,
+            naming_scheme=get_naming_scheme())
+        runner = TaskSetRunner(rundir, builder=builder, backend=backend)
+        resolver = CLITaskResolver.from_package(pkg)
 
         # Initialize cache providers from DV_FLOW_CACHE environment variable
         runner.cache_providers = load_cache_providers()
@@ -209,12 +248,16 @@ class CmdRun(object):
         tasks = []
 
         for spec in args.tasks:
-            # CLI usage: allow root package prefix for fragment-qualified names
-            # If no dot, prepend package name (existing behavior)
-            if spec.find('.') == -1:
-                spec = pkg.name + "." + spec
-            task = builder.mkTaskNode(spec, allow_root_prefix=True)
-            tasks.append(task)
+            try:
+                resolved_task = resolver.resolve(spec)
+                task = builder.mkTaskNode(resolved_task.name)
+                tasks.append(task)
+            except TaskResolutionError as e:
+                print("Error: %s" % str(e), file=sys.stderr)
+                return 1
+            except Exception as e:
+                print("Error: %s" % str(e), file=sys.stderr)
+                return 1
 
         asyncio.run(runner.run(tasks))
 

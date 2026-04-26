@@ -54,6 +54,11 @@ class TaskListenerProgress(object):
     _warning_count : int = 0
     _cache_enabled : bool = False
 
+    # Up-to-date checking spinner (visible until first task runs)
+    _checking_spinner : Optional[Progress] = dc.field(default=None)
+    _checking_spinner_id : Optional[int] = dc.field(default=None)
+    _first_run_seen : bool = False
+
     sev_pref_m : ClassVar = {
         "info": "[blue]I[/blue]",
         SeverityE.Info: "[blue]I[/blue]",
@@ -120,7 +125,7 @@ class TaskListenerProgress(object):
                 if task not in self._task_row_map and self._progress is not None:
                     tid = self._progress.add_task(
                         "", total=1, completed=0,
-                        status="[cyan]…", name=task.name, elapsed=""
+                        status="[cyan]…", name=task._get_display_name(), elapsed=""
                     )
                     self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '', 'cache_hit': False }
                     self._order.append(task)
@@ -139,16 +144,19 @@ class TaskListenerProgress(object):
                 self._task_row_map[task]['cache_hit'] = True
         elif reason == 'run':
             # Task will actually run - add to display if not already added
+            self._dismiss_checking_spinner()
             if task not in self._task_row_map and self._progress is not None:
                 tid = self._progress.add_task(
                     "", total=1, completed=0,
-                    status="[cyan]…", name=task.name, elapsed=""
+                    status="[cyan]…", name=task._get_display_name(), elapsed=""
                 )
                 self._task_row_map[task] = { 'progress_id': tid, 'markers': [], 'elapsed': '', 'cache_hit': False }
                 self._order.append(task)
                 # Trigger a manual refresh
                 if self._live:
                     self._live.update(self._render_group())
+        elif reason == 'checking':
+            self._ensure_checking_spinner()
         elif reason == 'leave':
             info = self._task_row_map.get(task)
             if info is None:
@@ -202,6 +210,31 @@ class TaskListenerProgress(object):
         self.show_marker(marker)
         self.has_severity[marker.severity] += 1
 
+    def _ensure_checking_spinner(self):
+        """Show a checking spinner if no task has started running yet."""
+        if self._first_run_seen:
+            return
+        if self._checking_spinner is None:
+            self._checking_spinner = Progress(
+                SpinnerColumn(spinner_name="dots"),
+                TextColumn("[cyan]Checking up-to-date..."),
+            )
+            self._checking_spinner_id = self._checking_spinner.add_task("", total=None)
+            if self._live:
+                self._live.update(self._render_group())
+
+    def _dismiss_checking_spinner(self):
+        """Remove the checking spinner once the first task starts running."""
+        if self._first_run_seen:
+            return
+        self._first_run_seen = True
+        if self._checking_spinner is not None:
+            self._checking_spinner.stop()
+            self._checking_spinner = None
+            self._checking_spinner_id = None
+            if self._live:
+                self._live.update(self._render_group())
+
     # Rendering helpers
     def _render_group(self):
         # Build a table representation from current progress tasks
@@ -217,7 +250,11 @@ class TaskListenerProgress(object):
                 if info.get('markers'):
                     for m in info['markers']:
                         table.add_row("  " + self._format_marker_line(m, t.name))
-        return Group(self._progress if self._running else self._final_panel())
+        renderables = []
+        if self._checking_spinner is not None:
+            renderables.append(self._checking_spinner)
+        renderables.append(self._progress if self._running else self._final_panel())
+        return Group(*renderables)
 
     def _final_panel(self):
         # Create a static panel summarizing all tasks with final statuses + markers

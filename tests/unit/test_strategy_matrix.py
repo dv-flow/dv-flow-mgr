@@ -129,3 +129,81 @@ package:
     assert "Value: 1" in captured.out
     assert "Value: 2" in captured.out
     assert "Value: 3" in captured.out
+
+def test_matrix_var_via_matrix_namespace(tmpdir, capsys):
+    """Test that matrix variables are accessible via ${{ matrix.xxx }}"""
+    flow_dv = """
+package:
+    name: foo
+    tasks:
+    - name: MatrixTest
+      strategy:
+        matrix:
+          greeting: ["hello", "world"]
+      body:
+      - name: Task
+        uses: std.Message
+        with:
+          msg: "say ${{ matrix.greeting }}"
+"""
+
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    rundir = os.path.join(tmpdir, "rundir")
+
+    loader, pkg_def = loadProjPkgDef(os.path.join(tmpdir))
+    assert pkg_def is not None
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=rundir)
+    runner = TaskSetRunner(rundir=rundir)
+
+    task = builder.mkTaskNode("foo.MatrixTest")
+
+    output = asyncio.run(runner.run(task))
+
+    captured = capsys.readouterr()
+    print("Captured:\n%s\n" % captured.out)
+
+    assert "say hello" in captured.out
+    assert "say world" in captured.out
+
+def test_matrix_var_both_namespaces(tmpdir, capsys):
+    """Test that ${{ this.xxx }} and ${{ matrix.xxx }} both work"""
+    flow_dv = """
+package:
+    name: foo
+    tasks:
+    - name: MatrixTest
+      strategy:
+        matrix:
+          val: ["alpha", "beta"]
+      body:
+      - name: Task
+        uses: std.Message
+        with:
+          msg: "${{ this.val }}_${{ matrix.val }}"
+"""
+
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    rundir = os.path.join(tmpdir, "rundir")
+
+    loader, pkg_def = loadProjPkgDef(os.path.join(tmpdir))
+    assert pkg_def is not None
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=rundir)
+    runner = TaskSetRunner(rundir=rundir)
+
+    task = builder.mkTaskNode("foo.MatrixTest")
+
+    output = asyncio.run(runner.run(task))
+
+    captured = capsys.readouterr()
+    print("Captured:\n%s\n" % captured.out)
+
+    assert "alpha_alpha" in captured.out
+    assert "beta_beta" in captured.out

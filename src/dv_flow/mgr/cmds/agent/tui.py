@@ -409,16 +409,11 @@ class AgentTUI:
             return
 
         # Resolve the task
-        full_name = task_name if '.' in task_name else f"{self.pkg.name}.{task_name}"
-        task = self.pkg.task_m.get(full_name)
-        if not task:
-            # Try short name match
-            for t in self.pkg.task_m.values():
-                if t.name.split('.')[-1] == task_name:
-                    task = t
-                    break
-        if not task:
-            self._console.print(f"[red]Task not found:[/red] {task_name}")
+        resolver = CLITaskResolver.from_package(self.pkg)
+        try:
+            task = resolver.resolve(task_name)
+        except TaskResolutionError as e:
+            self._console.print(f"[red]{e}[/red]")
             return
 
         # Build context entry by executing the task
@@ -460,3 +455,4 @@ class AgentTUI:
 
         label = "Skill" if kind == "skill" else "Persona"
         self._console.print(f"[green]✓ {label} loaded:[/green] {task_name}")
+from ...cli_task_resolver import CLITaskResolver, TaskResolutionError

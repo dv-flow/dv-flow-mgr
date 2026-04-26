@@ -19,26 +19,75 @@
 #*     Author: 
 #*
 #****************************************************************************
-from .package_def import *
-from .package_loader import PackageLoader
-from .package_loader_p import PackageLoaderP
+#
+# Lazy-loading __init__.py
+#
+# Heavy modules (PackageLoader, TaskGraphBuilder, TaskRunner, rich-based
+# listeners, etc.) are imported on first access via __getattr__ so that
+# ``python -m dv_flow.mgr`` doesn't pay a large upfront import tax just
+# to parse CLI arguments.
+#
+# Lightweight / decorator-support imports stay eager because they are
+# needed at module-definition time (e.g. PassthroughE used as a default
+# argument value in the ``task()`` decorator below).
+#
+
+import importlib as _importlib
+import os as _os
+import sys as _sys
+
+# ── Eager (lightweight) imports ──────────────────────────────────────
+from .task_def import *        # PassthroughE, ConsumesE, … (used by task() decorator)
+from .task_data import *       # TaskMarker, SeverityE, TaskDataResult, …
+from .package_def import PackageDef, PackageSpec
 from .ext_rgy import ExtRgy
 from .pytask import PyTask, pytask
 from .pypkg import PyPkg, pypkg
-from .task_data import *
-from .task_def import *
-from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
-from .task_graph_builder import TaskGraphBuilder
-from .task_run_ctxt import TaskRunCtxt, ExecCmd
-from .task_runner import TaskRunner, TaskSetRunner
-from .task_listener_log import TaskListenerLog
-from .util.util import parse_parameter_overrides, loadProjPkgDef
 
-VERSION="1.5.0"
-SUFFIX=""
-__version__="%s%s" % (VERSION, SUFFIX)
+VERSION = "1.5.0"
+SUFFIX = ""
+__version__ = "%s%s" % (VERSION, SUFFIX)
 
-def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
+# ── Lazy-loaded symbols ─────────────────────────────────────────────
+# Maps public name → (module_path, attribute).
+_LAZY_IMPORTS = {
+    "PackageLoader":        (".package_loader",      "PackageLoader"),
+    "PackageLoaderP":       (".package_loader_p",    "PackageLoaderP"),
+    "TaskGraphBuilder":     (".task_graph_builder",   "TaskGraphBuilder"),
+    "TaskRunner":           (".task_runner",          "TaskRunner"),
+    "TaskSetRunner":        (".task_runner",          "TaskSetRunner"),
+    "TaskGenCtxt":          (".task_gen_ctxt",        "TaskGenCtxt"),
+    "TaskGenInputData":     (".task_gen_ctxt",        "TaskGenInputData"),
+    "TaskRunCtxt":          (".task_run_ctxt",        "TaskRunCtxt"),
+    "ExecCmd":              (".task_run_ctxt",        "ExecCmd"),
+    "TaskListenerLog":      (".task_listener_log",    "TaskListenerLog"),
+    "CLITaskResolver":      (".cli_task_resolver",    "CLITaskResolver"),
+    "TaskResolutionError":  (".cli_task_resolver",    "TaskResolutionError"),
+    "TaskNotFoundError":    (".cli_task_resolver",    "TaskNotFoundError"),
+    "AmbiguousTaskError":   (".cli_task_resolver",    "AmbiguousTaskError"),
+    "NamingScheme":         (".naming_scheme",        "NamingScheme"),
+    "NamingSchemeRegistry": (".naming_scheme",        "NamingSchemeRegistry"),
+    "TaskNamingContext":    (".naming_scheme",        "TaskNamingContext"),
+    "parse_parameter_overrides": (".util.util",       "parse_parameter_overrides"),
+    "loadProjPkgDef":       (".util.util",            "loadProjPkgDef"),
+}
+
+def __getattr__(name):
+    if name in _LAZY_IMPORTS:
+        module_path, attr = _LAZY_IMPORTS[name]
+        mod = _importlib.import_module(module_path, __package__)
+        val = getattr(mod, attr)
+        globals()[name] = val
+        return val
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
+
+
+# Naming schemes must be registered before TaskGraphBuilder usage.
+import dv_flow.mgr.naming_scheme_legacy  # noqa: F401
+import dv_flow.mgr.naming_scheme_leaf    # noqa: F401
+
+
+def task(paramT, passthrough=PassthroughE.Unused, consumes=ConsumesE.All):
     """Decorator to wrap a task method as a TaskNodeCtor"""
 
     def wrapper(T):
@@ -46,7 +95,7 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
         from .param import Param
         import typing
         task_mname = T.__module__
-        task_module = sys.modules[task_mname]
+        task_module = _sys.modules[task_mname]
         task_passthrough = passthrough
         task_consumes = consumes
 
@@ -64,17 +113,13 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                     return [value]
             return value
 
-        def mkTaskParams(params : Dict) -> Any:
+        def mkTaskParams(params):
             obj = paramT()
-
-            # Apply user-specified params
             if params is not None:
-                for key,value in params.items():
+                for key, value in params.items():
                     if not hasattr(obj, key):
                         raise Exception("Parameters class %s does not contain field %s" % (
-                            str(obj),
-                            key
-                        ))
+                            str(obj), key))
                     else:
                         if isinstance(value, Param):
                             if value.append is not None:
@@ -86,22 +131,14 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                                 value = value.copy()
                                 value.extend(ex_value)
                                 setattr(obj, key, value)
-                                pass
                             else:
                                 raise Exception("Unhandled value spec: %s" % str(value))
                         else:
                             setattr(obj, key, _coerce_param(obj, key, value))
             return obj
 
-        def ctor(
-                builder=None, 
-                name=None, 
-                srcdir=None, 
-                params=None, 
-                needs=None, 
-                passthrough=None, 
-                consumes=None, 
-                **kwargs):
+        def ctor(builder=None, name=None, srcdir=None, params=None,
+                 needs=None, passthrough=None, consumes=None, **kwargs):
             if params is None:
                 params = mkTaskParams(kwargs)
             if passthrough is None:
@@ -109,12 +146,12 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
             if consumes is None:
                 consumes = task_consumes
             if srcdir is None:
-                srcdir=os.path.dirname(os.path.abspath(task_module.__file__))
-            
+                srcdir = _os.path.dirname(_os.path.abspath(task_module.__file__))
+
             print("needs: %s" % str(needs))
 
             task_mname = T.__module__
-            task_module = sys.modules[task_mname]
+            task_module_local = _sys.modules[task_mname]
             node = TaskNodeLeaf(
                 name=T.__name__,
                 params=params,
@@ -125,14 +162,5 @@ def task(paramT,passthrough=PassthroughE.Unused,consumes=ConsumesE.All):
                 consumes=consumes,
                 needs=needs)
             return node
-        # ctor = TaskNodeCtorWrapper(
-        #     name=T.__name__,
-        #     srcdir=os.path.dirname(os.path.abspath(task_module.__file__)),
-        #     paramT=paramT,
-        #     passthrough=passthrough,
-        #     consumes=consumes,
-        #     needs=[],
-        #     T=T)
         return ctor
     return wrapper
-

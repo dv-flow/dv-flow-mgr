@@ -34,6 +34,8 @@ from .task_node_ctxt import TaskNodeCtxt
 from .task_run_ctxt import TaskRunCtxt
 from .param import Param
 
+from .naming_scheme import TaskNamingContext
+
 class RundirE(enum.Enum):
     Unique = enum.auto()
     Inherit = enum.auto()
@@ -63,6 +65,7 @@ class TaskNode(object):
     iff : bool = dc.field(default=True)
     parent : 'TaskNode' = dc.field(default=None)
     in_params : List[Any] = dc.field(default=None)
+    inherits_rundir : bool = dc.field(default=False)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 
@@ -79,7 +82,67 @@ class TaskNode(object):
     @property
     def first(self):
         return self
-    
+
+    def get_resource_tag(self):
+        """Extract ResourceTag fields from this node's taskdef tags.
+
+        Returns a dict of tag fields if std.ResourceTag is present, None otherwise.
+        """
+        from .resource_resolver import _extract_resource_tag
+        taskdef = getattr(self, 'taskdef', None)
+        if taskdef is None:
+            return None
+        tags = getattr(taskdef, 'tags', [])
+        return _extract_resource_tag(tags)
+
+    def _build_naming_context(self):
+        """Build a TaskNamingContext from this node's fields."""
+        fq_name = self.name
+        leaf_name = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
+        root_pkg_name = self.ctxt.root_package_name if self.ctxt else ""
+        parent_leaf = None
+        parent_fq = None
+        if self.parent is not None:
+            parent_fq = self.parent.name
+            parent_leaf = self.parent.name.rsplit(".", 1)[-1] if "." in self.parent.name else self.parent.name
+        return TaskNamingContext(
+            fq_name=fq_name,
+            leaf_name=leaf_name,
+            package_name="",
+            root_package_name=root_pkg_name,
+            parent_leaf=parent_leaf,
+            parent_fq=parent_fq,
+            inherits_rundir=self.inherits_rundir,
+        )
+
+    def _get_exec_data_filename(self):
+        """Get the exec_data filename using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            ctx = self._build_naming_context()
+            return self.ctxt.naming_scheme.exec_data_filename(ctx)
+        return "%s.exec_data.json" % self.name
+
+    def _get_log_filename(self):
+        """Get the log filename using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            ctx = self._build_naming_context()
+            return self.ctxt.naming_scheme.log_filename(ctx)
+        return "%s.log" % self.name
+
+    def _get_script_filename(self):
+        """Get the script filename using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            ctx = self._build_naming_context()
+            return self.ctxt.naming_scheme.script_filename(ctx)
+        return "%s_cmd.sh" % self.name
+
+    def _get_display_name(self):
+        """Get the display name using the naming scheme."""
+        if self.ctxt and self.ctxt.naming_scheme:
+            ctx = self._build_naming_context()
+            return self.ctxt.naming_scheme.display_name(ctx)
+        return self.name
+
     async def get_in_params(self, rundir, runner = None) -> List[Any]:
         self._log.debug("--> get_in_params %s (%d deps)" % (self.name, len(self.needs)))
 
@@ -190,10 +253,7 @@ class TaskNode(object):
         else:
             data["produces"] = str(self.produces) if self.produces else None
 
-        with open(os.path.join(rundir, "%s.exec_data.json" % self.name), "w") as f:
+        with open(os.path.join(rundir, self._get_exec_data_filename()), "w") as f:
             json.dump(data, f, indent=2)
             f.write("\n")
     
-
-
-
