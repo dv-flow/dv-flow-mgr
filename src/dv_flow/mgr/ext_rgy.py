@@ -30,7 +30,6 @@ from .package_loader_p import PackageLoaderP
 from .package_provider import PackageProvider
 from .package_provider_yaml import PackageProviderYaml
 from .package_provider import Package
-from .pytask_callable import PytaskCallable
 from .shell_callable import ShellCallable
 from .hash_provider import HashProvider
 from .hash_provider_default import DefaultHashProvider

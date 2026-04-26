@@ -54,6 +54,7 @@ def test_sv_hash_simple(temp_dir):
     asyncio.run(_impl())
 
 def test_sv_hash_with_includes(temp_dir):
+    pytest.importorskip('svdep', reason="svdep module required for include tracking")
     async def _impl():
         """Test SV hash includes dependency files"""
         # Create include file
@@ -82,6 +83,7 @@ def test_sv_hash_with_includes(temp_dir):
     asyncio.run(_impl())
 
 def test_sv_hash_nested_includes(temp_dir):
+    pytest.importorskip('svdep', reason="svdep module required for include tracking")
     async def _impl():
         """Test SV hash handles nested includes"""
         # Create nested includes

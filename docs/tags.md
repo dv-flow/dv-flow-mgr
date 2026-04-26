@@ -277,6 +277,50 @@ for tag in task.tags:
     print(f"  Value: {tag.paramT.value}")
 ```
 
+
+
+## Resource Tags
+
+The `std.ResourceTag` type declares compute resource requirements for tasks.
+Cluster runners (LSF, SLURM) use these tags to select appropriate worker nodes.
+The local runner ignores them.
+
+### Explicit Resources
+
+```yaml
+tasks:
+  - name: compile_rtl
+    uses: hdl.Compile
+    tags:
+      - std.ResourceTag:
+          cores: 4
+          memory: "8G"
+```
+
+### Named Resource Class
+
+```yaml
+tasks:
+  - name: run_sim
+    uses: hdl.Simulate
+    tags:
+      - std.ResourceTag:
+          resource_class: large
+          walltime: "4:00"
+```
+
+### ResourceTag Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `cores` | int | 1 | Number of CPU cores required |
+| `memory` | str | "1G" | Memory with unit suffix (e.g. "512M", "2G") |
+| `queue` | str | "" | Target queue (empty = use config default) |
+| `walltime` | str | "1:00" | Maximum walltime (HH:MM) |
+| `resource_class` | str | "" | Named resource class (overrides cores/memory) |
+
+See the [Resource Tags reference](reference/resource_tags.rst) for full
+resolution precedence and resource class configuration.
 ## Future Tag Features
 
 Tags are designed to support future enhancements:

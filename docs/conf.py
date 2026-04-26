@@ -17,7 +17,6 @@ extensions = [
     'sphinxarg.ext',
     'sphinx-jsonschema',
     'sphinxcontrib.mermaid',
-    'sphinxcontrib-dv-flow'
 ]
 
 templates_path = ['_templates']
