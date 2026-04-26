@@ -155,6 +155,13 @@ class CmdRun(object):
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
         rundir = os.path.join(os.getcwd(), "rundir")
 
+        # Validate --base-rundir
+        base_rundir = getattr(args, 'base_rundir', None)
+        if base_rundir is not None:
+            base_rundir = os.path.abspath(base_rundir)
+            if not os.path.isdir(base_rundir):
+                print("Error: --base-rundir path does not exist: %s" % base_rundir)
+                sys.exit(1)
 
         if args.clean:
             print("Note: Cleaning rundir %s" % rundir)
@@ -181,33 +188,35 @@ class CmdRun(object):
             project_root=project_root,
             cli_runner=cli_runner,
             cli_opts=cli_runner_opts if cli_runner_opts else None,
-        )
+       )
 
-        # Resolve backend class from registry
-        runner_cls = rgy.findRunner(runner_config.type)
-        if runner_cls is None:
-            available = ', '.join(rgy.getRunnerNames())
-            print("Error: unknown runner '%s'. Available runners: %s" % (
-                runner_config.type, available), file=sys.stderr)
-            return 1
-
-        # Discover a running daemon next to the root flow file.
-        # If .dfm/daemon.json exists with a live PID, connect to it
-        # instead of running tasks locally.
+        # Determine runner backend.
+        # - No --runner: auto-detect (daemon if running, else local)
+        # - --runner local: force local, ignore daemon
+        # - --runner <other>: use that backend directly, ignore daemon
         backend = None
-        from ..daemon_client import DaemonClientBackend
-        daemon_client = DaemonClientBackend.discover(project_root)
-        if daemon_client is not None:
-            backend = daemon_client
-            self._log.info("Discovered running daemon at %s", project_root)
-        elif runner_config.type != "local":
-            # Non-local runner requested but no daemon running
-            print(
-                "Error: runner '%s' requires a running daemon.\n"
-                "Start one with: dfm daemon start" % runner_config.type,
-                file=sys.stderr,
-            )
-            return 1
+        if cli_runner is None:
+            # Auto-detect: delegate to daemon if one is running
+            from ..daemon_client import DaemonClientBackend
+            daemon_client = DaemonClientBackend.discover(project_root)
+            if daemon_client is not None:
+                backend = daemon_client
+                self._log.info("Auto-detected running daemon at %s", project_root)
+            else:
+                self._log.info("No daemon detected, using local execution")
+        elif cli_runner == "local":
+            # Explicit local: always run in-process
+            self._log.info("Using local execution (--runner local)")
+        else:
+            # Explicit non-local runner: instantiate backend directly
+            runner_cls = rgy.findRunner(cli_runner)
+            if runner_cls is None:
+                available = ', '.join(rgy.getRunnerNames())
+                print("Error: unknown runner '%s'. Available runners: %s" % (
+                    cli_runner, available), file=sys.stderr)
+                return 1
+            backend = runner_cls(config=runner_config, project_root=project_root)
+            self._log.info("Using %s runner backend (--runner %s)", cli_runner, cli_runner)
 
         builder = TaskGraphBuilder(
             root_pkg=pkg, 
@@ -216,7 +225,17 @@ class CmdRun(object):
             task_param_overrides=task_overrides,
             leaf_param_overrides=leaf_overrides,
             naming_scheme=get_naming_scheme())
+
+        # Apply CLI --override arguments (TARGET=REPLACEMENT)
+        for override_spec in getattr(args, 'overrides', []):
+            if '=' not in override_spec:
+                print("Error: --override requires TARGET=REPLACEMENT format", file=sys.stderr)
+                return 1
+            target, replacement = override_spec.split('=', 1)
+            builder.addOverride(target.strip(), replacement.strip())
+
         runner = TaskSetRunner(rundir, builder=builder, backend=backend)
+        runner.base_rundir = base_rundir
         resolver = CLITaskResolver.from_package(pkg)
 
         # Initialize cache providers from DV_FLOW_CACHE environment variable

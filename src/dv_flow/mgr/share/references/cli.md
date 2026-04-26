@@ -34,6 +34,8 @@ If no tasks specified, lists available tasks.
 | `-c, --config NAME` | Select configuration |
 | `-u, --ui {log,progress,tui}` | UI mode |
 | `-D NAME=VALUE` | Parameter override |
+| `--base-rundir PATH` | Reuse artifacts from a previous build's rundir |
+| `--override TARGET=REPLACEMENT` | Replace a task for this run |
 
 ### Examples
 
@@ -64,6 +66,11 @@ dfm run build -u log
 
 # TUI mode for monitoring
 dfm run build -u tui
+
+# Build once, run tests reusing artifacts
+dfm run build
+dfm run test_a --base-rundir /path/to/build/rundir
+dfm run test_b --base-rundir /path/to/build/rundir
 ```
 
 ## dfm show

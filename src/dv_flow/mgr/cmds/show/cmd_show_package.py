@@ -114,7 +114,7 @@ class CmdShowPackage:
             'uses': getattr(pkg, 'uses', None),
             'tasks': tasks,
             'types': types,
-            'configs': [c.name for c in getattr(pkg, 'configs', [])],
+            'configs': [c.name for c in getattr(pkg, 'all_configs', [])],
             'imports': [str(i) if isinstance(i, str) else getattr(i, 'path', str(i)) for i in getattr(pkg, 'imports', [])],
             'params': self._params_to_dict(getattr(pkg, 'params', {})),
             'tags': self._tags_to_list(getattr(pkg, 'tags', [])),

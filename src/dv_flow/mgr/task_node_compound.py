@@ -150,6 +150,19 @@ class TaskNodeCompound(TaskNode):
             output=self.result.output,
             dep_m={})
 
+        # Save exec_data so base-rundir can satisfy this compound later.
+        if self.save_exec_data:
+            input_for_save = TaskDataInput(
+                name=self.name,
+                changed=changed,
+                srcdir=self.srcdir,
+                rundir=rundir,
+                params=self.params,
+                inputs=output,
+                memento=memento,
+            )
+            self._save_exec_data(rundir, ctxt, input_for_save)
+
         return None
 
     def __hash__(self):

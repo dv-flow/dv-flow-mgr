@@ -101,6 +101,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
     hash_registry : 'ExtRgy' = None
     enable_server : bool = True  # Enable DFM command server for LLM integration
     backend : RunnerBackend = None  # Optional runner backend (None or LocalBackend = local execution)
+    base_rundir : str = None  # Pre-built rundir whose artifacts are assumed up-to-date
 
     _anon_tid : int = 1
     _jobserver : 'JobServer' = dc.field(default=None, init=False)
@@ -198,6 +199,10 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             self.env["DFM_SERVER_SOCKET"] = self._command_server.socket_path
             self.env["DFM_SESSION_RUNDIR"] = self.rundir
             self._log.info(f"Command server started at {self._command_server.socket_path}")
+
+        # Expose base-rundir to child processes
+        if self.base_rundir is not None:
+            self.env["DFM_BASE_RUNDIR"] = self.base_rundir
 
         # Start remote backend if present
         if self.backend is not None and self.backend.is_remote:
@@ -316,15 +321,142 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             raise Exception("TaskSetRunner.mkDataItem() requires a builder")
         return self.builder.mkDataItem(type, **kwargs)
     
-    async def _launch_task(
-        self,
-        t: TaskNode,
-        active_task_l: List,
-        src_memento: dict,
-        dst_memento: dict
-    ):
-        """Launch a single task with proper setup and dependency waiting"""
-        
+    _INVALID_RUNDIR_CHARS = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
+
+    def _resolve_task_rundir(self, root: str, segments) -> str:
+        """Resolve task rundir path segments against a root directory."""
+        rundir_split = segments
+        if not isinstance(segments, list):
+            rundir_split = segments.split('/')
+
+        if len(rundir_split) > 0 and os.path.isabs(rundir_split[0]):
+            path = rundir_split[0]
+            segs = rundir_split[1:]
+        else:
+            path = root
+            segs = rundir_split
+
+        for seg in segs:
+            seg = re.sub(self._INVALID_RUNDIR_CHARS, '_', seg)
+            path = os.path.join(path, seg)
+        return path
+
+    def _try_satisfy_from_base(self, task: TaskNode) -> bool:
+        """Attempt to satisfy a task from the base-rundir.
+
+        Returns True and populates task.result/task.output if satisfied.
+        Returns False if the task must execute locally.
+        """
+        if self.base_rundir is None:
+            return False
+
+        # Task rundir segments typically start with the absolute local rundir
+        # root (e.g. ['/local/rundir', 'pkg.build']).  Replace that root with
+        # the base-rundir so we probe the right location.
+        segments = task.rundir
+        if not isinstance(segments, list):
+            segments = segments.split('/')
+        if len(segments) > 0 and os.path.isabs(segments[0]):
+            segments = [self.base_rundir] + segments[1:]
+        base_task_dir = self._resolve_task_rundir(self.base_rundir, segments)
+        if not os.path.isdir(base_task_dir):
+            return False
+
+        exec_file = os.path.join(base_task_dir, task._get_exec_data_filename())
+        if not os.path.isfile(exec_file):
+            return False
+
+        try:
+            with open(exec_file, 'r') as f:
+                exec_data = json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            self._log.warning("base-rundir: malformed exec_data for %s: %s" % (task.name, e))
+            return False
+
+        if exec_data.get("result", {}).get("status", -1) != 0:
+            return False
+
+        return self._satisfy_from_base(task, base_task_dir, exec_data)
+
+    def _satisfy_from_base(self, task: TaskNode, base_task_dir: str, exec_data: dict) -> bool:
+        """Reconstruct task output from base-rundir exec_data.
+
+        Reconstructs a lightweight data layout from the serialized exec_data
+        without requiring the type registry.  Output items are generic
+        BaseModel instances that carry all saved fields; ``basedir`` paths
+        are rewritten to reference the base-rundir.
+        Returns True on success, False if reconstruction fails.
+        """
+        from .task_def import ConsumesE, PassthroughE
+        from pydantic import ConfigDict, BaseModel
+
+        class _BaseItem(BaseModel):
+            """Generic output item that accepts any fields from exec_data."""
+            model_config = ConfigDict(extra='allow')
+            type : str = ""
+            src : str = ""
+            seq : int = -1
+
+        task.result = TaskDataResult(
+            status=0,
+            changed=False,
+            output=[],
+            markers=[],
+            memento=None,
+            base_hit=True,
+        )
+
+        output = []
+        dep_m = {task.name: [need.name for need, _ in task.needs]}
+
+        # Passthrough: collect upstream outputs from already-satisfied deps
+        passthrough = getattr(task, 'passthrough', False)
+        consumes = getattr(task, 'consumes', [])
+
+        if isinstance(passthrough, list):
+            pass  # list-based passthrough not yet supported
+        elif passthrough == PassthroughE.All:
+            for need, block in task.needs:
+                if not block and need.output is not None:
+                    for out in need.output.output:
+                        if getattr(out, "type", None) != "std.Env":
+                            output.append(out)
+        elif passthrough == PassthroughE.Unused:
+            if consumes == ConsumesE.No or (isinstance(consumes, list) and len(consumes) == 0):
+                for need, block in task.needs:
+                    if not block and need.output is not None:
+                        for out in need.output.output:
+                            if getattr(out, "type", None) != "std.Env":
+                                output.append(out)
+            elif isinstance(consumes, list):
+                for need, block in task.needs:
+                    if not block and need.output is not None:
+                        for out in need.output.output:
+                            if getattr(out, "type", None) != "std.Env" and not task._matches(out, consumes):
+                                output.append(out)
+
+        # Restore local outputs from exec_data, rewriting paths into base
+        saved_rundir = exec_data.get("rundir", "")
+        output_data = exec_data.get("output", {})
+
+        for i, out_data in enumerate(output_data.get("output", [])):
+            if out_data.get("src") != task.name:
+                continue
+            out_data = dict(out_data)  # shallow copy to avoid mutating stored data
+            # Rewrite basedir to reference base-rundir instead of original rundir
+            if "basedir" in out_data and saved_rundir:
+                out_data["basedir"] = out_data["basedir"].replace(saved_rundir, base_task_dir)
+            try:
+                item = _BaseItem.model_validate(out_data)
+                output.append(item)
+            except Exception as e:
+                self._log.warning("base-rundir: failed to restore output for %s: %s" % (task.name, e))
+                task.result = None
+                return False
+
+        task.output = TaskDataOutput(changed=False, dep_m=dep_m, output=output)
+        return True
+
     async def _launch_task(
         self,
         t: TaskNode,
@@ -347,26 +479,24 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                     await event.wait()
         
         memento = src_memento.get(t.name, None)
-        invalid_chars_pattern = r'[\/:*?"<>|#%&{}\$\\!\'`;=@+]'
 
-        # TaskNode rundir is a list of path elements relative
-        # to the root rundir
-        rundir_split = t.rundir
-        if not isinstance(t.rundir, list):
-            rundir_split = t.rundir.split('/')
+        # Base-rundir short-circuit: skip execution for tasks satisfied
+        # by a pre-built rundir (unless --force is active).
+        if not self.force_run and self._try_satisfy_from_base(t):
+            self._log.debug("Task %s satisfied from base-rundir" % t.name)
+            t.start = datetime.now()
+            t.end = t.start
+            self._notify(t, "enter")
+            self._notify(t, "base_hit")
+            self._task_state[t] = TaskState.COMPLETED
+            if t.name in self._task_completion_events:
+                self._task_completion_events[t.name].set()
+                self._pending_tasks.pop(t.name, None)
+            self._notify(t, "leave")
+            self._check_and_enqueue_dependents(t)
+            return
 
-        # Determine base rundir: absolute first segment or anchor to self.rundir
-        if len(rundir_split) > 0 and os.path.isabs(rundir_split[0]):
-            rundir = rundir_split[0]
-            segs = rundir_split[1:]
-        else:
-            rundir = self.rundir
-            segs = rundir_split
-
-        for rundir_e in segs:
-            rundir_e = re.sub(invalid_chars_pattern, '_', rundir_e)
-            rundir = os.path.join(rundir, rundir_e)
-
+        rundir = self._resolve_task_rundir(self.rundir, t.rundir)
         if not os.path.isdir(rundir):
             try:
                 os.makedirs(rundir, exist_ok=True)

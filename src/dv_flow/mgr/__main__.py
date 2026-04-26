@@ -160,6 +160,12 @@ def get_parser():
     run_parser.add_argument("--clean",
                             action="store_true",
                             help="Cleans the rundir before running")
+    run_parser.add_argument("--base-rundir",
+                            dest="base_rundir",
+                            default=None,
+                            metavar="PATH",
+                            help="Reuse artifacts from a pre-built rundir. Tasks present in "
+                                 "this directory are assumed up-to-date and not re-executed.")
     run_parser.add_argument("-f", "--force",
                             action="store_true",
                             help="Force all tasks to run, ignoring up-to-date status")
@@ -185,9 +191,10 @@ def get_parser():
     run_parser.add_argument("-P", "--param-file",
                         dest="param_file",
                         metavar="FILE_OR_JSON",
-                        help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
+                       help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
     run_parser.add_argument("--runner",
-                        help="Runner backend to use (e.g. local, lsf). Default: from config or 'local'",
+                        help="Runner backend: 'local' (in-process), 'lsf' (embedded LSF pool), "
+                             "or omit for auto-detect (daemon if running, else local)",
                         default=None)
     run_parser.add_argument("--runner-opt",
                         dest="runner_opts",
@@ -195,6 +202,12 @@ def get_parser():
                         default=[],
                         metavar="KEY=VALUE",
                         help="Runner backend option (key=value). May be used multiple times")
+    run_parser.add_argument("--override",
+                        dest="overrides",
+                        action="append",
+                        default=[],
+                        metavar="TARGET=REPLACEMENT",
+                        help="Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)")
     run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"))
 
     # Completion command

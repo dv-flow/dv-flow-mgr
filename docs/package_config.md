@@ -147,6 +147,174 @@ In the example above:
 - config p2::default overrides t2. This means that p1::t3 actually `needs` p2::default::t2
 
 
+## Config-Level Task Overrides
+
+Configurations support an `overrides:` section that substitutes tasks in the
+graph when the config is active.  This is useful for stubbing out expensive
+tasks during fast-iteration builds without modifying the base task graph.
+
+Each override entry uses `task:` or `package:` to identify the target and
+`with:` to name the replacement:
+
+```yaml
+package:
+  name: my_project
+  imports:
+    - sim_pkg
+
+  configs:
+    - name: fast
+      overrides:
+        - task: sim_pkg.CompileAndSim.Compile
+          with: std.Null
+        - task: sim_pkg.CompileAndSim.Simulate
+          with: std.Null
+```
+
+Running with the config active applies the substitutions:
+
+```
+dfm run -c fast entry
+```
+
+### Addressing nested tasks
+
+Tasks inside compound bodies have fully-qualified names built from the
+nesting path:
+
+```yaml
+- name: Outer
+  body:
+    - name: Inner
+      body:
+        - name: Sub   # -> pkg.Outer.Inner.Sub
+```
+
+The override target uses the same fully-qualified path.
+
+### Package-level overrides
+
+Overrides can also be declared at the package level (always active, no config
+required) using a simple map syntax:
+
+```yaml
+package:
+  name: my_project
+  overrides:
+    sim_pkg.OldLint: my_project.NewLint
+```
+
+### Override precedence
+
+When multiple override sources exist, later sources shadow earlier ones:
+
+1. Package-level `overrides:` map (applied first)
+2. Config-level `overrides:` list (applied on top)
+3. CLI `--override` flags (applied last, highest priority)
+
+If a config inherits from a base config (`uses:`), the base config's
+overrides apply first, then the derived config's overrides shadow them.
+
+### Stubbing with std.Null
+
+The built-in `std.Null` task is a no-op that passes inputs through
+unchanged.  It is the natural replacement for tasks you want to skip:
+
+```yaml
+configs:
+  - name: fast
+    overrides:
+      - task: pkg.ExpensiveTask
+        with: std.Null
+```
+
+### Overrides vs task-level override:
+
+| Aspect | Task `override:` | Config `overrides:` |
+|--------|-----------------|---------------------|
+| Scope | Single task definition | Whole graph under this config |
+| Inheritance | Replacement inherits from target | Full substitution (no inheritance) |
+| Target | Must exist in base (`uses`) package | Any task in the graph |
+| Depth | Top-level tasks only | Any depth, including compound body |
+
+
+
+## Config-Level Extensions
+
+Configurations support an `extensions:` section that modifies task
+parameters when the config is active.  Unlike overrides (which replace
+tasks entirely), extensions augment existing tasks by appending or
+prepending to their list-typed parameters or injecting additional
+dependencies.
+
+### Appending to a list parameter
+
+```yaml
+configs:
+  - name: debug
+    extensions:
+      - task: pkg.build
+        with:
+          args: { append: ["-debug_access+all", "-kdb"] }
+```
+
+### Prepending to a list parameter
+
+```yaml
+configs:
+  - name: debug
+    extensions:
+      - task: pkg.build
+        with:
+          args: { prepend: ["-g"] }
+```
+
+### Injecting dependencies
+
+```yaml
+configs:
+  - name: debug
+    extensions:
+      - task: pkg.build
+        needs: [pkg.setup_debug]
+```
+
+### Inline append on derived tasks
+
+The same `append`/`prepend` syntax works inside any task's `with:`
+block, not only in config extensions:
+
+```yaml
+tasks:
+  - name: my_build
+    uses: hdlsim.vcs.SimImage
+    with:
+      args: { append: ["-kdb"] }
+```
+
+### Accumulation
+
+Multiple layers can append/prepend to the same parameter.  The values
+accumulate in declaration order:
+
+```
+base task:     args = ["-O2"]
+derived task:  args: { append: ["-Wall"] }   =>  ["-O2", "-Wall"]
+config ext:    args: { append: ["-kdb"] }    =>  ["-O2", "-Wall", "-kdb"]
+```
+
+If any layer uses a plain value (full replacement), it resets the
+accumulated list.  Subsequent appends continue from the new base.
+
+### Extensions vs overrides
+
+| Aspect | Config `extensions:` | Config `overrides:` |
+|--------|---------------------|---------------------|
+| Effect | Modify parameters | Replace entire task |
+| Scope | Single parameter | Whole task |
+| Use case | Add debug flags | Stub out expensive tasks |
+| Inheritance | Composes across config chain | Last writer wins |
+
 ## Importing Configurations
 Configurations can be applied to packages when they are imported. For example:
 
@@ -240,4 +408,3 @@ Adjust PackageProviderYaml/Toml and PackageLoader to implement the staged load s
   - Task override precedence (base package vs package override vs config override).
   - Fragment variable reference resolution order.
   - Default config fallback behavior.
-

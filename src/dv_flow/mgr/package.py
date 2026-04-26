@@ -47,7 +47,9 @@ class Package(object):
     fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
     pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
     tags : List[Type] = dc.field(default_factory=list)
-#    overrides : Dict[str, str]
+    substitution_m : Dict[str, str] = dc.field(default_factory=dict)
+    pkg_override_m : Dict[str, str] = dc.field(default_factory=dict)
+    all_configs : list = dc.field(default_factory=list)  # Unified configs from package + fragments
     srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")
 

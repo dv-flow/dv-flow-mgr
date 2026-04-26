@@ -363,6 +363,65 @@ Messages support expression syntax for dynamic content:
           msg: "Building version ${{ version }}"
 
 
+std.Null
+========
+
+A no-op task that passes its inputs through unchanged. ``std.Null`` is
+the natural replacement when stubbing out tasks via config-level or CLI
+overrides.
+
+Example
+-------
+
+.. code-block:: yaml
+
+    package:
+        name: stub.example
+
+        tasks:
+        - name: placeholder
+          uses: std.Null
+
+Using as an Override
+--------------------
+
+The most common use of ``std.Null`` is as a replacement in config-level
+overrides to skip expensive tasks during fast-iteration builds:
+
+.. code-block:: yaml
+
+    package:
+        name: my_project
+
+        configs:
+        - name: fast
+          overrides:
+          - task: sim_pkg.Compile
+            with: std.Null
+          - task: sim_pkg.Simulate
+            with: std.Null
+
+Or from the command line:
+
+.. code-block:: bash
+
+    dfm run entry --override sim_pkg.Compile=std.Null
+
+Consumes
+--------
+None (``consumes: none``)
+
+Produces
+--------
+No output data items. With ``passthrough: all`` (the default), all input
+data items are passed through to downstream tasks.
+
+Parameters
+----------
+
+None.
+
+
 std.Agent
 =========
 
@@ -692,5 +751,4 @@ You can define custom filters in your package using JQ-style expressions:
 * ``local`` - Hide filter from child packages (default: false)
 
 For detailed filter documentation, see :doc:`filters`.
-
 

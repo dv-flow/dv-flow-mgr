@@ -18,9 +18,14 @@ class TestLsfBackend:
             asyncio.run(b.execute_task(TaskExecRequest()))
 
     def test_start_without_daemon_raises(self, tmp_path):
-        b = LsfBackend(project_root=str(tmp_path))
-        with pytest.raises(RuntimeError):
-            asyncio.run(b.start())
+        """LsfBackend.start() creates an embedded worker pool (no daemon needed)."""
+        async def _run():
+            b = LsfBackend(project_root=str(tmp_path))
+            await b.start()
+            assert b._host is not None
+            assert b._host.worker_port > 0
+            await b.stop()
+        asyncio.run(_run())
 
     def test_acquire_release_noop(self):
         b = LsfBackend()

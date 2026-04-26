@@ -68,6 +68,63 @@ configs:
           profiling: true
 ```
 
+## Append and Prepend for List Parameters
+
+When overriding list-type parameters, use `append` or `prepend` to extend
+rather than replace the base value:
+
+```yaml
+with:
+  args:
+    append: ["-extra-flag"]    # Added after base value
+  incdirs:
+    prepend: ["/priority/inc"] # Added before base value
+```
+
+Resolution: `prepend + (value or base_value) + append`.
+
+### In Configurations
+
+```yaml
+package:
+  name: my_project
+
+  tasks:
+    - name: compile
+      uses: sim.SimImage
+      with:
+        args: ["-Wall"]  # Base value
+
+  configs:
+    - name: strict
+      tasks:
+        - name: compile_strict
+          override: compile
+          with:
+            args:
+              append: ["-Werror"]
+              # Result: ["-Wall", "-Werror"]
+```
+
+### feeds as an Alternative
+
+For configs where you want to keep the original task completely untouched,
+use `feeds` with a DataItem task instead of append:
+
+```yaml
+configs:
+  - name: debug
+    tasks:
+      - name: debug_args
+        uses: hdlsim.SimCompileArgs
+        with:
+          args: ["-debug_access+all"]
+        feeds: [my_project.compile]
+```
+
+Both approaches are valid. `append` modifies the task's parameters directly;
+`feeds` injects a separate data item into the task's input stream.
+
 ## Complex Dataflow
 
 ### Fan-Out/Fan-In

@@ -1,6 +1,6 @@
 ---
 name: dv-flow-manager
-description: Create and modify DV Flow Manager (dfm) YAML-based build flows for silicon design and verification projects. Use when working with flow.yaml, flow.dv files, or dfm commands.
+description: Create and modify DV Flow Manager (dfm) YAML-based build flows for silicon design and verification projects. Use when working with flow.dv files or dfm commands.
 ---
 
 # DV Flow Manager (dfm)
@@ -10,7 +10,7 @@ DV Flow Manager is a YAML-based build system and execution engine designed for s
 ## When to Use This Skill
 
 Use this skill when:
-- Creating or modifying `flow.yaml` or `flow.dv` files
+- Creating or modifying `flow.dv` (or `flow.yaml`) files
 - Writing task definitions for HDL compilation, simulation, or verification
 - Configuring dataflow between tasks using `needs`, `consumes`, `produces`, `passthrough`
 - Discovering tasks by their outputs using `produces` patterns
@@ -23,6 +23,8 @@ Use this skill when:
 - **Executing dfm commands from within an LLM-driven Agent task**
 
 ## Quick Reference
+
+> **File naming:** DFM recognizes `flow.dv`, `flow.yaml`, `flow.yml`, and `flow.toml`. This document uses `flow.dv` by convention.
 
 ### Minimal Flow Example
 
@@ -57,6 +59,7 @@ package:
 dfm run [tasks...]          # Execute tasks
 dfm run -j 4                # Run with 4 parallel jobs
 dfm run --clean             # Clean rebuild
+dfm run --base-rundir PATH  # Reuse artifacts from a pre-built rundir (see below)
 dfm run -c debug            # Use 'debug' configuration
 dfm run -D param=value      # Override parameter
 
@@ -277,6 +280,181 @@ WARNING: Task 'Consumer' consumes [{'type': 'std.FileSet', 'filetype': 'vhdl'}]
 3. Add converter task in between
 4. Check if parameter can adjust producer's output
 
+## Package Fragments
+
+Large packages can be split across multiple files using **fragments**. The
+root file uses `package:` while child files use `fragment:`.
+
+```yaml
+# Top-level flow.dv
+package:
+  name: my_project
+  fragments:
+    - src/rtl/flow.dv
+    - tb/flow.dv
+
+# src/rtl/flow.dv
+fragment:
+  tasks:
+    - name: rtl_sources
+      uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
+
+# tb/flow.dv -- intermediate fragment with nesting
+fragment:
+  fragments:
+    - tests/flow.dv
+    - testbench/flow.dv
+  tasks:
+    - name: tb_sources
+      uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
+```
+
+All fragments contribute to the parent package namespace. Task names must be
+unique across all fragments.
+
+Fragment paths are relative to the file containing the `fragments:` list.
+
+### Fragment Allowed Fields
+
+| Field | Allowed? | Notes |
+|-------|----------|-------|
+| tasks | Yes | Same syntax as package tasks |
+| types | Yes | Data type definitions |
+| configs | Yes | Configuration definitions |
+| imports | Yes | Package imports |
+| filters | Yes | Filter definitions |
+| fragments | Yes | Nested fragment paths |
+| name | Yes | Optional; prefixes task names |
+| with | **No** | Package-level params only in root |
+| desc | **No** | Package description only in root |
+
+## Dependency Graph Best Practices
+
+Each task should declare only its **direct** dependencies in `needs`. DFM
+resolves transitive dependencies automatically.
+
+**Co-location principle:** Define tasks in the same `flow.dv` as the source
+files they describe. Use fragments to link directories together.
+
+```yaml
+# BAD: flat needs list -- hides the real dependency chain
+- root: build
+  uses: sim.SimImage
+  needs: [rtl, pkg_a_hdl, pkg_a_hvl, pkg_b_hdl, pkg_b_hvl,
+          env, sequences, tests, hdl_top, hvl_top]
+
+# GOOD: each task declares only direct deps
+# (in separate fragment files co-located with source)
+
+# verification_ip/pkg_a/flow.dv
+- name: pkg_a_hdl
+  uses: std.FileSet
+  with:
+    type: systemVerilogSource
+    include: "*.sv"
+- name: pkg_a_hvl
+  needs: [pkg_a_hdl]
+  uses: std.FileSet
+  with:
+    type: systemVerilogSource
+    include: "*.sv"
+
+# tb/flow.dv
+- name: hdl_top
+  needs: [pkg_a_hdl, pkg_b_hdl]
+  uses: std.FileSet
+  with:
+    type: systemVerilogSource
+    include: "hdl_top.sv"
+- root: build
+  uses: sim.SimImage
+  needs: [hdl_top, hvl_top, rtl]
+  with:
+    top: [hdl_top, hvl_top]
+```
+
+Use `dfm graph <task> -o flow.dot` to visualize and verify the DAG.
+
+## feeds
+
+The `feeds` field is the inverse of `needs`. It declares that a task's output
+should be injected into another task, without modifying the target task's
+definition.
+
+```yaml
+# These two are equivalent:
+- name: sources
+  uses: std.FileSet
+  feeds: [compile]        # "I feed compile"
+
+- name: compile
+  uses: sim.SimImage
+  needs: [sources]        # "I need sources"
+```
+
+`feeds` is particularly useful inside configs, where you want to add
+arguments or data to existing tasks without modifying them:
+
+```yaml
+configs:
+  - name: debug
+    tasks:
+      - name: debug_compile_args
+        uses: hdlsim.SimCompileArgs
+        with:
+          args: ["-debug_access+all"]
+        feeds: [my_project.build]
+
+      - name: debug_run_args
+        uses: hdlsim.SimRunArgs
+        with:
+          args: ["-gui"]
+        feeds: [my_project.run]
+```
+
+Feed targets use fully-qualified task names (`package_name.task_name`).
+
+## Append and Prepend for List Parameters
+
+When overriding list-type parameters, use `append` or `prepend` to extend
+rather than replace the base value:
+
+```yaml
+with:
+  args:
+    append: ["-extra-flag"]    # Added after base value
+  incdirs:
+    prepend: ["/priority/inc"] # Added before base value
+```
+
+Resolution: `prepend + (value or base_value) + append`. If `value` is also
+set, it replaces the base before append/prepend are applied.
+
+## Build Reuse with --base-rundir
+
+The `--base-rundir` option lets you split a DFM run into separate build
+and test phases. Tasks that completed successfully in the base-rundir are
+satisfied without re-execution.
+
+```bash
+# Build once
+dfm run build
+
+# Run tests reusing the build (no recompilation)
+dfm run test_a --base-rundir /path/to/build/rundir
+dfm run test_b --base-rundir /path/to/build/rundir
+```
+
+The base-rundir is read-only and trusted. The environment variable
+`DFM_BASE_RUNDIR` is exported to child processes. Use `--force` to
+override base-rundir satisfaction.
+
 ## Detailed Documentation
 
 For comprehensive documentation, see the following reference files:
@@ -290,7 +468,7 @@ For comprehensive documentation, see the following reference files:
 
 ## Flow File Format
 
-DV Flow uses YAML files (`flow.yaml` or `flow.dv`) to define workflows. The file structure is validated against a JSON Schema located at `dv.flow.schema.json`.
+DV Flow uses YAML files (`flow.dv` or `flow.yaml`) to define workflows. The file structure is validated against a JSON Schema located at `dv.flow.schema.json`.
 
 ### Schema Validation
 

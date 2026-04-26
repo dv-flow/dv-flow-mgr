@@ -64,9 +64,9 @@ class PackageDef(BaseModel):
     imports : List[Union[str,PackageImportSpec]] = Field(
         default_factory=list,
         description="List of packages to import. Can be package names (strings) or import specifications with configuration")
-    overrides : Dict[str, str] = Field(
+    overrides : Dict[str, Union[str, dict]] = Field(
         default_factory=dict,
-        description="Parameter and package overrides. Maps override targets to replacement values")
+        description="Task overrides. Maps target task name to a replacement task name (str) or an inline task definition (dict)")
     fragments: List[str] = Field(
         default_factory=list,
         description="List of fragment file paths to include in this package")
@@ -191,4 +191,3 @@ PackageDef.model_rebuild()
 
 #         return pkg
     
-

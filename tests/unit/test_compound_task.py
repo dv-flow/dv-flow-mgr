@@ -982,3 +982,78 @@ package:
         assert content.find("srcdir:") != -1
         path = content[content.find(":")+1:].strip()
         assert path == str(tmpdir)
+
+def test_rundir_inherit_uses_compound(tmpdir):
+    """Test that rundir:inherit propagates through uses of a compound task.
+    
+    When a task specifies rundir:inherit and uses a compound task,
+    the used compound should NOT introduce its own rundir segment.
+    """
+    flow_dv = """
+package:
+    name: foo
+
+    tasks:
+    - name: inner-compound
+      body:
+      - name: leaf
+        rundir: inherit
+        uses: std.CreateFile
+        with:
+          filename: result.txt
+          content: "hello from inner"
+
+    - name: outer
+      body:
+      - name: step
+        rundir: inherit
+        uses: inner-compound
+"""
+
+    rundir = os.path.join(tmpdir)
+    with open(os.path.join(rundir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    collector = MarkerCollector()
+    pkg = PackageLoader(marker_listeners=[collector]).load(
+        os.path.join(rundir, "flow.dv"))
+
+    assert len(collector.markers) == 0
+    builder = TaskGraphBuilder(
+        root_pkg=pkg,
+        rundir=os.path.join(rundir, "rundir"))
+    runner = TaskSetRunner(rundir=os.path.join(rundir, "rundir"))
+
+    t1 = builder.mkTaskNode("foo.outer", name="t1")
+
+    output = asyncio.run(runner.run(t1))
+
+    assert runner.status == 0
+
+    # The key assertion: with rundir:inherit on 'step', the used compound
+    # 'inner-compound' should not add its own rundir layer.
+    # The leaf task (with rundir:inherit) should run in the outer compound's
+    # rundir directly, so result.txt should be in the outer compound's rundir.
+    outer_rundir = os.path.join(rundir, "rundir")
+
+    # Walk the rundir tree to check directory depth.
+    # With the fix: outer/rundir/<outer-segment>/ should contain result.txt
+    # Without the fix: there would be an extra nested directory.
+    result_files = []
+    for root, dirs, files in os.walk(outer_rundir):
+        for f in files:
+            if f == "result.txt":
+                result_files.append(os.path.join(root, f))
+
+    assert len(result_files) == 1, "Expected exactly one result.txt, found: %s" % result_files
+
+    # The result.txt should be at depth 2 from the rundir root:
+    # rundir/<outer-segment>/result.txt
+    # NOT at depth 3: rundir/<outer-segment>/<inner-segment>/result.txt
+    rel_path = os.path.relpath(result_files[0], outer_rundir)
+    depth = len(rel_path.split(os.sep))
+    assert depth == 2, (
+        "result.txt is at depth %d (%s), expected depth 2 "
+        "(rundir:inherit on uses-compound should not add extra directory)"
+        % (depth, rel_path)
+    )

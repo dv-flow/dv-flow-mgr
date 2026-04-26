@@ -99,6 +99,61 @@ Data passes between each pair of steps above:
 In addition, one step cannot proceed until the proceeding step has completed. These
 scheduling and dataflow requirements are captured using `needs` relationships.
 
+
+Structuring Dependencies
+========================
+
+Each task should declare only its **direct** dependencies in ``needs``.
+DFM resolves transitive dependencies automatically -- if task C needs B and
+B needs A, then C receives the outputs of both A and B without listing A
+explicitly.
+
+**Co-location principle:** Define tasks in the same ``flow.dv`` file as the
+source files they describe. Use package fragments to link directories together.
+This keeps each directory's build logic close to its source and makes the
+dependency graph easy to reason about.
+
+.. code-block:: yaml
+
+    # BAD: flat needs list -- no structure, hides the real dependency chain
+    - root: build
+      uses: sim.SimImage
+      needs: [rtl, pkg_a_hdl, pkg_a_hvl, pkg_b_hdl, pkg_b_hvl,
+              env, sequences, tests, hdl_top, hvl_top]
+
+    # GOOD: each task declares only direct deps
+    # (defined in separate fragment files co-located with source)
+
+    # verification_ip/pkg_a/flow.dv
+    - name: pkg_a_hdl
+      uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
+    - name: pkg_a_hvl
+      needs: [pkg_a_hdl]
+      uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
+
+    # tb/flow.dv
+    - name: hdl_top
+      uses: std.FileSet
+      needs: [pkg_a_hdl, pkg_b_hdl]
+      with:
+        type: systemVerilogSource
+        include: "hdl_top.sv"
+
+    - root: build
+      uses: sim.SimImage
+      needs: [hdl_top, hvl_top, rtl]
+      with:
+        top: [hdl_top, hvl_top]
+
+Use ``dfm graph <task> -o flow.dot`` to visualize and verify the dependency
+graph.
+
 Tasks and Dataflow
 ==================
 Task `needs` relationships specify dataflow between tasks in addition to 

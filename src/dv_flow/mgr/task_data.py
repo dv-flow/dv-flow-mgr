@@ -89,6 +89,7 @@ class TaskDataResult(BaseModel):
     status : int = dc.Field(default=0)
     cache_hit : bool = dc.Field(default=False)
     cache_stored : bool = dc.Field(default=False)
+    base_hit : bool = dc.Field(default=False)
 
 class TaskDataOutput(BaseModel):
     changed : bool = True

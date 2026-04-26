@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import enum
+import logging as _logging
 from typing import Any, List, Union
 from pydantic import BaseModel, Field, model_validator
 
@@ -71,4 +72,33 @@ class ParamDef(BaseModel):
         default=None,
         description="Path to prepend to path-type parameters (OS-specific separator)")
     srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
+
+    def resolve_value(self, base_value):
+        """Apply append/prepend/value operations against *base_value*.
+
+        When 'value' is set, it replaces base_value as the starting point.
+        Then prepend/append are applied on top of that base.
+        result = prepend + (value or base_value) + append.
+        """
+        if self.value is not None:
+            result = list(self.value) if isinstance(self.value, list) \
+                     else [self.value] if self.value is not None else []
+        else:
+            result = list(base_value) if base_value else []
+        if self.prepend is not None:
+            items = self.prepend if isinstance(self.prepend, list) \
+                    else [self.prepend]
+            result = items + result
+        if self.append is not None:
+            items = self.append if isinstance(self.append, list) \
+                    else [self.append]
+            result = result + items
+        # If only value was set (no append/prepend), return as-is
+        if not self.has_list_op() and self.value is not None:
+            return self.value
+        return result
+
+    def has_list_op(self) -> bool:
+        """True when this ParamDef carries an append or prepend."""
+        return self.append is not None or self.prepend is not None
 

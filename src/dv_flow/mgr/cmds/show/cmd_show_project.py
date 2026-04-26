@@ -132,9 +132,9 @@ class CmdShowProject:
         
         # Configs
         if getattr(args, 'configs', False) or getattr(args, 'verbose', False):
-            info['configs'] = [{'name': c.name} for c in getattr(pkg, 'configs', [])]
+            info['configs'] = [{'name': c.name} for c in getattr(pkg, 'all_configs', [])]
         else:
-            info['config_count'] = len(getattr(pkg, 'configs', []))
+            info['config_count'] = len(getattr(pkg, 'all_configs', []))
         
         return info
     

@@ -1,4 +1,12 @@
 
+# 1.19.0
+- Add template tasks (`template: true`) -- defer `run` expansion to graph-build time for reusable task definitions
+- Add config-level task overrides (`overrides:` in configs) -- substitute arbitrary tasks when a config is active
+- Add package-level task overrides (`overrides:` map on packages)
+- Add `std.Null` no-op passthrough task for stubbing out tasks
+- Add `--override TARGET=REPLACEMENT` CLI flag for ad-hoc task substitution
+- Add `--runner` flag with auto-detect (daemon if running, else local)
+
 # 1.11.0
 - Support flow.yaml and flow.yml in addition to flow.dv
 - Add support for loading package files relative to an environment variable

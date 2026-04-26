@@ -135,7 +135,7 @@ Import a package from a file or directory path:
         - name: use_imported
           uses: my_lib.some_task
 
-When a directory is specified, DV Flow searches for ``flow.yaml`` or ``flow.yaml`` 
+When a directory is specified, DV Flow searches for ``flow.dv`` or ``flow.yaml`` 
 files in the subdirectory tree.
 
 Import with Alias
@@ -235,8 +235,82 @@ Fragment files use the ``fragment`` keyword instead of ``package``:
             include: "*.sv"
 
 All fragments contribute to the same package namespace. Task names must be unique
-across all fragments - you cannot define ``build`` in multiple fragments of the
+across all fragments -- you cannot define ``build`` in multiple fragments of the
 same package.
+
+Fragment Fields
+---------------
+
+Fragments support most package-level constructs but not all.  The schema
+uses ``extra = "forbid"``, so any unlisted field produces an error.
+
+.. list-table:: Allowed Fragment Fields
+   :header-rows: 1
+   :widths: 20 10 70
+
+   * - Field
+     - Allowed?
+     - Notes
+   * - ``tasks``
+     - Yes
+     - Task definitions, same syntax as in a package
+   * - ``types``
+     - Yes
+     - Data type definitions
+   * - ``configs``
+     - Yes
+     - Configuration definitions
+   * - ``imports``
+     - Yes
+     - Package imports
+   * - ``filters``
+     - Yes
+     - Filter definitions
+   * - ``fragments``
+     - Yes
+     - Nested fragment paths (hierarchical)
+   * - ``name``
+     - Yes
+     - Optional; prefixes all task names with ``<package>.<name>.<task>``
+   * - ``with``
+     - **No**
+     - Package-level parameters can only be declared in the root package
+   * - ``desc``
+     - **No**
+     - Package description is set in the root package only
+
+Nested Fragments
+----------------
+
+Fragments can reference other fragments, enabling a hierarchical directory
+structure:
+
+.. code-block:: yaml
+
+    # Top-level flow.dv
+    package:
+      name: my_project
+      fragments:
+        - src/flow.dv
+        - tb/flow.dv
+
+    # src/flow.dv -- intermediate fragment
+    fragment:
+      fragments:
+        - rtl/flow.dv
+        - lib/flow.dv
+
+    # src/rtl/flow.dv -- leaf fragment
+    fragment:
+      tasks:
+        - name: rtl_sources
+          uses: std.FileSet
+          with:
+            type: systemVerilogSource
+            include: "*.sv"
+
+Fragment paths are always relative to the file that contains the
+``fragments:`` list.
 
 Task Namespacing
 ================

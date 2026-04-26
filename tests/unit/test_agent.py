@@ -406,3 +406,35 @@ def test_agent_fail_on_empty_output_after_max_retries(tmp_path):
     
     # Cleanup
     del ASSISTANT_REGISTRY["always_empty"]
+
+
+def test_agent_max_retries_zero_no_retries(tmp_path):
+    """Test that max_retries=0 results in exactly one attempt and no retries"""
+    from dv_flow.mgr.std.ai_assistant import AIAssistantBase, ASSISTANT_REGISTRY
+    from typing import Tuple
+
+    class CountingAssistant(AIAssistantBase):
+        call_count = 0
+
+        async def execute(self, prompt: str, runner, model: str, config: dict) -> Tuple[int, str, str]:
+            CountingAssistant.call_count += 1
+            return 1, f"Attempt {CountingAssistant.call_count}", "fail"
+
+        def check_available(self) -> Tuple[bool, str]:
+            return True, ""
+
+    CountingAssistant.call_count = 0
+    ASSISTANT_REGISTRY["counting"] = CountingAssistant
+
+    input = MockInput()
+    input.rundir = str(tmp_path)
+    input.params.assistant = "counting"
+    input.params.max_retries = 0
+
+    result = asyncio.run(Agent(input, input))
+
+    assert result.status == 1
+    # With max_retries=0 the assistant must be called exactly once
+    assert CountingAssistant.call_count == 1
+
+    del ASSISTANT_REGISTRY["counting"]

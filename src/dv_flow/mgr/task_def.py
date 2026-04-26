@@ -245,6 +245,9 @@ class TaskDef(BaseModel):
     shell: str = dc.Field(
         default="bash",
         description="Shell to use for shell-based implementation")
+    template : bool = dc.Field(
+        default=False,
+        description="Template task: run expression deferred to graph-build time")
     strategy : StrategyDef = dc.Field(
         default=None)
     control : Union[ControlDef, None] = dc.Field(
@@ -350,6 +353,8 @@ class TaskDef(BaseModel):
         """Ensure control and strategy are mutually exclusive"""
         if self.control is not None and self.strategy is not None:
             raise ValueError("Task cannot have both 'control' and 'strategy' fields. They are mutually exclusive.")
+        if self.template and self.override is not None:
+            raise ValueError("Task cannot have both 'template' and 'override' fields.")
         return self
 
 TaskDef.model_rebuild()

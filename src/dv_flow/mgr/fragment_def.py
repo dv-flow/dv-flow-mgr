@@ -23,6 +23,7 @@ import pydantic.dataclasses as dc
 import json
 from pydantic import BaseModel
 from typing import Any, Dict, List, Union
+from .config_def import ConfigDef
 from .package_import_spec import PackageImportSpec
 from .srcinfo import SrcInfo
 from .task_def import TaskDef
@@ -51,6 +52,9 @@ class FragmentDef(BaseModel):
     types : List[TypeDef] = dc.Field(
         default_factory=list,
         description="List of data type definitions for this fragment")
+    configs : List[ConfigDef] = dc.Field(
+        default_factory=list,
+        description="List of configuration definitions for this fragment")
     srcinfo : SrcInfo = dc.Field(default=None)
 
     _basedir : str = None
@@ -63,3 +67,5 @@ class FragmentDef(BaseModel):
 #    def apply(self, session, pkg : Package):
 #        pass
             
+
+FragmentDef.model_rebuild()

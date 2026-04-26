@@ -225,8 +225,8 @@ class CmdContext:
         """Get information about configurations."""
         configs = []
         
-        if hasattr(pkg, 'pkg_def') and pkg.pkg_def and hasattr(pkg.pkg_def, 'configs'):
-            for config in pkg.pkg_def.configs:
+        if hasattr(pkg, 'all_configs') and pkg.all_configs:
+            for config in pkg.all_configs:
                 config_info = {
                     'name': config.name,
                 }

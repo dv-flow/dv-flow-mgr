@@ -94,6 +94,7 @@ class TaskGraphBuilder(object):
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
+    _inherit_rundir_depth : int = 0
     _filter_registry : FilterRegistry = dc.field(default_factory=FilterRegistry)
 
     _log : logging.Logger = None
@@ -155,6 +156,10 @@ class TaskGraphBuilder(object):
                 self._pkg_params_m[self.root_pkg.name] = None
 
             self._addPackageTasks(self.root_pkg, pkg_s)
+
+            # Seed override map from package-level and config-level substitutions
+            if hasattr(self.root_pkg, 'substitution_m'):
+                self._override_m.update(self.root_pkg.substitution_m)
         else:
             self._ctxt = TaskNodeCtxt(
                 root_pkgdir=None,
@@ -444,6 +449,9 @@ class TaskGraphBuilder(object):
             self.push_name_resolution_context(task.package)
 
             try:
+                # Reject direct invocation of template tasks
+                if getattr(task, "template", False) and not self.in_uses():
+                    raise Exception("Cannot invoke template task '%s' directly; use it via 'uses:' or as an override replacement" % task.name)
                 ret = self._mkTaskNode(
                     task, 
                     name=name, 
@@ -575,6 +583,9 @@ class TaskGraphBuilder(object):
                     params=None, 
                     hierarchical=False,
                     eval=None):
+
+        # Apply override substitution before anything else
+        task = self._findOverride(task)
 
         if not hierarchical:
             self._task_rundir_s.append([self.rundir])
@@ -1052,23 +1063,27 @@ class TaskGraphBuilder(object):
         self._eval.set("srcdir", prev_srcdir)
 
 
-        if task.rundir == RundirE.Unique:
+        if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
             _leaf_ctx = self._build_task_naming_context(task, name)
             _leaf_segment = self._naming_scheme.rundir_segment(_leaf_ctx)
             if _leaf_segment is not None:
                 self.enter_rundir(_leaf_segment)
 
-        # TODO: handle callable in light of overrides
+        # Expand template run expression at graph-build time
+        task_run = task.run
+        if getattr(task, "template", False) and task_run and "${{" in task_run:
+            eval_ctx = eval if eval is not None else self._eval
+            task_run = self._expandParam(task_run, eval_ctx)
 
         callable = None
 
-        if task.run is not None:
+        if task_run is not None:
             shell = task.shell if task.shell is not None else "shell"
             if shell in self._shell_m.keys():
                 self._log.debug("Use shell implementation")
-                self._log.debug("task.run: %s" % task.run)
+                self._log.debug("task_run: %s" % task_run)
                 callable = self._shell_m[shell](
-                    task.run, 
+                    task_run, 
                     os.path.dirname(task.srcinfo.file), 
                     task.shell)
             else:
@@ -1083,7 +1098,7 @@ class TaskGraphBuilder(object):
                 callable = uses.task
         
         if callable is None:
-            callable = NullCallable(task.run)
+            callable = NullCallable(task_run)
 
         node.task = callable
 
@@ -1098,7 +1113,7 @@ class TaskGraphBuilder(object):
         self._gatherNeeds(task, node)
         self._log.debug("<-- processing needs")
 
-        if task.rundir == RundirE.Unique:
+        if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
             self.leave_rundir()
 
         # Clean up
@@ -1159,7 +1174,7 @@ class TaskGraphBuilder(object):
         # Restore previous srcdir after all parameter evaluation
         self._eval.set("srcdir", prev_srcdir)
 
-        if task.rundir == RundirE.Unique:
+        if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
             _compound_ctx = self._build_task_naming_context(task, name)
             _compound_segment = self._naming_scheme.rundir_segment(_compound_ctx)
             if _compound_segment is not None:
@@ -1176,24 +1191,40 @@ class TaskGraphBuilder(object):
 
             self.push_task_scope(node)  # Push scope before enter_uses
             self.enter_uses()
-            uses_node = self._mkTaskNode(
-                task_uses,
-                name=name, 
-                srcdir=srcdir,
-                params=params,
-                hierarchical=True,
-                eval=eval)
+            # Propagate rundir:inherit through the uses chain: increment
+            # depth so all tasks built inside the expansion (compound
+            # and leaf) skip their own rundir segments.
+            if task.rundir == RundirE.Inherit:
+                self._inherit_rundir_depth += 1
+            try:
+                uses_node = self._mkTaskNode(
+                    task_uses,
+                    name=name, 
+                    srcdir=srcdir,
+                    params=params,
+                    hierarchical=True,
+                    eval=eval)
+            finally:
+                if task.rundir == RundirE.Inherit:
+                    self._inherit_rundir_depth -= 1
             self.leave_uses()
             
             if not isinstance(uses_node, TaskNodeCompound):
-                # TODO: need to enclose the leaf node in a compound wrapper
-                raise Exception("Task %s is not compound" % task_uses)
-            
-            # Copy properties from uses_node to our node
-            node.tasks = uses_node.tasks
-            node.input = uses_node.input
-            node.needs = uses_node.needs
-            self.pop_task_scope()  # Pop the scope
+                # Non-compound base with no implementation is parameter-only;
+                # allow the compound task to provide its own body.
+                _has_impl = (isinstance(task_uses, Task) and
+                             (task_uses.run is not None or
+                              (task_uses.subtasks is not None and len(task_uses.subtasks) > 0)))
+                if _has_impl:
+                    raise Exception("Task %s is not compound" % task_uses)
+                self.pop_task_scope()
+                self.push_task_scope(node)
+            else:
+                # Copy properties from uses_node to our node
+                node.tasks = uses_node.tasks
+                node.input = uses_node.input
+                node.needs = uses_node.needs
+                self.pop_task_scope()  # Pop the scope
         else:
             # Node represents the terminal node of the sub-DAG
             self.push_task_scope(node)  # Push scope for non-uses compound task
@@ -1300,7 +1331,7 @@ class TaskGraphBuilder(object):
                 self._log.debug("Add node %s as a top-level dependency" % tn.name)
                 node.needs.append((tn, False))
 
-        if task.rundir == RundirE.Unique:
+        if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
             self.leave_rundir()
 
         # Clean up task scope if we created one for a non-uses compound task
@@ -1543,6 +1574,57 @@ class TaskGraphBuilder(object):
         self.marker_l(marker)
 
     def _findOverride(self, task):
+        """Check if this task has a substitution registered.
+        
+        Returns the replacement Task if a substitution exists, otherwise
+        the original task.
+        """
+        if task.name in self._override_m:
+            replacement_name = self._override_m[task.name]
+            replacement = self._task_m.get(replacement_name)
+            if replacement is None and self.loader is not None:
+                replacement = self.loader.findTask(replacement_name)
+            if replacement is None:
+                # Search imported packages by prefix (handles implicit std, etc.)
+                parts = replacement_name.split(".", 1)
+                if len(parts) == 2:
+                    pkg_name, task_short = parts
+                    pkg = self._pkg_m.get(pkg_name)
+                    if pkg is None and self.root_pkg is not None:
+                        # Walk root_pkg's pkg_m for the package
+                        pkg = self.root_pkg.pkg_m.get(pkg_name)
+                    if pkg is not None:
+                        replacement = pkg.task_m.get(replacement_name)
+                        if replacement is not None:
+                            # Register so subsequent lookups are fast
+                            self._task_m[replacement_name] = replacement
+            if replacement is None:
+                # Search packages reachable through existing tasks' uses chains
+                parts = replacement_name.split(".", 1)
+                if len(parts) == 2:
+                    pkg_name = parts[0]
+                    for t in self._task_m.values():
+                        if (hasattr(t, 'package') and t.package is not None
+                                and t.package.name == pkg_name):
+                            replacement = t.package.task_m.get(replacement_name)
+                            if replacement is not None:
+                                self._task_m[replacement_name] = replacement
+                                break
+                        if (hasattr(t, 'uses') and t.uses is not None
+                                and hasattr(t.uses, 'package')
+                                and t.uses.package is not None
+                                and t.uses.package.name == pkg_name):
+                            replacement = t.uses.package.task_m.get(replacement_name)
+                            if replacement is not None:
+                                self._task_m[replacement_name] = replacement
+                                break
+            if replacement is None:
+                raise Exception(
+                    "Override '%s' -> '%s': replacement task not found"
+                    % (task.name, replacement_name))
+            self._log.info("Overriding task '%s' with '%s'"
+                           % (task.name, replacement_name))
+            return replacement
         return task
 
     def _build_task_naming_context(self, task, name, is_sentinel=False):

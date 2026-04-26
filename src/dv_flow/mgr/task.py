@@ -53,6 +53,7 @@ class Task(object):
     strategy : Strategy = dc.field(default=None)
     run : str = None
     shell : str = "bash"
+    template : bool = False
     tags : List['Type'] = dc.field(default_factory=list)
     max_failures : int = -1
     on_error : str = None

@@ -170,6 +170,49 @@ Inverse of `needs` - declare from producer's perspective:
   feeds: [compile]        # Equivalent to compile.needs: [sources]
 ```
 
+`feeds` is particularly useful inside configs for injecting arguments or
+data into existing tasks without modifying their definition:
+
+```yaml
+configs:
+  - name: debug
+    tasks:
+      - name: debug_compile_args
+        uses: hdlsim.SimCompileArgs
+        with:
+          args: ["-debug_access+all"]
+        feeds: [my_project.build]
+
+      - name: debug_run_args
+        uses: hdlsim.SimRunArgs
+        with:
+          args: ["-gui"]
+        feeds: [my_project.run]
+```
+
+Feed targets use fully-qualified task names (`package_name.task_name`).
+
+### Structuring Dependencies
+
+Each task should declare only its **direct** dependencies in `needs`. DFM
+resolves transitive dependencies automatically. Co-locate tasks with the
+source files they describe (one `flow.dv` per directory via fragments).
+
+```yaml
+# BAD: flat needs list
+- root: build
+  uses: sim.SimImage
+  needs: [rtl, pkg_a, pkg_b, env, tests, hdl_top, hvl_top]
+
+# GOOD: each task declares direct deps only
+- name: pkg_a_hvl
+  needs: [pkg_a_hdl]
+- root: build
+  needs: [hdl_top, hvl_top, rtl]
+```
+
+Use `dfm graph <task> -o flow.dot` to visualize the DAG.
+
 ## Parameter Overrides
 
 ### Simple Values

@@ -53,6 +53,7 @@ class TaskListenerProgress(object):
     _error_count : int = 0
     _warning_count : int = 0
     _cache_enabled : bool = False
+    _base_hit_count : int = 0
 
     # Up-to-date checking spinner (visible until first task runs)
     _checking_spinner : Optional[Progress] = dc.field(default=None)
@@ -142,6 +143,10 @@ class TaskListenerProgress(object):
             # Mark in task_row_map if it exists (verbose mode)
             if task in self._task_row_map:
                 self._task_row_map[task]['cache_hit'] = True
+        elif reason == 'base_hit':
+            self._base_hit_count += 1
+            if task in self._task_row_map:
+                self._task_row_map[task]['base_hit'] = True
         elif reason == 'run':
             # Task will actually run - add to display if not already added
             self._dismiss_checking_spinner()
@@ -166,6 +171,7 @@ class TaskListenerProgress(object):
             # Check if task was up-to-date (not changed) or cache hit
             is_uptodate = not task.result.changed if task.result else False
             is_cache_hit = info.get('cache_hit', False)
+            is_base_hit = info.get('base_hit', False)
             
             # Determine status code
             err_ct = sum(1 for m in task.result.markers if m.severity == SeverityE.Error)
@@ -178,6 +184,8 @@ class TaskListenerProgress(object):
                 self._warning_count += 1
             elif is_cache_hit:
                 status_code = '[magenta]C[/magenta]'  # C for cache hit
+            elif is_base_hit:
+                status_code = '[cyan]B[/cyan]'  # B for base-rundir hit
             elif is_uptodate:
                 status_code = '[blue]U[/blue]'
             else:
@@ -273,6 +281,8 @@ class TaskListenerProgress(object):
         summary_parts = [f"Total: {self._total_tasks}"]
         if self._uptodate_count > 0:
             summary_parts.append(f"Up-to-date: {self._uptodate_count}")
+        if self._base_hit_count > 0:
+            summary_parts.append(f"Base: {self._base_hit_count}")
         if self._cache_enabled:
             cache_miss = self._done_count + self._error_count + self._warning_count
             summary_parts.append(f"Cache: {self._cache_hit_count} hit / {cache_miss} miss")

@@ -352,3 +352,87 @@ making them easy to share and version.
 Note: PyPkg is an advanced feature. For most use cases, YAML-based package
 definitions with PyTask implementations provide the right balance of
 simplicity and power.
+
+
+Template Tasks
+==============
+
+A template task defers expansion of its ``run`` expression from load time
+to graph-build time.  This is useful for reusable building blocks whose
+``run`` expression references variables that only exist in the use context
+(matrix variables, compound parameters, package parameters of the
+consuming package, etc.).
+
+Declaring a Template Task
+-------------------------
+
+Add ``template: true`` to the task definition:
+
+.. code-block:: yaml
+
+    package:
+      name: sim_pkg
+
+      tasks:
+      - name: CompileStub
+        template: true
+        shell: bash
+        run: "echo Skipping compile for ${{ matrix.variant }}"
+        passthrough: all
+        consumes: none
+
+The ``run`` string is stored verbatim at load time.  When the task is
+instantiated (via ``uses:`` or as an override replacement), the graph
+builder expands ``${{ }}`` expressions using the instantiation context.
+
+Using a Template Task
+---------------------
+
+A template task is consumed through ``uses:``, just like any other task:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: MyCompile
+      uses: sim_pkg.CompileStub
+
+At graph-build time, ``${{ matrix.variant }}`` (or whichever variables
+appear in ``run``) are resolved against the current context.
+
+Template tasks work naturally inside ``strategy.matrix``:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: StubMatrix
+      strategy:
+        matrix:
+          variant: [rtl, gate]
+      body:
+      - name: Step
+        uses: sim_pkg.CompileStub
+
+Each matrix cell gets its own expansion, so ``${{ matrix.variant }}``
+resolves to ``rtl`` and ``gate`` respectively.
+
+Constraints
+-----------
+
+* A template task **cannot be invoked directly** from the CLI or as a
+  top-level entry point.  Doing so raises an error.
+* ``template: true`` and ``override:`` are mutually exclusive on the same
+  task definition.
+* Parameter definitions (``with:``) are unaffected -- they are already
+  expanded lazily at graph-build time regardless of the ``template`` flag.
+
+When to Use Templates
+---------------------
+
+Use ``template: true`` when:
+
+* The ``run`` expression references variables that are not available at
+  load time (e.g. ``${{ matrix.variant }}``, ``${{ this.some_param }}``).
+* You are building a reusable task that will be consumed by multiple
+  packages with different parameter contexts.
+* You need the same task definition to produce different shell commands
+  depending on where it is instantiated.

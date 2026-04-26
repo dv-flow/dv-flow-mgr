@@ -74,6 +74,9 @@ class TaskListenerLog(object):
             # Task is a cache hit - in non-verbose mode, don't show it
             # In verbose mode, it was already shown in 'enter'
             pass
+        elif reason == 'base_hit':
+            # Task satisfied from base-rundir - same display rules as cache_hit
+            pass
         elif reason == 'run':
             # Task will actually run - show it now in non-verbose mode
             if not self.verbose and not self.quiet:
@@ -82,9 +85,10 @@ class TaskListenerLog(object):
             # Check if task was up-to-date (not changed) or cache hit
             is_uptodate = not task.result.changed if task.result else False
             is_cache_hit = task.result.cache_hit if (task.result and hasattr(task.result, 'cache_hit')) else False
+            is_base_hit = task.result.base_hit if (task.result and hasattr(task.result, 'base_hit')) else False
             
             # Skip display of up-to-date/cache-hit tasks unless verbose mode
-            if (is_uptodate or is_cache_hit) and not self.verbose and not self.quiet:
+            if (is_uptodate or is_cache_hit or is_base_hit) and not self.verbose and not self.quiet:
                 self.level -= 1
                 return
             
@@ -108,6 +112,8 @@ class TaskListenerLog(object):
                     status_suffix = ""
                     if is_cache_hit:
                         status_suffix = " (cache)"
+                    elif is_base_hit:
+                        status_suffix = " (base)"
                     elif is_uptodate:
                         status_suffix = " (up-to-date)"
                     

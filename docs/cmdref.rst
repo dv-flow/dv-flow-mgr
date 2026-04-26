@@ -105,6 +105,57 @@ Run Options
     
         dfm run build -u tui
 
+``--override TARGET=REPLACEMENT``
+    Replace a task in the graph with another task for this run. Can be
+    specified multiple times. Overrides applied via ``--override`` take
+    precedence over config-level and package-level overrides.
+    
+    .. code-block:: bash
+    
+        dfm run build --override sim_pkg.Compile=std.Null
+    
+    Multiple overrides:
+    
+    .. code-block:: bash
+    
+        dfm run build --override pkg.TaskA=std.Null --override pkg.TaskB=std.Null
+
+``--runner BACKEND``
+    Runner backend to use. ``local`` runs tasks in-process. Other backends
+    (e.g. ``lsf``) require a running daemon. If omitted, auto-detects
+    whether a daemon is running and delegates to it if so, otherwise uses
+    local execution.
+    
+    .. code-block:: bash
+    
+        dfm run build --runner local
+
+
+``--base-rundir PATH``
+    Reuse compiled artifacts from a previous build's rundir.  Tasks that
+    completed successfully in the base-rundir are satisfied without
+    re-execution; their output is reconstructed from saved data and
+    file paths are rewritten to reference the base-rundir.  The
+    base-rundir is treated as read-only and trusted.
+
+    This is essential for regression workflows where a build is performed
+    once and many test runs reuse the compiled artifacts.
+
+    .. code-block:: bash
+
+        # Build once
+        dfm run build
+
+        # Run tests reusing the build (no recompilation)
+        dfm run test_a --base-rundir /path/to/build/rundir
+        dfm run test_b --base-rundir /path/to/build/rundir
+
+    The environment variable ``DFM_BASE_RUNDIR`` is exported to child
+    processes when this option is set.
+
+    See :doc:`userguide/incremental` for full details on how base-rundir
+    satisfaction works.
+
 Run Examples
 ------------
 
@@ -942,10 +993,17 @@ Here are some common command patterns for typical workflows:
 
     dfm run test -D test_name=smoke -D seed=42
 
+**Stub out expensive tasks for fast iteration:**
+
+.. code-block:: bash
+
+    dfm run test -c fast
+    # or, ad-hoc from the command line:
+    dfm run test --override sim_pkg.Compile=std.Null
+
 **Generate documentation graph:**
 
 .. code-block:: bash
 
     dfm graph all -o project.dot
     dot -Tsvg project.dot -o project.svg
-

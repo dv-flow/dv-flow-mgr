@@ -199,6 +199,13 @@ package:
           Additional assistant-specific configuration.
           For codex: sandbox_mode and approval_mode can also be set here.
 
+  - name: "Null"
+    shell: pytask
+    run: dv_flow.mgr.std.task_null.TaskNull
+    passthrough: all
+    consumes: none
+    desc: "No-op task that passes inputs through unchanged"
+
   - name: RunTasks
     shell: pytask
     run: dv_flow.mgr.std.run_tasks.RunTasks

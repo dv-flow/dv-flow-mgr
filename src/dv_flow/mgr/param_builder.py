@@ -131,11 +131,17 @@ class ParamBuilder:
                     merged[name] = (param_def, ptype)
                     self._log.debug(f"  Adding param {name}: type={ptype}, value={param_def.value}")
                 else:
-                    # Parameter override - keep existing type if not specified, update value
+                    # Parameter override - keep existing type if not specified
                     existing_def, existing_type = merged[name]
                     new_type = collection.types.get(name) or existing_type
-                    merged[name] = (param_def, new_type)
-                    self._log.debug(f"  Overriding param {name}: type={new_type}, value={param_def.value}")
+                    if param_def.has_list_op():
+                        # Resolve append/prepend against existing base value
+                        resolved_value = param_def.resolve_value(existing_def.value)
+                        merged[name] = (ParamDef(value=resolved_value), new_type)
+                        self._log.debug(f"  Append/prepend param {name}: type={new_type}, value={resolved_value}")
+                    else:
+                        merged[name] = (param_def, new_type)
+                        self._log.debug(f"  Overriding param {name}: type={new_type}, value={param_def.value}")
         
         return merged
     

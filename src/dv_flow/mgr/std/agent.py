@@ -313,7 +313,7 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
     if hasattr(input.params, 'approval_mode') and input.params.approval_mode:
         assistant_config['approval_mode'] = input.params.approval_mode
     
-    max_retries = input.params.max_retries if hasattr(input.params, 'max_retries') and input.params.max_retries else 10
+    max_retries = input.params.max_retries if hasattr(input.params, 'max_retries') and input.params.max_retries is not None else 10
     
     try:
         assistant = get_assistant(assistant_name)

@@ -96,7 +96,7 @@ class TaskListenerTrace(object):
             task: The task that generated the event
             reason: Either 'enter' or 'leave' marking start/end of task execution
         """
-        if reason in ("start", "end", "uptodate", "run", "cache_hit", "checking"):
+        if reason in ("start", "end", "uptodate", "run", "cache_hit", "base_hit", "checking"):
             return
 
         # Get/create thread ID for this task

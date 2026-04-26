@@ -1,17 +1,41 @@
 
 import pydantic.dataclasses as pdc
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import List, Union, Any
 from .extend_def import ExtendDef
 from .param_def import ParamDef
 
 class OverrideDef(BaseModel):
-    """Override definition"""
+    """Override definition for task or package substitution.
+    
+    Exactly one of 'task', 'package', or 'override' (deprecated) must be set.
+    """
+    task : Union[str, None] = pdc.Field(
+        default=None,
+        description="Fully-qualified name of task to override")
+    package : Union[str, None] = pdc.Field(
+        default=None,
+        description="Name of package to override")
     override : Union[str, None] = pdc.Field(
-        description="Task or package to override")
-    value : str = pdc.Field(
-        description="Override to use",
+        default=None,
+        description="(Deprecated) Task or package to override")
+    value : Union[str, dict] = pdc.Field(
+        description="Replacement task name (str) or inline task definition (dict)",
         alias="with")
+
+    @model_validator(mode='after')
+    def validate_target(self):
+        targets = [x for x in [self.task, self.package, self.override] if x is not None]
+        if len(targets) == 0:
+            raise ValueError("One of 'task', 'package', or 'override' must be set")
+        if len(targets) > 1:
+            raise ValueError("Only one of 'task', 'package', or 'override' can be set")
+        return self
+
+    @property
+    def target_task(self) -> Union[str, None]:
+        """Return the task target, handling legacy 'override' field."""
+        return self.task or self.override
 
 class ConfigDef(BaseModel):
     name : str = pdc.Field(

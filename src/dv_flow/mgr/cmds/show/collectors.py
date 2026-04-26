@@ -107,7 +107,7 @@ class PackageCollector:
             info['params'] = self._params_to_dict(getattr(pkg, 'params', {}))
             info['tasks'] = tasks
             info['types'] = types
-            info['configs'] = [c.name for c in getattr(pkg, 'configs', [])]
+            info['configs'] = [c.name for c in getattr(pkg, 'all_configs', [])]
             info['imports'] = [str(i) for i in getattr(pkg, 'imports', [])]
         
         return info

@@ -340,23 +340,83 @@ Replace task implementations:
 
 ## Package Fragments
 
-Split large packages across multiple files:
+Split large packages across multiple files using fragments. The root
+file uses `package:` while child files use `fragment:`.
 
 ```yaml
-# Main flow.yaml
+# Top-level flow.dv
 package:
-  name: big_project
+  name: my_project
   fragments:
-    - src/rtl/flow.yaml
-    - src/tb/flow.yaml
-```
+    - src/rtl/flow.dv
+    - tb/flow.dv
 
-```yaml
-# src/rtl/flow.yaml
+# src/rtl/flow.dv
 fragment:
   tasks:
     - name: rtl_sources
       uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
+
+# tb/flow.dv -- intermediate fragment with nesting
+fragment:
+  fragments:
+    - tests/flow.dv
+    - testbench/flow.dv
+  tasks:
+    - name: tb_sources
+      uses: std.FileSet
+      with:
+        type: systemVerilogSource
+        include: "*.sv"
 ```
 
-All fragments contribute to the same package namespace.
+All fragments contribute to the same package namespace. Task names must be
+unique across all fragments.
+
+Fragment paths are relative to the file containing the `fragments:` list.
+
+### Fragment Allowed Fields
+
+| Field | Allowed? | Notes |
+|-------|----------|-------|
+| tasks | Yes | Same syntax as package tasks |
+| types | Yes | Data type definitions |
+| configs | Yes | Configuration definitions |
+| imports | Yes | Package imports |
+| filters | Yes | Filter definitions |
+| fragments | Yes | Nested fragment paths |
+| name | Yes | Optional; prefixes task names |
+| with | **No** | Package-level params only in root |
+| desc | **No** | Package description only in root |
+
+### Dependency Graph Best Practices
+
+Each task should declare only its **direct** dependencies in `needs`.
+DFM resolves transitive dependencies automatically.
+
+**Co-location principle:** Define tasks in the same `flow.dv` as the source
+files they describe. Use fragments to link directories together. The
+top-level build task should list only its direct inputs.
+
+```yaml
+# BAD: flat needs list
+- root: build
+  uses: sim.SimImage
+  needs: [rtl, pkg_a_hdl, pkg_a_hvl, pkg_b_hdl, pkg_b_hvl,
+          env, sequences, tests, hdl_top, hvl_top]
+
+# GOOD: each task declares only direct deps
+# verification_ip/pkg_a/flow.dv
+- name: pkg_a_hvl
+  needs: [pkg_a_hdl]  # direct dep only
+
+# tb/flow.dv
+- root: build
+  uses: sim.SimImage
+  needs: [hdl_top, hvl_top, rtl]
+```
+
+Use `dfm graph <task> -o flow.dot` to visualize and verify the DAG.

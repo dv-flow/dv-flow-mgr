@@ -55,6 +55,18 @@ def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
             return f". Did you mean one of: {', '.join(repr(m) for m in matches)}?"
     return ""
 
+
+# Keys whose presence in a dict marks it as a ParamDef, not a raw value.
+_PARAMDEF_KEYS = frozenset({
+    'type', 'value', 'append', 'prepend',
+    'path-append', 'path-prepend',
+    'doc', 'desc', 'srcinfo',
+})
+
+def _is_paramdef_dict(d: dict) -> bool:
+    """Return True if *d* looks like a ParamDef specification."""
+    return bool(d.keys() & _PARAMDEF_KEYS)
+
 @dc.dataclass
 class PackageProviderYaml(PackageProvider):
     path : str
@@ -315,10 +327,17 @@ class PackageProviderYaml(PackageProvider):
 
         # Apply any overrides from above
 
-        # Now, apply these overrides to the 
-        for target,override in pkg_def.overrides.items():
-            # TODO: expand target, override
-            pass
+        # Now, apply these overrides to the package substitution map.
+        # Values can be a task name (str) or an inline task definition (dict).
+        _inline_overrides = []
+        for target, override in pkg_def.overrides.items():
+            if isinstance(override, str):
+                pkg.substitution_m[target] = override
+            elif isinstance(override, dict):
+                # Inline task def -- defer until taskdefs list is available
+                _inline_overrides.append((target, override))
+            else:
+                self._log.warning("Ignoring override '%s': value must be a string or dict" % target)
 
         pkg_scope = self.package_scope()
         if pkg_scope is not None:
@@ -345,13 +364,29 @@ class PackageProviderYaml(PackageProvider):
             taskdefs = pkg_def.tasks.copy()
             typedefs = pkg_def.types.copy()
 
+            # Materialize inline override task definitions now that taskdefs exists
+            for idx, (target, override_d) in enumerate(_inline_overrides):
+                synth_name = "_override_%d" % idx
+                override_d = dict(override_d)  # don't mutate the original
+                override_d["name"] = synth_name
+                td = TaskDef.model_validate(override_d)
+                td.srcinfo = pkg.srcinfo
+                taskdefs.append(td)
+                pkg.substitution_m[target] = "%s.%s" % (pkg.name, synth_name)
+
+            # Collect all configs: package-level plus fragment-level
+            all_configs = list(pkg_def.configs)
+
             # Load package-level fragments before config selection
-            self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs)
+            self._loadFragments(loader, pkg, pkg_def.fragments, pkg.basedir, taskdefs, typedefs, config_defs=all_configs)
+
+            # Store unified configs on package for show commands / introspection
+            pkg.all_configs = all_configs
 
             # Select and apply configuration (if any) prior to elaborating types/tasks
-            cfg = self._selectConfig(pkg_def, loader)
+            cfg = self._selectConfig(all_configs, pkg_def.name, loader)
             if cfg is not None:
-                self._applyConfig(pkg_def, cfg, loader, pkg, taskdefs, typedefs)
+                self._applyConfig(pkg_def, cfg, all_configs, loader, pkg, taskdefs, typedefs)
 
             # Validate task overrides against base (uses) package when not in config
             base_pkg = None
@@ -472,7 +507,7 @@ class PackageProviderYaml(PackageProvider):
             loader._eval.set_name_resolution(prev_name_res)
             self.pop_package_scope()
 
-    def _selectConfig(self, pkg_def, loader):
+    def _selectConfig(self, configs, pkg_name, loader):
         # Explicit config from loader overrides implicit selection
         cfg_name = getattr(loader, 'config_name', None)
         if cfg_name is not None:
@@ -483,24 +518,24 @@ class PackageProviderYaml(PackageProvider):
                 is_root = (loader.rootDir() == loader.pathStack()[-1])
             except Exception:
                 pass
-            for c in pkg_def.configs:
+            for c in configs:
                 if c.name == cfg_name:
                     return c
             if is_root:
-                loader.error(f"Configuration '{cfg_name}' not found in package {pkg_def.name}")
+                loader.error(f"Configuration '{cfg_name}' not found in package {pkg_name}")
             return None
         # Implicit default
-        for c in pkg_def.configs:
+        for c in configs:
             if c.name == 'default':
                 return c
         return None
 
-    def _applyConfig(self, pkg_def, cfg, loader, pkg, taskdefs, typedefs):
+    def _applyConfig(self, pkg_def, cfg, all_configs, loader, pkg, taskdefs, typedefs):
         self._log.debug(f"Applying config {cfg.name} to package {pkg_def.name}")
         # Handle config inheritance (single level for now)
         base_cfg = None
         if cfg.uses is not None:
-            for c in pkg_def.configs:
+            for c in all_configs:
                 if c.name == cfg.uses:
                     base_cfg = c
                     break
@@ -514,7 +549,7 @@ class PackageProviderYaml(PackageProvider):
             if isinstance(new_params, dict):
                 for k,v in new_params.items():
                     # Convert dict with 'type'/etc to ParamDef if needed
-                    if isinstance(v, dict) and ('type' in v.keys() or 'value' in v.keys()):
+                    if isinstance(v, dict) and _is_paramdef_dict(v):
                         from .param_def import ParamDef
                         try:
                             v = ParamDef(**v)
@@ -533,12 +568,12 @@ class PackageProviderYaml(PackageProvider):
         # Update pkg_def params then rebuild paramT
         pkg_def.params = merged_params
         pkg.paramT = self._getParamT(loader, pkg_def, None)
-        # Apply imports/fragments from base then cfg
+        # Apply imports/fragments from base then cfg (config-loaded fragments cannot define configs)
         if base_cfg is not None:
             self._loadPackageImports(loader, pkg, base_cfg.imports, pkg.basedir)
-            self._loadFragments(loader, pkg, base_cfg.fragments, pkg.basedir, taskdefs, typedefs)
+            self._loadFragments(loader, pkg, base_cfg.fragments, pkg.basedir, taskdefs, typedefs, from_config=True)
         self._loadPackageImports(loader, pkg, cfg.imports, pkg.basedir)
-        self._loadFragments(loader, pkg, cfg.fragments, pkg.basedir, taskdefs, typedefs)
+        self._loadFragments(loader, pkg, cfg.fragments, pkg.basedir, taskdefs, typedefs, from_config=True)
         # Apply types (overrides)
         def apply_type_list(lst):
             for td in lst:
@@ -575,6 +610,102 @@ class PackageProviderYaml(PackageProvider):
         if base_cfg is not None:
             apply_task_list(base_cfg.tasks)
         apply_task_list(cfg.tasks)
+
+        # Propagate config-level overrides to the package substitution map
+        _cfg_inline_idx = 0
+        def apply_overrides(cfg_overrides, taskdefs=taskdefs):
+            nonlocal _cfg_inline_idx
+            for od in cfg_overrides:
+                if od.target_task is not None:
+                    if isinstance(od.value, str):
+                        pkg.substitution_m[od.target_task] = od.value
+                    elif isinstance(od.value, dict):
+                        # Inline task definition in config override
+                        synth_name = "_cfg_override_%d" % _cfg_inline_idx
+                        _cfg_inline_idx += 1
+                        inline_def = dict(od.value)
+                        inline_def["name"] = synth_name
+                        td = TaskDef.model_validate(inline_def)
+                        td.srcinfo = pkg.srcinfo
+                        taskdefs.append(td)
+                        pkg.substitution_m[od.target_task] = "%s.%s" % (pkg.name, synth_name)
+                elif od.package is not None:
+                    pkg.pkg_override_m[od.package] = od.value
+        if base_cfg is not None:
+            apply_overrides(base_cfg.overrides)
+        apply_overrides(cfg.overrides)
+
+        # ---- Apply config extensions ----
+        def apply_extensions(ext_list):
+            for ext in ext_list:
+                target_name = ext.task
+                # Find target taskdef by FQ name (pkg.task or pkg.frag.task)
+                target_td = None
+                for td in taskdefs:
+                    if td.name is None:
+                        continue
+                    frag = getattr(td, '_fragment_name', None)
+                    if frag:
+                        fq = f"{pkg.name}.{frag}.{td.name}"
+                    else:
+                        fq = f"{pkg.name}.{td.name}"
+                    if fq == target_name or td.name == target_name:
+                        target_td = td
+                        break
+                if target_td is None:
+                    available = [
+                        f"{pkg.name}.{(getattr(td,'_fragment_name','')+'.' if getattr(td,'_fragment_name',None) else '')}{td.name}"
+                        for td in taskdefs if td.name
+                    ]
+                    suggestion = ""
+                    matches = difflib.get_close_matches(
+                        target_name, available, n=3, cutoff=0.4)
+                    if matches:
+                        suggestion = ". Did you mean '%s'?" % matches[0]
+                    loader.error(
+                        f"Extension target task '{target_name}' not found"
+                        f"{suggestion}")
+                    continue
+
+                # Merge params into the taskdef's params dict.
+                # When multiple extensions target the same param, accumulate
+                # append/prepend rather than overwrite.
+                for pname, pval in ext.params.items():
+                    existing = target_td.params.get(pname)
+                    if (existing is not None
+                            and isinstance(pval, dict) and _is_paramdef_dict(pval)
+                            and isinstance(existing, dict) and _is_paramdef_dict(existing)):
+                        if 'append' in pval and 'append' in existing:
+                            existing['append'] = list(existing['append']) + list(pval['append'])
+                        elif 'append' in pval:
+                            existing['append'] = pval['append']
+                        if 'prepend' in pval and 'prepend' in existing:
+                            existing['prepend'] = list(pval['prepend']) + list(existing['prepend'])
+                        elif 'prepend' in pval:
+                            existing['prepend'] = pval['prepend']
+                    else:
+                        target_td.params[pname] = pval
+
+                # Inject additional needs
+                for need in ext.needs:
+                    if need not in target_td.needs:
+                        target_td.needs.append(need)
+
+        if base_cfg is not None:
+            apply_extensions(base_cfg.extensions)
+        apply_extensions(cfg.extensions)
+
+        # Warn if a task is both overridden and extended
+        override_targets = set(pkg.substitution_m.keys())
+        all_extensions = list(cfg.extensions)
+        if base_cfg is not None:
+            all_extensions = list(base_cfg.extensions) + all_extensions
+        for ext in all_extensions:
+            if ext.task in override_targets:
+                loader.marker(TaskMarker(
+                    msg=f"Task '{ext.task}' is both overridden and extended "
+                        f"in config '{cfg.name}'; the extension has no effect",
+                    severity=SeverityE.Warning))
 
         # Apply feeds after all tasks are loaded
         for fed_name, feeding_tasks in loader.feedsMap().items():
@@ -758,11 +889,11 @@ class PackageProviderYaml(PackageProvider):
                 break
         return ret
 
-    def _loadFragments(self, loader, pkg, fragments, basedir, taskdefs, typedefs):
+    def _loadFragments(self, loader, pkg, fragments, basedir, taskdefs, typedefs, config_defs=None, from_config=False):
         for spec in fragments:
-            self._loadFragmentSpec(loader, pkg, spec, basedir, taskdefs, typedefs)
+            self._loadFragmentSpec(loader, pkg, spec, basedir, taskdefs, typedefs, config_defs=config_defs, from_config=from_config)
 
-    def _loadFragmentSpec(self, loader, pkg, spec, basedir, taskdefs, typedefs):
+    def _loadFragmentSpec(self, loader, pkg, spec, basedir, taskdefs, typedefs, config_defs=None, from_config=False):
         # We're either going to have:
         # - File path
         # - Directory path
@@ -772,20 +903,21 @@ class PackageProviderYaml(PackageProvider):
                 loader,
                 pkg, 
                 os.path.join(basedir, spec),
-                taskdefs, typedefs)
+                taskdefs, typedefs,
+                config_defs=config_defs, from_config=from_config)
         elif os.path.isdir(os.path.join(basedir, spec)):
-            self._loadFragmentDir(loader, pkg, os.path.join(basedir, spec), taskdefs, typedefs)
+            self._loadFragmentDir(loader, pkg, os.path.join(basedir, spec), taskdefs, typedefs, config_defs=config_defs, from_config=from_config)
         else:
             raise Exception("Fragment spec %s not found" % spec)
 
-    def _loadFragmentDir(self, loader, pkg, dir, taskdefs, typedefs):
+    def _loadFragmentDir(self, loader, pkg, dir, taskdefs, typedefs, config_defs=None, from_config=False):
         for file in os.listdir(dir):
             if os.path.isdir(os.path.join(dir, file)):
-                self._loadFragmentDir(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
+                self._loadFragmentDir(loader, pkg, os.path.join(dir, file), taskdefs, typedefs, config_defs=config_defs, from_config=from_config)
             elif os.path.isfile(os.path.join(dir, file)) and file in ("flow.dv","flow.yaml","flow.yml","flow.toml"):
-                self._loadFragmentFile(loader, pkg, os.path.join(dir, file), taskdefs, typedefs)
+                self._loadFragmentFile(loader, pkg, os.path.join(dir, file), taskdefs, typedefs, config_defs=config_defs, from_config=from_config)
 
-    def _loadFragmentFile(self, loader, pkg, file, taskdefs, typedefs):
+    def _loadFragmentFile(self, loader, pkg, file, taskdefs, typedefs, config_defs=None, from_config=False):
         if file in loader.pathStack():
             raise Exception("Recursive file processing @ %s: %s" % (file, ", ".join(loader.pathStack())))
         loader.pushPath(file)
@@ -818,7 +950,7 @@ class PackageProviderYaml(PackageProvider):
                             self._fragment_names[frag.name] = file
 
                     self._loadPackageImports(loader, pkg, frag.imports, basedir)
-                    self._loadFragments(loader, pkg, frag.fragments, basedir, taskdefs, typedefs)
+                    self._loadFragments(loader, pkg, frag.fragments, basedir, taskdefs, typedefs, config_defs=config_defs, from_config=from_config)
                     
                     # Annotate each task and type with the fragment name
                     for task in frag.tasks:
@@ -830,6 +962,22 @@ class PackageProviderYaml(PackageProvider):
                     
                     taskdefs.extend(frag.tasks)
                     typedefs.extend(frag.types)
+
+                    # Collect configs from fragment
+                    if frag.configs:
+                        if from_config:
+                            loader.error(
+                                "Fragments loaded via a config cannot define configs",
+                                frag.srcinfo)
+                        elif frag.name is None:
+                            loader.error(
+                                "Fragment must have a name to define configs",
+                                frag.srcinfo)
+                        elif config_defs is not None:
+                            for c in frag.configs:
+                                # Qualify config name with fragment name
+                                c.name = "%s.%s" % (frag.name, c.name)
+                                config_defs.append(c)
                 except pydantic.ValidationError as e:
                     self._log.debug("Fragment validation errors: %s" % file)
                     error_paths = []
@@ -848,6 +996,8 @@ class PackageProviderYaml(PackageProvider):
                             model_class = TaskDef
                         elif 'types' in loc_list:
                             model_class = TypeDef
+                        elif 'configs' in loc_list:
+                            model_class = ConfigDef
                         elif len(loc_list) == 1:
                             # Top-level fragment field
                             model_class = FragmentDef
@@ -1074,7 +1224,7 @@ class PackageProviderYaml(PackageProvider):
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
             self._log.debug("hasattr[type]: %s" % hasattr(param, "type"))
             self._log.debug("type: %s" % getattr(param, "type", "<notpresent>"))
-            if isinstance(param, dict) and "type" in param.keys():
+            if isinstance(param, dict) and _is_paramdef_dict(param):
                 # Parameter declaration
                 try:
                     param = ParamDef(**param)
@@ -1108,25 +1258,37 @@ class PackageProviderYaml(PackageProvider):
                     val = param.value
                     if isinstance(val, str) and "${{" in val:
                         val = loader.evalExpr(val)
-                    field_m[p] = (ptype, val)
+                    # If declaration also has append/prepend (from extension),
+                    # resolve against the declared value.
+                    if isinstance(param, ParamDef) and param.has_list_op():
+                        resolved = param.resolve_value(val)
+                        field_m[p] = (ptype, resolved)
+                    else:
+                        field_m[p] = (ptype, val)
                 else:
-                    field_m[p] = (ptype, pdflt)
+                    if isinstance(param, ParamDef) and param.has_list_op():
+                        resolved = param.resolve_value(pdflt)
+                        field_m[p] = (ptype, resolved)
+                    else:
+                        field_m[p] = (ptype, pdflt)
                 self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
             else:
                 self._log.debug("  is already defined")
-                if p in field_m.keys():
+                if isinstance(param, ParamDef) and param.has_list_op():
+                    # Append/prepend against existing field value
+                    if p in field_m.keys():
+                        base_val = field_m[p][1]
+                        resolved = param.resolve_value(base_val)
+                        field_m[p] = (field_m[p][0], resolved)
+                        self._log.debug("Set param=%s (append/prepend) to %s" % (p, str(resolved)))
+                    else:
+                        loader.error("append/prepend target '%s' not found in task %s (%s)" % (
+                            p, taskdef.name, ",".join(field_m.keys())), taskdef.srcinfo)
+                elif p in field_m.keys():
                     if hasattr(param, "copy"):
                         value = param.copy()
                     else:
                         value = param
-
-                    # if type(param) != dict:
-                    #     value = param
-                    # elif "value" in param.keys():
-                    #     value = param["value"]
-                    # else:
-                    #     raise Exception("No value specified for param %s: %s" % (
-                    #         p, str(param)))
 
                     if type(value) == list:
                         for i in range(len(value)):
@@ -1143,14 +1305,6 @@ class PackageProviderYaml(PackageProvider):
                         self._log.debug("TODO: paramdef value")
                     elif type(value) == str and "${{" in value:
                         value = loader.evalExpr(value)
-
-                    # if type(value) == list:
-                    #     for i in range(len(value)):
-                    #         if "${{" in value[i]:
-                    #             value[i] = loader.evalExpr(value[i])
-                    # else:
-                    #     if "${{" in value:
-                    #         value = loader.evalExpr(value)
 
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
@@ -1214,7 +1368,7 @@ class PackageProviderYaml(PackageProvider):
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
             
             # Convert dict to ParamDef if needed
-            if isinstance(param, dict) and "type" in param.keys():
+            if isinstance(param, dict) and _is_paramdef_dict(param):
                 try:
                     param = ParamDef(**param)
                 except Exception as e:
@@ -1246,9 +1400,68 @@ class PackageProviderYaml(PackageProvider):
                 
                 # Store raw value - DON'T evaluate template expressions
                 val = param.value if param.value is not None else pdflt
-                collection.add_param(p, ParamDef(value=val), ptype)
-                self._log.debug("  Added param %s: type=%s, raw_value=%s" % (p, ptype, val))
+                if isinstance(param, ParamDef) and param.has_list_op():
+                    # Declaration with append/prepend (e.g. from extension merge).
+                    # Resolve immediately since base value is known here.
+                    resolved = param.resolve_value(val)
+                    collection.add_param(p, ParamDef(value=resolved), ptype)
+                    self._log.debug("  Added param %s: type=%s, resolved=%s" % (p, ptype, resolved))
+                else:
+                    collection.add_param(p, ParamDef(value=val), ptype)
+                    self._log.debug("  Added param %s: type=%s, raw_value=%s" % (p, ptype, val))
                 
+            elif isinstance(param, ParamDef) and param.has_list_op():
+                # Append/prepend modification
+                self._log.debug("  append/prepend modification on %s" % p)
+
+                # Resolve type from inheritance chain
+                ptype = None
+                if collection.has_param(p):
+                    ptype = collection.get_type(p)
+                else:
+                    ptype = self._find_param_type_in_chain(p, base_task)
+
+                if ptype is None and base_task:
+                    available_params = self._collect_all_params_in_chain(base_task)
+                    suggestion = ""
+                    matches = difflib.get_close_matches(p, available_params, n=3, cutoff=0.4)
+                    if matches:
+                        suggestion = ". Did you mean '%s'?" % matches[0]
+                    loader.error(
+                        "append/prepend target parameter '%s' not found in "
+                        "base task %s%s" % (p, base_task.name, suggestion),
+                        taskdef.srcinfo)
+                    continue
+
+                # Validate that the target is list-typed.
+                # The list type can appear as: list, List, Union[str, List], etc.
+                import typing as _typing
+                def _is_list_type(t):
+                    if t is list or t is List:
+                        return True
+                    origin = _typing.get_origin(t)
+                    if origin is list:
+                        return True
+                    # Union[str, List] is the standard list param type
+                    if origin is Union:
+                        return any(_is_list_type(a) for a in _typing.get_args(t))
+                    return False
+
+                if ptype is not None and not _is_list_type(ptype):
+                    loader.error(
+                        "'append'/'prepend' used on non-list parameter "
+                        "'%s' (type: %s) in task '%s'" % (
+                            p, ptype, taskdef.name),
+                        taskdef.srcinfo)
+                    continue
+
+                # Store the ParamDef with append/prepend intact.
+                # Resolution against the base value happens later in
+                # ParamBuilder._merge_param_defs when the full inheritance
+                # chain is available.
+                collection.add_param(p, param, ptype)
+                self._log.debug("  Stored param %s with append/prepend for deferred resolution" % p)
+
             else:
                 # Parameter override/assignment
                 self._log.debug("  is being overridden")
@@ -1416,6 +1629,12 @@ class PackageProviderYaml(PackageProvider):
                 uses_name = loader.evalExpr(uses_name)
             task.uses = self._findTaskOrType(uses_name, loader)
 
+            # If unqualified and from a fragment, try fragment-qualified name
+            fragment_name = getattr(taskdef, '_fragment_name', None)
+            if task.uses is None and fragment_name and '.' not in uses_name:
+                task.uses = self._findTaskOrType(
+                    f"{fragment_name}.{uses_name}", loader)
+
             if task.uses is None:
                 similar = loader.getSimilarNamesError(uses_name)
                 loader.error("failed to resolve task-uses %s.%s" % (
@@ -1531,15 +1750,22 @@ class PackageProviderYaml(PackageProvider):
         if taskdef.body is not None and len(taskdef.body) > 0:
             self._mkTaskBody(task, loader, taskdef)
         elif taskdef.run is not None:
-            # Add inherited parameters to eval scope before evaluating 'run'
-            # This allows base task parameters to be referenced in 'run' expressions
-            inherited_params = self._collect_inherited_param_defaults(task)
-            loader.pushEvalScope(inherited_params)
-            task.run = loader.evalExpr(taskdef.run)
-            loader.popEvalScope()
-            self._log.debug("Task %s run: %s (%s)" % (task.name, str(task.run), str(taskdef.run)))
-            if taskdef.shell is not None:
-                task.shell = taskdef.shell
+            if getattr(taskdef, "template", False):
+                # Template task: store run unexpanded for graph-build-time expansion
+                task.run = taskdef.run
+                task.template = True
+                if taskdef.shell is not None:
+                    task.shell = taskdef.shell
+            else:
+                # Add inherited parameters to eval scope before evaluating 'run'
+                # This allows base task parameters to be referenced in 'run' expressions
+                inherited_params = self._collect_inherited_param_defaults(task)
+                loader.pushEvalScope(inherited_params)
+                task.run = loader.evalExpr(taskdef.run)
+                loader.popEvalScope()
+                self._log.debug("Task %s run: %s (%s)" % (task.name, str(task.run), str(taskdef.run)))
+                if taskdef.shell is not None:
+                    task.shell = taskdef.shell
         elif taskdef.pytask is not None: # Deprecated case
             task.run = taskdef.pytask
             task.shell = "pytask"
@@ -1580,7 +1806,14 @@ class PackageProviderYaml(PackageProvider):
                     task, 
                     loader : PackageLoaderP,
                     taskdef):
-        self._pkg_s[-1].push_scope(SymbolScope(name=taskdef.name))
+        # Include fragment name in scope so subtask names are consistent
+        # with the compound task's fully-qualified name.
+        fragment_name = getattr(taskdef, "_fragment_name", None)
+        if fragment_name is not None:
+            scope_name = "%s.%s" % (fragment_name, taskdef.name)
+        else:
+            scope_name = taskdef.name
+        self._pkg_s[-1].push_scope(SymbolScope(name=scope_name))
         pkg = self.package_scope()
 
         # Need to add subtasks from 'uses' scope?
@@ -1711,11 +1944,17 @@ class PackageProviderYaml(PackageProvider):
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)
             elif td.run is not None:
-                loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
-                _expanded = loader.evalExpr(td.run)
-                st.run = _expanded
-                loader.popEvalScope()
-                st.shell = getattr(td, "shell", None)
+                if getattr(td, "template", False):
+                    # Template subtask: store run unexpanded
+                    st.run = td.run
+                    st.template = True
+                    st.shell = getattr(td, "shell", None)
+                else:
+                    loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
+                    _expanded = loader.evalExpr(td.run)
+                    st.run = _expanded
+                    loader.popEvalScope()
+                    st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:
                 st.run = td.pytask
                 st.shell = "pytask"

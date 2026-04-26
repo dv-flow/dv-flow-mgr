@@ -113,6 +113,106 @@ As described in the `Resolution Order` section, we could also override
 this parameter value using an environment variable or command-line argument.
 
 
+
+Append and Prepend
+==================
+
+When overriding list-type parameters, you often want to add items rather
+than replace the entire list.  The ``append`` and ``prepend`` fields
+support this:
+
+.. code-block:: yaml
+
+    # In a config or task override
+    with:
+      args:
+        append: ["-extra-flag"]
+
+    # Prepend items to the front of the list
+    with:
+      incdirs:
+        prepend: ["/priority/include"]
+
+The resolution formula is: ``prepend + (value or base_value) + append``.
+If ``value`` is also set, it replaces the base value before append/prepend
+are applied.  If only ``append`` or ``prepend`` is set, the base value is
+preserved.
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+
+      tasks:
+      - name: compile
+        uses: sim.SimImage
+        with:
+          args: ["-Wall"]  # Base value
+
+      configs:
+      - name: strict
+        tasks:
+        - name: compile_strict
+          override: compile
+          with:
+            args:
+              append: ["-Werror"]
+              # Result: ["-Wall", "-Werror"]
+
+Using feeds in Configurations
+==============================
+
+The ``feeds`` field provides a way to inject data into existing tasks from
+a configuration without modifying the original task definition.  This is
+the recommended approach when a config needs to add arguments, options, or
+data files to tasks that are defined elsewhere.
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+
+      tasks:
+      - root: build
+        uses: sim.SimImage
+        needs: [rtl, tb]
+        with:
+          top: [tb_top]
+
+      - root: run
+        uses: sim.SimRun
+        needs: [build]
+
+      configs:
+      - name: debug
+        tasks:
+          - name: debug_compile_args
+            uses: hdlsim.SimCompileArgs
+            with:
+              args: ["-debug_access+all"]
+            feeds: [my_project.build]
+
+          - name: debug_run_args
+            uses: hdlsim.SimRunArgs
+            with:
+              args: ["-gui"]
+            feeds: [my_project.run]
+
+Key points:
+
+* ``feeds`` injects data "from the side" into a task without modifying
+  its definition.
+* The feed target uses the fully-qualified task name
+  (``package_name.task_name``).
+* This is equivalent to adding the feeding task to the target's ``needs``
+  list, but expressed from the producer's perspective.
+* ``feeds`` is particularly useful in configs because the base tasks
+  remain unchanged -- the config only adds new tasks that connect to
+  existing ones.
+
+The ``feeds`` approach keeps the base flow clean and makes config-specific
+additions easy to understand and maintain.
+
 Resolution Order
 ================
 
