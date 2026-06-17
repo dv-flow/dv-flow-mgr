@@ -29,7 +29,17 @@ agent = [
 
 [project.scripts]
 dfm = "dv_flow.mgr.__main__:main"
+dfm-out = "dv_flow.mgr.out:main"
+
+# Publish the bundled agent skill for discovery by packaging tools (ivpm, etc.)
+[project.entry-points."agent.skills"]
+dv-flow-manager = "dv_flow.mgr.skills:get_skill_dirs"
 
 [tool.setuptools.package-data]
-"dv_flow.mgr" = ['share/*', 'share/*.json', 'share/references/*', 'share/prompts/*']
+"dv_flow.mgr" = [
+    'share/*',
+    'share/*.json',
+    'share/prompts/*',
+    'share/skills/**/*',
+]
 

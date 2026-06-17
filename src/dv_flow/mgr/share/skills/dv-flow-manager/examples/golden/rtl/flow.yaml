@@ -1,0 +1,12 @@
+# Fragment co-located with the RTL sources.
+# The 'name: rtl' field sub-namespaces every task here as top.rtl.<task>.
+fragment:
+  name: rtl
+  tasks:
+    # 'export:' makes this task visible to other packages and namespaces.
+    - export: files
+      uses: std.FileSet
+      with:
+        base: "."
+        type: systemVerilogSource
+        include: "*.sv"

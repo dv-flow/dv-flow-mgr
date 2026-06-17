@@ -2,10 +2,12 @@ import asyncio
 import dataclasses as dc
 import logging
 import os
+import sys
 from typing import ClassVar, List
 from .task_data import TaskDataResult
 from .exec_callable import _merge_env_filesets
 from .naming_scheme import TaskNamingContext
+from . import data_io
 
 @dc.dataclass
 class ShellCallable(object):
@@ -37,9 +39,21 @@ class ShellCallable(object):
         shell = ("/bin/%s" % self.shell) if self.shell != "shell" else "bash"
         # Setup environment for the call, merging any std.Env items
         env = _merge_env_filesets(ctxt, input)
+        # TASK_* retained as aliases for one release; prefer DFM_* (see data_io)
         env["TASK_SRCDIR"] = input.srcdir
         env["TASK_RUNDIR"] = input.rundir
 #        env["TASK_PARAMS"] = input.params.dumpto_json()
+
+        # Stage params/inputs/memento and add the DFM_* contract env vars.
+        # A script that ignores these behaves exactly as before.
+        env.update(data_io.stage_inputs(
+            input.rundir, input, memento=getattr(input, "memento", None)))
+
+        # Ensure the dfm-out helper resolves on PATH inside the script
+        _bin = os.path.dirname(sys.executable)
+        if _bin:
+            cur = env.get("PATH", "")
+            env["PATH"] = ("%s%s%s" % (_bin, os.pathsep, cur)) if cur else _bin
 
         # Expand parameter references in the body (e.g., ${{ this.p1 }}, ${{ p2 }}, ${{ rundir }})
         def _resolve_token(tok: str):
@@ -86,6 +100,17 @@ class ShellCallable(object):
             # Single-line command - use shell -c
             status = await ctxt.exec([shell, "-c", cmd], logfile=logfile, env=env, cwd=input.rundir)
 
+        # Harvest any outputs the script emitted (filesets, env, markers, memento)
+        harvest = data_io.harvest_outputs(
+            input.rundir, mk_item=ctxt.mkDataItem, src_name=input.name)
+        output = list(harvest.output)
+        if harvest.env_item is not None:
+            output.append(harvest.env_item)
+
         return TaskDataResult(
-            status=status
+            status=status,
+            output=output,
+            markers=harvest.markers,
+            memento=harvest.memento,
+            changed=True
         )

@@ -1,0 +1,58 @@
+package:
+  name: top
+  desc: "Mock IP build/test flow demonstrating DFM best practices (std-only, no plugins required)"
+
+  # Package-level parameter. Referenced in task run-bodies by its bare name
+  # inside ${{ ... }}.
+  with:
+    top_module:
+      type: str
+      value: "top"
+
+  # Distribute content with a fragment hierarchy. Each fragment is co-located
+  # with the sources it describes and uses a fragment 'name' to create a
+  # sub-namespace: top.rtl.*, top.tb.*, top.tests.*
+  fragments:
+    - rtl/flow.yaml
+    - tb/flow.yaml
+    - tests/flow.yaml
+
+  tasks:
+    # 'root:' marks this as a user-facing entry point (shown by `dfm run`).
+    - root: build
+      desc: "Compile design + testbench sources into a build manifest"
+      # Declare only direct dependencies; transitive deps resolve automatically.
+      needs: [top.rtl.files, top.tb.files]
+      # Typed dataflow: this task consumes filesets and produces a manifest.
+      consumes:
+        - type: std.FileSet
+      produces:
+        - type: std.FileSet
+          filetype: buildManifest
+      shell: bash
+      with:
+        defines:
+          type: list
+          value: []
+      # Embedded shell. Reference values with DFM expressions (${{ ... }}):
+      #  - top_module : a package parameter (bare name)
+      #  - defines    : this task's own parameter (bare name)
+      #  - rundir     : the task's run directory
+      # and with injected shell environment variables: $TASK_SRCDIR, $TASK_RUNDIR.
+      run: |
+        echo "Building '${{ top_module }}' in ${{ rundir }} (srcdir=$TASK_SRCDIR)"
+        echo "defines: ${{ defines }}"
+        echo "manifest" > build.manifest
+        echo '{"type":"std.FileSet","filetype":"buildManifest","basedir":"'"${{ rundir }}"'","files":["build.manifest"]}'
+
+  # Configs capture build variants. Select with: dfm run build -c debug
+  configs:
+    - name: debug
+      tasks:
+        # 'feeds' injects this task's output into top.build without editing it.
+        # 'local:' keeps the helper hidden outside this fragment/config.
+        - local: debug_defines
+          uses: std.Message
+          with:
+            msg: "debug build enabled (+define+DEBUG)"
+          feeds: [top.build]

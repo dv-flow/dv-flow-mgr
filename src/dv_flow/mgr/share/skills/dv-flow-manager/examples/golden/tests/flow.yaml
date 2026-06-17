@@ -1,0 +1,15 @@
+# Fragment holding the tests. 'name: tests' -> top.tests.<task>.
+fragment:
+  name: tests
+  tasks:
+    - root: smoke
+      desc: "Run the smoke test against the build manifest"
+      needs: [top.build]
+      # Only consume the manifest produced by 'build'.
+      consumes:
+        - type: std.FileSet
+          filetype: buildManifest
+      shell: bash
+      run: |
+        echo "Smoke test running in ${{ rundir }}"
+        echo "PASS"

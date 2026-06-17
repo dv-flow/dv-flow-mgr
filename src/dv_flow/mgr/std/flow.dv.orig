@@ -1,0 +1,256 @@
+
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+
+#****************************************************************************
+#* flow.dv
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may 
+#* not use this file except in compliance with the License.  
+#* You may obtain a copy of the License at:
+#*  
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*  
+#* Unless required by applicable law or agreed to in writing, software 
+#* distributed under the License is distributed on an "AS IS" BASIS, 
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  
+#* See the License for the specific language governing permissions and 
+#* limitations under the License.
+#*
+#* Created on:
+#*     Author: 
+#*
+#****************************************************************************
+
+package:
+  name: std
+
+  tasks:
+  - name: Message
+    shell: pytask
+    run: dv_flow.mgr.std.message.Message
+    with:
+      msg:
+        type: str
+        value: ""
+  - name: FileSet
+    doc: |
+      Creates a fileset from a list of files or glob patterns
+    shell: pytask
+    run: dv_flow.mgr.std.fileset.FileSet
+    uptodate: dv_flow.mgr.std.fileset.FileSetUpToDate
+    passthrough: all
+    consumes: none
+    with:
+      base:
+        doc: |
+          Specifies the base directory for the fileset.
+        type: str
+        value: ""
+      type:
+        doc: |
+          Specifies the file type (eg verilogSource) for the fileset.
+        type: str
+        value: ""
+      incdirs:
+        type: list
+      defines:
+        type: list
+      attributes:
+        type: list
+      include:
+        doc: |
+          Specifies a list of files or a glob pattern for the files to include
+        type: list
+        value: []
+      exclude:
+        type: list
+        value: []
+  - name: CreateFile
+    shell: pytask
+    run: dv_flow.mgr.std.create_file.CreateFile
+    passthrough: all
+    consumes: none
+    doc: |
+      Creates one or more files in the run directory from 
+      literal content in the .dv file. Outputs a fileset 
+      referencing all the created files.
+    with:
+      type:
+        desc: Content-type to use for the fileset
+        type: str
+        value: ""
+      filename:
+        type: str
+      content:
+        type: str
+      incdir: 
+        type: bool
+        value: false
+  - name: SetEnv
+    desc: Sets environment variables for use by other tasks
+    shell: pytask
+    run: dv_flow.mgr.std.setenv.SetEnv
+    uptodate: dv_flow.mgr.std.setenv.SetEnvUpToDate
+    with:
+      setenv:
+        type: map
+      append_path:
+        type: map
+      prepend_path:
+        type: map
+
+  - name: SetFileType
+    consumes:
+    - type: std.FileSet 
+    desc: Outputs all input filesets with the specified filetype
+    shell: pytask
+    run: dv_flow.mgr.std.set_file_type.SetFileType
+    with:
+      filetype:
+        type: str
+        value: ""
+  - name: IncDirs
+    shell: pytask
+    run: dv_flow.mgr.std.incdirs.IncDirs
+    doc: |
+      Creates a list of include directories from a set of
+      input files.
+  - name: Exec
+    shell: pytask
+    run: dv_flow.mgr.std.exec.Exec
+    desc: Executes a subprocess
+    with:
+      shell:
+        type: str
+        value: "bash"
+        doc: |
+          Shell to use for executing the command
+      command:
+        type: str
+        value: ""
+        doc: |
+          Command to execute
+      when:
+        type: str
+        value: "always"
+        doc: |
+          Specifies when the command is run.
+          - always  -- Command is always run (default)
+          - changed -- If upstream tasks change
+      timestamp:
+        type: str
+        value: ""
+        doc: |
+          Optional timestamp file to determine if running 
+          the command changed the output
+
+  - name: Prompt
+    desc: |
+      Executes an AI assistant with a specified prompt and collects 
+      structured results. The assistant MUST create a valid JSON result
+      file or the task will fail.
+      
+      Supported assistants: GitHub Copilot, Claude, OpenAI
+    shell: pytask
+    run: dv_flow.mgr.std.prompt.Prompt
+    with:
+      system_prompt:
+        type: str
+        doc: |
+          System prompt template. Can include variable references:
+          - ${{ inputs }} - JSON of input data (runtime expansion)
+          - ${{ name }} - Task name (runtime expansion)
+          - ${{ result_file }} - Expected result filename (runtime expansion)
+          Note: These use DV Flow's ${{ }} syntax but are expanded at runtime
+          If empty, uses default template.
+        value: ""
+      user_prompt:
+        type: str
+        value: ""
+        doc: |
+          User's prompt content. Combined with system_prompt.
+      result_file:
+        type: str
+        value: ""
+        doc: |
+          Name of JSON result file (default: {name}.result.json).
+          Assistant MUST write valid JSON to this file or task fails.
+      assistant:
+        type: str
+        value: ""
+        doc: |
+          Override default AI assistant. Options: copilot, openai, claude
+      model:
+        type: str
+        value: ""
+        doc: |
+          Specify the model to use (e.g., gpt-4, claude-3-opus). 
+          If empty, uses the assistant's default model.
+      assistant_config:
+        type: map
+        doc: |
+          Assistant-specific configuration (e.g., API keys, model settings)
+
+  types:
+  - name: DataItem
+    with:
+      type:
+        type: str
+
+  - name: FileSet
+    uses: std.DataItem
+    with:
+      filetype:
+        type: str
+        value: ""
+      basedir:
+        type: str
+      files:
+        type:
+          list:
+            item: str
+      incdirs:
+        type:
+          list:
+            item: str
+      defines:
+        type:
+          list:
+            item: str
+      attributes:
+        type:
+          list:
+            item: str
+
+  - name: Env
+    doc: |
+      Environment variables
+    with:
+      vals:
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
+      append_path:
+        doc: |
+          Path elements to append to existing environment variables
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
+      prepend_path:
+        doc: |
+          Path elements to prepend to existing environment variables
+        type:
+          map:
+            key:
+              type: str
+            val:
+              type: str
+

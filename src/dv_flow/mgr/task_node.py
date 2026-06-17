@@ -221,6 +221,12 @@ class TaskNode(object):
             for item in input.inputs
         ]
 
+        # The memento may be a pydantic model (e.g. AgentMemento) or a plain
+        # script-owned dict/blob (shell tasks via DFM_MEMENTO_OUT).
+        memento = self.result.memento
+        if memento is not None and hasattr(memento, 'model_dump'):
+            memento = memento.model_dump(mode='json')
+
         data = {
             "name": self.name,
             "srcdir": self.srcdir,
@@ -233,7 +239,7 @@ class TaskNode(object):
             "result": {
                 "status": self.result.status,
                 "changed": self.result.changed,
-                "memento": self.result.memento.model_dump(mode='json') if self.result.memento else None,
+                "memento": memento,
             },
             "output": self.output.model_dump(mode='json'),
         }

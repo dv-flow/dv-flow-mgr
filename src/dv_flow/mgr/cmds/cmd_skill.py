@@ -34,9 +34,9 @@ For detailed information, see the skill documentation at:
 class CmdSkill(object):
 
     def __call__(self, args):
-        # Get the path to skill.md in the share directory
+        # Get the path to SKILL.md in the share/skills directory
         share_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "share")
-        skill_path = os.path.join(share_dir, "skill.md")
+        skill_path = os.path.join(share_dir, "skills", "dv-flow-manager", "SKILL.md")
         
         print(SKILL_DESCRIPTION.format(skill_path=skill_path))
         

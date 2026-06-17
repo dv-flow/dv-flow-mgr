@@ -1,0 +1,11 @@
+# Fragment co-located with the testbench sources.
+# 'name: tb' sub-namespaces every task here as top.tb.<task>.
+fragment:
+  name: tb
+  tasks:
+    - export: files
+      uses: std.FileSet
+      with:
+        base: "."
+        type: systemVerilogSource
+        include: "*.sv"

@@ -89,10 +89,10 @@ class _CmdWorker:
         return 0
 
 def _get_skill_path():
-    """Get the absolute path to the skill.md file."""
+    """Get the absolute path to the bundled SKILL.md file."""
     import dv_flow.mgr
     pkg_dir = os.path.dirname(os.path.abspath(dv_flow.mgr.__file__))
-    return os.path.join(pkg_dir, "share", "skill.md")
+    return os.path.join(pkg_dir, "share", "skills", "dv-flow-manager", "SKILL.md")
 
 def get_parser():
     skill_path = _get_skill_path()
