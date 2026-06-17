@@ -55,12 +55,13 @@ MEMENTO_OUT  = "dfm.memento.out.json" # memento the script writes back
 class _DuckItem(BaseModel):
     """Fallback data item used when the emitted ``type`` is not registered.
 
-    Supports arbitrary fields (like ``agent.py``'s ``DuckTypedOutput``) and is a
-    pydantic model so it serializes cleanly into ``exec.json`` via ``model_dump``.
+    Supports arbitrary fields and is a pydantic model so it serializes cleanly
+    into ``exec.json`` via ``model_dump``.  Used for both shell-task harvest and
+    ``std.Agent`` result-file items.
     """
     model_config = ConfigDict(extra="allow")
 
-    type : str
+    type : Optional[str] = None
     src : Optional[str] = None
     seq : int = -1
 
@@ -89,11 +90,11 @@ def _scalar_to_env(value: Any) -> str:
     return str(value)
 
 
-def _serialize_item(item: Any) -> Any:
+def serialize_item(item: Any) -> Any:
     """Serialize one input item to a plain JSON-able value.
 
-    Lifted from ``agent.py`` (the ``_build_prompt`` inputs loop) so the
-    ``DFM_INPUTS`` payload matches the shape ``std.Agent`` already produces.
+    Shared by ``DFM_INPUTS`` staging and ``std.Agent``'s prompt builder so the
+    payload shape stays identical across both.
     """
     if hasattr(item, "model_dump"):
         return item.model_dump()
@@ -101,6 +102,26 @@ def _serialize_item(item: Any) -> Any:
         return item.dict()
     else:
         return {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
+
+
+def serialize_inputs(inputs: Any) -> List[Any]:
+    """Serialize a list of input items to plain JSON-able values."""
+    return [serialize_item(inp) for inp in (inputs or [])]
+
+
+def coerce_output_item(item: Any, rundir: str) -> Any:
+    """Coerce one raw output dict into a duck-typed item.
+
+    Applies the ``std.FileSet`` ``basedir: "."`` -> rundir convenience.
+    Non-dict values pass through unchanged.  Shared with ``std.Agent`` (which
+    parses a single JSON result file) so the item shape stays consistent.
+    """
+    if not isinstance(item, dict):
+        return item
+    if item.get("type") == "std.FileSet" and item.get("basedir") == ".":
+        item = dict(item)
+        item["basedir"] = rundir
+    return _DuckItem(**item)
 
 
 def stage_inputs(rundir: str, input: Any, memento: Any = None) -> Dict[str, str]:
@@ -134,7 +155,7 @@ def stage_inputs(rundir: str, input: Any, memento: Any = None) -> Dict[str, str]
         env["DFM_PARAM_%s" % name.upper()] = _scalar_to_env(value)
 
     # 3. Consumed input items -> dfm.inputs.json (a JSON array)
-    inputs_list = [_serialize_item(inp) for inp in getattr(input, "inputs", [])]
+    inputs_list = serialize_inputs(getattr(input, "inputs", []))
     inputs_path = os.path.join(rundir, INPUTS_FILE)
     with open(inputs_path, "w") as fp:
         json.dump(inputs_list, fp, indent=2)
@@ -347,7 +368,7 @@ def harvest_outputs(
                         msg="Malformed DFM_MARKERS line %d: %s" % (lineno, e),
                         severity=SeverityE.Warning))
                     continue
-                markers.append(_coerce_marker(md))
+                markers.append(coerce_marker(md))
 
     # --- DFM_MEMENTO_OUT: opaque script-owned blob -------------------------
     memento = None
@@ -367,8 +388,12 @@ def harvest_outputs(
     return HarvestResult(output, env_item, markers, memento)
 
 
-def _coerce_marker(md: Any) -> TaskMarker:
-    """Coerce a parsed marker dict into a TaskMarker (mirrors agent.py)."""
+def coerce_marker(md: Any) -> TaskMarker:
+    """Coerce a parsed marker dict into a TaskMarker.
+
+    Coerces a string ``severity`` to ``SeverityE`` (unknown -> Info) and a
+    ``loc`` dict to ``TaskMarkerLoc``.  Shared by harvest and ``std.Agent``.
+    """
     if not isinstance(md, dict):
         return TaskMarker(
             msg="Invalid marker format: %s" % str(md),

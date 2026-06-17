@@ -26,6 +26,7 @@ import hashlib
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional, Tuple
 from dv_flow.mgr import TaskDataResult, TaskMarker, SeverityE
+from dv_flow.mgr import data_io
 from .ai_assistant import get_assistant, get_available_assistant_name
 
 
@@ -49,14 +50,6 @@ def _agent_filenames(ctxt, input):
     return f"{input.name}.prompt.txt", f"{input.name}.result.json"
 
 _log = logging.getLogger("Agent")
-
-class DuckTypedOutput(BaseModel):
-    """Duck-typed output object that supports arbitrary fields"""
-    class Config:
-        extra = "allow"  # Allow arbitrary fields
-    
-    def __init__(self, **data):
-        super().__init__(**data)
 
 # Default system prompt template
 # Notes on variable expansion:
@@ -487,34 +480,14 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
     output_raw = result_data.get("output", [])
     changed = result_data.get("changed", True)
     
-    # Convert output dicts to objects with attribute access (duck typing)
-    # Also fix basedir if it's "." to be the actual rundir
-    output = []
-    for item in output_raw:
-        if isinstance(item, dict):
-            # Fix basedir for FileSet items: convert "." to actual rundir
-            if item.get("type") == "std.FileSet" and item.get("basedir") == ".":
-                item["basedir"] = input.rundir
-            # Convert dict to duck-typed object with attribute access
-            output.append(DuckTypedOutput(**item))
-        else:
-            output.append(item)
-    
-    # Add any markers from result
+    # Convert output dicts to duck-typed items (shared with shell tasks via
+    # data_io); also fixes std.FileSet basedir "." -> the actual rundir.
+    output = [data_io.coerce_output_item(item, input.rundir) for item in output_raw]
+
+    # Add any markers from result (shared coercion: severity str -> SeverityE,
+    # loc dict -> TaskMarkerLoc)
     for marker_data in result_data.get("markers", []):
-        try:
-            if isinstance(marker_data, dict):
-                if "severity" in marker_data and isinstance(marker_data["severity"], str):
-                    marker_data["severity"] = SeverityE(marker_data["severity"])
-                markers.append(TaskMarker(**marker_data))
-            else:
-                markers.append(marker_data)
-        except Exception as e:
-            _log.warning(f"Invalid marker in result: {e}")
-            markers.append(TaskMarker(
-                msg=f"Invalid marker format in result: {str(marker_data)}",
-                severity=SeverityE.Warning
-            ))
+        markers.append(data_io.coerce_marker(marker_data))
     
     # Override status if result indicates failure
     if "status" in result_data:
@@ -591,16 +564,8 @@ def _build_prompt(input) -> str:
         _default_result = f"{leaf}.result.json"
     result_file = input.params.result_file if input.params.result_file else _default_result
     
-    # Convert inputs to JSON (runtime expansion)
-    inputs_list = []
-    for inp in input.inputs:
-        if hasattr(inp, 'model_dump'):
-            inputs_list.append(inp.model_dump())
-        elif hasattr(inp, 'dict'):
-            inputs_list.append(inp.dict())
-        else:
-            inp_dict = {k: v for k, v in inp.__dict__.items() if not k.startswith('_')}
-            inputs_list.append(inp_dict)
+    # Convert inputs to JSON (runtime expansion) -- shared with shell tasks
+    inputs_list = data_io.serialize_inputs(input.inputs)
     inputs_json = json.dumps(inputs_list, indent=2)
     
     # Expand runtime variables in system prompt
