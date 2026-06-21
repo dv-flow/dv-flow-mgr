@@ -24,6 +24,7 @@ import os
 import logging
 import shutil
 import sys
+import time
 from typing import ClassVar
 from ..ext_rgy import ExtRgy
 from ..util import loadProjPkgDef, parse_parameter_overrides
@@ -264,6 +265,17 @@ class CmdRun(object):
         runner.add_listener(listener.event)
         runner.add_listener(trace.event)
 
+        # Optionally set up the diagnostics report bundle. The report reads
+        # per-task data from the on-disk exec_data.json each task writes to the
+        # shared rundir, so it works for any execution backend (local, daemon,
+        # or remote runners such as LSF).
+        report = None
+        report_dir = getattr(args, "report_dir", None)
+        if report_dir is not None:
+            from ..task_listener_report import TaskListenerReport
+            report = TaskListenerReport(rundir=rundir, root_name=pkg.name)
+            runner.add_listener(report.event)
+
         tasks = []
 
         for spec in args.tasks:
@@ -282,5 +294,9 @@ class CmdRun(object):
 
         trace.close()
         fp.close()
+
+        if report is not None:
+            report.generate(report_dir, generated_unix=int(time.time()))
+            print("Wrote run report to %s" % report_dir)
 
         return runner.status

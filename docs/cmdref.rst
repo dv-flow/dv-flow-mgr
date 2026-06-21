@@ -156,6 +156,22 @@ Run Options
     See :doc:`userguide/incremental` for full details on how base-rundir
     satisfaction works.
 
+``--report DIR``
+    After the run completes, write a self-contained diagnostics bundle to
+    ``DIR`` (per-task logs, markers, and status). This is intended for CI,
+    where the rundir is ephemeral: publish ``DIR`` as a build artifact to
+    retain diagnostics after the job ends.
+
+    .. code-block:: bash
+
+        dfm run sim.regress --report build/dfm-report
+
+    See `Run Report Bundle`_ for the bundle layout and ``report.json`` schema.
+
+    The report is assembled from the per-task ``exec_data.json`` each task
+    writes to the shared rundir, so it works for any execution backend
+    (local, daemon, or remote runners such as ``--runner lsf``).
+
 Run Examples
 ------------
 
@@ -918,6 +934,97 @@ Use traces to:
 * Optimize parallelism
 * Debug scheduling issues
 * Understand execution patterns
+
+Run Report Bundle
+=================
+
+When ``dfm run`` is invoked with ``--report DIR``, a diagnostics bundle is
+written to ``DIR`` after the run completes. Logs and markers are normally
+written into the per-task rundir, which is ephemeral in CI; the report bundle
+gathers the small, always-useful diagnostic subset into one location that a CI
+job can publish as an artifact.
+
+Unlike uploading the whole rundir (which can contain large build/simulation
+artifacts), the bundle leads with a structured status/marker manifest and
+includes per-task logs as drill-down.
+
+The bundle is assembled from the ``exec_data.json`` that each task writes into
+its rundir (status, markers, and the name of its logfile). Because this is the
+same on-disk record used for up-to-date checks, the report is backend-agnostic:
+it works identically for local, daemon, and remote (e.g. LSF) execution, and a
+report can even be regenerated from a preserved rundir after the fact.
+
+Bundle Layout
+-------------
+
+.. code-block:: text
+
+    <report-dir>/
+      report.json          # machine-readable manifest (primary surface)
+      report.md            # human-readable summary (CI job-summary friendly)
+      markers.jsonl        # all markers flattened, one JSON object per line
+      logs/
+        <task-name>.log    # per-task logs, copied from each task's rundir
+
+report.json Schema
+------------------
+
+.. code-block:: json
+
+    {
+      "schema": "dvflow-report/1",
+      "root": "sim.regress",
+      "status": 1,
+      "generated_unix": 1750464000,
+      "counts": {
+        "tasks_total": 42,
+        "tasks_failed": 1,
+        "markers": { "info": 3, "warning": 5, "error": 2 }
+      },
+      "tasks": [
+        {
+          "name": "sim.build",
+          "status": 0,
+          "changed": true,
+          "cache_hit": false,
+          "rundir": "/abs/path/rundir/sim.build",
+          "log": "logs/sim.build.log",
+          "markers": [
+            { "severity": "error", "msg": "...",
+              "loc": { "path": "...", "line": 12, "pos": 4 } }
+          ]
+        }
+      ]
+    }
+
+Notes:
+
+* ``status`` is the number of tasks that failed (0 means success).
+* ``tasks`` includes every task that ran, including up-to-date and cache-hit
+  tasks. The ``log`` field is omitted (``null``) when a task produced no
+  logfile (e.g. pure-Python tasks).
+* Each task's ``markers`` are also aggregated into ``markers.jsonl`` with an
+  added ``"task"`` field, for easy log-style scanning.
+
+CI Usage
+--------
+
+Publish the bundle as a build artifact. For GitHub Actions:
+
+.. code-block:: yaml
+
+    - name: Run flow
+      run: dfm run sim.regress --report build/dfm-report
+
+    - name: Upload report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: dfm-report
+        path: build/dfm-report
+
+The ``if: always()`` ensures the report is uploaded even when the run fails,
+which is exactly when the logs and markers are most useful.
 
 Output Directory Structure
 ==========================

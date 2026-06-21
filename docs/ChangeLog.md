@@ -1,5 +1,7 @@
 
 # 1.19.0
+- Add `--report DIR` flag to `dfm run` -- writes a diagnostics bundle (per-task logs, markers, status as `report.json`/`report.md`/`markers.jsonl`) for publishing as a CI artifact. Assembled from each task's on-disk `exec_data.json`, so it is backend-agnostic (local, daemon, LSF). See the "Run Report Bundle" section of the command reference.
+- `exec_data.json` now records each task's `markers` and `logfile` name (enables the backend-agnostic run report).
 - Add Script ↔ Dataflow I/O contract for shell tasks: `DFM_*` env vars stage params/inputs/memento, and append-only files (`$DFM_OUTPUT`, `$DFM_ENV`, `$DFM_PATH`, `$DFM_MARKERS`, `$DFM_MEMENTO_OUT`) let scripts emit filesets, env, markers, and a memento downstream (GitHub-Actions-style). `TASK_SRCDIR`/`TASK_RUNDIR` retained as aliases.
 - Add `dfm-out` helper CLI for emitting typed items/env/path/markers from shell tasks without hand-writing JSON
 - Add template tasks (`template: true`) -- defer `run` expansion to graph-build time for reusable task definitions

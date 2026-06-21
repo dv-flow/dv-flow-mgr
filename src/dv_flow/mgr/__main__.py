@@ -208,6 +208,12 @@ def get_parser():
                         default=[],
                         metavar="TARGET=REPLACEMENT",
                         help="Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)")
+    run_parser.add_argument("--report",
+                        dest="report_dir",
+                        default=None,
+                        metavar="DIR",
+                        help="After the run, write a diagnostics bundle (per-task logs, "
+                             "markers, status) to DIR for publishing as a CI artifact.")
     run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"))
 
     # Completion command

@@ -227,10 +227,18 @@ class TaskNode(object):
         if memento is not None and hasattr(memento, 'model_dump'):
             memento = memento.model_dump(mode='json')
 
+        # Serialize markers so a report can be reconstructed from disk for any
+        # execution backend (the in-memory result is not available remotely).
+        markers = [
+            m.model_dump(mode='json') if hasattr(m, 'model_dump') else m
+            for m in (self.result.markers or [])
+        ]
+
         data = {
             "name": self.name,
             "srcdir": self.srcdir,
             "rundir": rundir,
+            "logfile": self._get_log_filename(),
             "params": self.params.model_dump(mode='json') if hasattr(self.params, 'model_dump') else {},
             "inputs_signature": inputs_signature,
             "input": input.model_dump(mode='json', warnings=False),
@@ -239,6 +247,7 @@ class TaskNode(object):
             "result": {
                 "status": self.result.status,
                 "changed": self.result.changed,
+                "markers": markers,
                 "memento": memento,
             },
             "output": self.output.model_dump(mode='json'),
