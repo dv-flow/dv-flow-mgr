@@ -46,6 +46,9 @@ class Package(object):
     type_m : Dict[str,Type] = dc.field(default_factory=dict)
     fragment_def_l : List[FragmentDef] = dc.field(default_factory=list)
     pkg_m : Dict[str, 'Package'] = dc.field(default_factory=dict)
+    # Import aliases declared via `as:` -- maps local alias -> real package name.
+    # pkg_m stays keyed by real package name; aliases are an additional lookup.
+    pkg_alias_m : Dict[str, str] = dc.field(default_factory=dict)
     tags : List[Type] = dc.field(default_factory=list)
     substitution_m : Dict[str, str] = dc.field(default_factory=dict)
     pkg_override_m : Dict[str, str] = dc.field(default_factory=dict)
@@ -82,7 +85,7 @@ class Package(object):
             
     def __hash__(self):
         return id(self)
-    
+
     def to_json(self, markers=None) -> dict:
         """Convert package data to a JSON-compatible dictionary format.
         
@@ -143,5 +146,74 @@ class Package(object):
                 {"msg": marker.msg, "severity": str(marker.severity)}
                 for marker in markers
             ]
-            
+
         return result
+
+
+class LazyPackage(Package):
+    """A placeholder for an imported package that defers parsing.
+
+    Stored in a parent's ``pkg_m`` in place of a real ``Package`` when an
+    import is by name. The package's ``flow`` file is parsed the first time any
+    *data* attribute (``task_m``, ``type_m``, ``pkg_m``, ``paramT``, ...) is
+    touched -- resolution is transparent, so consumers need not know the entry
+    is lazy. ``name`` is known up front (the bound name), so keying a parent's
+    ``pkg_m`` and reading ``pkg.name`` do **not** force materialization.
+
+    Note: building a task graph flattens all imported packages, so a graph
+    build materializes every reachable import. The deferral benefits load-only
+    paths (introspection, partial validation) where unreferenced imports are
+    never touched.
+    """
+
+    # The Package data fields whose access should trigger materialization.
+    # ``name`` is excluded: it is known up front (the bound name), so keying a
+    # parent's pkg_m and reading pkg.name stay lazy. These have class-level
+    # defaults on Package, so __getattr__ would not fire -- __getattribute__ is
+    # required to intercept them.
+    _LAZY_ATTRS = frozenset({
+        "desc", "basedir", "paramT", "pkg_def", "task_m", "type_m",
+        "fragment_def_l", "pkg_m", "pkg_alias_m", "tags", "substitution_m",
+        "pkg_override_m", "all_configs", "srcinfo",
+    })
+
+    def __init__(self, bind_name, loader, name=None, srcinfo=None):
+        # Intentionally do NOT call Package.__init__: only identity/binding
+        # state is set here. Data fields are filled in on materialization.
+        object.__setattr__(self, "name", name if name is not None else bind_name)
+        object.__setattr__(self, "_lazy_bind", bind_name)
+        object.__setattr__(self, "_lazy_loader", loader)
+        object.__setattr__(self, "_lazy_resolved", None)
+
+    def materialize(self) -> "Package":
+        resolved = object.__getattribute__(self, "_lazy_resolved")
+        if resolved is None:
+            bind = object.__getattribute__(self, "_lazy_bind")
+            loader = object.__getattribute__(self, "_lazy_loader")
+            resolved = loader.findPackage(bind)
+            if resolved is None:
+                raise Exception("Unresolved imported package '%s'" % bind)
+            object.__setattr__(self, "_lazy_resolved", resolved)
+            # Adopt the resolved package's data onto self so subsequent access
+            # is served directly (and __getattribute__ stops short-circuiting).
+            for f, v in vars(resolved).items():
+                if f != "name":
+                    object.__setattr__(self, f, v)
+        return resolved
+
+    def is_materialized(self) -> bool:
+        return object.__getattribute__(self, "_lazy_resolved") is not None
+
+    def __getattribute__(self, item):
+        if item in LazyPackage._LAZY_ATTRS:
+            if object.__getattribute__(self, "_lazy_resolved") is None:
+                object.__getattribute__(self, "materialize")()
+        return object.__getattribute__(self, item)
+
+    # Identity-based equality/hashing so membership checks (e.g. the builder's
+    # visited-set) never trigger field comparison and thus never materialize.
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self is other

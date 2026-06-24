@@ -40,7 +40,8 @@ class CmdShowProject:
             loader, pkg = loadProjPkgDef(
                 get_rootdir(args),
                 parameter_overrides=parse_parameter_overrides(getattr(args, 'param_overrides', [])),
-                config=getattr(args, 'config', None)
+                config=getattr(args, 'config', None),
+                package_maps=getattr(args, 'package_map', [])
             )
         except Exception as e:
             print(f"Error: Not in a project directory or could not load project: {e}")

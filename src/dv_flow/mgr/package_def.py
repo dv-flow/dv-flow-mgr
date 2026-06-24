@@ -64,6 +64,9 @@ class PackageDef(BaseModel):
     imports : List[Union[str,PackageImportSpec]] = Field(
         default_factory=list,
         description="List of packages to import. Can be package names (strings) or import specifications with configuration")
+    package_map : Union[str, List[str]] = Field(
+        default=None, alias="package-map",
+        description="One or more package-map files (name -> flow file) consulted when resolving imports by name")
     overrides : Dict[str, Union[str, dict]] = Field(
         default_factory=dict,
         description="Task overrides. Maps target task name to a replacement task name (str) or an inline task definition (dict)")

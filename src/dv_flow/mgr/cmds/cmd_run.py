@@ -93,7 +93,8 @@ class CmdRun(object):
             get_rootdir(args),
             listener=listener.marker,
             parameter_overrides=merged_overrides,  # Pass full structure (will extract package params)
-            config=getattr(args, "config", None))
+            config=getattr(args, "config", None),
+            package_maps=getattr(args, "package_map", []))
 
         if listener.has_severity[SeverityE.Error] > 0:
             print("Error(s) encountered while loading package definition")

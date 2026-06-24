@@ -1,5 +1,8 @@
 
 # 1.19.0
+- Add **package maps** -- a generated `name -> flow file` manifest (`package-map:` key, `--package-map` flag, or `DV_FLOW_PACKAGE_MAP` env) that lets a project import dependencies by name without hard-coding paths. Maps register names lazily, so a dependency is parsed only when actually referenced. Multiple maps are supported (first-wins precedence).
+- Import forms: import a package by `name` (located via map/registry), pin a name to an explicit file with `name`+`from`, and the `as:` alias is now honored -- an aliased import's tasks, types, and parameters resolve under the alias (e.g. `sim.SimImage`).
+- Imports by name are loaded lazily: the dependency's flow file is parsed only when first referenced (unresolved names are still reported at load time). Building a task graph still materializes all reachable imports.
 - Add `--report DIR` flag to `dfm run` -- writes a diagnostics bundle (per-task logs, markers, status as `report.json`/`report.md`/`markers.jsonl`) for publishing as a CI artifact. Assembled from each task's on-disk `exec_data.json`, so it is backend-agnostic (local, daemon, LSF). See the "Run Report Bundle" section of the command reference.
 - `exec_data.json` now records each task's `markers` and `logfile` name (enables the backend-agnostic run report).
 - Add Script ↔ Dataflow I/O contract for shell tasks: `DFM_*` env vars stage params/inputs/memento, and append-only files (`$DFM_OUTPUT`, `$DFM_ENV`, `$DFM_PATH`, `$DFM_MARKERS`, `$DFM_MEMENTO_OUT`) let scripts emit filesets, env, markers, and a memento downstream (GitHub-Actions-style). `TASK_SRCDIR`/`TASK_RUNDIR` retained as aliases.

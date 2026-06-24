@@ -102,9 +102,10 @@ class PackageScope(SymbolScope):
                     # Model fields hold defaults; actual values may be set on instance
                     ret = self.pkg.paramT.model_fields[pname].default
             else:
-                # Check subpackages for qualified reference
-                if pkg_name in self.pkg.pkg_m.keys():
-                    subpkg = self.pkg.pkg_m[pkg_name]
+                # Check subpackages for qualified reference (resolve aliases)
+                real_name = self.pkg.pkg_alias_m.get(pkg_name, pkg_name)
+                if real_name in self.pkg.pkg_m.keys():
+                    subpkg = self.pkg.pkg_m[real_name]
                     if pname in subpkg.paramT.model_fields.keys():
                         ret = subpkg.paramT.model_fields[pname].default
         else:

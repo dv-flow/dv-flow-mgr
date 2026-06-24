@@ -88,7 +88,8 @@ class CmdValidate:
                 root,
                 listener=marker_listener.marker,
                 parameter_overrides=parse_parameter_overrides(getattr(args, 'param_overrides', [])),
-                config=getattr(args, 'config', None)
+                config=getattr(args, 'config', None),
+                package_maps=getattr(args, 'package_map', [])
             )
         except Exception as e:
             errors.append({

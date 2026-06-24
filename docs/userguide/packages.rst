@@ -138,10 +138,33 @@ Import a package from a file or directory path:
 When a directory is specified, DV Flow searches for ``flow.dv`` or ``flow.yaml`` 
 files in the subdirectory tree.
 
+Import with Explicit Location
+-----------------------------
+
+Combine ``name`` with ``from`` to import a package by name while pinning the exact
+file that defines it (no package map required):
+
+.. code-block:: yaml
+
+    package:
+        name: top
+
+        imports:
+        - name: hdlsim.vlt
+          from: ../vendor/vlt/flow.dv
+
+        tasks:
+        - name: build
+          uses: hdlsim.vlt.SimImage
+
+The pinned name/location takes precedence over any map or registry entry for the
+same name. The file's declared ``package.name`` must match the ``name`` given.
+
 Import with Alias
 -----------------
 
-Use the ``as`` keyword to give an imported package an alias:
+Use the ``as`` keyword to give an imported package an alias. The alias can then be
+used to qualify the package's tasks, types, and parameters:
 
 .. code-block:: yaml
 
@@ -156,6 +179,31 @@ Use the ``as`` keyword to give an imported package an alias:
         - name: build
           uses: sim.SimImage  # References hdlsim.vlt.SimImage
 
+Aliases are local to the importing package. Two imports cannot share the same
+alias, and an alias cannot collide with an existing package name.
+
+Import by Name
+--------------
+
+A package can be imported by **name** alone, leaving its location to be resolved
+through a package map (see below), the package registry, or ``DV_FLOW_PATH``:
+
+.. code-block:: yaml
+
+    package:
+        name: top
+
+        imports:
+        - name: my_lib
+
+        tasks:
+        - name: build
+          uses: my_lib.some_task
+
+Importing by name decouples the importing project from where the dependency lives
+on disk — useful when dependencies are fetched into a workspace by a package
+manager rather than checked in at a fixed path.
+
 Import Resolution
 -----------------
 
@@ -163,7 +211,8 @@ When resolving imports, DV Flow searches in the following order:
 
 1. **Relative to current file** - Paths relative to the importing package's location
 2. **Relative to project root** - Allows sibling packages to find each other
-3. **Package registry** - Built-in and installed packages
+3. **Package maps** - ``name -> flow file`` entries from declared package maps
+4. **Package registry** - Built-in and installed packages, and ``DV_FLOW_PATH``
 
 This allows sub-packages to import sibling packages naturally:
 
@@ -174,6 +223,72 @@ This allows sub-packages to import sibling packages naturally:
         name: ip1
         imports:
         - packages/ip2/flow.yaml  # Finds sibling relative to project root
+
+Package Maps
+============
+
+A **package map** is a generated file that lists the packages contributed by a
+dependency tree, keyed by name. It lets a project import dependencies by name
+without hard-coding their paths. A map is a pure ``name -> flow file`` directory:
+
+.. code-block:: yaml
+
+    # deps/flow-packages.yaml  (generated)
+    package-map:
+      version: 1
+      packages:
+        - name: hdl.sim.vcs
+          path: hdl_sim_vcs/flow.dv
+        - name: uvm.util
+          path: uvm_util/flow.yaml
+
+Each ``path`` is resolved relative to the directory containing the map file.
+
+A project references one or more maps via the ``package-map`` key, which accepts a
+single path or a list (earlier entries take precedence on name collisions):
+
+.. code-block:: yaml
+
+    package:
+        name: my_project
+        package-map: deps/flow-packages.yaml
+        # — or — multiple maps:
+        # package-map:
+        # - deps/flow-packages.yaml
+        # - ../shared/flow-packages.yaml
+        imports:
+        - name: hdl.sim.vcs
+        - name: uvm.util
+
+Maps can also be supplied without editing the flow file:
+
+* command line: ``dfm --package-map deps/flow-packages.yaml run ...`` (repeatable)
+* environment: ``DV_FLOW_PACKAGE_MAP`` (a ``:``-separated list of map files)
+
+**Precedence** (highest first): maps declared in the flow file, then ``--package-map``
+maps, then ``DV_FLOW_PACKAGE_MAP`` maps, then the package registry / ``DV_FLOW_PATH``.
+
+**Lazy loading.** A map registers package *names* without parsing any dependency, so
+listing many available packages in a map is cheap. More generally, any import by
+**name** is deferred: the dependency's ``flow`` file is parsed only when one of its
+tasks, types, or parameters is first touched. (Unresolvable names are still reported at
+load time, so a typo'd or missing dependency is not silently ignored.)
+
+Two things still force a dependency to be parsed eagerly, by design:
+
+* Building a task graph flattens *all* imported packages to resolve names, so
+  ``dfm run``/``dfm graph`` parse every reachable import.
+* Resolving an unqualified task/type name scans imported packages.
+
+So lazy loading mainly benefits load-only operations (introspection, partial
+validation) where an import is never referenced. Imports by **path** are always
+parsed eagerly.
+
+.. note::
+
+    Package-map files are typically produced by a dependency manager (e.g. ivpm)
+    when it syncs a project's dependencies. dv-flow consumes the map; generating it
+    is the dependency manager's responsibility.
 
 Package Parameters
 ==================

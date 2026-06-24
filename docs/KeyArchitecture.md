@@ -63,3 +63,35 @@ plusargs: .[] select(uses==SimArgs) |
 - In most cases, data must be flattened in order to use it. For example,
   
 - 
+
+# Package Providers
+- Packages are resolved through an ordered list of *package providers*
+  (`PackageLoader._pkg_providers`), walked first-wins by `findPackage`.
+- A provider answers two questions with different guarantees:
+  - `findPackage(name)` is **authoritative**: it resolves and parses the
+    named package on demand, caches it, and returns `None` if it does not own
+    the name. This is the single lazy entry point — a package is parsed the
+    first time some provider's `findPackage` reaches it.
+  - `getPackageNames()` is **best-effort** enumeration (used by list/discover
+    paths). It may be incomplete or empty for search-style providers (e.g. the
+    `DV_FLOW_PATH` search), which can only answer "do you have *this* name?".
+- The loader caches resolved packages by both name and normalized absolute
+  path, so a package reachable both by registry/map name and by a file-path
+  import is parsed only once.
+- `ExtRgy` (built-in `std`, entry-point plugins, `DV_FLOW_PATH`) and the
+  ivpm-generated package map (`PackageMapProvider`) are both just providers in
+  this list.
+
+# Lazy Package Loading
+- An import by *name* (`- name: foo`, `{name, from}`) is stored in the parent's
+  `pkg_m` as a `LazyPackage` placeholder instead of a fully-parsed package.
+- `LazyPackage` is a transparent proxy: the dependency's `flow` file is parsed
+  the first time a *data* attribute (`task_m`, `type_m`, `pkg_m`, `paramT`, ...)
+  is accessed. `name` is known up front, so keying `pkg_m` and reading
+  `pkg.name` do not force materialization.
+- Unresolvable names are reported at load time via a cheap `canResolve` check
+  (provider membership / `hasPackage`) that does not parse the dependency.
+- Imports by *path* are parsed eagerly. Building a task graph flattens all
+  imported packages, so a graph build materializes every reachable import; the
+  deferral therefore benefits load-only paths (introspection, partial
+  validation) where an import is never touched.

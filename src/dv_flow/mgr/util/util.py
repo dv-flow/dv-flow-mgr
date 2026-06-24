@@ -191,7 +191,8 @@ def _is_package_file(fpath: str) -> bool:
         return False
 
 
-def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None):
+def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None,
+                   package_maps=None):
     """Locates the project's flow spec and returns the PackageDef.
     
     Searches for a flow file containing a 'package' key. Fragment files
@@ -253,7 +254,8 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
             
             loader = PackageLoader(
                 marker_listeners=listeners,
-                param_overrides=pkg_overrides)
+                param_overrides=pkg_overrides,
+                package_maps=list(package_maps) if package_maps else [])
             ret = loader.load(rootfile, config=config)
         except Exception:
             print("Fatal Error: while parsing %s" % rootfile)

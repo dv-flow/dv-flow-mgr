@@ -26,7 +26,8 @@ class CmdComplete:
         try:
             loader, pkg = loadProjPkgDef(
                 get_rootdir(args),
-                config=getattr(args, 'config', None))
+                config=getattr(args, 'config', None),
+                package_maps=getattr(args, 'package_map', []))
         except Exception:
             return 0
 

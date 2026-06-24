@@ -12,7 +12,7 @@ from .config_def import ConfigDef
 from .fragment_def import FragmentDef
 from .loader_scope import LoaderScope
 from .marker_listener import MarkerListener
-from .package import Package
+from .package import Package, LazyPackage
 from .package_loader_p import PackageLoaderP
 from .package_def import PackageDef
 from .package_provider import PackageProvider
@@ -358,6 +358,18 @@ class PackageProviderYaml(PackageProvider):
         loader._eval.set_name_resolution(self._pkg_s[-1])
 
         try:
+            # Register any package maps declared by this package, ahead of CLI/env
+            # maps and the registry, before resolving imports by name.
+            pm = getattr(pkg_def, "package_map", None)
+            if pm:
+                # Insert in reverse so the first-declared map ends up at the
+                # front (highest precedence) after successive front-inserts.
+                for p in reversed([pm] if isinstance(pm, str) else pm):
+                    p = loader.evalExpr(p)
+                    if not os.path.isabs(p):
+                        p = os.path.join(pkg.basedir, p)
+                    loader.add_package_map(p, front=True)
+
             # Imports are loaded first
             self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
 
@@ -781,79 +793,104 @@ class PackageProviderYaml(PackageProvider):
             self._loadPackageImport(loader, pkg, imp, basedir)
         self._log.debug("<-- _loadPackageImports %s" % str(imports))
     
-    def _loadPackageImport(self, 
+    def _loadPackageImport(self,
                            loader : PackageLoaderP,
-                           pkg : Package, 
-                           imp : Union[str,object], 
+                           pkg : Package,
+                           imp : Union[str,object],
                            basedir : str):
         self._log.debug("--> _loadPackageImport %s" % str(imp))
-        # TODO: need to locate and load these external packages (?)
+
+        # Decompose the import into name / from-path / alias
         if type(imp) == str:
-            imp_path = imp
-        elif imp.path is not None:
-            imp_path = imp.path
-        elif hasattr(imp, 'name') and imp.name is not None:
-            imp_path = imp.name
+            imp_name = None
+            imp_from = imp
+            alias = None
         else:
-            raise Exception("imp.path is none: %s" % str(imp))
-        
-        self._log.info("Loading imported package %s" % imp_path)
+            imp_name = getattr(imp, 'name', None)
+            imp_from = getattr(imp, 'path', None)      # `from:`
+            alias = getattr(imp, 'alias', None)        # `as:`
 
-        imp_path = loader.evalExpr(imp_path)
-
-        # First try to load as a package name from registry
         sub_pkg = None
-        try:
-            sub_pkg = loader.findPackage(imp_path)
-            if sub_pkg is not None:
-                self._log.debug("Found package %s in registry" % imp_path)
-                pkg.pkg_m[sub_pkg.name] = sub_pkg
-                self._log.debug("<-- _loadPackageImport %s" % str(imp))
+
+        if imp_name is not None:
+            imp_name = loader.evalExpr(imp_name)
+            # name + from: pin an explicit location, then resolve by name
+            if imp_from is not None:
+                from_path = loader.evalExpr(imp_from)
+                abs_from = self._resolveFlowFile(loader, from_path, basedir)
+                if abs_from is None:
+                    loader.error("Import file %s not found" % from_path, pkg.srcinfo)
+                    return
+                loader.register_local_package(imp_name, abs_from)
+            # Verify the name is resolvable now (cheap; does not parse the
+            # dependency) so an unresolved import is reported at load time...
+            if not loader.canResolve(imp_name):
+                loader.error("Imported package '%s' not found" % imp_name, pkg.srcinfo)
                 return
-        except Exception as e:
-            self._log.debug("Could not find package %s in registry: %s" % (imp_path, e))
-
-        # If not found in registry, try as file path
-        if not os.path.isabs(imp_path):
-            for root in (basedir, os.path.dirname(loader.rootDir())):
-                self._log.debug("Search basedir: %s ; imp_path: %s" % (root, imp_path))
-
-                resolved_path = self._findFlowDvInDir(os.path.join(root, imp_path))
-
-                if resolved_path is not None and os.path.isfile(resolved_path):
-                    self._log.debug("Found root file: %s" % resolved_path)
-                    imp_path = resolved_path
-                    break
+            # ...then defer the actual parse: the flow file is parsed only when
+            # a data attribute is first touched. The bound name equals the
+            # resolved package's name, so we can key pkg_m by it without
+            # forcing materialization here.
+            sub_pkg = LazyPackage(bind_name=imp_name, loader=loader, name=imp_name)
         else:
-            # absolute path. 
+            # Bare string / `from:`-only: a registry name or a file path
+            imp_path = loader.evalExpr(imp_from)
+            try:
+                sub_pkg = loader.findPackage(imp_path)
+            except Exception as e:
+                self._log.debug("Could not find package %s in registry: %s" % (imp_path, e))
+            if sub_pkg is None:
+                abs_path = self._resolveFlowFile(loader, imp_path, basedir)
+                if abs_path is None:
+                    loader.error("Import file %s not found" % imp_path, pkg.srcinfo)
+                    return
+                sub_pkg = self._loadFlowFile(loader, abs_path)
+
+        # Store the resolved package (keyed by its real name) and record any alias
+        pkg.pkg_m[sub_pkg.name] = sub_pkg
+        if alias is not None:
+            if alias in pkg.pkg_alias_m or alias in pkg.pkg_m or alias == pkg.name:
+                loader.error(
+                    "Import alias '%s' conflicts with an existing package or alias" % alias,
+                    pkg.srcinfo)
+            else:
+                pkg.pkg_alias_m[alias] = sub_pkg.name
+        self._log.debug("<-- _loadPackageImport %s" % str(imp))
+
+    def _resolveFlowFile(self, loader, raw_path, basedir):
+        """Resolve a path/dir reference to an absolute flow file, or None."""
+        if not os.path.isabs(raw_path):
+            for root in (basedir, os.path.dirname(loader.rootDir())):
+                resolved = self._findFlowDvInDir(os.path.join(root, raw_path))
+                if resolved is not None and os.path.isfile(resolved):
+                    return os.path.normpath(resolved)
+            return None
+        else:
+            imp_path = raw_path
             if os.path.isdir(imp_path):
                 imp_path = self._findFlowDvInDir(imp_path)
+            if imp_path is not None and os.path.isfile(imp_path):
+                return os.path.normpath(imp_path)
+            return None
 
-        if not os.path.isfile(imp_path):
-            loader.error("Import file %s not found" % imp_path, pkg.srcinfo)
-            return
-
-        if imp_path in self._pkg_path_m.keys():
-            sub_pkg = self._pkg_path_m[imp_path]
+    def _loadFlowFile(self, loader, abs_path):
+        """Load (and cache) a package from an absolute flow file path."""
+        if abs_path in self._pkg_path_m.keys():
+            return self._pkg_path_m[abs_path]
+        self._log.info("Loading imported file %s" % abs_path)
+        if abs_path.endswith(".toml"):
+            from .package_provider_toml import PackageProviderToml
+            sub_pkg = Package(
+                basedir=os.path.dirname(abs_path),
+                srcinfo=SrcInfo(file=abs_path))
+            sub_pkg = PackageProviderToml(path=abs_path)._loadPackage(sub_pkg, abs_path, loader)
         else:
-            self._log.info("Loading imported file %s" % imp_path)
-            imp_path = os.path.normpath(imp_path)
-            if imp_path.endswith(".toml"):
-                from .package_provider_toml import PackageProviderToml
-                sub_pkg = Package(
-                    basedir=os.path.dirname(imp_path),
-                    srcinfo=SrcInfo(file=imp_path))
-                # Use TOML provider to load
-                sub_pkg = PackageProviderToml(path=imp_path)._loadPackage(sub_pkg, imp_path, loader)
-            else:
-                sub_pkg = Package(
-                    basedir=os.path.dirname(imp_path),
-                    srcinfo=SrcInfo(file=imp_path))
-                sub_pkg = self._loadPackage(sub_pkg, imp_path, loader)
-            self._log.info("Loaded imported package %s" % sub_pkg.name)
-
-        pkg.pkg_m[sub_pkg.name] = sub_pkg
-        self._log.debug("<-- _loadPackageImport %s" % str(imp))
+            sub_pkg = Package(
+                basedir=os.path.dirname(abs_path),
+                srcinfo=SrcInfo(file=abs_path))
+            sub_pkg = self._loadPackage(sub_pkg, abs_path, loader)
+        self._log.info("Loaded imported package %s" % sub_pkg.name)
+        return sub_pkg
 
     def _findFlowDvInDir(self, base):
         """Search down the tree looking for a <flow.dv> file"""

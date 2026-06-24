@@ -218,6 +218,28 @@ class TaskGraphBuilder(object):
                 self._addType(tt)
             for subpkg in pkg.pkg_m.values():
                 self._addPackageTasks(subpkg, pkg_s)
+            # Register import aliases (`as:`) so qualified references like
+            # `alias.Task` / `alias.Type` / `alias.PARAM` resolve to the
+            # aliased package's symbols.
+            for alias, real_name in getattr(pkg, 'pkg_alias_m', {}).items():
+                sub = pkg.pkg_m.get(real_name)
+                if sub is not None:
+                    self._registerPackageAlias(sub, alias)
+
+    def _registerPackageAlias(self, sub, alias):
+        """Make *sub*'s tasks/types/params reachable under an alias prefix."""
+        self._pkg_m.setdefault(alias, sub)
+        prefix = sub.name + "."
+        for task in sub.task_m.values():
+            short = task.name[len(prefix):] if task.name.startswith(prefix) else task.name
+            self._task_m.setdefault("%s.%s" % (alias, short), task)
+        for tt in sub.type_m.values():
+            short = tt.name[len(prefix):] if tt.name.startswith(prefix) else tt.name
+            self._type_m.setdefault("%s.%s" % (alias, short), tt)
+        params = self._pkg_params_m.get(sub.name)
+        if params is not None and alias not in self._pkg_params_m:
+            self._pkg_params_m[alias] = params
+            self._eval.set(alias, params)
 
     def _addTask(self, task):
         if task.name not in self._task_m.keys():

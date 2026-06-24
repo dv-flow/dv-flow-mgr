@@ -498,6 +498,25 @@
           },
           "title": "Tags",
           "type": "array"
+        },
+        "package-map": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "One or more package-map files (name -> flow file) consulted when resolving imports by name",
+          "title": "Package Map"
         }
       },
       "required": [

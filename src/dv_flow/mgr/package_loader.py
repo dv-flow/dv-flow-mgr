@@ -31,15 +31,20 @@ class PackageLoader(PackageLoaderP):
     marker_listeners : List[Callable] = dc.field(default_factory=list)
     env : Optional[Dict[str, str]] = dc.field(default=None)
     param_overrides : Dict[str, Any] = dc.field(default_factory=dict)
+    package_maps : List[str] = dc.field(default_factory=list)
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)
+    # Secondary cache keyed by normalized absolute path, so a package resolved
+    # once (by name or by path) is not reparsed when reached the other way.
+    _pkg_path_m : Dict[str, Package] = dc.field(default_factory=dict)
     _pkg_s : List[PackageScope] = dc.field(default_factory=list)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
     _feeds_map : Dict[str, List["Task"]] = dc.field(default_factory=dict)
 #    _eval_ctxt : NameResolutionContext = dc.field(default_factory=NameResolutionContext)
     _loader_scope : Optional[LoaderScope] = None
     _pkg_providers : List[PackageProvider] = dc.field(default_factory=list)
+    _local_provider : Optional["_LocalBindingProvider"] = None
 
     def __post_init__(self):
         if self.pkg_rgy is None:
@@ -62,6 +67,16 @@ class PackageLoader(PackageLoaderP):
         self._loader_scope = LoaderScope(name=None, loader=self)
         # Seed loader-scope overrides from CLI parameter overrides
         self._loader_scope.override_m = dict(self.param_overrides) if self.param_overrides is not None else {}
+
+        # Register CLI-supplied package maps (ahead of ExtRgy), then env maps.
+        # Flow-file maps are registered later (front) during parse and so outrank these.
+        for p in self.package_maps:
+            if p:
+                self.add_package_map(p)
+        env_maps = self.env.get("DV_FLOW_PACKAGE_MAP", "")
+        for p in env_maps.split(os.pathsep):
+            if p:
+                self.add_package_map(p)
 
     def load(self, root, config: Optional[str]=None) -> Package:
         self._log.debug("--> load %s (config=%s)" % (root, config))
@@ -121,13 +136,83 @@ class PackageLoader(PackageLoaderP):
             for p in self._pkg_providers:
                 pkg = p.findPackage(name, self)
                 if pkg:
-                    self._pkg_m[name] = pkg
+                    self._cache_pkg(pkg, name)
                     break
 
         self._log.debug("<-- findPackage %s" % (
             (pkg.name if pkg is not None else "None"),))
 
         return pkg
+
+    def canResolve(self, name) -> bool:
+        """Cheaply test whether *name* is resolvable by some provider, without
+        parsing the package. Used to report unresolved imports at load time
+        while still deferring the actual parse (lazy imports)."""
+        if name in self._pkg_m.keys():
+            return True
+        for p in self._pkg_providers:
+            has = getattr(p, "hasPackage", None)
+            if has is not None:
+                try:
+                    if has(name, self):
+                        return True
+                except TypeError:
+                    # ExtRgy.hasPackage(name, search_path=True) has a different
+                    # signature; fall back to the single-arg form.
+                    if has(name):
+                        return True
+        return False
+
+    def _cache_pkg(self, pkg : Package, name=None):
+        """Record a resolved package in both the name- and path-keyed caches.
+
+        Keying by normalized absolute path lets a package reachable both by
+        map-name and by a file-path import be parsed once (design P0)."""
+        if name is not None:
+            self._pkg_m[name] = pkg
+        if pkg is not None and pkg.name is not None:
+            self._pkg_m.setdefault(pkg.name, pkg)
+        if pkg is not None and pkg.srcinfo is not None and pkg.srcinfo.file is not None:
+            self._pkg_path_m[os.path.normpath(pkg.srcinfo.file)] = pkg
+
+    def findPackageByPath(self, path) -> Optional[Package]:
+        """Return an already-resolved package for *path*, if one is cached."""
+        return self._pkg_path_m.get(os.path.normpath(path))
+
+    def register_local_package(self, name : str, abs_path : str) -> None:
+        """Bind a package *name* to an explicit flow file (from an import's
+        ``from:``). The binding is served by a provider at the front of the
+        list, so it outranks maps and the registry."""
+        from .package_provider_yaml import PackageProviderYaml
+        if self._local_provider is None:
+            self._local_provider = _LocalBindingProvider()
+            self._pkg_providers.insert(0, self._local_provider)
+        self._local_provider.bindings[name] = os.path.normpath(os.path.abspath(abs_path))
+
+    def add_package_map(self, path : str, front : bool=False) -> None:
+        """Register a package-map file as a provider.
+
+        Precedence is list order. ``front=True`` inserts at the head (used for
+        a project's own flow-file map, which must outrank CLI/env maps and the
+        registry); otherwise the map is inserted just before ``ExtRgy`` (used
+        for CLI/env maps, which outrank only the registry)."""
+        from .package_map_provider import PackageMapProvider
+        path = os.path.normpath(os.path.abspath(path))
+
+        # Dedupe: skip if a map for this path is already registered
+        for p in self._pkg_providers:
+            if isinstance(p, PackageMapProvider) and \
+                    os.path.normpath(os.path.abspath(p.path)) == path:
+                return
+
+        provider = PackageMapProvider(path=path)
+        if front:
+            self._pkg_providers.insert(0, provider)
+        else:
+            # Insert ahead of the registry (ExtRgy), which is appended last
+            idx = self._pkg_providers.index(self.pkg_rgy) \
+                if self.pkg_rgy in self._pkg_providers else len(self._pkg_providers)
+            self._pkg_providers.insert(idx, provider)
 
     def _error(self, msg, elem):
         pass
@@ -283,4 +368,29 @@ class PackageLoader(PackageLoaderP):
         if fed_name not in self._feeds_map.keys():
             self._feeds_map[fed_name] = []
         self._feeds_map[fed_name].append(task)
+
+
+@dc.dataclass
+class _LocalBindingProvider(PackageProvider):
+    """Provider for explicit ``{name: from}`` import pins. Resolves a bound
+    name to its pinned flow file on demand."""
+    bindings : Dict[str, str] = dc.field(default_factory=dict)
+    _provider_m : Dict[str, Any] = dc.field(default_factory=dict)
+
+    def hasPackage(self, name, loader=None) -> bool:
+        return name in self.bindings
+
+    def getPackageNames(self, loader) -> List[str]:
+        return list(self.bindings.keys())
+
+    def getPackage(self, name, loader) -> Optional[Package]:
+        return self.findPackage(name, loader)
+
+    def findPackage(self, name, loader) -> Optional[Package]:
+        if name not in self.bindings:
+            return None
+        from .package_provider_yaml import PackageProviderYaml
+        if name not in self._provider_m:
+            self._provider_m[name] = PackageProviderYaml(path=self.bindings[name])
+        return self._provider_m[name].findPackage(name, loader)
 

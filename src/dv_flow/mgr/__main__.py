@@ -56,6 +56,7 @@ class _CmdMcp:
                 get_rootdir(args),
                 listener=listener.marker,
                 config=getattr(args, 'config', None),
+                package_maps=getattr(args, 'package_map', []),
             )
         except Exception as e:
             print(f"Error loading project: {e}", file=sys.stderr)
@@ -121,6 +122,13 @@ def get_parser():
                         help="JSON file path or inline JSON string for complex parameter types. "
                              "Inline example: -P '{\"tasks\": {\"build\": {\"top\": [\"counter\"]}}}'. "
                              "CLI -D options take precedence over -P values")
+    parser.add_argument("--package-map",
+                        dest="package_map",
+                        action="append",
+                        default=[],
+                        metavar="FILE",
+                        help="Package-map file (name -> flow file) for resolving imports "
+                             "by name. May be used multiple times")
     # parser.add_argument("-v", "--verbose", 
     #                     help="Enable verbose output",
     #                     action="store_true")
