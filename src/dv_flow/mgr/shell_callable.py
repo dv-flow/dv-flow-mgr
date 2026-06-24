@@ -49,8 +49,14 @@ class ShellCallable(object):
         env.update(data_io.stage_inputs(
             input.rundir, input, memento=getattr(input, "memento", None)))
 
-        # Ensure the dfm-out helper resolves on PATH inside the script
-        _bin = os.path.dirname(sys.executable)
+        # Ensure the dfm-out helper resolves on PATH inside the script.
+        # Rather than relying on the console-script being pip-installed next to
+        # the interpreter (it is absent when running from a source checkout via
+        # PYTHONPATH, e.g. in CI), generate a small shim that re-invokes the
+        # current interpreter on the dv_flow.mgr.out module. The shim exports
+        # PYTHONPATH so the module resolves regardless of how dv_flow is on the
+        # path.
+        _bin = self._ensure_dfm_out_shim(input.rundir)
         if _bin:
             cur = env.get("PATH", "")
             env["PATH"] = ("%s%s%s" % (_bin, os.pathsep, cur)) if cur else _bin
@@ -114,3 +120,31 @@ class ShellCallable(object):
             memento=harvest.memento,
             changed=True
         )
+
+    @staticmethod
+    def _ensure_dfm_out_shim(rundir):
+        """Create a `dfm-out` shim in rundir that re-invokes this interpreter.
+
+        Returns the directory containing the shim (to be prepended to PATH), or
+        None if the shim could not be created. The shim works whether dv_flow is
+        pip-installed or made importable via PYTHONPATH from a source checkout.
+        """
+        # Package root that must be importable: parent of the `dv_flow` package.
+        pkg_root = os.path.dirname(  # .../src
+            os.path.dirname(          # .../src/dv_flow
+                os.path.dirname(os.path.abspath(__file__))))  # .../src/dv_flow/mgr
+        bindir = os.path.join(rundir, ".dfm-bin")
+        shim = os.path.join(bindir, "dfm-out")
+        try:
+            os.makedirs(bindir, exist_ok=True)
+            with open(shim, "w") as fp:
+                fp.write(
+                    "#!/bin/sh\n"
+                    'PYTHONPATH="%s${PYTHONPATH:+%s$PYTHONPATH}"\n'
+                    "export PYTHONPATH\n"
+                    'exec "%s" -m dv_flow.mgr.out "$@"\n'
+                    % (pkg_root, os.pathsep, sys.executable))
+            os.chmod(shim, 0o755)
+        except OSError:
+            return None
+        return bindir
