@@ -123,6 +123,56 @@ specifies the tasks that must complete before this task can execute.</p>
 <p>In addition, one step cannot proceed until the proceeding step has completed. These
 scheduling and dataflow requirements are captured using <cite>needs</cite> relationships.</p>
 </section>
+<section id="structuring-dependencies">
+<h2>Structuring Dependencies<a class="headerlink" href="#structuring-dependencies" title="Link to this heading">¶</a></h2>
+<p>Each task should declare only its <strong>direct</strong> dependencies in <code class="docutils literal notranslate"><span class="pre">needs</span></code>.
+DFM resolves transitive dependencies automatically – if task C needs B and
+B needs A, then C receives the outputs of both A and B without listing A
+explicitly.</p>
+<p><strong>Co-location principle:</strong> Define tasks in the same <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code> file as the
+source files they describe. Use package fragments to link directories together.
+This keeps each directory’s build logic close to its source and makes the
+dependency graph easy to reason about.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># BAD: flat needs list -- no structure, hides the real dependency chain</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pkg_a_hdl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pkg_a_hvl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pkg_b_hdl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pkg_b_hvl</span><span class="p p-Indicator">,</span>
+<span class="w">          </span><span class="nv">env</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sequences</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tests</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">hdl_top</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">hvl_top</span><span class="p p-Indicator">]</span>
+
+<span class="c1"># GOOD: each task declares only direct deps</span>
+<span class="c1"># (defined in separate fragment files co-located with source)</span>
+
+<span class="c1"># verification_ip/pkg_a/flow.dv</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pkg_a_hdl</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pkg_a_hvl</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pkg_a_hdl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+
+<span class="c1"># tb/flow.dv</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl_top</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">pkg_a_hdl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">pkg_b_hdl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hdl_top.sv&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">hdl_top</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">hvl_top</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">hdl_top</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">hvl_top</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">graph</span> <span class="pre">&lt;task&gt;</span> <span class="pre">-o</span> <span class="pre">flow.dot</span></code> to visualize and verify the dependency
+graph.</p>
+</section>
 <section id="tasks-and-dataflow">
 <h2>Tasks and Dataflow<a class="headerlink" href="#tasks-and-dataflow" title="Link to this heading">¶</a></h2>
 <p>Task <cite>needs</cite> relationships specify dataflow between tasks in addition to
@@ -505,6 +555,7 @@ find both created files.</p>
 <li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>

@@ -148,12 +148,32 @@ There are several ways to import packages:</p>
 <span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lib.some_task</span>
 </pre></div>
 </div>
-<p>When a directory is specified, DV Flow searches for <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code> or <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>
+<p>When a directory is specified, DV Flow searches for <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code> or <code class="docutils literal notranslate"><span class="pre">flow.yaml</span></code>
 files in the subdirectory tree.</p>
+</section>
+<section id="import-with-explicit-location">
+<h3>Import with Explicit Location<a class="headerlink" href="#import-with-explicit-location" title="Link to this heading">¶</a></h3>
+<p>Combine <code class="docutils literal notranslate"><span class="pre">name</span></code> with <code class="docutils literal notranslate"><span class="pre">from</span></code> to import a package by name while pinning the exact
+file that defines it (no package map required):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt</span>
+<span class="w">      </span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../vendor/vlt/flow.dv</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+</pre></div>
+</div>
+<p>The pinned name/location takes precedence over any map or registry entry for the
+same name. The file’s declared <code class="docutils literal notranslate"><span class="pre">package.name</span></code> must match the <code class="docutils literal notranslate"><span class="pre">name</span></code> given.</p>
 </section>
 <section id="import-with-alias">
 <h3>Import with Alias<a class="headerlink" href="#import-with-alias" title="Link to this heading">¶</a></h3>
-<p>Use the <code class="docutils literal notranslate"><span class="pre">as</span></code> keyword to give an imported package an alias:</p>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">as</span></code> keyword to give an imported package an alias. The alias can then be
+used to qualify the package’s tasks, types, and parameters:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proj</span>
 
@@ -166,6 +186,27 @@ files in the subdirectory tree.</p>
 <span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span><span class="w">  </span><span class="c1"># References hdlsim.vlt.SimImage</span>
 </pre></div>
 </div>
+<p>Aliases are local to the importing package. Two imports cannot share the same
+alias, and an alias cannot collide with an existing package name.</p>
+</section>
+<section id="import-by-name">
+<h3>Import by Name<a class="headerlink" href="#import-by-name" title="Link to this heading">¶</a></h3>
+<p>A package can be imported by <strong>name</strong> alone, leaving its location to be resolved
+through a package map (see below), the package registry, or <code class="docutils literal notranslate"><span class="pre">DV_FLOW_PATH</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">top</span>
+
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lib</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_lib.some_task</span>
+</pre></div>
+</div>
+<p>Importing by name decouples the importing project from where the dependency lives
+on disk — useful when dependencies are fetched into a workspace by a package
+manager rather than checked in at a fixed path.</p>
 </section>
 <section id="import-resolution">
 <h3>Import Resolution<a class="headerlink" href="#import-resolution" title="Link to this heading">¶</a></h3>
@@ -173,7 +214,8 @@ files in the subdirectory tree.</p>
 <ol class="arabic simple">
 <li><p><strong>Relative to current file</strong> - Paths relative to the importing package’s location</p></li>
 <li><p><strong>Relative to project root</strong> - Allows sibling packages to find each other</p></li>
-<li><p><strong>Package registry</strong> - Built-in and installed packages</p></li>
+<li><p><strong>Package maps</strong> - <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">-&gt;</span> <span class="pre">flow</span> <span class="pre">file</span></code> entries from declared package maps</p></li>
+<li><p><strong>Package registry</strong> - Built-in and installed packages, and <code class="docutils literal notranslate"><span class="pre">DV_FLOW_PATH</span></code></p></li>
 </ol>
 <p>This allows sub-packages to import sibling packages naturally:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In packages/ip1/flow.yaml</span>
@@ -184,6 +226,64 @@ files in the subdirectory tree.</p>
 </pre></div>
 </div>
 </section>
+</section>
+<section id="package-maps">
+<h2>Package Maps<a class="headerlink" href="#package-maps" title="Link to this heading">¶</a></h2>
+<p>A <strong>package map</strong> is a generated file that lists the packages contributed by a
+dependency tree, keyed by name. It lets a project import dependencies by name
+without hard-coding their paths. A map is a pure <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">-&gt;</span> <span class="pre">flow</span> <span class="pre">file</span></code> directory:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># deps/flow-packages.yaml  (generated)</span>
+<span class="nt">package-map</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="nt">packages</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vcs</span>
+<span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl_sim_vcs/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uvm.util</span>
+<span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uvm_util/flow.yaml</span>
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">path</span></code> is resolved relative to the directory containing the map file.</p>
+<p>A project references one or more maps via the <code class="docutils literal notranslate"><span class="pre">package-map</span></code> key, which accepts a
+single path or a list (earlier entries take precedence on name collisions):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+<span class="w">    </span><span class="nt">package-map</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deps/flow-packages.yaml</span>
+<span class="w">    </span><span class="c1"># — or — multiple maps:</span>
+<span class="w">    </span><span class="c1"># package-map:</span>
+<span class="w">    </span><span class="c1"># - deps/flow-packages.yaml</span>
+<span class="w">    </span><span class="c1"># - ../shared/flow-packages.yaml</span>
+<span class="w">    </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdl.sim.vcs</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">uvm.util</span>
+</pre></div>
+</div>
+<p>Maps can also be supplied without editing the flow file:</p>
+<ul class="simple">
+<li><p>command line: <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">--package-map</span> <span class="pre">deps/flow-packages.yaml</span> <span class="pre">run</span> <span class="pre">...</span></code> (repeatable)</p></li>
+<li><p>environment: <code class="docutils literal notranslate"><span class="pre">DV_FLOW_PACKAGE_MAP</span></code> (a <code class="docutils literal notranslate"><span class="pre">:</span></code>-separated list of map files)</p></li>
+</ul>
+<p><strong>Precedence</strong> (highest first): maps declared in the flow file, then <code class="docutils literal notranslate"><span class="pre">--package-map</span></code>
+maps, then <code class="docutils literal notranslate"><span class="pre">DV_FLOW_PACKAGE_MAP</span></code> maps, then the package registry / <code class="docutils literal notranslate"><span class="pre">DV_FLOW_PATH</span></code>.</p>
+<p><strong>Lazy loading.</strong> A map registers package <em>names</em> without parsing any dependency, so
+listing many available packages in a map is cheap. More generally, any import by
+<strong>name</strong> is deferred: the dependency’s <code class="docutils literal notranslate"><span class="pre">flow</span></code> file is parsed only when one of its
+tasks, types, or parameters is first touched. (Unresolvable names are still reported at
+load time, so a typo’d or missing dependency is not silently ignored.)</p>
+<p>Two things still force a dependency to be parsed eagerly, by design:</p>
+<ul class="simple">
+<li><p>Building a task graph flattens <em>all</em> imported packages to resolve names, so
+<code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">run</span></code>/<code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">graph</span></code> parse every reachable import.</p></li>
+<li><p>Resolving an unqualified task/type name scans imported packages.</p></li>
+</ul>
+<p>So lazy loading mainly benefits load-only operations (introspection, partial
+validation) where an import is never referenced. Imports by <strong>path</strong> are always
+parsed eagerly.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Package-map files are typically produced by a dependency manager (e.g. ivpm)
+when it syncs a project’s dependencies. dv-flow consumes the map; generating it
+is the dependency manager’s responsibility.</p>
+</div>
 </section>
 <section id="package-parameters">
 <h2>Package Parameters<a class="headerlink" href="#package-parameters" title="Link to this heading">¶</a></h2>
@@ -238,8 +338,95 @@ package namespace:</p>
 </pre></div>
 </div>
 <p>All fragments contribute to the same package namespace. Task names must be unique
-across all fragments - you cannot define <code class="docutils literal notranslate"><span class="pre">build</span></code> in multiple fragments of the
+across all fragments – you cannot define <code class="docutils literal notranslate"><span class="pre">build</span></code> in multiple fragments of the
 same package.</p>
+<section id="fragment-fields">
+<h3>Fragment Fields<a class="headerlink" href="#fragment-fields" title="Link to this heading">¶</a></h3>
+<p>Fragments support most package-level constructs but not all.  The schema
+uses <code class="docutils literal notranslate"><span class="pre">extra</span> <span class="pre">=</span> <span class="pre">&quot;forbid&quot;</span></code>, so any unlisted field produces an error.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Allowed Fragment Fields</span><a class="headerlink" href="#id1" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Allowed?</p></th>
+<th class="head"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tasks</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Task definitions, same syntax as in a package</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">types</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Data type definitions</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">configs</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Configuration definitions</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">imports</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Package imports</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">filters</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Filter definitions</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fragments</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Nested fragment paths (hierarchical)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Optional; prefixes all task names with <code class="docutils literal notranslate"><span class="pre">&lt;package&gt;.&lt;name&gt;.&lt;task&gt;</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">with</span></code></p></td>
+<td><p><strong>No</strong></p></td>
+<td><p>Package-level parameters can only be declared in the root package</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">desc</span></code></p></td>
+<td><p><strong>No</strong></p></td>
+<td><p>Package description is set in the root package only</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="nested-fragments">
+<h3>Nested Fragments<a class="headerlink" href="#nested-fragments" title="Link to this heading">¶</a></h3>
+<p>Fragments can reference other fragments, enabling a hierarchical directory
+structure:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Top-level flow.dv</span>
+<span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+<span class="w">  </span><span class="nt">fragments</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">src/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tb/flow.dv</span>
+
+<span class="c1"># src/flow.dv -- intermediate fragment</span>
+<span class="nt">fragment</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">fragments</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl/flow.dv</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/flow.dv</span>
+
+<span class="c1"># src/rtl/flow.dv -- leaf fragment</span>
+<span class="nt">fragment</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl_sources</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+</pre></div>
+</div>
+<p>Fragment paths are always relative to the file that contains the
+<code class="docutils literal notranslate"><span class="pre">fragments:</span></code> list.</p>
+</section>
 </section>
 <section id="task-namespacing">
 <h2>Task Namespacing<a class="headerlink" href="#task-namespacing" title="Link to this heading">¶</a></h2>
@@ -487,6 +674,7 @@ to the <code class="docutils literal notranslate"><span class="pre">hdlsim.vlt.S
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Packages</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>

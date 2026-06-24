@@ -378,7 +378,65 @@ Combine multiple checks for accuracy:
         # Expensive check: content hashes changed?
         for file in ctxt.memento.get("critical_files", []):
             current_hash = await ComputeHash(file)
-            if current_hash != ctxt.memento.get(f"hash_{file}"):
+        if current_hash != ctxt.memento.get(f"hash_{file}"):
                 return False
         
         return True
+
+Base Rundir
+===========
+
+The ``--base-rundir`` option lets you split a DFM run into separate build
+and test phases.  A build run populates a shared rundir with compiled
+artifacts, then multiple independent test runs reuse those artifacts
+without re-building.
+
+.. code-block:: bash
+
+    # Phase 1: build (writes to ./rundir)
+    dfm run build
+
+    # Phase 2: fan out independent test runs
+    dfm run test_a --base-rundir /abs/path/to/build/rundir
+    dfm run test_b --base-rundir /abs/path/to/build/rundir
+
+How It Works
+------------
+
+When ``--base-rundir`` is specified, the runner checks each task before
+execution:
+
+1. Resolve the task's rundir path against the base-rundir.
+2. Look for an ``exec_data.json`` in that directory.
+3. If found and the recorded status is 0 (success), the task is
+   **satisfied** from the base -- its output is reconstructed from the
+   saved data and execution is skipped entirely.
+4. Output file paths are rewritten to reference the base-rundir so
+   downstream tasks can locate the artifacts.
+
+Tasks that are not present in the base-rundir, or whose previous run
+failed, execute normally in the local rundir.
+
+The base-rundir is treated as **read-only** and **trusted**: no parameter
+or input-signature comparison is performed.  The user asserts that the
+base-rundir artifacts are valid for the current run.
+
+Interaction with Other Options
+------------------------------
+
+``--force``
+    Overrides base-rundir satisfaction.  All tasks run locally regardless
+    of what exists in the base-rundir.
+
+``--clean``
+    Cleans only the local rundir.  The base-rundir is never modified.
+
+``--verbose``
+    Base-satisfied tasks appear in output with a ``(base)`` suffix.
+
+Environment
+-----------
+
+When ``--base-rundir`` is set, the environment variable
+``DFM_BASE_RUNDIR`` is exported to child processes, containing the
+absolute path to the base-rundir.

@@ -38,7 +38,7 @@
 <p><p>DV Flow Manager (dfm) - A dataflow-based build system for silicon design and verification.</p>
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">dfm</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">log</span><span class="o">-</span><span class="n">level</span> <span class="p">{</span><span class="n">NONE</span><span class="p">,</span><span class="n">INFO</span><span class="p">,</span><span class="n">DEBUG</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
-           <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span>
+           <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">package</span><span class="o">-</span><span class="nb">map</span> <span class="n">FILE</span><span class="p">]</span>
            <span class="p">{</span><span class="n">graph</span><span class="p">,</span><span class="n">run</span><span class="p">,</span><span class="n">complete</span><span class="p">,</span><span class="n">show</span><span class="p">,</span><span class="n">cache</span><span class="p">,</span><span class="n">validate</span><span class="p">,</span><span class="n">context</span><span class="p">,</span><span class="n">agent</span><span class="p">,</span><span class="n">mcp</span><span class="p">,</span><span class="n">daemon</span><span class="p">,</span><span class="n">worker</span><span class="p">,</span><span class="n">util</span><span class="p">}</span>
            <span class="o">...</span>
 </pre></div>
@@ -56,6 +56,10 @@
 </dd>
 <dt><kbd>-P, --param-file</kbd></dt>
 <dd><p>JSON file path or inline JSON string for complex parameter types. Inline example: -P ‘{“tasks”: {“build”: {“top”: [“counter”]}}}’. CLI -D options take precedence over -P values</p>
+</dd>
+<dt><kbd>--package-map</kbd></dt>
+<dd><p>Package-map file (name -&gt; flow file) for resolving imports by name. May be used multiple times</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
 </dd>
 </dl>
 </section>
@@ -112,9 +116,10 @@
 <section id="run">
 <h3>run<a class="headerlink" href="#run" title="Link to this heading">¶</a></h3>
 <p>run a flow</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span>
-        <span class="p">[</span><span class="o">-</span><span class="n">u</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">progressbar</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span>
-        <span class="p">[</span><span class="o">--</span><span class="n">runner</span> <span class="n">RUNNER</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">runner</span><span class="o">-</span><span class="n">opt</span> <span class="n">KEY</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">dfm</span> <span class="n">run</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">j</span> <span class="n">J</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">clean</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">base</span><span class="o">-</span><span class="n">rundir</span> <span class="n">PATH</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">f</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">v</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">root</span> <span class="n">ROOT</span><span class="p">]</span>
+        <span class="p">[</span><span class="o">-</span><span class="n">c</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">u</span> <span class="p">{</span><span class="n">log</span><span class="p">,</span><span class="n">progress</span><span class="p">,</span><span class="n">progressbar</span><span class="p">,</span><span class="n">tui</span><span class="p">}]</span> <span class="p">[</span><span class="o">-</span><span class="n">D</span> <span class="n">NAME</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+        <span class="p">[</span><span class="o">-</span><span class="n">P</span> <span class="n">FILE_OR_JSON</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">runner</span> <span class="n">RUNNER</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">runner</span><span class="o">-</span><span class="n">opt</span> <span class="n">KEY</span><span class="o">=</span><span class="n">VALUE</span><span class="p">]</span>
+        <span class="p">[</span><span class="o">--</span><span class="n">override</span> <span class="n">TARGET</span><span class="o">=</span><span class="n">REPLACEMENT</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">report</span> <span class="n">DIR</span><span class="p">]</span>
         <span class="p">[</span><span class="n">tasks</span> <span class="o">...</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -136,6 +141,9 @@
 <dt><kbd>--clean</kbd></dt>
 <dd><p>Cleans the rundir before running</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">False</span></code></p>
+</dd>
+<dt><kbd>--base-rundir</kbd></dt>
+<dd><p>Reuse artifacts from a pre-built rundir. Tasks present in this directory are assumed up-to-date and not re-executed.</p>
 </dd>
 <dt><kbd>-f, --force</kbd></dt>
 <dd><p>Force all tasks to run, ignoring up-to-date status</p>
@@ -163,11 +171,18 @@
 <dd><p>JSON file or inline JSON string (e.g., ‘{“tasks”: {…}}’)</p>
 </dd>
 <dt><kbd>--runner</kbd></dt>
-<dd><p>Runner backend to use (e.g. local, lsf). Default: from config or ‘local’</p>
+<dd><p>Runner backend: ‘local’ (in-process), ‘lsf’ (embedded LSF pool), or omit for auto-detect (daemon if running, else local)</p>
 </dd>
 <dt><kbd>--runner-opt</kbd></dt>
 <dd><p>Runner backend option (key=value). May be used multiple times</p>
 <p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>--override</kbd></dt>
+<dd><p>Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)</p>
+<p>Default: <code class="docutils literal notranslate"><span class="pre">[]</span></code></p>
+</dd>
+<dt><kbd>--report</kbd></dt>
+<dd><p>After the run, write a diagnostics bundle (per-task logs, markers, status) to DIR for publishing as a CI artifact.</p>
 </dd>
 </dl>
 </section>
@@ -898,7 +913,7 @@
 </section>
 </section>
 </section>
-<p><p>For LLM agents: See the skill file at: /home/runner/work/dv-flow-mgr/dv-flow-mgr/src/dv_flow/mgr/share/skill.md</p>
+<p><p>For LLM agents: See the skill file at: /home/runner/work/dv-flow-mgr/dv-flow-mgr/src/dv_flow/mgr/share/skills/dv-flow-manager/SKILL.md</p>
 </p>
 <section id="commands-overview">
 <h2>Commands Overview<a class="headerlink" href="#commands-overview" title="Link to this heading">¶</a></h2>
@@ -979,6 +994,57 @@ that execute are shown.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>-u<span class="w"> </span>tui
 </pre></div>
 </div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--override</span> <span class="pre">TARGET=REPLACEMENT</span></code></dt><dd><p>Replace a task in the graph with another task for this run. Can be
+specified multiple times. Overrides applied via <code class="docutils literal notranslate"><span class="pre">--override</span></code> take
+precedence over config-level and package-level overrides.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>--override<span class="w"> </span>sim_pkg.Compile<span class="o">=</span>std.Null
+</pre></div>
+</div>
+<p>Multiple overrides:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>--override<span class="w"> </span>pkg.TaskA<span class="o">=</span>std.Null<span class="w"> </span>--override<span class="w"> </span>pkg.TaskB<span class="o">=</span>std.Null
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--runner</span> <span class="pre">BACKEND</span></code></dt><dd><p>Runner backend to use. <code class="docutils literal notranslate"><span class="pre">local</span></code> runs tasks in-process. Other backends
+(e.g. <code class="docutils literal notranslate"><span class="pre">lsf</span></code>) require a running daemon. If omitted, auto-detects
+whether a daemon is running and delegates to it if so, otherwise uses
+local execution.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>build<span class="w"> </span>--runner<span class="w"> </span><span class="nb">local</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--base-rundir</span> <span class="pre">PATH</span></code></dt><dd><p>Reuse compiled artifacts from a previous build’s rundir.  Tasks that
+completed successfully in the base-rundir are satisfied without
+re-execution; their output is reconstructed from saved data and
+file paths are rewritten to reference the base-rundir.  The
+base-rundir is treated as read-only and trusted.</p>
+<p>This is essential for regression workflows where a build is performed
+once and many test runs reuse the compiled artifacts.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Build once</span>
+dfm<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># Run tests reusing the build (no recompilation)</span>
+dfm<span class="w"> </span>run<span class="w"> </span>test_a<span class="w"> </span>--base-rundir<span class="w"> </span>/path/to/build/rundir
+dfm<span class="w"> </span>run<span class="w"> </span>test_b<span class="w"> </span>--base-rundir<span class="w"> </span>/path/to/build/rundir
+</pre></div>
+</div>
+<p>The environment variable <code class="docutils literal notranslate"><span class="pre">DFM_BASE_RUNDIR</span></code> is exported to child
+processes when this option is set.</p>
+<p>See <a class="reference internal" href="userguide/incremental.html"><span class="doc">Incremental Builds</span></a> for full details on how base-rundir
+satisfaction works.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--report</span> <span class="pre">DIR</span></code></dt><dd><p>After the run completes, write a self-contained diagnostics bundle to
+<code class="docutils literal notranslate"><span class="pre">DIR</span></code> (per-task logs, markers, and status). This is intended for CI,
+where the rundir is ephemeral: publish <code class="docutils literal notranslate"><span class="pre">DIR</span></code> as a build artifact to
+retain diagnostics after the job ends.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>sim.regress<span class="w"> </span>--report<span class="w"> </span>build/dfm-report
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="#run-report-bundle">Run Report Bundle</a> for the bundle layout and <code class="docutils literal notranslate"><span class="pre">report.json</span></code> schema.</p>
+<p>The report is assembled from the per-task <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> each task
+writes to the shared rundir, so it works for any execution backend
+(local, daemon, or remote runners such as <code class="docutils literal notranslate"><span class="pre">--runner</span> <span class="pre">lsf</span></code>).</p>
 </dd>
 </dl>
 </section>
@@ -1646,6 +1712,89 @@ compatible with the Perfetto trace viewer and Chrome’s <a class="reference ext
 </ul>
 </section>
 </section>
+<section id="run-report-bundle">
+<h2>Run Report Bundle<a class="headerlink" href="#run-report-bundle" title="Link to this heading">¶</a></h2>
+<p>When <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">run</span></code> is invoked with <code class="docutils literal notranslate"><span class="pre">--report</span> <span class="pre">DIR</span></code>, a diagnostics bundle is
+written to <code class="docutils literal notranslate"><span class="pre">DIR</span></code> after the run completes. Logs and markers are normally
+written into the per-task rundir, which is ephemeral in CI; the report bundle
+gathers the small, always-useful diagnostic subset into one location that a CI
+job can publish as an artifact.</p>
+<p>Unlike uploading the whole rundir (which can contain large build/simulation
+artifacts), the bundle leads with a structured status/marker manifest and
+includes per-task logs as drill-down.</p>
+<p>The bundle is assembled from the <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> that each task writes into
+its rundir (status, markers, and the name of its logfile). Because this is the
+same on-disk record used for up-to-date checks, the report is backend-agnostic:
+it works identically for local, daemon, and remote (e.g. LSF) execution, and a
+report can even be regenerated from a preserved rundir after the fact.</p>
+<section id="bundle-layout">
+<h3>Bundle Layout<a class="headerlink" href="#bundle-layout" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&lt;report-dir&gt;/
+  report.json          # machine-readable manifest (primary surface)
+  report.md            # human-readable summary (CI job-summary friendly)
+  markers.jsonl        # all markers flattened, one JSON object per line
+  logs/
+    &lt;task-name&gt;.log    # per-task logs, copied from each task&#39;s rundir
+</pre></div>
+</div>
+</section>
+<section id="report-json-schema">
+<h3>report.json Schema<a class="headerlink" href="#report-json-schema" title="Link to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;schema&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;dvflow-report/1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;root&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sim.regress&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;generated_unix&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1750464000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;counts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;tasks_total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tasks_failed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;info&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;warning&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;tasks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sim.build&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;cache_hit&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;rundir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/abs/path/rundir/sim.build&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;log&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;logs/sim.build.log&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;error&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;msg&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">&quot;loc&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;line&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;pos&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Notes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">status</span></code> is the number of tasks that failed (0 means success).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tasks</span></code> includes every task that ran, including up-to-date and cache-hit
+tasks. The <code class="docutils literal notranslate"><span class="pre">log</span></code> field is omitted (<code class="docutils literal notranslate"><span class="pre">null</span></code>) when a task produced no
+logfile (e.g. pure-Python tasks).</p></li>
+<li><p>Each task’s <code class="docutils literal notranslate"><span class="pre">markers</span></code> are also aggregated into <code class="docutils literal notranslate"><span class="pre">markers.jsonl</span></code> with an
+added <code class="docutils literal notranslate"><span class="pre">&quot;task&quot;</span></code> field, for easy log-style scanning.</p></li>
+</ul>
+</section>
+<section id="ci-usage">
+<h3>CI Usage<a class="headerlink" href="#ci-usage" title="Link to this heading">¶</a></h3>
+<p>Publish the bundle as a build artifact. For GitHub Actions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run flow</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dfm run sim.regress --report build/dfm-report</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload report</span>
+<span class="w">  </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always()</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/upload-artifact@v4</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dfm-report</span>
+<span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build/dfm-report</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">if:</span> <span class="pre">always()</span></code> ensures the report is uploaded even when the run fails,
+which is exactly when the logs and markers are most useful.</p>
+</section>
+</section>
 <section id="output-directory-structure">
 <h2>Output Directory Structure<a class="headerlink" href="#output-directory-structure" title="Link to this heading">¶</a></h2>
 <p>DV Flow Manager creates an output directory structure that mirrors
@@ -1701,6 +1850,12 @@ tasks can be seen.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-D<span class="w"> </span><span class="nv">test_name</span><span class="o">=</span>smoke<span class="w"> </span>-D<span class="w"> </span><span class="nv">seed</span><span class="o">=</span><span class="m">42</span>
 </pre></div>
 </div>
+<p><strong>Stub out expensive tasks for fast iteration:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-c<span class="w"> </span>fast
+<span class="c1"># or, ad-hoc from the command line:</span>
+dfm<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--override<span class="w"> </span>sim_pkg.Compile<span class="o">=</span>std.Null
+</pre></div>
+</div>
 <p><strong>Generate documentation graph:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>graph<span class="w"> </span>all<span class="w"> </span>-o<span class="w"> </span>project.dot
 dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="w"> </span>-o<span class="w"> </span>project.svg
@@ -1754,6 +1909,7 @@ dot<span class="w"> </span>-Tsvg<span class="w"> </span>project.dot<span class="
 <li class="toctree-l2"><a class="reference internal" href="#graph-command">Graph Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#ui-modes">UI Modes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#trace-output">Trace Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#run-report-bundle">Run Report Bundle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#output-directory-structure">Output Directory Structure</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#viewing-task-execution-data">Viewing Task Execution Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#common-patterns">Common Patterns</a></li>

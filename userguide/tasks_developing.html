@@ -766,6 +766,80 @@ definitions with PyTask implementations provide the right balance of
 simplicity and power.</p>
 </section>
 </section>
+<section id="template-tasks">
+<h2>Template Tasks<a class="headerlink" href="#template-tasks" title="Link to this heading">¶</a></h2>
+<p>A template task defers expansion of its <code class="docutils literal notranslate"><span class="pre">run</span></code> expression from load time
+to graph-build time.  This is useful for reusable building blocks whose
+<code class="docutils literal notranslate"><span class="pre">run</span></code> expression references variables that only exist in the use context
+(matrix variables, compound parameters, package parameters of the
+consuming package, etc.).</p>
+<section id="declaring-a-template-task">
+<h3>Declaring a Template Task<a class="headerlink" href="#declaring-a-template-task" title="Link to this heading">¶</a></h3>
+<p>Add <code class="docutils literal notranslate"><span class="pre">template:</span> <span class="pre">true</span></code> to the task definition:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_pkg</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompileStub</span>
+<span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;echo</span><span class="nv"> </span><span class="s">Skipping</span><span class="nv"> </span><span class="s">compile</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.variant</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">passthrough</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">run</span></code> string is stored verbatim at load time.  When the task is
+instantiated (via <code class="docutils literal notranslate"><span class="pre">uses:</span></code> or as an override replacement), the graph
+builder expands <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code> expressions using the instantiation context.</p>
+</section>
+<section id="using-a-template-task">
+<h3>Using a Template Task<a class="headerlink" href="#using-a-template-task" title="Link to this heading">¶</a></h3>
+<p>A template task is consumed through <code class="docutils literal notranslate"><span class="pre">uses:</span></code>, just like any other task:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyCompile</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_pkg.CompileStub</span>
+</pre></div>
+</div>
+<p>At graph-build time, <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">matrix.variant</span> <span class="pre">}}</span></code> (or whichever variables
+appear in <code class="docutils literal notranslate"><span class="pre">run</span></code>) are resolved against the current context.</p>
+<p>Template tasks work naturally inside <code class="docutils literal notranslate"><span class="pre">strategy.matrix</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StubMatrix</span>
+<span class="w">  </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">variant</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">gate</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Step</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_pkg.CompileStub</span>
+</pre></div>
+</div>
+<p>Each matrix cell gets its own expansion, so <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">matrix.variant</span> <span class="pre">}}</span></code>
+resolves to <code class="docutils literal notranslate"><span class="pre">rtl</span></code> and <code class="docutils literal notranslate"><span class="pre">gate</span></code> respectively.</p>
+</section>
+<section id="constraints">
+<h3>Constraints<a class="headerlink" href="#constraints" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>A template task <strong>cannot be invoked directly</strong> from the CLI or as a
+top-level entry point.  Doing so raises an error.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">template:</span> <span class="pre">true</span></code> and <code class="docutils literal notranslate"><span class="pre">override:</span></code> are mutually exclusive on the same
+task definition.</p></li>
+<li><p>Parameter definitions (<code class="docutils literal notranslate"><span class="pre">with:</span></code>) are unaffected – they are already
+expanded lazily at graph-build time regardless of the <code class="docutils literal notranslate"><span class="pre">template</span></code> flag.</p></li>
+</ul>
+</section>
+<section id="when-to-use-templates">
+<h3>When to Use Templates<a class="headerlink" href="#when-to-use-templates" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">template:</span> <span class="pre">true</span></code> when:</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">run</span></code> expression references variables that are not available at
+load time (e.g. <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">matrix.variant</span> <span class="pre">}}</span></code>, <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">this.some_param</span> <span class="pre">}}</span></code>).</p></li>
+<li><p>You are building a reusable task that will be consumed by multiple
+packages with different parameter contexts.</p></li>
+<li><p>You need the same task definition to produce different shell commands
+depending on where it is instantiated.</p></li>
+</ul>
+</section>
+</section>
 </section>
 
 
@@ -802,6 +876,7 @@ simplicity and power.</p>
 <li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>

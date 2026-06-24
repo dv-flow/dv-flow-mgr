@@ -9,6 +9,7 @@ User Guide
    packages
    tasks_using
    dataflow
+   script_io
    visibility
    tasks_developing
    error_handling

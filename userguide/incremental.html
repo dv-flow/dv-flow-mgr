@@ -376,12 +376,64 @@ structure:</p>
     <span class="c1"># Expensive check: content hashes changed?</span>
     <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;critical_files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
         <span class="n">current_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ComputeHash</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">current_hash</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;hash_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">current_hash</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;hash_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
 
     <span class="k">return</span> <span class="kc">True</span>
 </pre></div>
 </div>
+</section>
+</section>
+<section id="base-rundir">
+<h2>Base Rundir<a class="headerlink" href="#base-rundir" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> option lets you split a DFM run into separate build
+and test phases.  A build run populates a shared rundir with compiled
+artifacts, then multiple independent test runs reuse those artifacts
+without re-building.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Phase 1: build (writes to ./rundir)</span>
+dfm<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># Phase 2: fan out independent test runs</span>
+dfm<span class="w"> </span>run<span class="w"> </span>test_a<span class="w"> </span>--base-rundir<span class="w"> </span>/abs/path/to/build/rundir
+dfm<span class="w"> </span>run<span class="w"> </span>test_b<span class="w"> </span>--base-rundir<span class="w"> </span>/abs/path/to/build/rundir
+</pre></div>
+</div>
+<section id="id1">
+<h3>How It Works<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> is specified, the runner checks each task before
+execution:</p>
+<ol class="arabic simple">
+<li><p>Resolve the task’s rundir path against the base-rundir.</p></li>
+<li><p>Look for an <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> in that directory.</p></li>
+<li><p>If found and the recorded status is 0 (success), the task is
+<strong>satisfied</strong> from the base – its output is reconstructed from the
+saved data and execution is skipped entirely.</p></li>
+<li><p>Output file paths are rewritten to reference the base-rundir so
+downstream tasks can locate the artifacts.</p></li>
+</ol>
+<p>Tasks that are not present in the base-rundir, or whose previous run
+failed, execute normally in the local rundir.</p>
+<p>The base-rundir is treated as <strong>read-only</strong> and <strong>trusted</strong>: no parameter
+or input-signature comparison is performed.  The user asserts that the
+base-rundir artifacts are valid for the current run.</p>
+</section>
+<section id="interaction-with-other-options">
+<h3>Interaction with Other Options<a class="headerlink" href="#interaction-with-other-options" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--force</span></code></dt><dd><p>Overrides base-rundir satisfaction.  All tasks run locally regardless
+of what exists in the base-rundir.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--clean</span></code></dt><dd><p>Cleans only the local rundir.  The base-rundir is never modified.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--verbose</span></code></dt><dd><p>Base-satisfied tasks appear in output with a <code class="docutils literal notranslate"><span class="pre">(base)</span></code> suffix.</p>
+</dd>
+</dl>
+</section>
+<section id="environment">
+<h3>Environment<a class="headerlink" href="#environment" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> is set, the environment variable
+<code class="docutils literal notranslate"><span class="pre">DFM_BASE_RUNDIR</span></code> is exported to child processes, containing the
+absolute path to the base-rundir.</p>
 </section>
 </section>
 </section>
@@ -420,6 +472,7 @@ structure:</p>
 <li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>

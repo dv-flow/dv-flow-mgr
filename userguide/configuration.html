@@ -134,6 +134,98 @@ for all tasks under the scope of the root package <cite>proj</cite>.</p>
 this parameter value using an environment variable or command-line argument.</p>
 </section>
 </section>
+<section id="append-and-prepend">
+<h2>Append and Prepend<a class="headerlink" href="#append-and-prepend" title="Link to this heading">¶</a></h2>
+<p>When overriding list-type parameters, you often want to add items rather
+than replace the entire list.  The <code class="docutils literal notranslate"><span class="pre">append</span></code> and <code class="docutils literal notranslate"><span class="pre">prepend</span></code> fields
+support this:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In a config or task override</span>
+<span class="nt">with</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">args</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">append</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-extra-flag&quot;</span><span class="p p-Indicator">]</span>
+
+<span class="c1"># Prepend items to the front of the list</span>
+<span class="nt">with</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">incdirs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prepend</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;/priority/include&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>The resolution formula is: <code class="docutils literal notranslate"><span class="pre">prepend</span> <span class="pre">+</span> <span class="pre">(value</span> <span class="pre">or</span> <span class="pre">base_value)</span> <span class="pre">+</span> <span class="pre">append</span></code>.
+If <code class="docutils literal notranslate"><span class="pre">value</span></code> is also set, it replaces the base value before append/prepend
+are applied.  If only <code class="docutils literal notranslate"><span class="pre">append</span></code> or <code class="docutils literal notranslate"><span class="pre">prepend</span></code> is set, the base value is
+preserved.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-Wall&quot;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Base value</span>
+
+<span class="w">  </span><span class="nt">configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">strict</span>
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile_strict</span>
+<span class="w">      </span><span class="nt">override</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">args</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">append</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-Werror&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">          </span><span class="c1"># Result: [&quot;-Wall&quot;, &quot;-Werror&quot;]</span>
+</pre></div>
+</div>
+</section>
+<section id="using-feeds-in-configurations">
+<h2>Using feeds in Configurations<a class="headerlink" href="#using-feeds-in-configurations" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">feeds</span></code> field provides a way to inject data into existing tasks from
+a configuration without modifying the original task definition.  This is
+the recommended approach when a config needs to add arguments, options, or
+data files to tasks that are defined elsewhere.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimImage</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tb</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">tb_top</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">root</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim.SimRun</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">build</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug_compile_args</span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.SimCompileArgs</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-debug_access+all&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">feeds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_project.build</span><span class="p p-Indicator">]</span>
+
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug_run_args</span>
+<span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.SimRunArgs</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-gui&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">feeds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_project.run</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Key points:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">feeds</span></code> injects data “from the side” into a task without modifying
+its definition.</p></li>
+<li><p>The feed target uses the fully-qualified task name
+(<code class="docutils literal notranslate"><span class="pre">package_name.task_name</span></code>).</p></li>
+<li><p>This is equivalent to adding the feeding task to the target’s <code class="docutils literal notranslate"><span class="pre">needs</span></code>
+list, but expressed from the producer’s perspective.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">feeds</span></code> is particularly useful in configs because the base tasks
+remain unchanged – the config only adds new tasks that connect to
+existing ones.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">feeds</span></code> approach keeps the base flow clean and makes config-specific
+additions easy to understand and maintain.</p>
+</section>
 <section id="resolution-order">
 <h2>Resolution Order<a class="headerlink" href="#resolution-order" title="Link to this heading">¶</a></h2>
 <p>DV Flow specifies the resolution order for parameters and overrides
@@ -185,6 +277,7 @@ such that “outer” specifications take precedence over “inner” specificat
 <li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>

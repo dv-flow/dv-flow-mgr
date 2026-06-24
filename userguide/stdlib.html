@@ -369,6 +369,57 @@ and providing user feedback during flow execution.</p>
 </div>
 </section>
 </section>
+<section id="std-null">
+<h2>std.Null<a class="headerlink" href="#std-null" title="Link to this heading">¶</a></h2>
+<p>A no-op task that passes its inputs through unchanged. <code class="docutils literal notranslate"><span class="pre">std.Null</span></code> is
+the natural replacement when stubbing out tasks via config-level or CLI
+overrides.</p>
+<section id="id22">
+<h3>Example<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stub.example</span>
+
+<span class="w">    </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">placeholder</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Null</span>
+</pre></div>
+</div>
+</section>
+<section id="using-as-an-override">
+<h3>Using as an Override<a class="headerlink" href="#using-as-an-override" title="Link to this heading">¶</a></h3>
+<p>The most common use of <code class="docutils literal notranslate"><span class="pre">std.Null</span></code> is as a replacement in config-level
+overrides to skip expensive tasks during fast-iteration builds:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_project</span>
+
+<span class="w">    </span><span class="nt">configs</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fast</span>
+<span class="w">      </span><span class="nt">overrides</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_pkg.Compile</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Null</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim_pkg.Simulate</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Null</span>
+</pre></div>
+</div>
+<p>Or from the command line:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>entry<span class="w"> </span>--override<span class="w"> </span>sim_pkg.Compile<span class="o">=</span>std.Null
+</pre></div>
+</div>
+</section>
+<section id="id23">
+<h3>Consumes<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
+<p>None (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">none</span></code>)</p>
+</section>
+<section id="id24">
+<h3>Produces<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<p>No output data items. With <code class="docutils literal notranslate"><span class="pre">passthrough:</span> <span class="pre">all</span></code> (the default), all input
+data items are passed through to downstream tasks.</p>
+</section>
+<section id="id25">
+<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<p>None.</p>
+</section>
+</section>
 <section id="std-agent">
 <h2>std.Agent<a class="headerlink" href="#std-agent" title="Link to this heading">¶</a></h2>
 <p>Executes an AI assistant with a specified prompt and collects structured
@@ -377,8 +428,8 @@ will fail with an error.</p>
 <p>This task enables AI-assisted workflows for code generation, documentation,
 test creation, and other automated tasks that benefit from large language
 model capabilities.</p>
-<section id="id22">
-<h3>Example<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<section id="id26">
+<h3>Example<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
 <p>Basic usage:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agent.example</span>
@@ -416,19 +467,19 @@ model capabilities.</p>
 </pre></div>
 </div>
 </section>
-<section id="id23">
-<h3>Consumes<a class="headerlink" href="#id23" title="Link to this heading">¶</a></h3>
+<section id="id27">
+<h3>Consumes<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
 <p>All inputs by default (<code class="docutils literal notranslate"><span class="pre">consumes:</span> <span class="pre">all</span></code>). Input data is available in the
 prompt via the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">}}</span></code> variable.</p>
 </section>
-<section id="id24">
-<h3>Produces<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<section id="id28">
+<h3>Produces<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
 <p>Outputs are determined by the AI assistant’s result JSON file. Typically
 produces <code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> items for generated files, but can produce any
 data type specified in the result.</p>
 </section>
-<section id="id25">
-<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Parameters<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <ul>
 <li><p><strong>system_prompt</strong> - [Optional] System prompt template. Can include variable references:</p>
 <ul class="simple">
@@ -692,6 +743,7 @@ or other data.</p>
 <li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_using.html">Using Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
 <li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
 <li class="toctree-l2"><a class="reference internal" href="tasks_developing.html">Developing Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
