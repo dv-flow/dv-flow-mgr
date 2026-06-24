@@ -7,6 +7,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Outer failsafe: the whole suite runs in well under a minute, so a job
+    # that runs this long means something is hung. Fail fast instead of
+    # letting a deadlocked test burn the 6h GitHub default.
+    timeout-minutes: 20
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -17,7 +21,7 @@ jobs:
           python3 -m venv py
           ./py/bin/pip install --upgrade --pre ivpm
           ./py/bin/ivpm update -a -d default-dev 
-          ./packages/python/bin/pip install -U typing_extensions build pytest-json-ctrf
+          ./packages/python/bin/pip install -U typing_extensions build pytest-json-ctrf pytest-timeout
 
       - name: Build package
         run: |
@@ -27,7 +31,11 @@ jobs:
       - name: Run tests with CTRF
         run: |
           export PYTHONPATH=$(pwd)/src
-          ./packages/python/bin/pytest tests --ctrf test-results.json
+          # Per-test failsafe: any single test taking >300s is hung. The
+          # signal method raises in the test so just that test fails (with a
+          # traceback) and the rest of the suite still runs.
+          ./packages/python/bin/pytest tests --ctrf test-results.json \
+            --timeout=300 --timeout-method=signal
 
       - name: Publish Test Results
         if: always()

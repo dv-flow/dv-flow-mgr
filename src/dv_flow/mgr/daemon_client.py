@@ -69,7 +69,16 @@ class DaemonClientBackend(RunnerBackend):
         return True
 
     async def start(self) -> None:
-        """Discover and connect to a running daemon."""
+        """Discover and connect to a running daemon.
+
+        Idempotent: if already connected (e.g. the caller started the
+        backend and then handed it to a runner that also starts it), this
+        returns immediately rather than opening a second connection and
+        orphaning the first reader loop.
+        """
+        if self._connected:
+            return
+
         if not os.path.isfile(self._state_path):
             raise RuntimeError(
                 "No daemon found (no %s). Start one with: dfm daemon start"
@@ -122,7 +131,13 @@ class DaemonClientBackend(RunnerBackend):
         _log.info("Connected to daemon at %s", self._socket_path)
 
     async def stop(self) -> None:
-        """Disconnect from the daemon, cancelling all inflight tasks first."""
+        """Disconnect from the daemon, cancelling all inflight tasks first.
+
+        Idempotent: safe to call more than once (e.g. once by the runner's
+        cleanup and again by the owning caller).
+        """
+        if not self._connected and self._writer is None:
+            return
         self._connected = False
 
         # Tell the daemon to cancel every request we're still waiting on.
@@ -149,6 +164,9 @@ class DaemonClientBackend(RunnerBackend):
                 await self._writer.wait_closed()
             except Exception:
                 pass
+            self._writer = None
+            self._reader = None
+            self._reader_task = None
 
     async def _cancel_inflight(self):
         """Send task.cancel for every pending request to the daemon."""
@@ -234,9 +252,14 @@ class DaemonClientBackend(RunnerBackend):
 
     async def _reader_loop(self):
         """Read lines from the daemon and route each to the matching Future."""
+        # Capture the reader locally so a (defensive) re-start that swaps
+        # self._reader can never make two loops read the same StreamReader,
+        # which would raise "readuntil() called while another coroutine is
+        # already waiting" and spuriously fail all pending requests.
+        reader = self._reader
         try:
             while True:
-                line = await self._reader.readline()
+                line = await reader.readline()
                 if not line:
                     _log.warning("Daemon closed connection")
                     break

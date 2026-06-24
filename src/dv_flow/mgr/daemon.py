@@ -258,15 +258,30 @@ class Daemon:
             "name": params.get("name", ""),
         })
 
-        # Store the full request data on the pool so the dispatch
-        # callback can access it when a worker becomes available.
-        asyncio.ensure_future(
-            self._host.pool.enqueue_task(
+        # Enqueue the task and, when the worker reports completion, route
+        # the result back to the originating client.  enqueue_task returns
+        # a Future (via the PoolManager) that resolves to the result dict;
+        # we must await it here so _send_result_to_client actually fires.
+        asyncio.ensure_future(self._run_and_route(request_id, params, resource_class))
+
+    async def _run_and_route(self, request_id: str, params: dict, resource_class: str):
+        """Enqueue a task on the pool and forward its result to the client."""
+        try:
+            result_future = await self._host.pool.enqueue_task(
                 request_id=request_id,
                 request_data=params,
                 resource_class=resource_class,
             )
-        )
+            result = await result_future
+        except asyncio.CancelledError:
+            # Task was cancelled (e.g. client disconnected); nothing to route.
+            return
+        except Exception as e:
+            _log.warning("Task %s failed before producing a result: %s",
+                         request_id, e)
+            self._inflight.pop(request_id, None)
+            return
+        await self._send_result_to_client(request_id, result)
 
     async def _send_result_to_client(self, request_id: str, result: dict):
         """Route a worker result back to the originating client."""
