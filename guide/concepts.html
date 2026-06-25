@@ -1,0 +1,566 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Packages" href="packages.html"><link rel="prev" title="User Guide" href="index.html">
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
+        <title>Key Concepts - DV Flow Manager documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">DV Flow Manager  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">DV Flow Manager  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configurations.html">Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_flow.html">Conditional &amp; Iterative Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="running.html">Running Flows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="caching.html">Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runners.html">Task Runners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developing_tasks.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tasks.html">Python Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced.html">Advanced Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">AI &amp; Agent Integration</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../ai/index.html">AI &amp; Agent Integration</a><input aria-label="Toggle navigation of AI &amp; Agent Integration" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ai/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/using_with_agents.html">Using DFM with External Agents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/agent_resources.html">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/native_agent.html">Native AI Agent (dfm agent)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/flow_spec.html">Flow-Spec Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli.html">Command reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/python_api.html">Python Task API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_backend_api.html">Runner Backend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_config.html">Runner Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/resource_tags.html">Resource Tags</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/guide/concepts.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="key-concepts">
+<h1>Key Concepts<a class="headerlink" href="#key-concepts" title="Link to this heading">¶</a></h1>
+<section id="tasks">
+<h2>Tasks<a class="headerlink" href="#tasks" title="Link to this heading">¶</a></h2>
+<p>Tasks are the fundamental unit of behavior in a DV-Flow specification. Tasks
+typically build on another task – either in whole or in part.</p>
+<a class="reference internal image-reference" href="../_images/task_diagram.excalidraw.svg"><img alt="Task Diagram" class="align-center" src="../_images/task_diagram.excalidraw.svg" style="width: 50%;" />
+</a>
+<p>There are three key concepts of tasks to understand:</p>
+<ul>
+<li><p><strong>Task Inputs/Dependencies</strong> - A task may express dependencies on other
+tasks. Doing so has two effects:</p>
+<ul class="simple">
+<li><p>A task is executed only after all its dependencies have executed</p></li>
+<li><p>The task receives the union of all output data produced by its dependencies.</p></li>
+</ul>
+<p>Executing a task results in outputs that are passed to any task that
+depends on it.</p>
+</li>
+<li><p><strong>Task Implementation</strong> - A task implementation provides the behavior
+for a task. It is most common for tasks to be implemented in whole or in
+part by existing tasks. Users can also define their own tasks via several
+mechanisms. (see developer’s guide)</p></li>
+<li><p><strong>Task Parameters</strong> - A task may specify a set of parameters that it
+accepts. Users of that task may modify the parameter values</p></li>
+</ul>
+<p>Let’s look at two examples using tasks implemented by the standard library
+(ref) to illustrate these concepts.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p1</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SayHello</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Hello</span><span class="nv"> </span><span class="s">World!&quot;</span>
+</pre></div>
+</div>
+<p>The code above specifies a package (named <cite>p1</cite>) that defines a single task
+named <cite>SayHello</cite>. The implementation of the task is provided by the
+standard library task <cite>Message</cite> (uses: std.Message). The <cite>Message</cite> task
+defines a parameter named <cite>msg</cite>, which specifies the message to display.
+Since we want to display “Hello World!”, we override the parameter value
+in our task.</p>
+<p>Running the <cite>p1.SayHello</cite> task will result in the message “Hello World!”
+being displayed.</p>
+<p>The example above showed the use of parameters, but not dataflow.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p1</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl_files</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src/rtl&quot;</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl_files</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>The example above shows simple dataflow. The <cite>std.FileSet</cite> task from the
+standard library produces a <cite>FileSet</cite> parameter based on the specified
+user input. In this case, the <cite>FileSet</cite> will contain a list of all
+SystemVerilog source files in the <cite>src/rtl</cite> sub-directory.</p>
+<p>We identify all SystemVerilog source files because we want to compile them
+into a simulation image using the Verilator tool. The task <cite>sim</cite> uses the
+<cite>hdlsim.vlt.SimImage</cite> task from the <cite>hdlsim</cite> library to compile the source
+files. Note how the <cite>sim</cite> task specifies the <cite>rtl_files</cite> task as a
+dependency. This means that it will receive a list of the SystemVerilog
+source files paths identified by the <cite>rtl_files</cite> task.</p>
+</section>
+<section id="packages">
+<h2>Packages<a class="headerlink" href="#packages" title="Link to this heading">¶</a></h2>
+<p>Packages are used as package namespaces, and to support static configuration.
+Built-in packages (eg ‘std’) are always available. User-defined packages
+can be imported explicitly via filesystem path or be discovered via tool-specific
+package-path mechanisms.</p>
+</section>
+<section id="dataflow">
+<h2>Dataflow<a class="headerlink" href="#dataflow" title="Link to this heading">¶</a></h2>
+<p>Many build systems coordinate tasks via shared variables. For example, if
+<cite>lib2</cite> has a dependency on <cite>lib1</cite>, then it uses a variable (eg <cite>LIB1_PATH</cite>)
+to reference <cite>lib1</cite>. For reliability, the value of these variables are
+typically set from above.</p>
+<p>Shared and global data poses a flexility and scalability problem. Using
+global data to configure tools means that it’s impossible to use two
+different configurations as part of the same workflow. Coordinating via
+known paths requires all tasks to share the same filesystem, which
+limits where tasks can run, and limits opportunities for caching.</p>
+<p>Consequently, DV-Flow tasks coordinate via parameter sets produced by
+a task and consumed by tasks that depend on the producing task.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p1</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl_files</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">base</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src/rtl&quot;</span>
+<span class="w">        </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.sv&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">      </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl_files</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>In many cases, dataflow naturally falls out of the build flow. In the example
+above, for example, it’s natural to think of the simulation image ‘needing’
+to have required source files. In cases where the parameter sets represent
+controls over tools in the flow, the production is explicit.</p>
+</section>
+<section id="types">
+<h2>Types<a class="headerlink" href="#types" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager supports custom data types that can be used to structure
+the data passed between tasks. Types are defined in packages and can inherit
+from other types, enabling reuse and extension of data structures.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_types</span>
+
+<span class="w">  </span><span class="nt">types</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-O2&quot;</span>
+<span class="w">      </span><span class="nt">warnings</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DebugOptions</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CompilerOptions</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">debug_level</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+</pre></div>
+</div>
+<p>Types can be used as the base for tasks (see DataItem tasks in the Using Tasks
+guide) or as structured parameters. When a type inherits from another using
+<code class="docutils literal notranslate"><span class="pre">uses:</span></code>, it includes all parameters from the base type and can add or
+override parameters.</p>
+</section>
+<section id="expression-system">
+<h2>Expression System<a class="headerlink" href="#expression-system" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager supports dynamic parameter evaluation using the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code>
+expression syntax. This allows parameters to reference other parameters,
+perform calculations, and make decisions based on configuration values.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;O2&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Compiling</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">-${{</span><span class="nv"> </span><span class="s">optimization</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">debug=${{</span><span class="nv"> </span><span class="s">debug</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Expressions can access:</p>
+<ul class="simple">
+<li><p><strong>Package parameters</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">param_name</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>Task parameters</strong>: From containing compound tasks</p></li>
+<li><p><strong>Matrix variables</strong>: When using matrix strategy</p></li>
+<li><p><strong>Arithmetic</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">value</span> <span class="pre">*</span> <span class="pre">2</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>Comparisons</strong>: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">debug_level</span> <span class="pre">&gt;</span> <span class="pre">0</span> <span class="pre">}}</span></code></p></li>
+<li><p><strong>String operations</strong>: Concatenation and formatting</p></li>
+</ul>
+<p>The expression evaluator provides a safe subset of Python expressions,
+ensuring that flow specifications remain declarative and predictable.</p>
+</section>
+<section id="task-dependencies-needs-and-feeds">
+<h2>Task Dependencies: needs and feeds<a class="headerlink" href="#task-dependencies-needs-and-feeds" title="Link to this heading">¶</a></h2>
+<p>Tasks express dependencies using the <code class="docutils literal notranslate"><span class="pre">needs</span></code> field, which specifies
+which tasks must complete before this task can run. DV Flow also supports
+the <code class="docutils literal notranslate"><span class="pre">feeds</span></code> field, which is the inverse relationship - it declares which
+tasks depend on this task.</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sources</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">feeds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">compile</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Inverse of &#39;needs&#39;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hdlsim.vlt.SimImage</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sources</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># Explicit dependency</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">feeds</span></code> field can be useful for defining dependencies from the producer’s
+perspective, particularly when organizing large flows where it’s clearer to
+declare what a task provides rather than what consumes it.</p>
+<p>Both <code class="docutils literal notranslate"><span class="pre">needs</span></code> and <code class="docutils literal notranslate"><span class="pre">feeds</span></code> establish the same scheduling dependencies and
+dataflow relationships - they are simply two ways to express the same graph
+structure.</p>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="packages.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Packages</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="index.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">User Guide</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023-2025, Matthew Ballance
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Key Concepts</a><ul>
+<li><a class="reference internal" href="#tasks">Tasks</a></li>
+<li><a class="reference internal" href="#packages">Packages</a></li>
+<li><a class="reference internal" href="#dataflow">Dataflow</a></li>
+<li><a class="reference internal" href="#types">Types</a></li>
+<li><a class="reference internal" href="#expression-system">Expression System</a></li>
+<li><a class="reference internal" href="#task-dependencies-needs-and-feeds">Task Dependencies: needs and feeds</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

@@ -1,0 +1,1006 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Parameters and Configuration" href="parameters.html"><link rel="prev" title="Using Tasks" href="tasks.html">
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
+        <title>Dataflow &amp; Produces - DV Flow Manager documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">DV Flow Manager  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">DV Flow Manager  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="concepts.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks.html">Using Tasks</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configurations.html">Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_flow.html">Conditional &amp; Iterative Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="running.html">Running Flows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="caching.html">Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runners.html">Task Runners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developing_tasks.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tasks.html">Python Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced.html">Advanced Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">AI &amp; Agent Integration</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../ai/index.html">AI &amp; Agent Integration</a><input aria-label="Toggle navigation of AI &amp; Agent Integration" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ai/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/using_with_agents.html">Using DFM with External Agents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/agent_resources.html">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/native_agent.html">Native AI Agent (dfm agent)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/flow_spec.html">Flow-Spec Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli.html">Command reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/python_api.html">Python Task API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_backend_api.html">Runner Backend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_config.html">Runner Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/resource_tags.html">Resource Tags</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/guide/dataflow.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="dataflow-produces">
+<h1>Dataflow &amp; Produces<a class="headerlink" href="#dataflow-produces" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager uses <strong>dataflow dependencies</strong> to connect tasks together. Each task can:</p>
+<ul class="simple">
+<li><p><strong>Consume</strong> input data from its dependencies</p></li>
+<li><p><strong>Produce</strong> output data for dependent tasks</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">produces</span></code> feature allows tasks to declare what output datasets they create,
+enabling workflow validation and task discovery.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>When a task lists another task in its <code class="docutils literal notranslate"><span class="pre">needs</span></code>, it receives the output data from
+that dependency as input. To ensure compatibility and help with task discovery,
+tasks should declare:</p>
+<ul class="simple">
+<li><p><strong>produces</strong> - What output datasets this task creates</p></li>
+<li><p><strong>consumes</strong> - What input datasets this task accepts</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_flow</span>
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># Producer declares what it outputs</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VerilogCompiler</span>
+<span class="w">      </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">          </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no"># ... compile verilog files</span>
+
+<span class="w">    </span><span class="c1"># Consumer declares what it needs</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Simulator</span>
+<span class="w">      </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">VerilogCompiler</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">consumes</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">          </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">      </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no"># ... run simulation</span>
+</pre></div>
+</div>
+<p>The validator checks that <code class="docutils literal notranslate"><span class="pre">VerilogCompiler</span></code>’s produces matches <code class="docutils literal notranslate"><span class="pre">Simulator</span></code>’s
+consumes, warning if there’s a mismatch.</p>
+</section>
+<section id="declaring-produces">
+<h2>Declaring Produces<a class="headerlink" href="#declaring-produces" title="Link to this heading">¶</a></h2>
+<section id="basic-declaration">
+<h3>Basic Declaration<a class="headerlink" href="#basic-declaration" title="Link to this heading">¶</a></h3>
+<p>Declare output datasets using a list of pattern dictionaries:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyTask</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;produce verilog files&quot;</span>
+</pre></div>
+</div>
+<p>Each pattern describes one type of output. Tasks can produce multiple types:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Compiler</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilogInclude</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom.BuildLog</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json</span>
+</pre></div>
+</div>
+</section>
+<section id="parameter-references">
+<h3>Parameter References<a class="headerlink" href="#parameter-references" title="Link to this heading">¶</a></h3>
+<p>Produces patterns can reference task parameters using <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code> syntax:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GenericProducer</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">output_type</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">params.output_type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;produce ${{ output_type }} files&quot;</span>
+</pre></div>
+</div>
+<p>The parameter reference is evaluated when the task graph is built, creating
+a concrete produces pattern for that task instance.</p>
+</section>
+<section id="complex-patterns">
+<h3>Complex Patterns<a class="headerlink" href="#complex-patterns" title="Link to this heading">¶</a></h3>
+<p>Produces patterns can have multiple attributes to precisely describe outputs:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VendorTool</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">      </span><span class="nt">vendor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synopsys</span>
+<span class="w">      </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2023.09&quot;</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">speed</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;vendor-specific output&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="optional-declaration">
+<h3>Optional Declaration<a class="headerlink" href="#optional-declaration" title="Link to this heading">¶</a></h3>
+<p>Declaring produces is <strong>optional</strong>. Tasks without produces are assumed to have
+unknown or dynamic outputs, which is acceptable for validation:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># No produces declared - that&#39;s OK</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DynamicTask</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;outputs vary at runtime&quot;</span>
+
+<span class="c1"># Explicitly declare no outputs</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SideEffectTask</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;only side effects, no data output&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="inheritance">
+<h2>Inheritance<a class="headerlink" href="#inheritance" title="Link to this heading">¶</a></h2>
+<p>When a task uses another task as a base, it <strong>inherits and extends</strong> the base
+task’s produces patterns:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BaseCompiler</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;base compilation&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AdvancedCompiler</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BaseCompiler</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ucdb</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;advanced compilation with coverage&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">AdvancedCompiler</span></code> produces <strong>both</strong>:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> with <code class="docutils literal notranslate"><span class="pre">filetype:</span> <span class="pre">verilog</span></code> (inherited from base)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std.FileSet</span></code> with <code class="docutils literal notranslate"><span class="pre">filetype:</span> <span class="pre">coverage</span></code> (added by derived task)</p></li>
+</ol>
+<p>This matches the principle that derived tasks add capabilities to base tasks.</p>
+</section>
+<section id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">dfm</span> <span class="pre">validate</span></code> command checks produces/consumes compatibility between
+connected tasks.</p>
+<section id="compatibility-rules">
+<h3>Compatibility Rules<a class="headerlink" href="#compatibility-rules" title="Link to this heading">¶</a></h3>
+<p>Two tasks are compatible when:</p>
+<ol class="arabic simple">
+<li><p><strong>Consumer has consumes: all</strong> - Accepts any produces</p></li>
+<li><p><strong>Producer has no produces</strong> - Unknown outputs assumed compatible</p></li>
+<li><p><strong>OR Logic</strong> - If ANY consumer pattern matches ANY producer pattern, the
+dataflow is valid</p></li>
+</ol>
+</section>
+<section id="pattern-matching">
+<h3>Pattern Matching<a class="headerlink" href="#pattern-matching" title="Link to this heading">¶</a></h3>
+<p>A consumer pattern matches a producer pattern when:</p>
+<ul class="simple">
+<li><p>All attributes in the consumer pattern exist in the producer pattern</p></li>
+<li><p>All attribute values match exactly</p></li>
+<li><p>Producer can have additional attributes (subset matching)</p></li>
+</ul>
+<p>Examples:</p>
+<p>✅ <strong>Compatible - Exact Match</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Producer</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+
+<span class="c1"># Consumer</span>
+<span class="nt">consumes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+</pre></div>
+</div>
+<p>✅ <strong>Compatible - Subset Match</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Producer has extra attributes</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="nt">vendor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synopsys</span>
+
+<span class="c1"># Consumer only requires some attributes</span>
+<span class="nt">consumes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Warning - Mismatch</strong>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Producer</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+
+<span class="c1"># Consumer needs different type</span>
+<span class="nt">consumes</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vhdl</span><span class="w">  </span><span class="c1"># Mismatch!</span>
+</pre></div>
+</div>
+</section>
+<section id="or-logic-example">
+<h3>OR Logic Example<a class="headerlink" href="#or-logic-example" title="Link to this heading">¶</a></h3>
+<p>When multiple patterns exist, ANY match makes it valid:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Producer outputs both verilog and vhdl</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MultiProducer</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vhdl</span>
+
+<span class="c1"># Consumer accepts either</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FlexibleConsumer</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">MultiProducer</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">consumes</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span><span class="w">  </span><span class="c1"># This matches, so it&#39;s valid!</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemverilog</span>
+</pre></div>
+</div>
+</section>
+<section id="warnings-vs-errors">
+<h3>Warnings vs Errors<a class="headerlink" href="#warnings-vs-errors" title="Link to this heading">¶</a></h3>
+<p>Dataflow mismatches generate <strong>warnings</strong>, not errors. This allows:</p>
+<ul class="simple">
+<li><p>Flexible workflows during development</p></li>
+<li><p>Dynamic outputs not known at definition time</p></li>
+<li><p>Gradual adoption of produces declarations</p></li>
+</ul>
+<p>To see validation warnings:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>dfm<span class="w"> </span>validate
+Package:<span class="w"> </span>my_flow
+<span class="w">  </span>Tasks:<span class="w"> </span><span class="m">5</span>
+<span class="w">  </span>Types:<span class="w"> </span><span class="m">2</span>
+
+Warnings<span class="w"> </span><span class="o">(</span><span class="m">1</span><span class="o">)</span>:
+<span class="w">  </span>WARNING:<span class="w"> </span>Task<span class="w"> </span><span class="s1">&#39;Consumer&#39;</span><span class="w"> </span>consumes<span class="w"> </span><span class="o">[{</span><span class="s1">&#39;type&#39;</span>:<span class="w"> </span><span class="s1">&#39;std.FileSet&#39;</span>,<span class="w"> </span><span class="s1">&#39;filetype&#39;</span>:<span class="w"> </span><span class="s1">&#39;vhdl&#39;</span><span class="o">}]</span>
+<span class="w">           </span>but<span class="w"> </span><span class="s1">&#39;Producer&#39;</span><span class="w"> </span>produces<span class="w"> </span><span class="o">[{</span><span class="s1">&#39;type&#39;</span>:<span class="w"> </span><span class="s1">&#39;std.FileSet&#39;</span>,<span class="w"> </span><span class="s1">&#39;filetype&#39;</span>:<span class="w"> </span><span class="s1">&#39;verilog&#39;</span><span class="o">}]</span>.
+<span class="w">           </span>No<span class="w"> </span>consume<span class="w"> </span>pattern<span class="w"> </span>matches<span class="w"> </span>any<span class="w"> </span>produce<span class="w"> </span>pattern.
+
+✓<span class="w"> </span>Validation<span class="w"> </span>passed
+<span class="w">  </span><span class="o">(</span><span class="m">1</span><span class="w"> </span>warning<span class="o">(</span>s<span class="o">))</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="task-discovery">
+<h2>Task Discovery<a class="headerlink" href="#task-discovery" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">show</span></code> command can filter tasks by their produces patterns.</p>
+<section id="finding-tasks-by-output">
+<h3>Finding Tasks by Output<a class="headerlink" href="#finding-tasks-by-output" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">--produces</span></code> to find tasks that produce specific outputs:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Find tasks that produce verilog files</span>
+$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet,filetype=verilog&quot;</span>
+
+Task<span class="w">                              </span>Description
+────────────────────────────────────────────────────
+my_flow.VerilogCompiler<span class="w">          </span>Compiles<span class="w"> </span>Verilog<span class="w"> </span>RTL
+my_flow.PreProcessor<span class="w">             </span>Preprocesses<span class="w"> </span>sources
+</pre></div>
+</div>
+</section>
+<section id="viewing-task-details">
+<h3>Viewing Task Details<a class="headerlink" href="#viewing-task-details" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">show</span> <span class="pre">task</span></code> command displays produces information:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>VerilogCompiler
+
+Task:<span class="w">        </span>my_flow.VerilogCompiler
+Package:<span class="w">     </span>my_flow
+Base:<span class="w">        </span>-
+Scope:<span class="w">       </span>-
+
+Parameters:
+<span class="w">  </span>optimization<span class="w">  </span>str<span class="w">     </span>O2<span class="w">    </span>Optimization<span class="w"> </span>level
+
+Produces:
+<span class="w">  </span>-<span class="w"> </span><span class="nv">type</span><span class="o">=</span>std.FileSet,<span class="w"> </span><span class="nv">filetype</span><span class="o">=</span>verilog,<span class="w"> </span><span class="nv">optimization</span><span class="o">=</span>O2
+
+Direct<span class="w"> </span>Needs:
+<span class="w">  </span>-<span class="w"> </span>my_flow.SourceFiles
+</pre></div>
+</div>
+</section>
+<section id="filter-syntax">
+<h3>Filter Syntax<a class="headerlink" href="#filter-syntax" title="Link to this heading">¶</a></h3>
+<p>The produces filter uses comma-separated key=value pairs:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Single attribute</span>
+--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet&quot;</span>
+
+<span class="c1"># Multiple attributes (all must match)</span>
+--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet,filetype=verilog&quot;</span>
+
+<span class="c1"># Complex filter</span>
+--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet,filetype=verilog,vendor=synopsys&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="json-output">
+<h3>JSON Output<a class="headerlink" href="#json-output" title="Link to this heading">¶</a></h3>
+<p>For programmatic use, add <code class="docutils literal notranslate"><span class="pre">--json</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>tasks<span class="w"> </span>--produces<span class="w"> </span><span class="s2">&quot;type=std.FileSet&quot;</span><span class="w"> </span>--json
+</pre></div>
+</div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;show tasks&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;produces&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;type=std.FileSet&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;results&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_flow.VerilogCompiler&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;package&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_flow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;desc&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Compiles Verilog RTL&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;produces&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verilog&quot;</span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<section id="when-to-declare-produces">
+<h3>When to Declare Produces<a class="headerlink" href="#when-to-declare-produces" title="Link to this heading">¶</a></h3>
+<p>✅ <strong>Do declare produces for:</strong></p>
+<ul class="simple">
+<li><p>Tasks with predictable, structured outputs</p></li>
+<li><p>Tasks that produce FileSet or custom data items</p></li>
+<li><p>Reusable library tasks</p></li>
+<li><p>Tasks where output type matters to consumers</p></li>
+</ul>
+<p>❌ <strong>Don’t declare produces for:</strong></p>
+<ul class="simple">
+<li><p>Tasks with purely side effects (no data outputs)</p></li>
+<li><p>Tasks with highly dynamic outputs not known until runtime</p></li>
+<li><p>Quick one-off tasks in a specific workflow</p></li>
+</ul>
+</section>
+<section id="being-specific">
+<h3>Being Specific<a class="headerlink" href="#being-specific" title="Link to this heading">¶</a></h3>
+<p>More specific produces patterns enable better validation:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Less helpful - too generic</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+
+<span class="c1"># Better - includes key characteristics</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compiled</span>
+
+<span class="c1"># Best - fully describes the output</span>
+<span class="nt">produces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compiled</span>
+<span class="w">    </span><span class="nt">vendor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synopsys</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">speed</span>
+</pre></div>
+</div>
+</section>
+<section id="documenting-outputs">
+<h3>Documenting Outputs<a class="headerlink" href="#documenting-outputs" title="Link to this heading">¶</a></h3>
+<p>Use task description and documentation to explain produces:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AdvancedCompiler</span>
+<span class="w">  </span><span class="nt">desc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Compiles Verilog with vendor-specific optimizations</span>
+<span class="w">  </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no">This task compiles Verilog RTL using vendor-specific tools,</span>
+<span class="w">    </span><span class="no">producing optimized netlists and optional coverage databases.</span>
+
+<span class="w">    </span><span class="no">Outputs:</span>
+<span class="w">    </span><span class="no">- Compiled Verilog netlist (optimized for speed)</span>
+<span class="w">    </span><span class="no">- UCDB coverage database (if coverage enabled)</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">      </span><span class="nt">optimization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">speed</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ucdb</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="common-patterns">
+<h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading">¶</a></h2>
+<section id="file-transformation-pipeline">
+<h3>File Transformation Pipeline<a class="headerlink" href="#file-transformation-pipeline" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PreProcess</span>
+<span class="w">    </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">        </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">preprocessed</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;preprocess&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Compile</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">PreProcess</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">    </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">        </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compiled</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;compile&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Optimize</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Compile</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">        </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compiled</span>
+<span class="w">    </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">        </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+<span class="w">        </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optimized</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;optimize&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="multi-output-tasks">
+<h3>Multi-Output Tasks<a class="headerlink" href="#multi-output-tasks" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BuildAndAnalyze</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">executable</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">coverage</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lcov</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">    </span><span class="no"># Build creates executable, coverage data, and logs</span>
+</pre></div>
+</div>
+</section>
+<section id="parameterized-outputs">
+<h3>Parameterized Outputs<a class="headerlink" href="#parameterized-outputs" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GenericBuilder</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">target</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<span class="w">    </span><span class="nt">format</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">elf</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">executable</span>
+<span class="w">      </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">params.target</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">      </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">params.format</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;build for ${{ target }}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
+<section id="validation-warnings">
+<h3>Validation Warnings<a class="headerlink" href="#validation-warnings" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Getting dataflow mismatch warnings</p>
+<p><strong>Solutions</strong>:</p>
+<ol class="arabic">
+<li><p>Check produces pattern matches consumes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>ProducerTask
+$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>ConsumerTask
+</pre></div>
+</div>
+</li>
+<li><p>Make produces more specific or consumes less specific</p></li>
+<li><p>Verify parameter values are correct</p></li>
+<li><p>Check task inheritance - derived tasks extend produces</p></li>
+</ol>
+<p><strong>Problem</strong>: Warning says “No consume pattern matches any produce pattern”</p>
+<p><strong>Solution</strong>: This means NONE of the consumer’s patterns match ANY of the
+producer’s patterns. Check for typos in attribute names or values.</p>
+</section>
+<section id="missing-produces">
+<h3>Missing Produces<a class="headerlink" href="#missing-produces" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Tasks not appearing in <code class="docutils literal notranslate"><span class="pre">--produces</span></code> filter</p>
+<p><strong>Solutions</strong>:</p>
+<ol class="arabic simple">
+<li><p>Verify produces is declared in task definition</p></li>
+<li><p>Check produces patterns match filter exactly</p></li>
+<li><p>Ensure task is in the loaded package</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Debug: show all tasks to verify it exists</span>
+$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>tasks
+
+<span class="c1"># Debug: show specific task to see its produces</span>
+$<span class="w"> </span>dfm<span class="w"> </span>show<span class="w"> </span>task<span class="w"> </span>MyTask
+</pre></div>
+</div>
+</section>
+<section id="parameter-evaluation">
+<h3>Parameter Evaluation<a class="headerlink" href="#parameter-evaluation" title="Link to this heading">¶</a></h3>
+<p><strong>Problem</strong>: Parameter references not being evaluated</p>
+<p><strong>Solutions</strong>:</p>
+<ol class="arabic simple">
+<li><p>Use correct syntax: <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">params.name</span> <span class="pre">}}</span></code> not <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">name</span> <span class="pre">}}</span></code></p></li>
+<li><p>Verify parameter is defined in task’s <code class="docutils literal notranslate"><span class="pre">with</span></code> section</p></li>
+<li><p>Check parameter has a value (default or override)</p></li>
+</ol>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MyTask</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">output_type</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span><span class="w">  </span><span class="c1"># Must have a value!</span>
+<span class="w">  </span><span class="nt">produces</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">      </span><span class="nt">filetype</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">params.output_type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="filtering-inputs">
+<h2>Filtering Inputs<a class="headerlink" href="#filtering-inputs" title="Link to this heading">¶</a></h2>
+<p>When a task consumes data from multiple producers, you can use <strong>filters</strong> to
+transform or select specific items from the inputs.</p>
+<section id="basic-filtering">
+<h3>Basic Filtering<a class="headerlink" href="#basic-filtering" title="Link to this heading">¶</a></h3>
+<p>Use the pipe operator <code class="docutils literal notranslate"><span class="pre">|</span></code> to apply filters to inputs:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile_sv</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">find_sources</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">sv_files</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.sv&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">for file in ${sv_files}; do</span>
+<span class="w">        </span><span class="no">echo &quot;Compiling $file&quot;</span>
+<span class="w">      </span><span class="no">done</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">by_filetype</span></code> filter selects only files with the <code class="docutils literal notranslate"><span class="pre">.sv</span></code> extension from
+the <code class="docutils literal notranslate"><span class="pre">inputs</span></code> array.</p>
+</section>
+<section id="chaining-filters">
+<h3>Chaining Filters<a class="headerlink" href="#chaining-filters" title="Link to this heading">¶</a></h3>
+<p>Chain multiple filters for complex transformations:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extract just filenames without paths</span>
+<span class="nt">basenames</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">by_filetype(&#39;.v&#39;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">basenames</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Get unique file extensions</span>
+<span class="nt">extensions</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">extensions</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Count items by type</span>
+<span class="nt">counts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">count_by_type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="standard-filters">
+<h3>Standard Filters<a class="headerlink" href="#standard-filters" title="Link to this heading">¶</a></h3>
+<p>The standard library provides common filters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">by_filetype(ext)</span></code> - Filter files by extension</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">by_type(typename)</span></code> - Filter by data type</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">basenames</span></code> - Extract basenames from paths</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">extensions</span></code> - Extract file extensions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">paths</span></code> - Get all paths from FileSet items</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">first_of_type(typename)</span></code> - Get first item of type</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pluck(field)</span></code> - Extract field values from objects</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">count_by_type</span></code> - Count items grouped by type</p></li>
+</ul>
+<p>For complete filter documentation, see <a class="reference internal" href="filters.html"><span class="doc">Filters</span></a>.</p>
+</section>
+<section id="custom-filters">
+<h3>Custom Filters<a class="headerlink" href="#custom-filters" title="Link to this heading">¶</a></h3>
+<p>Define custom filters in your package:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filters</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog_only</span>
+<span class="w">    </span><span class="nt">export</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">input[] | select(input.path | split(&quot;.&quot;) | last | . == &quot;v&quot; or . == &quot;sv&quot;)</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="filters.html"><span class="doc">Filters</span></a> for details on defining and using custom filters.</p>
+</section>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="tasks.html"><span class="doc">Using Tasks</span></a> - Using and customizing tasks</p></li>
+<li><p><a class="reference internal" href="developing_tasks.html"><span class="doc">Developing Tasks</span></a> - Creating new tasks</p></li>
+<li><p><a class="reference internal" href="expressions.html"><span class="doc">Expressions</span></a> - Parameter and expression syntax</p></li>
+<li><p><a class="reference internal" href="filters.html"><span class="doc">Filters</span></a> - Filter reference and custom filter creation</p></li>
+<li><p><a class="reference internal" href="../reference/cli.html"><span class="doc">Command reference</span></a> - Command reference for validate and show</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="parameters.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Parameters and Configuration</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="tasks.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Using Tasks</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023-2025, Matthew Ballance
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dataflow &amp; Produces</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#declaring-produces">Declaring Produces</a><ul>
+<li><a class="reference internal" href="#basic-declaration">Basic Declaration</a></li>
+<li><a class="reference internal" href="#parameter-references">Parameter References</a></li>
+<li><a class="reference internal" href="#complex-patterns">Complex Patterns</a></li>
+<li><a class="reference internal" href="#optional-declaration">Optional Declaration</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#inheritance">Inheritance</a></li>
+<li><a class="reference internal" href="#validation">Validation</a><ul>
+<li><a class="reference internal" href="#compatibility-rules">Compatibility Rules</a></li>
+<li><a class="reference internal" href="#pattern-matching">Pattern Matching</a></li>
+<li><a class="reference internal" href="#or-logic-example">OR Logic Example</a></li>
+<li><a class="reference internal" href="#warnings-vs-errors">Warnings vs Errors</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#task-discovery">Task Discovery</a><ul>
+<li><a class="reference internal" href="#finding-tasks-by-output">Finding Tasks by Output</a></li>
+<li><a class="reference internal" href="#viewing-task-details">Viewing Task Details</a></li>
+<li><a class="reference internal" href="#filter-syntax">Filter Syntax</a></li>
+<li><a class="reference internal" href="#json-output">JSON Output</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#best-practices">Best Practices</a><ul>
+<li><a class="reference internal" href="#when-to-declare-produces">When to Declare Produces</a></li>
+<li><a class="reference internal" href="#being-specific">Being Specific</a></li>
+<li><a class="reference internal" href="#documenting-outputs">Documenting Outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#common-patterns">Common Patterns</a><ul>
+<li><a class="reference internal" href="#file-transformation-pipeline">File Transformation Pipeline</a></li>
+<li><a class="reference internal" href="#multi-output-tasks">Multi-Output Tasks</a></li>
+<li><a class="reference internal" href="#parameterized-outputs">Parameterized Outputs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li><a class="reference internal" href="#validation-warnings">Validation Warnings</a></li>
+<li><a class="reference internal" href="#missing-produces">Missing Produces</a></li>
+<li><a class="reference internal" href="#parameter-evaluation">Parameter Evaluation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#filtering-inputs">Filtering Inputs</a><ul>
+<li><a class="reference internal" href="#basic-filtering">Basic Filtering</a></li>
+<li><a class="reference internal" href="#chaining-filters">Chaining Filters</a></li>
+<li><a class="reference internal" href="#standard-filters">Standard Filters</a></li>
+<li><a class="reference internal" href="#custom-filters">Custom Filters</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

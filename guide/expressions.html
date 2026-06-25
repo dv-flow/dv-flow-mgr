@@ -1,0 +1,945 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Conditional &amp; Iterative Tasks" href="control_flow.html"><link rel="prev" title="Configurations" href="configurations.html">
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
+        <title>Expressions - DV Flow Manager documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">DV Flow Manager  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">DV Flow Manager  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="concepts.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configurations.html">Configurations</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_flow.html">Conditional &amp; Iterative Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="running.html">Running Flows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="incremental.html">Incremental Builds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="caching.html">Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runners.html">Task Runners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developing_tasks.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tasks.html">Python Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced.html">Advanced Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">AI &amp; Agent Integration</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../ai/index.html">AI &amp; Agent Integration</a><input aria-label="Toggle navigation of AI &amp; Agent Integration" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ai/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/using_with_agents.html">Using DFM with External Agents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/agent_resources.html">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/native_agent.html">Native AI Agent (dfm agent)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/flow_spec.html">Flow-Spec Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli.html">Command reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/python_api.html">Python Task API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_backend_api.html">Runner Backend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_config.html">Runner Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/resource_tags.html">Resource Tags</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/guide/expressions.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="expressions">
+<h1>Expressions<a class="headerlink" href="#expressions" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager supports dynamic parameter evaluation using the <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code>
+expression syntax. Expressions allow parameters to reference other parameters,
+perform calculations, and make decisions based on configuration values.</p>
+<section id="expression-syntax">
+<h2>Expression Syntax<a class="headerlink" href="#expression-syntax" title="Link to this heading">¶</a></h2>
+<p>Expressions are enclosed in <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">}}</span></code> markers:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Value</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">some_parameter</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Any parameter value can contain expressions. They are evaluated during
+task graph elaboration, before any task execution begins.</p>
+</section>
+<section id="basic-usage">
+<h2>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h2>
+<section id="parameter-references">
+<h3>Parameter References<a class="headerlink" href="#parameter-references" title="Link to this heading">¶</a></h3>
+<p>Reference package and task parameters by name:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_pkg</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">build_type</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;debug&quot;</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">build_type</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">mode&quot;</span>
+</pre></div>
+</div>
+<p>Expressions can reference:</p>
+<ul class="simple">
+<li><p><strong>Package parameters</strong>: Defined in the package’s <code class="docutils literal notranslate"><span class="pre">with</span></code> section</p></li>
+<li><p><strong>Task parameters</strong>: Defined in the task’s <code class="docutils literal notranslate"><span class="pre">with</span></code> section</p></li>
+<li><p><strong>Parent task parameters</strong>: In compound tasks, access parent parameters</p></li>
+</ul>
+</section>
+<section id="arithmetic-operations">
+<h3>Arithmetic Operations<a class="headerlink" href="#arithmetic-operations" title="Link to this heading">¶</a></h3>
+<p>Perform calculations within expressions:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">base_value</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Double</span><span class="nv"> </span><span class="s">value:</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">base_value</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">2</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task2</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sum:</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">base_value</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">50</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Supported operators:</p>
+<ul class="simple">
+<li><p>Arithmetic: <code class="docutils literal notranslate"><span class="pre">+</span></code>, <code class="docutils literal notranslate"><span class="pre">-</span></code>, <code class="docutils literal notranslate"><span class="pre">*</span></code>, <code class="docutils literal notranslate"><span class="pre">/</span></code>, <code class="docutils literal notranslate"><span class="pre">//</span></code>, <code class="docutils literal notranslate"><span class="pre">%</span></code>, <code class="docutils literal notranslate"><span class="pre">**</span></code></p></li>
+<li><p>Comparison: <code class="docutils literal notranslate"><span class="pre">==</span></code>, <code class="docutils literal notranslate"><span class="pre">!=</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;=</span></code>, <code class="docutils literal notranslate"><span class="pre">&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&gt;=</span></code></p></li>
+<li><p>Logical: <code class="docutils literal notranslate"><span class="pre">and</span></code>, <code class="docutils literal notranslate"><span class="pre">or</span></code>, <code class="docutils literal notranslate"><span class="pre">not</span></code></p></li>
+</ul>
+</section>
+<section id="boolean-expressions">
+<h3>Boolean Expressions<a class="headerlink" href="#boolean-expressions" title="Link to this heading">¶</a></h3>
+<p>Use boolean expressions for conditional logic:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">iff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ debug and optimization &lt; 2 }}</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Debug</span><span class="nv"> </span><span class="s">mode</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">low</span><span class="nv"> </span><span class="s">optimization&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="string-operations">
+<h3>String Operations<a class="headerlink" href="#string-operations" title="Link to this heading">¶</a></h3>
+<p>Concatenate strings and format values:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prefix</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;build&quot;</span>
+<span class="w">    </span><span class="nt">version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">prefix</span><span class="nv"> </span><span class="s">}}_v${{</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="w">  </span><span class="c1"># &quot;build_v1.0&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="expression-contexts">
+<h2>Expression Contexts<a class="headerlink" href="#expression-contexts" title="Link to this heading">¶</a></h2>
+<section id="package-scope">
+<h3>Package Scope<a class="headerlink" href="#package-scope" title="Link to this heading">¶</a></h3>
+<p>At package level, expressions can reference package parameters:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">compiler</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;gcc&quot;</span>
+<span class="w">    </span><span class="nt">version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;11&quot;</span>
+
+<span class="w">  </span><span class="nt">imports</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">toolchain</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">compiler</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler }}</span>
+<span class="w">      </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
+</pre></div>
+</div>
+</section>
+<section id="task-scope">
+<h3>Task Scope<a class="headerlink" href="#task-scope" title="Link to this heading">¶</a></h3>
+<p>Within tasks, expressions can access:</p>
+<ul class="simple">
+<li><p>Package parameters</p></li>
+<li><p>Task parameters</p></li>
+<li><p>Parent compound task parameters (if nested)</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parent</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;release&quot;</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">child</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># Access parent&#39;s &#39;mode&#39; parameter</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Running</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">mode</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">mode&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="matrix-variables">
+<h3>Matrix Variables<a class="headerlink" href="#matrix-variables" title="Link to this heading">¶</a></h3>
+<p>When using matrix strategy, expressions can reference matrix variables:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test_suite</span>
+<span class="w">  </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;test1&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;test2&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;test3&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">100</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">200</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">300</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">body</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run_test</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Running</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.test</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">seed</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.seed</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>This generates 9 tasks (3 tests × 3 seeds) with appropriate parameter values.</p>
+</section>
+</section>
+<section id="advanced-features">
+<h2>Advanced Features<a class="headerlink" href="#advanced-features" title="Link to this heading">¶</a></h2>
+<section id="conditional-expressions">
+<h3>Conditional Expressions<a class="headerlink" href="#conditional-expressions" title="Link to this heading">¶</a></h3>
+<p>Use ternary-like conditional logic:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">debug</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;make debug&quot; if debug else &quot;make release&quot; }}</span>
+</pre></div>
+</div>
+<p>Note: Python-style conditional expressions (<code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">if</span> <span class="pre">condition</span> <span class="pre">else</span> <span class="pre">y</span></code>) are supported.</p>
+</section>
+<section id="list-and-dict-operations">
+<h3>List and Dict Operations<a class="headerlink" href="#list-and-dict-operations" title="Link to this heading">¶</a></h3>
+<p>Access list elements and dictionary values:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">flags</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;-O2&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-Wall&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-Werror&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">map</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">arch</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x86_64&quot;</span>
+<span class="w">        </span><span class="nt">os</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;linux&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task1</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;First</span><span class="nv"> </span><span class="s">flag:</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">flags[0]</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="w">  </span><span class="c1"># &quot;-O2&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task2</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Architecture:</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">config[&#39;arch&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="w">  </span><span class="c1"># &quot;x86_64&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="function-calls">
+<h3>Function Calls<a class="headerlink" href="#function-calls" title="Link to this heading">¶</a></h3>
+<p>Limited set of built-in functions are available:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">example</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ len(some_list) }}</span><span class="w">  </span><span class="c1"># List length</span>
+<span class="w">    </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ str(some_int) }}</span><span class="w">   </span><span class="c1"># Convert to string</span>
+<span class="w">    </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ int(some_str) }}</span><span class="w">   </span><span class="c1"># Convert to integer</span>
+</pre></div>
+</div>
+<p>Available functions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">len(x)</span></code>: Length of list/string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">str(x)</span></code>: Convert to string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">int(x)</span></code>: Convert to integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">bool(x)</span></code>: Convert to boolean</p></li>
+</ul>
+</section>
+</section>
+<section id="expression-evaluation-order">
+<h2>Expression Evaluation Order<a class="headerlink" href="#expression-evaluation-order" title="Link to this heading">¶</a></h2>
+<p>Expressions are evaluated in the following order:</p>
+<ol class="arabic simple">
+<li><p><strong>Package load time</strong>: Package-level expressions in imports and overrides</p></li>
+<li><p><strong>Task elaboration</strong>: Task parameter expressions</p></li>
+<li><p><strong>Condition evaluation</strong>: <code class="docutils literal notranslate"><span class="pre">iff</span></code> expressions for conditional tasks</p></li>
+<li><p><strong>Matrix expansion</strong>: Matrix variable substitution</p></li>
+</ol>
+<p>This order ensures that:</p>
+<ul class="simple">
+<li><p>Configuration is resolved before task creation</p></li>
+<li><p>Parameters are available when needed</p></li>
+<li><p>Dependencies are properly evaluated</p></li>
+</ul>
+</section>
+<section id="runtime-expressions">
+<h2>Runtime Expressions<a class="headerlink" href="#runtime-expressions" title="Link to this heading">¶</a></h2>
+<p>Expressions can reference runtime data from task dependencies using special variables:</p>
+<ul class="simple">
+<li><p><strong>inputs</strong> - Outputs from dependency tasks (available at task runtime)</p></li>
+<li><p><strong>memento</strong> - Cached data from previous run (for incremental builds)</p></li>
+</ul>
+<p>These expressions are automatically <strong>deferred</strong> during graph construction and evaluated
+when the task executes.</p>
+<p>Example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">producer</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">produces</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &#39;{&quot;type&quot;:&quot;std.FileSet&quot;,&quot;files&quot;:[&quot;a.sv&quot;,&quot;b.sv&quot;]}&#39;</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">consumer</span>
+<span class="w">    </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">producer</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">consumes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">std.FileSet</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">file_count</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">inputs</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">length</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">      </span><span class="no">echo &quot;Received ${file_count} inputs&quot;</span>
+<span class="w">    </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</pre></div>
+</div>
+<p>The expression <code class="docutils literal notranslate"><span class="pre">${{</span> <span class="pre">inputs</span> <span class="pre">|</span> <span class="pre">length</span> <span class="pre">}}</span></code> cannot be evaluated during graph construction
+(inputs aren’t known yet), so it’s stored as a <strong>deferred expression</strong> and evaluated
+when <code class="docutils literal notranslate"><span class="pre">consumer</span></code> runs, after <code class="docutils literal notranslate"><span class="pre">producer</span></code> completes.</p>
+<section id="variable-references">
+<h3>Variable References<a class="headerlink" href="#variable-references" title="Link to this heading">¶</a></h3>
+<p>Variables can be referenced using the <code class="docutils literal notranslate"><span class="pre">$</span></code> prefix for explicit variable references:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">threshold</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check</span>
+<span class="w">      </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">result</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">$threshold</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">2</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>This is particularly useful when working with filter parameters.</p>
+</section>
+<section id="array-and-object-operations">
+<h3>Array and Object Operations<a class="headerlink" href="#array-and-object-operations" title="Link to this heading">¶</a></h3>
+<p>Access array and object elements using indexing:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Array indexing</span>
+<span class="nt">first_item</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[0]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">second_item</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[1]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array slicing</span>
+<span class="nt">first_three</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[:3]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">from_third</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[2:]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">middle</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">my_array[2:5]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Object field access</span>
+<span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">config.settings.timeout</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">by_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data[&#39;key_name&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array iteration</span>
+<span class="nt">all_items</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items[]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="jq-style-builtins">
+<h3>JQ-Style Builtins<a class="headerlink" href="#jq-style-builtins" title="Link to this heading">¶</a></h3>
+<p>Expressions support JQ-style builtin functions for data transformation using
+the pipe operator <code class="docutils literal notranslate"><span class="pre">|</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># String operations</span>
+<span class="nt">parts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">basename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">extension</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">filename</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;.\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Array operations</span>
+<span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">length</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">sorted</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">values</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">unique_vals</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">reversed</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">list</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">reverse</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">first_val</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">first</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">last_val</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Type checking</span>
+<span class="nt">item_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">type</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+<p>Available builtins:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">length</span></code> - Get length of array/object/string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">keys</span></code> - Get keys of object</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">values</span></code> - Get values of object</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sort</span></code> - Sort array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unique</span></code> - Remove duplicates from array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reverse</span></code> - Reverse array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">first</span></code> - Get first element</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">last</span></code> - Get last element</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">flatten</span></code> - Flatten nested arrays</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span></code> - Get type name (“array”, “object”, “string”, “number”, “boolean”, “null”)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">split(sep)</span></code> - Split string by separator</p></li>
+</ul>
+</section>
+<section id="chaining-operations">
+<h3>Chaining Operations<a class="headerlink" href="#chaining-operations" title="Link to this heading">¶</a></h3>
+<p>Chain multiple operations using the pipe operator:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Multiple builtins</span>
+<span class="nt">result</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">sort</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">reverse</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Indexing with builtins</span>
+<span class="nt">last_unique</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">items</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">unique</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="c1"># Complex pipeline</span>
+<span class="nt">filename</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">full_path</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">split(\&quot;/\&quot;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">¶</a></h2>
+<p>Expressions have some limitations to maintain safety and predictability:</p>
+<ul class="simple">
+<li><p><strong>No side effects</strong>: Expressions cannot modify state</p></li>
+<li><p><strong>No I/O</strong>: Cannot read files or access network</p></li>
+<li><p><strong>No arbitrary code</strong>: Limited to safe expression subset</p></li>
+</ul>
+<p><strong>Evaluation Phases:</strong></p>
+<ul class="simple">
+<li><p><strong>Static evaluation</strong>: Most expressions evaluated during graph construction</p></li>
+<li><p><strong>Runtime evaluation</strong>: Expressions referencing <code class="docutils literal notranslate"><span class="pre">inputs</span></code> or <code class="docutils literal notranslate"><span class="pre">memento</span></code> deferred until task execution</p></li>
+</ul>
+<p>These limitations ensure that:</p>
+<ul class="simple">
+<li><p>Flow specifications remain declarative</p></li>
+<li><p>Task graphs can be analyzed before execution</p></li>
+<li><p>Flows are reproducible and predictable</p></li>
+</ul>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<section id="keep-expressions-simple">
+<h3>Keep Expressions Simple<a class="headerlink" href="#keep-expressions-simple" title="Link to this heading">¶</a></h3>
+<p>Prefer simple, readable expressions:</p>
+<p><strong>Good:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Version</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="nt">iff</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ debug }}</span>
+</pre></div>
+</div>
+<p><strong>Avoid:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;v&quot; + str(major) + &quot;.&quot; + str(minor) + (&quot;_debug&quot; if debug else &quot;&quot;) }}</span>
+</pre></div>
+</div>
+</section>
+<section id="use-parameters-for-complex-logic">
+<h3>Use Parameters for Complex Logic<a class="headerlink" href="#use-parameters-for-complex-logic" title="Link to this heading">¶</a></h3>
+<p>Move complex logic into parameters rather than inline expressions:</p>
+<p><strong>Good:</strong></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">full_version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">major</span><span class="nv"> </span><span class="s">}}.${{</span><span class="nv"> </span><span class="s">minor</span><span class="nv"> </span><span class="s">}}${{</span><span class="nv"> </span><span class="s">&#39;_debug&#39;</span><span class="nv"> </span><span class="s">if</span><span class="nv"> </span><span class="s">debug</span><span class="nv"> </span><span class="s">else</span><span class="nv"> </span><span class="s">&#39;&#39;</span><span class="nv"> </span><span class="s">}}&quot;</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Building</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">full_version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="document-parameter-relationships">
+<h3>Document Parameter Relationships<a class="headerlink" href="#document-parameter-relationships" title="Link to this heading">¶</a></h3>
+<p>When parameters depend on each other, document the relationships:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">      </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Optimization level (0-3)</span>
+
+<span class="w">    </span><span class="nt">debug_symbols</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">      </span><span class="nt">doc</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w">        </span><span class="no">Enable debug symbols. Typically true when optimization is 0,</span>
+<span class="w">        </span><span class="no">false otherwise. Can be overridden explicitly.</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="common-patterns">
+<h2>Common Patterns<a class="headerlink" href="#common-patterns" title="Link to this heading">¶</a></h2>
+<section id="version-construction">
+<h3>Version Construction<a class="headerlink" href="#version-construction" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">major</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">minor</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">    </span><span class="nt">patch</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">    </span><span class="nt">version</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">major</span><span class="nv"> </span><span class="s">}}.${{</span><span class="nv"> </span><span class="s">minor</span><span class="nv"> </span><span class="s">}}.${{</span><span class="nv"> </span><span class="s">patch</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="path-construction">
+<h3>Path Construction<a class="headerlink" href="#path-construction" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">install_prefix</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/tools&quot;</span>
+<span class="w">    </span><span class="nt">tool_name</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mytool&quot;</span>
+<span class="w">    </span><span class="nt">tool_path</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">install_prefix</span><span class="nv"> </span><span class="s">}}/${{</span><span class="nv"> </span><span class="s">tool_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="conditional-features">
+<h3>Conditional Features<a class="headerlink" href="#conditional-features" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">enable_coverage</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">enable_assertions</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">debug_mode</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;${{</span><span class="nv"> </span><span class="s">enable_coverage</span><span class="nv"> </span><span class="s">or</span><span class="nv"> </span><span class="s">enable_assertions</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="parameter-selection">
+<h3>Parameter Selection<a class="headerlink" href="#parameter-selection" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">package</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">simulator</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;verilator&quot;</span>
+<span class="w">    </span><span class="nt">debug_level</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">int</span>
+<span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+
+<span class="w">  </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sim</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.Message</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Using</span><span class="nv"> </span><span class="s">simulator:</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">simulator</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">debug=${{</span><span class="nv"> </span><span class="s">debug_level</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="control_flow.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Conditional &amp; Iterative Tasks</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="configurations.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Configurations</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023-2025, Matthew Ballance
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Expressions</a><ul>
+<li><a class="reference internal" href="#expression-syntax">Expression Syntax</a></li>
+<li><a class="reference internal" href="#basic-usage">Basic Usage</a><ul>
+<li><a class="reference internal" href="#parameter-references">Parameter References</a></li>
+<li><a class="reference internal" href="#arithmetic-operations">Arithmetic Operations</a></li>
+<li><a class="reference internal" href="#boolean-expressions">Boolean Expressions</a></li>
+<li><a class="reference internal" href="#string-operations">String Operations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#expression-contexts">Expression Contexts</a><ul>
+<li><a class="reference internal" href="#package-scope">Package Scope</a></li>
+<li><a class="reference internal" href="#task-scope">Task Scope</a></li>
+<li><a class="reference internal" href="#matrix-variables">Matrix Variables</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#advanced-features">Advanced Features</a><ul>
+<li><a class="reference internal" href="#conditional-expressions">Conditional Expressions</a></li>
+<li><a class="reference internal" href="#list-and-dict-operations">List and Dict Operations</a></li>
+<li><a class="reference internal" href="#function-calls">Function Calls</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#expression-evaluation-order">Expression Evaluation Order</a></li>
+<li><a class="reference internal" href="#runtime-expressions">Runtime Expressions</a><ul>
+<li><a class="reference internal" href="#variable-references">Variable References</a></li>
+<li><a class="reference internal" href="#array-and-object-operations">Array and Object Operations</a></li>
+<li><a class="reference internal" href="#jq-style-builtins">JQ-Style Builtins</a></li>
+<li><a class="reference internal" href="#chaining-operations">Chaining Operations</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limitations">Limitations</a></li>
+<li><a class="reference internal" href="#best-practices">Best Practices</a><ul>
+<li><a class="reference internal" href="#keep-expressions-simple">Keep Expressions Simple</a></li>
+<li><a class="reference internal" href="#use-parameters-for-complex-logic">Use Parameters for Complex Logic</a></li>
+<li><a class="reference internal" href="#document-parameter-relationships">Document Parameter Relationships</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#common-patterns">Common Patterns</a><ul>
+<li><a class="reference internal" href="#version-construction">Version Construction</a></li>
+<li><a class="reference internal" href="#path-construction">Path Construction</a></li>
+<li><a class="reference internal" href="#conditional-features">Conditional Features</a></li>
+<li><a class="reference internal" href="#parameter-selection">Parameter Selection</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>

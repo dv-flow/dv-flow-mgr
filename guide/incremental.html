@@ -1,0 +1,796 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Caching" href="caching.html"><link rel="prev" title="Running Flows" href="running.html">
+
+    <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
+        <title>Incremental Builds - DV Flow Manager documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">DV Flow Manager  documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">DV Flow Manager  documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">User Guide</a><input aria-label="Toggle navigation of User Guide" checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="concepts.html">Key Concepts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="packages.html">Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks.html">Using Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dataflow.html">Dataflow &amp; Produces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="parameters.html">Parameters and Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="configurations.html">Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="expressions.html">Expressions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_flow.html">Conditional &amp; Iterative Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visibility.html">Task Visibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="error_handling.html">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stdlib.html">Standard Library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="running.html">Running Flows</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Incremental Builds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="caching.html">Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runners.html">Task Runners</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developing_tasks.html">Developing Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="script_io.html">Script ↔ Dataflow I/O</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_tasks.html">Python Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="advanced.html">Advanced Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">AI &amp; Agent Integration</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../ai/index.html">AI &amp; Agent Integration</a><input aria-label="Toggle navigation of AI &amp; Agent Integration" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../ai/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/using_with_agents.html">Using DFM with External Agents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/agent_resources.html">AI Agent Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ai/native_agent.html">Native AI Agent (dfm agent)</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/flow_spec.html">Flow-Spec Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/cli.html">Command reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/python_api.html">Python Task API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/types_api.html">Type System API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_backend_api.html">Runner Backend API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/runner_config.html">Runner Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/resource_tags.html">Resource Tags</a></li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/guide/incremental.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="incremental-builds">
+<h1>Incremental Builds<a class="headerlink" href="#incremental-builds" title="Link to this heading">¶</a></h1>
+<p>DV Flow Manager supports incremental builds by tracking task execution
+state and skipping tasks that are already up-to-date. This can significantly
+reduce build times when only a subset of inputs have changed.</p>
+<p>Incremental execution operates <em>within a rundir</em>. To reuse results across
+workspaces or machines – for example a shared CI cache – see <a class="reference internal" href="caching.html"><span class="doc">Caching</span></a>.</p>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">¶</a></h2>
+<p>Tasks record their inputs, outputs, and parameters in an <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> file
+in their run directory. On subsequent runs, DV Flow Manager checks:</p>
+<ol class="arabic simple">
+<li><p><strong>Exec record existence</strong>: If no <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> exists, the task must run.</p></li>
+<li><p><strong>Parameter values</strong>: If recorded parameters differ from current values, re-run.</p></li>
+<li><p><strong>Input data</strong>: If any input dataset is marked as ‘changed’, re-run.</p></li>
+<li><p><strong>Input structure</strong>: If the number, position, or elements of inputs differ, re-run.</p></li>
+<li><p><strong>Custom up-to-date check</strong>: If provided, invoke the custom method for final confirmation.</p></li>
+</ol>
+</section>
+<section id="cli-options">
+<h2>CLI Options<a class="headerlink" href="#cli-options" title="Link to this heading">¶</a></h2>
+<p>The following CLI options control incremental build behavior:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">-f,</span> <span class="pre">--force</span></code></dt><dd><p>Force all tasks to run, ignoring up-to-date status. Useful when you
+want to rebuild everything regardless of what has changed.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>my_task<span class="w"> </span>--force
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-v,</span> <span class="pre">--verbose</span></code></dt><dd><p>Show all tasks including up-to-date ones. By default, tasks that are
+determined to be up-to-date are not displayed in the output. Use this
+option to see all tasks that were evaluated.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dfm<span class="w"> </span>run<span class="w"> </span>my_task<span class="w"> </span>--verbose
+</pre></div>
+</div>
+</dd>
+</dl>
+</section>
+<section id="custom-up-to-date-methods">
+<h2>Custom Up-to-Date Methods<a class="headerlink" href="#custom-up-to-date-methods" title="Link to this heading">¶</a></h2>
+<p>For tasks that reference files not explicitly listed in a fileset, you can
+provide a custom up-to-date check method. The <code class="docutils literal notranslate"><span class="pre">uptodate</span></code> field in a task
+definition accepts one of three values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">false</span></code>: Always run the task (never consider it up-to-date)</p></li>
+<li><p>A non-empty string: Python method to evaluate</p></li>
+<li><p>Empty/null: Use the default up-to-date check</p></li>
+</ul>
+<section id="yaml-configuration">
+<h3>YAML Configuration<a class="headerlink" href="#yaml-configuration" title="Link to this heading">¶</a></h3>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compile_sources</span>
+<span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">  </span><span class="c1"># Always recompile</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">check_dependencies</span>
+<span class="w">  </span><span class="nt">uptodate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mymodule.check_deps_uptodate</span><span class="w">  </span><span class="c1"># Custom check method</span>
+</pre></div>
+</div>
+</section>
+<section id="implementing-a-custom-check">
+<h3>Implementing a Custom Check<a class="headerlink" href="#implementing-a-custom-check" title="Link to this heading">¶</a></h3>
+<p>A custom up-to-date method is an async Python function that receives an
+<code class="docutils literal notranslate"><span class="pre">UpToDateCtxt</span></code> object and returns a boolean indicating whether the task
+is up-to-date:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">check_deps_uptodate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Custom up-to-date check that verifies external dependencies.</span>
+
+<span class="sd">    Returns True if task is up-to-date, False if it needs to run.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+    <span class="c1"># Check if a specific file has been modified since last run</span>
+    <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;external_dep.txt&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Compare timestamps, checksums, etc.</span>
+    <span class="c1"># ...</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="../reference/python_api.html"><span class="doc">Python Task API</span></a> for complete documentation of the <code class="docutils literal notranslate"><span class="pre">UpToDateCtxt</span></code> class.</p>
+</section>
+</section>
+<section id="task-output">
+<h2>Task Output<a class="headerlink" href="#task-output" title="Link to this heading">¶</a></h2>
+<p>When a task is determined to be up-to-date, it is marked as such in the
+output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&lt;&lt; [1] Task mypackage.compile (up-to-date) 0.05ms
+</pre></div>
+</div>
+<p>The previous output data is loaded from the task’s <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> file,
+allowing downstream tasks to use cached results without re-executing.</p>
+</section>
+<section id="the-memento-system">
+<h2>The Memento System<a class="headerlink" href="#the-memento-system" title="Link to this heading">¶</a></h2>
+<p>DV Flow Manager uses a memento pattern to store task execution state for
+incremental builds. Each task can save arbitrary data that describes its
+execution, which is used to determine if re-execution is needed.</p>
+<section id="how-mementos-work">
+<h3>How Mementos Work<a class="headerlink" href="#how-mementos-work" title="Link to this heading">¶</a></h3>
+<p>When a task executes:</p>
+<ol class="arabic simple">
+<li><p>Task runs and produces outputs</p></li>
+<li><p>Task optionally creates a memento (dictionary of state data)</p></li>
+<li><p>Memento is saved to the task’s exec_data.json file</p></li>
+<li><p>On next run, memento is passed to up-to-date check</p></li>
+</ol>
+<p>Mementos typically store:</p>
+<ul class="simple">
+<li><p>File timestamps</p></li>
+<li><p>Content hashes</p></li>
+<li><p>Configuration values</p></li>
+<li><p>Dependency versions</p></li>
+<li><p>Any data needed to detect changes</p></li>
+</ul>
+</section>
+<section id="creating-mementos">
+<h3>Creating Mementos<a class="headerlink" href="#creating-mementos" title="Link to this heading">¶</a></h3>
+<p>Task implementations return mementos in the TaskDataResult:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TaskDataResult</span><span class="p">:</span>
+    <span class="c1"># Perform work</span>
+    <span class="n">result_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.txt&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">result_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;result data&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create memento with file timestamp</span>
+    <span class="n">memento</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;result_file&quot;</span><span class="p">:</span> <span class="n">result_file</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">result_file</span><span class="p">),</span>
+        <span class="s2">&quot;parameters&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;param1&quot;</span><span class="p">:</span> <span class="nb">input</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">param1</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span>
+        <span class="n">changed</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">memento</span><span class="o">=</span><span class="n">memento</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>On the next run, this memento is available in <code class="docutils literal notranslate"><span class="pre">input.memento</span></code> for
+comparison with current state.</p>
+</section>
+<section id="accessing-mementos">
+<h3>Accessing Mementos<a class="headerlink" href="#accessing-mementos" title="Link to this heading">¶</a></h3>
+<p>In up-to-date checks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">CheckUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># No previous execution</span>
+
+    <span class="c1"># Access saved memento data</span>
+    <span class="n">prev_timestamp</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+    <span class="n">prev_params</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="c1"># Compare with current state</span>
+    <span class="n">current_timestamp</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="p">[</span><span class="s2">&quot;result_file&quot;</span><span class="p">])</span>
+    <span class="n">current_params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;param1&quot;</span><span class="p">:</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">param1</span><span class="p">}</span>
+
+    <span class="c1"># Up-to-date if nothing changed</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">prev_timestamp</span> <span class="o">==</span> <span class="n">current_timestamp</span> <span class="ow">and</span>
+            <span class="n">prev_params</span> <span class="o">==</span> <span class="n">current_params</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="memento-best-practices">
+<h3>Memento Best Practices<a class="headerlink" href="#memento-best-practices" title="Link to this heading">¶</a></h3>
+<p><strong>Keep mementos small</strong>: Only store data needed for change detection</p>
+<p><strong>Use structured data</strong>: Store dictionaries and lists that serialize to JSON</p>
+<p><strong>Include version info</strong>: Store schema versions if memento format might change</p>
+<p><strong>Handle missing data</strong>: Check for None and missing keys gracefully</p>
+<p><strong>Be deterministic</strong>: Ensure memento generation is consistent</p>
+</section>
+</section>
+<section id="exec-json-structure">
+<h2>Exec.json Structure<a class="headerlink" href="#exec-json-structure" title="Link to this heading">¶</a></h2>
+<p>Each task’s execution data is stored in a JSON file with the following
+structure:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;my_pkg.my_task&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;param1&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;value1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;param2&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;inputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;verilogSource&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;file1.v&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file2.v&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;outputs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;std.FileSet&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;filetype&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;simImage&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sim_image.so&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;memento&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1703456789.123</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;checksum&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123def456&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;severity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Unused signal detected&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;location&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;file&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;src/module.v&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;line&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;column&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;exec_info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;cmd&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;verilator&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;-c&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file.v&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;start_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-12-24T10:30:00Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;end_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2024-12-24T10:30:05Z&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;duration_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5432</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<section id="fields">
+<h3>Fields<a class="headerlink" href="#fields" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>name</strong>: Fully-qualified task name</p></li>
+<li><p><strong>status</strong>: Exit status (0 = success, non-zero = failure)</p></li>
+<li><p><strong>changed</strong>: Whether the task’s output changed from previous execution</p></li>
+<li><p><strong>params</strong>: Task parameters used for this execution</p></li>
+<li><p><strong>inputs</strong>: List of input data items received from dependencies</p></li>
+<li><p><strong>outputs</strong>: List of output data items produced</p></li>
+<li><p><strong>memento</strong>: Custom state data for incremental builds</p></li>
+<li><p><strong>markers</strong>: Warnings, errors, and info messages</p></li>
+<li><p><strong>exec_info</strong>: Commands executed and their results</p></li>
+<li><p><strong>start_time, end_time, duration_ms</strong>: Timing information</p></li>
+</ul>
+</section>
+<section id="using-exec-data">
+<h3>Using Exec Data<a class="headerlink" href="#using-exec-data" title="Link to this heading">¶</a></h3>
+<p>Exec data files can be used for:</p>
+<ul class="simple">
+<li><p><strong>Debugging</strong>: Inspect what inputs a task received</p></li>
+<li><p><strong>Analysis</strong>: Review parameters and execution time</p></li>
+<li><p><strong>Documentation</strong>: Generate reports on build process</p></li>
+<li><p><strong>Testing</strong>: Verify task behavior and outputs</p></li>
+</ul>
+<p>Example: Reading exec data:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;rundir/my_task/my_task.exec_data.json&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task took </span><span class="si">{</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;duration_ms&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">ms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;exec_info&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2"> commands&quot;</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;markers&#39;</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">marker</span><span class="p">[</span><span class="s1">&#39;severity&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">marker</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="advanced-incremental-build-patterns">
+<h2>Advanced Incremental Build Patterns<a class="headerlink" href="#advanced-incremental-build-patterns" title="Link to this heading">¶</a></h2>
+<section id="content-based-detection">
+<h3>Content-Based Detection<a class="headerlink" href="#content-based-detection" title="Link to this heading">¶</a></h3>
+<p>Instead of timestamps, use content hashes for more reliable detection:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ComputeHash</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="n">hasher</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="nb">iter</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4096</span><span class="p">),</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">MyTask</span><span class="p">(</span><span class="n">ctxt</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+    <span class="c1"># Process files</span>
+    <span class="n">output_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">rundir</span><span class="p">,</span> <span class="s2">&quot;output.dat&quot;</span><span class="p">)</span>
+    <span class="c1"># ... create output ...</span>
+
+    <span class="c1"># Store content hash</span>
+    <span class="n">file_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ComputeHash</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">TaskDataResult</span><span class="p">(</span>
+        <span class="n">memento</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;output_hash&quot;</span><span class="p">:</span> <span class="n">file_hash</span><span class="p">}</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dependency-tracking">
+<h3>Dependency Tracking<a class="headerlink" href="#dependency-tracking" title="Link to this heading">¶</a></h3>
+<p>Track external dependencies explicitly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">TrackDependencies</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="c1"># Read dependency file</span>
+    <span class="n">dep_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctxt</span><span class="o">.</span><span class="n">srcdir</span><span class="p">,</span> <span class="s2">&quot;dependencies.txt&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep_file</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dep_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">current_deps</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+
+    <span class="c1"># Compare with saved dependencies</span>
+    <span class="n">saved_deps</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dependencies&quot;</span><span class="p">,</span> <span class="p">[])</span>
+
+    <span class="c1"># Check if list changed</span>
+    <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">current_deps</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">saved_deps</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Check if any dependency file changed</span>
+    <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">current_deps</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dep</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">current_time</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">dep</span><span class="p">)</span>
+        <span class="n">saved_time</span> <span class="o">=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dep_time_</span><span class="si">{</span><span class="n">dep</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">saved_time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">current_time</span> <span class="o">!=</span> <span class="n">saved_time</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+</section>
+<section id="multi-stage-checking">
+<h3>Multi-Stage Checking<a class="headerlink" href="#multi-stage-checking" title="Link to this heading">¶</a></h3>
+<p>Combine multiple checks for accuracy:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ComplexUpToDate</span><span class="p">(</span><span class="n">ctxt</span><span class="p">:</span> <span class="n">UpToDateCtxt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="c1"># Quick check: parameters changed?</span>
+    <span class="k">if</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;params&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">params</span><span class="o">.</span><span class="n">model_dump</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Medium check: timestamps changed?</span>
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;time_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="c1"># Expensive check: content hashes changed?</span>
+    <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;critical_files&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+        <span class="n">current_hash</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ComputeHash</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">current_hash</span> <span class="o">!=</span> <span class="n">ctxt</span><span class="o">.</span><span class="n">memento</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;hash_</span><span class="si">{</span><span class="n">file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="kc">True</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="base-rundir">
+<h2>Base Rundir<a class="headerlink" href="#base-rundir" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> option lets you split a DFM run into separate build
+and test phases.  A build run populates a shared rundir with compiled
+artifacts, then multiple independent test runs reuse those artifacts
+without re-building.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Phase 1: build (writes to ./rundir)</span>
+dfm<span class="w"> </span>run<span class="w"> </span>build
+
+<span class="c1"># Phase 2: fan out independent test runs</span>
+dfm<span class="w"> </span>run<span class="w"> </span>test_a<span class="w"> </span>--base-rundir<span class="w"> </span>/abs/path/to/build/rundir
+dfm<span class="w"> </span>run<span class="w"> </span>test_b<span class="w"> </span>--base-rundir<span class="w"> </span>/abs/path/to/build/rundir
+</pre></div>
+</div>
+<section id="id1">
+<h3>How It Works<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> is specified, the runner checks each task before
+execution:</p>
+<ol class="arabic simple">
+<li><p>Resolve the task’s rundir path against the base-rundir.</p></li>
+<li><p>Look for an <code class="docutils literal notranslate"><span class="pre">exec_data.json</span></code> in that directory.</p></li>
+<li><p>If found and the recorded status is 0 (success), the task is
+<strong>satisfied</strong> from the base – its output is reconstructed from the
+saved data and execution is skipped entirely.</p></li>
+<li><p>Output file paths are rewritten to reference the base-rundir so
+downstream tasks can locate the artifacts.</p></li>
+</ol>
+<p>Tasks that are not present in the base-rundir, or whose previous run
+failed, execute normally in the local rundir.</p>
+<p>The base-rundir is treated as <strong>read-only</strong> and <strong>trusted</strong>: no parameter
+or input-signature comparison is performed.  The user asserts that the
+base-rundir artifacts are valid for the current run.</p>
+</section>
+<section id="interaction-with-other-options">
+<h3>Interaction with Other Options<a class="headerlink" href="#interaction-with-other-options" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--force</span></code></dt><dd><p>Overrides base-rundir satisfaction.  All tasks run locally regardless
+of what exists in the base-rundir.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--clean</span></code></dt><dd><p>Cleans only the local rundir.  The base-rundir is never modified.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--verbose</span></code></dt><dd><p>Base-satisfied tasks appear in output with a <code class="docutils literal notranslate"><span class="pre">(base)</span></code> suffix.</p>
+</dd>
+</dl>
+</section>
+<section id="environment">
+<h3>Environment<a class="headerlink" href="#environment" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">--base-rundir</span></code> is set, the environment variable
+<code class="docutils literal notranslate"><span class="pre">DFM_BASE_RUNDIR</span></code> is exported to child processes, containing the
+absolute path to the base-rundir.</p>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="caching.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Caching</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="running.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Running Flows</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2023-2025, Matthew Ballance
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Incremental Builds</a><ul>
+<li><a class="reference internal" href="#how-it-works">How It Works</a></li>
+<li><a class="reference internal" href="#cli-options">CLI Options</a></li>
+<li><a class="reference internal" href="#custom-up-to-date-methods">Custom Up-to-Date Methods</a><ul>
+<li><a class="reference internal" href="#yaml-configuration">YAML Configuration</a></li>
+<li><a class="reference internal" href="#implementing-a-custom-check">Implementing a Custom Check</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#task-output">Task Output</a></li>
+<li><a class="reference internal" href="#the-memento-system">The Memento System</a><ul>
+<li><a class="reference internal" href="#how-mementos-work">How Mementos Work</a></li>
+<li><a class="reference internal" href="#creating-mementos">Creating Mementos</a></li>
+<li><a class="reference internal" href="#accessing-mementos">Accessing Mementos</a></li>
+<li><a class="reference internal" href="#memento-best-practices">Memento Best Practices</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#exec-json-structure">Exec.json Structure</a><ul>
+<li><a class="reference internal" href="#fields">Fields</a></li>
+<li><a class="reference internal" href="#using-exec-data">Using Exec Data</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#advanced-incremental-build-patterns">Advanced Incremental Build Patterns</a><ul>
+<li><a class="reference internal" href="#content-based-detection">Content-Based Detection</a></li>
+<li><a class="reference internal" href="#dependency-tracking">Dependency Tracking</a></li>
+<li><a class="reference internal" href="#multi-stage-checking">Multi-Stage Checking</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#base-rundir">Base Rundir</a><ul>
+<li><a class="reference internal" href="#id1">How It Works</a></li>
+<li><a class="reference internal" href="#interaction-with-other-options">Interaction with Other Options</a></li>
+<li><a class="reference internal" href="#environment">Environment</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    </body>
+</html>
