@@ -3,31 +3,108 @@ Developing Tasks
 ################
 
 The `Using Tasks` chapter describes how to customize existing tasks by
-specifying parameter values and using compound tasks to compose tasks 
-from a collection of sub-tasks. When adding a new tool or capability, 
-it's likely that more fine-grained control will be needed. In these
-cases, it makes sense to provide a programming-language implementation
-for a task.
+specifying parameter values and using compound tasks to compose tasks
+from a collection of sub-tasks. When adding a new tool or capability, you
+will often need finer-grained control: a task that runs a specific command,
+generates files, or invokes a tool. DV Flow lets you implement such a task
+directly in the flow file.
+
+The recommended starting point is a **shell-script task** -- you put the
+commands in the task's ``run`` body and DV Flow handles scheduling, inputs,
+outputs, and up-to-date tracking. When a script grows unwieldy -- when you
+need rich control flow, typed data manipulation, or in-process access to DV
+Flow APIs -- you can graduate the same task to a
+:ref:`Python implementation <python-task-impl>`.
 
 Task Execution
 ==============
 
-It is most common to provide an implementation for a task's execution
-behavior. This is most-commonly done in Python, but shell scripts can
-also be used. Tasks provide the `run` and `shell` parameters to specify
-the implementation. 
+A task selects its implementation with two parameters:
+
+* ``run`` -- the body of the implementation (shell commands, or Python code /
+  a Python entry-point reference).
+* ``shell`` -- the interpreter for ``run``. ``bash`` (the default),
+  ``shell``, ``csh``, and ``tcsh`` run ``run`` as a shell script;
+  ``pytask`` runs it as Python.
+
+If ``shell`` is omitted, the task is a shell-script task executed with
+``bash``.
+
+Shell-Script Tasks
+==================
+
+A shell-script task puts one or more shell commands in the ``run`` body. This
+is the most direct way to wrap a tool or generate files, and it is the
+recommended place to start.
+
+.. code-block:: yaml
+
+    package:
+      name: my_tool
+      tasks:
+      - name: gen_rtl
+        with:
+          top:
+            type: str
+            value: top
+        run: |
+          mkdir -p rtl
+          echo "module ${{ top }}(); endmodule" > rtl/${{ top }}.v
+          echo "Generated rtl/${{ top }}.v"
+
+The ``run`` body is written to a script and executed. ``${{ }}`` expressions
+are substituted before the script runs, so ``${{ top }}`` above expands to the
+value of the task's ``top`` parameter. Other useful expressions include
+``${{ rundir }}`` (the task's run directory) and ``${{ this.<param> }}``.
+
+You can select a different shell explicitly:
+
+.. code-block:: yaml
+
+    - name: report
+      shell: bash
+      run: |
+        echo "Building in ${{ rundir }}"
+
+Exchanging data with the dataflow graph
+---------------------------------------
+
+Shell tasks exchange data with the rest of the graph through a
+GitHub-Actions-style contract: the runner passes **inputs as ``DFM_*``
+environment variables** (parameters via ``DFM_PARAM_*``/``DFM_PARAMS``,
+consumed inputs via ``DFM_INPUTS``, the run directory via ``DFM_RUNDIR``) and
+collects **outputs from append-only files** the script writes -- produced
+filesets (``DFM_OUTPUT``), environment/PATH additions (``DFM_ENV`` /
+``DFM_PATH``), diagnostics (``DFM_MARKERS``), and the memento used for
+up-to-date checks (``DFM_MEMENTO_OUT``). The ``dfm-out`` helper writes these
+output files for you.
+
+See :doc:`script_io` for the full input/output contract and the ``dfm-out``
+reference.
+
+.. _python-task-impl:
+
+Python Task Implementation
+==========================
+
+When a shell script becomes unwieldy -- you need loops and conditionals over
+structured data, want to manipulate typed inputs/outputs directly, or need
+in-process access to DV Flow services -- implement the task in Python instead.
+Set ``shell: pytask`` and provide the Python code inline, or reference an
+external Python entry point.
 
 External Pytask
 ---------------
 
-A `pytask` implementation for a task is provided by a Python async method 
+A `pytask` implementation for a task is provided by a Python async method
 that accepts input parameters from the DV Flow runtime system and returns
 data to the system. When the `pytask` implementation is external, the
 `run` parameter specifies the name of the Python method.
 
 .. code-block:: yaml
+
     package:
-      name: my_tool 
+      name: my_tool
       tasks:
       - name: my_task
         uses: my_package.MyTask
@@ -38,18 +115,18 @@ data to the system. When the `pytask` implementation is external, the
             type: str
 
 The task definition above specifies that a `pytask` implementation for the task
-is provided by a Python method named `my_package.my_module.MyTask`. 
+is provided by a Python method named `my_package.my_module.MyTask`.
 
 .. code-block:: python3
 
     async def MyTask(ctxt, input):
         print("Message: %s" % input.params.msg)
 
-See the :doc:`../pytask_api` documentation 
+See the :doc:`/reference/python_api` documentation
 for more information about the Python API available to task implementations.
 
 This "external" implementation makes the most sense when the task implementation
-is moderately complex or lengthy. 
+is moderately complex or lengthy.
 
 Inline Pytask
 -------------
@@ -59,7 +136,7 @@ When the task implementation is simple, the code can be in-lined within the YAML
 .. code-block:: yaml
 
     package:
-      name: my_tool 
+      name: my_tool
       tasks:
       - name: my_task
         uses: my_package.MyTask
@@ -160,7 +237,7 @@ be specified externally in a Python module or inline.
                 name=ctxt.mkName("SayHi%d" % i), 
                 msg="Hello World% %d!" % (i+1)))
 
-See the :doc:`../pytask_api` documentation
+See the :doc:`/reference/python_api` documentation
 for more information about the Python task-graph generation API.
 
 
@@ -185,173 +262,8 @@ failures are tolerated before remaining independent siblings are skipped:
 See :doc:`error_handling` for the full ``max_failures`` semantics.
 
 
-PyTask Class-Based API
-======================
-
-For more complex tasks, DV Flow Manager provides a class-based API using the
-``PyTask`` base class. This approach provides better organization for tasks
-with substantial logic or state.
-
-Defining a PyTask
------------------
-
-A PyTask is defined as a dataclass that inherits from ``dv_flow.mgr.PyTask``:
-
-.. code-block:: python
-
-    from dv_flow.mgr import PyTask
-    import dataclasses as dc
-
-    @dc.dataclass
-    class MyCompiler(PyTask):
-        desc = "Compiles HDL sources"
-        doc = """
-        This task compiles HDL sources using a configurable compiler.
-        Supports multiple file types and optimization levels.
-        """
-        
-        @dc.dataclass
-        class Params:
-            sources: list = dc.field(default_factory=list)
-            optimization: str = "O2"
-            debug: bool = False
-        
-        async def __call__(self) -> str:
-            # Access parameters via self.params
-            print(f"Compiling {len(self.params.sources)} files")
-            print(f"Optimization: {self.params.optimization}")
-            
-            # Access context via self._ctxt
-            rundir = self._ctxt.rundir
-            
-            # Perform compilation work here
-            # ...
-            
-            # Return None for pytask execution, or a string for shell execution
-            return None
-
-The ``__call__`` method is the main entry point and receives the task
-context automatically through the ``_ctxt`` and ``_input`` fields.
-
-Using PyTask in YAML
---------------------
-
-Reference a PyTask class in your flow definition:
-
-.. code-block:: yaml
-
-    package:
-      name: my_tools
-      
-      tasks:
-      - name: compile
-        shell: pytask
-        run: my_package.my_module.MyCompiler
-        with:
-          sources:
-            - src/file1.v
-            - src/file2.v
-          optimization: "O3"
-          debug: true
-
-The PyTask class provides several advantages:
-
-* **Type safety**: Parameters are defined with Python type hints
-* **Documentation**: Docstrings become part of the task documentation
-* **Organization**: Related logic stays together in a class
-* **Reusability**: Classes can inherit from other classes
-* **Testing**: Easier to unit test than inline code
-
-Returning Commands
-------------------
-
-A PyTask can return a shell command instead of executing directly:
-
-.. code-block:: python
-
-    @dc.dataclass
-    class MyTool(PyTask):
-        @dc.dataclass
-        class Params:
-            input_file: str
-            output_file: str
-        
-        async def __call__(self) -> str:
-            # Generate command string
-            cmd = f"my_tool -i {self.params.input_file} -o {self.params.output_file}"
-            return cmd
-
-When a string is returned, DV Flow executes it as a shell command using
-the configured shell (default: pytask for Python execution).
-
-
-PyPkg Package Factory
-=====================
-
-For advanced use cases, DV Flow supports defining packages entirely in Python
-using the ``PyPkg`` class. This enables dynamic package construction and
-programmatic task registration.
-
-Defining a PyPkg
-----------------
-
-.. code-block:: python
-
-    from dv_flow.mgr import PyPkg, pypkg
-    import dataclasses as dc
-
-    @dc.dataclass
-    class MyToolPackage(PyPkg):
-        name = "mytool"
-        
-        @dc.dataclass
-        class Params:
-            version: str = "1.0"
-            enable_debug: bool = False
-
-The ``@pypkg`` decorator registers tasks with the package:
-
-.. code-block:: python
-
-    @pypkg(MyToolPackage)
-    @dc.dataclass
-    class Compile(PyTask):
-        @dc.dataclass
-        class Params:
-            sources: list = dc.field(default_factory=list)
-        
-        async def __call__(self):
-            # Task implementation
-            pass
-
-    @pypkg(MyToolPackage)
-    @dc.dataclass  
-    class Link(PyTask):
-        @dc.dataclass
-        class Params:
-            objects: list = dc.field(default_factory=list)
-        
-        async def __call__(self):
-            # Task implementation
-            pass
-
-PyPkg Benefits
---------------
-
-Using PyPkg provides several advantages:
-
-* **Code reuse**: Share common Python code across tasks
-* **Dynamic generation**: Programmatically create task definitions
-* **Type checking**: Full Python type checking for package definitions
-* **Version control**: Package and task versions managed together
-* **Testing**: Unit test entire packages in Python
-
-PyPkg packages can be distributed as Python packages and installed via pip,
-making them easy to share and version.
-
-Note: PyPkg is an advanced feature. For most use cases, YAML-based package
-definitions with PyTask implementations provide the right balance of
-simplicity and power.
+For larger Python implementations -- the class-based ``PyTask`` API and the
+``PyPkg`` package factory -- see :doc:`python_tasks`.
 
 
 Template Tasks

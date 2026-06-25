@@ -80,7 +80,7 @@ Error Handling API
 ==================
 
 These types are used by ``on_error`` handler callables attached to compound
-tasks.  See :doc:`userguide/error_handling` for usage examples.
+tasks.  See :doc:`/guide/error_handling` for usage examples.
 
 TaskFailure
 -----------

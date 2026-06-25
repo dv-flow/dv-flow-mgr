@@ -162,56 +162,11 @@ preserved.
 Using feeds in Configurations
 ==============================
 
-The ``feeds`` field provides a way to inject data into existing tasks from
-a configuration without modifying the original task definition.  This is
-the recommended approach when a config needs to add arguments, options, or
-data files to tasks that are defined elsewhere.
-
-.. code-block:: yaml
-
-    package:
-      name: my_project
-
-      tasks:
-      - root: build
-        uses: sim.SimImage
-        needs: [rtl, tb]
-        with:
-          top: [tb_top]
-
-      - root: run
-        uses: sim.SimRun
-        needs: [build]
-
-      configs:
-      - name: debug
-        tasks:
-          - name: debug_compile_args
-            uses: hdlsim.SimCompileArgs
-            with:
-              args: ["-debug_access+all"]
-            feeds: [my_project.build]
-
-          - name: debug_run_args
-            uses: hdlsim.SimRunArgs
-            with:
-              args: ["-gui"]
-            feeds: [my_project.run]
-
-Key points:
-
-* ``feeds`` injects data "from the side" into a task without modifying
-  its definition.
-* The feed target uses the fully-qualified task name
-  (``package_name.task_name``).
-* This is equivalent to adding the feeding task to the target's ``needs``
-  list, but expressed from the producer's perspective.
-* ``feeds`` is particularly useful in configs because the base tasks
-  remain unchanged -- the config only adds new tasks that connect to
-  existing ones.
-
-The ``feeds`` approach keeps the base flow clean and makes config-specific
-additions easy to understand and maintain.
+The ``feeds`` field lets a configuration inject arguments, options, or data
+files into existing tasks without modifying their definitions -- the
+recommended way to add config-specific inputs to a flow. This pattern is
+covered, with examples, in :doc:`configurations` (see *Injecting Options with
+feeds*).
 
 Resolution Order
 ================

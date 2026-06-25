@@ -236,6 +236,71 @@ class TaskListenerReport(object):
                 return name
             idx += 1
 
+    # Severities listed (highest first) in the foldable Markers section.
+    _MARKER_SEVERITIES = (
+        ("error", "Error"),
+        ("warning", "Warning"),
+        ("info", "Info"),
+    )
+
+    @staticmethod
+    def _format_loc(loc) -> str:
+        """Render a marker location (path[:line]) as a parenthetical suffix."""
+        if not loc:
+            return ""
+        if isinstance(loc, dict):
+            path = loc.get("path")
+            line = loc.get("line", -1)
+        else:
+            path = getattr(loc, "path", None)
+            line = getattr(loc, "line", -1)
+        if not path:
+            return ""
+        return " (%s:%d)" % (path, line) if line and line >= 0 else " (%s)" % path
+
+    def _write_markers_section(self, lines: list, report: dict):
+        """Append a foldable Markers section, grouped by severity.
+
+        Each severity becomes a collapsible <details> block (rendered by the
+        GitHub job-summary HTML subset), so the summary stays compact and the
+        reader expands Error/Warning/Info on demand.
+        """
+        # Group every marker by (normalized) severity, preserving task context.
+        by_sev = {key: [] for key, _ in self._MARKER_SEVERITIES}
+        other = {}
+        for t in report["tasks"]:
+            for m in t["markers"]:
+                sev = str(m.get("severity", "")).lower()
+                entry = (t["name"], m.get("msg", ""), m.get("loc"))
+                if sev in by_sev:
+                    by_sev[sev].append(entry)
+                else:
+                    other.setdefault(sev or "unknown", []).append(entry)
+
+        groups = [(label, by_sev[key]) for key, label in self._MARKER_SEVERITIES]
+        groups += [(sev.capitalize(), items) for sev, items in sorted(other.items())]
+
+        if not any(items for _, items in groups):
+            return
+
+        lines.append("## Markers")
+        lines.append("")
+        for label, items in groups:
+            if not items:
+                continue
+            # <details>/<summary> renders as a fold widget in the job summary.
+            # The blank line after </summary> lets GitHub parse the list as
+            # Markdown rather than literal text.
+            lines.append("<details>")
+            lines.append("<summary>%s (%d)</summary>" % (label, len(items)))
+            lines.append("")
+            for task_name, msg, loc in items:
+                where = self._format_loc(loc)
+                lines.append("- `%s`%s: %s" % (task_name, where, msg))
+            lines.append("")
+            lines.append("</details>")
+            lines.append("")
+
     def _write_markdown(self, path: str, report: dict):
         """Write a human-readable summary suitable for a CI job summary."""
         counts = report["counts"]
@@ -252,6 +317,8 @@ class TaskListenerReport(object):
         lines.append("- **Markers:** %d error, %d warning, %d info" % (
             markers.get("error", 0), markers.get("warning", 0), markers.get("info", 0)))
         lines.append("")
+
+        self._write_markers_section(lines, report)
 
         failed_tasks = [t for t in report["tasks"] if t["status"] not in (0, None)]
         if failed_tasks:

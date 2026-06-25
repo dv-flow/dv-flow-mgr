@@ -34,7 +34,7 @@ _log = logging.getLogger("TaskExecSerialize")
 def _get_callable_spec(task_node) -> str:
     """Extract the callable spec (e.g. 'dv_flow.mgr.std.fileset.FileSet').
 
-    For pytask, the spec lives in taskdef.run (the flow.dv 'run:' field).
+    For pytask, the spec lives in taskdef.run (the flow.yaml 'run:' field).
     Falls back to reading ExecCallable.body if taskdef is unavailable.
     """
     taskdef = getattr(task_node, "taskdef", None)

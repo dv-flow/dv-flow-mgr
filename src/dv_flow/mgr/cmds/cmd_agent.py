@@ -87,7 +87,7 @@ class CmdAgent:
             return 1
         
         if pkg is None:
-            print("Error: No flow.dv/flow.yaml/flow.toml found in current directory or parent directories",
+            print("Error: No flow.yaml/flow.toml found in current directory or parent directories",
                   file=sys.stderr)
             return 1
         

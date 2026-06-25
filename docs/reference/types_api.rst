@@ -1,6 +1,6 @@
-==============
+===============
 Type System API
-==============
+===============
 
 DV Flow Manager provides a type system for defining structured data that
 flows between tasks. Types can be defined in packages, inherit from other
