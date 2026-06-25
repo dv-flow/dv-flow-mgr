@@ -1,6 +1,6 @@
-######################
+###########################
 Native AI Agent (dfm agent)
-######################
+###########################
 
 DV Flow Manager ships a fully-embedded, native AI agent that runs entirely
 within the ``dfm`` process — no external CLI tools required.  It is the
@@ -583,7 +583,6 @@ the query.
 See Also
 ========
 
-* :doc:`agent_integration` — Defining skills, personas, tools, and references
-* :doc:`llm_integration` — General LLM integration guide
-* :doc:`../cmdref` — Full command reference
-* :doc:`../llms` — LLM call interface (server mode, parameter overrides)
+* :doc:`agent_resources` — Defining skills, personas, tools, and references
+* :doc:`/reference/cli` — Full command reference
+* :doc:`/ai/using_with_agents` — Driving DFM from external agents; LLM call interface (server mode, parameter overrides)

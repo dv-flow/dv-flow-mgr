@@ -2,31 +2,10 @@
 Quickstart
 ##########
 
-==========================
-Installing DV Flow Manager
-==========================
-
-DV Flow Manager is most-easily installed from the PyPi repository:
-
-.. code-block:: bash
-
-    % pip install dv-flow-mgr
-
-
-Once installed, DV Flow Mananager can be invoked using the `dfm` command:
-
-.. code-block:: bash
-
-    % dfm --help
-
-It's common to install other plugin-ins to support various tools. The example
-below builds and runs a Verilog module. The `dv-flow-libhdlsim` package 
-provides the required tasks:
-
-.. code-block:: bash
-
-    % pip install dv-flow-libhdlsim
-
+This quickstart builds and runs your first flow. If you have not installed DV
+Flow Manager yet, see :doc:`install` first (in short: ``pip install
+dv-flow-mgr``, plus ``pip install dv-flow-libhdlsim`` for the HDL-simulation
+tasks used below).
 
 ===============
 Your First Flow
@@ -111,7 +90,7 @@ other and contain *tasks* to operate on sources within the *packages*.
    while ``uses:`` is preferred in formal documentation for clarity.
 
 .. code-block:: yaml
-    :emphasize-lines: 8,12
+    :emphasize-lines: 6,8
 
     package:
         name: my_design
@@ -133,7 +112,8 @@ Note that the ``type`` field appears twice here with different meanings:
 * ``type: "systemVerilogSource"`` (line 8) - A parameter specifying the file type
 
 To avoid this ambiguity, you can use ``uses: std.FileSet`` instead, which is
-equivalent but clearer.
+equivalent but clearer. See :doc:`guide/tasks` for the canonical explanation of
+``uses:`` vs ``type:``.
 
 .. code-block:: yaml
     :emphasize-lines: 5,6

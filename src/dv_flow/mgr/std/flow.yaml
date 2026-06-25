@@ -28,7 +28,7 @@ package:
   desc: Standard library providing core tasks, types, and utilities for DV Flow workflows
 
   fragments:
-    - filters.dv
+    - filters.yaml
 
   tasks:
   - name: Message

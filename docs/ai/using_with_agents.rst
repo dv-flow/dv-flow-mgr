@@ -1,9 +1,12 @@
-#####################
-LLM Agent Integration
-#####################
+################################
+Using DFM with External Agents
+################################
 
 DV Flow Manager provides built-in support for Large Language Model (LLM) agents,
-enabling AI assistants to discover, understand, and work with DFM flows effectively.
+enabling external AI assistants (Claude, GitHub Copilot, and others) to
+discover, understand, and drive DFM flows effectively. This page covers
+consuming DFM from such an agent; for *authoring* agent resources that ship
+with a package, see :doc:`/ai/agent_resources`.
 
 Overview
 ========
@@ -12,7 +15,7 @@ The goal of LLM integration is to enable AI agents to:
 
 1. **Discover** available DFM capabilities, packages, tasks, and types
 2. **Understand** DFM's dataflow-based build system paradigm
-3. **Generate** correct flow.yaml/flow.yaml configurations
+3. **Generate** correct flow.yaml configurations
 4. **Debug** and **modify** existing flows with minimal hallucination
 5. **Execute** builds and simulations via the dfm CLI
 6. **Run tasks dynamically** from within LLM-driven Agent tasks
@@ -54,7 +57,9 @@ Parameter Overrides
 
 DFM supports runtime parameter overrides via the ``-D`` option and ``-P`` parameter
 file option. This allows you to customize task and package parameters without
-modifying the flow definition.
+modifying the flow definition. This section focuses on how an agent uses
+overrides; the canonical reference for override syntax and resolution order is
+:doc:`/guide/parameters`.
 
 Command Line Overrides (``-D``)
 --------------------------------
@@ -182,8 +187,9 @@ This allows you to:
 The ``dfm show skills`` Command
 ===============================
 
-The ``dfm show skills`` command lists and queries skills defined as DataSet types
-tagged with ``std.AgentSkillTag``. This provides programmatic access to package
+The ``dfm show skills`` command lists and queries skills -- data items tagged
+with ``std.AgentSkillTag`` (typically a task that ``uses: std.AgentSkill``; see
+:doc:`agent_resources`). This provides programmatic access to package
 capabilities for LLM agents.
 
 Basic Usage
@@ -240,42 +246,12 @@ Example Output
 Skill Definition
 ----------------
 
-Skills are defined as DataSet types tagged with ``std.AgentSkillTag``:
-
-.. code-block:: yaml
-
-    package:
-      name: hdlsim.vlt
-
-      types:
-        - name: AgentSkill
-          uses: std.DataSet
-          tags:
-            - std.AgentSkillTag
-          with:
-            name:
-              type: str
-              value: "verilator-simulation"
-            desc:
-              type: str
-              value: "Compile and run simulations with Verilator"
-            skill_doc:
-              type: str
-              value: |
-                # Verilator Simulation
-                
-                ## Quick Start
-                ```yaml
-                imports:
-                  - name: hdlsim.vlt
-                    as: sim
-                tasks:
-                  - name: build
-                    uses: sim.SimImage
-                    needs: [rtl]
-                    with:
-                      top: [my_module]
-                ```
+This page covers *discovering* and *consuming* skills from an external agent.
+*Authoring* skills (and personas, tools, and references) that ship with a
+package is covered in the canonical :doc:`/ai/agent_resources` guide -- a skill
+is a task that ``uses: std.AgentSkill`` and points at one or more Markdown
+files via its ``files`` field. Once defined, skills surface through
+``dfm show skills`` exactly as shown above.
 
 LLM Call Interface (Server Mode)
 ================================
@@ -352,7 +328,6 @@ When an LLM running inside a ``std.Agent`` task needs to compile generated code:
 
     # 3. Output is JSON with status, outputs, and markers
     # {"status": 0, "outputs": [...], "markers": []}
---------------------
 
 All server mode commands return JSON responses:
 
@@ -857,6 +832,210 @@ features. With the skill.md documentation and ``dfm show skills``, assistants ca
 Enabling LLM Support in Your Project
 ====================================
 
-For detailed instructions on enabling LLM agent support in your own projects,
-including creating AGENTS.md files and defining custom skills, see the
-:doc:`userguide/llm_integration` guide.
+This section explains how to make your own project easy for external LLM
+agents to discover, understand, and drive.
+
+Why Enable LLM Support?
+-----------------------
+
+Enabling LLM support in your project allows AI assistants to:
+
+* Automatically discover your project's build capabilities
+* Generate correct ``flow.yaml`` configurations
+* Understand task dependencies and dataflow patterns
+* Debug and modify existing flows with minimal hallucination
+* Execute builds and simulations via the CLI
+
+Creating AGENTS.md
+------------------
+
+The recommended way to enable LLM support is to create an ``AGENTS.md`` file in
+your project root. This file is automatically discovered by AI assistants.
+
+.. code-block:: markdown
+
+    # Project Name
+
+    Brief description of what this project does.
+
+    ## DV Flow Manager
+
+    This project uses DV Flow Manager (dfm) for build automation.
+
+    ### Getting Started
+
+    ```bash
+    # Get DFM documentation path
+    dfm --help
+
+    # List available package capabilities
+    dfm show skills
+
+    # List available tasks
+    dfm show tasks
+
+    # Show project structure
+    dfm show project --json
+    ```
+
+    ## Project Structure
+
+    ```
+    project-root/
+    ├── flow.yaml          # Main flow definition
+    ├── AGENTS.md          # This file
+    ├── src/
+    │   └── rtl/           # RTL source files
+    └── tb/                # Testbench files
+    ```
+
+    ## Key Tasks
+
+    | Task | Description | Usage |
+    |------|-------------|-------|
+    | `build` | Compile RTL and testbench | `dfm run build` |
+    | `sim` | Run simulation | `dfm run sim` |
+    | `test` | Run all tests | `dfm run test` |
+
+    ## Common Workflows
+
+    ### Run a Specific Test
+
+    ```bash
+    dfm run test -D test_name=smoke_test
+    ```
+
+**Best practices for AGENTS.md:**
+
+1. **Keep it concise** -- LLM context windows are limited, so focus on the
+   essentials.
+2. **Include examples** -- show common command patterns and task usage.
+3. **Document configurations** -- list available configurations and their
+   purposes.
+4. **Reference dfm commands** -- point agents at ``dfm show`` commands for
+   detailed, always-current information.
+
+Defining Skills for Your Package
+--------------------------------
+
+To expose a package's capabilities to agents, ship a skill resource. The
+canonical reference for authoring skills, personas, tools, and references is
+:doc:`/ai/agent_resources`. In brief, a skill is a task that uses
+``std.AgentSkill`` and points at a Markdown document:
+
+.. code-block:: yaml
+
+    tasks:
+    - local: AgentSkill
+      uses: std.AgentSkill
+      desc: Build and simulate the counter design
+      with:
+        files:
+        - "${{ srcdir }}/skill.md"
+
+Skills defined this way are discoverable via ``dfm show skills`` (see
+`The dfm show skills Command`_).
+
+Verifying Agent Compatibility
+-----------------------------
+
+To verify your project is configured for LLM agents, run the sequence of
+commands an agent would use:
+
+.. code-block:: bash
+
+    dfm --help                    # Get the skill.md path
+    dfm show skills               # Discover capabilities
+    dfm show project --json       # Project structure (machine-readable)
+    dfm show tasks --json         # List available tasks
+    dfm show task std.FileSet     # Inspect a specific task
+
+If each command returns sensible output -- skills listed, JSON well-formed --
+your project is ready for agent consumption.
+
+Example: Complete Project Setup
+-------------------------------
+
+A minimal project with LLM support enabled looks like this:
+
+.. code-block:: text
+
+    my_project/
+    ├── AGENTS.md           # Agent documentation
+    ├── flow.yaml           # Main flow definition
+    ├── skill.md            # Skill documentation (referenced by the skill task)
+    ├── src/
+    │   └── rtl/
+    │       └── counter.sv
+    └── tb/
+        └── counter_tb.sv
+
+The ``flow.yaml`` defines the build tasks plus a skill that points at
+``skill.md``:
+
+.. code-block:: yaml
+
+    package:
+      name: my_project
+
+      tasks:
+        - local: AgentSkill
+          uses: std.AgentSkill
+          desc: Build and simulate the counter design
+          with:
+            files:
+            - "${{ srcdir }}/skill.md"
+
+        - name: rtl
+          uses: std.FileSet
+          with:
+            base: src/rtl
+            type: systemVerilogSource
+            include: "*.sv"
+
+        - name: tb
+          uses: std.FileSet
+          needs: [rtl]
+          with:
+            base: tb
+            type: systemVerilogSource
+            include: "*.sv"
+
+        - name: build
+          uses: hdlsim.vlt.SimImage
+          needs: [rtl, tb]
+          with:
+            top: [counter_tb]
+
+        - name: sim
+          uses: hdlsim.vlt.SimRun
+          needs: [build]
+
+The ``AGENTS.md`` orients the agent and points it at the ``dfm`` commands:
+
+.. code-block:: markdown
+
+    # Counter Project
+
+    A simple counter design with Verilator simulation.
+
+    ## Quick Start
+
+    ```bash
+    dfm run sim    # Build and run simulation
+    ```
+
+    ## Tasks
+
+    | Task | Description |
+    |------|-------------|
+    | `build` | Compile counter RTL and testbench |
+    | `sim` | Run simulation |
+
+    ## DFM Commands
+
+    ```bash
+    dfm show skills           # List project capabilities
+    dfm show tasks            # List available tasks
+    dfm show project --json   # Get project structure
+    ```

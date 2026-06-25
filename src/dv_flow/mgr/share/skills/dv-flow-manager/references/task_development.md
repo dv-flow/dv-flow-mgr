@@ -63,7 +63,7 @@ memento is persisted in the rundir cache and compared on the next run.
 ## Packaging a plugin
 
 Ship tasks as a normal Python package whose installed files include a
-`flow.dv`/`flow.yaml` describing the package, so `dfm` can discover it. Use
+`flow.yaml` describing the package, so `dfm` can discover it. Use
 `dfm show packages` / `dfm show tasks` to confirm discovery after install.
 
 > For the full API surface (TaskDataResult fields, runner/exec helpers, PyTask

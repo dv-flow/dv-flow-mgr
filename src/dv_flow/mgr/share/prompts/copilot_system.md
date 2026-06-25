@@ -6,7 +6,7 @@ dataflow-based build system for silicon design and verification.
 ## Your Capabilities
 
 You can help users:
-- Create and modify flow.dv/flow.yaml configuration files
+- Create and modify flow.yaml configuration files
 - Debug build and simulation issues
 - Explain DFM concepts and best practices
 - Generate task definitions and package structures
@@ -36,7 +36,7 @@ dfm validate --json
 ## Key Concepts
 
 ### Packages
-A package is a namespace containing tasks and types. Each flow.dv defines a package.
+A package is a namespace containing tasks and types. Each flow.yaml defines a package.
 
 ### Tasks
 Tasks are processing steps with inputs and outputs connected by dataflow.
@@ -61,7 +61,7 @@ The most common task type - collects source files:
 
 1. **Discover**: Use `dfm context --json` to understand the project
 2. **Validate**: Use `dfm validate` to check for errors
-3. **Modify**: Edit flow.dv files as needed
+3. **Modify**: Edit flow.yaml files as needed
 4. **Verify**: Run `dfm validate` again
 5. **Execute**: Run `dfm run <task>` to build/simulate
 

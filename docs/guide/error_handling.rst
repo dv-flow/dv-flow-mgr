@@ -222,7 +222,7 @@ YAML field: ``-1`` runs all independent tasks while still propagating
 failures to the overall run status; ``N > 0`` stops after *N* failures and
 scopes the failures so they do not update the global run status.
 
-See also: :doc:`tasks_developing` for the full dynamic subgraph API.
+See also: :doc:`developing_tasks` for the full dynamic subgraph API.
 
 
 Worked Example: Test Regression
