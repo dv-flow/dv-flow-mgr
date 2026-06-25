@@ -14,8 +14,16 @@ import os
 def get_skill_dirs():
     """Return the list of bundled agent-skill directories.
 
-    Each returned directory contains a 'SKILL.md' describing the skill.
-    Referenced by the 'agent.skills' entry point in pyproject.toml.
+    Auto-discovers every immediate subdirectory of ``share/skills`` that
+    contains a ``SKILL.md`` file, so newly bundled skills register without
+    editing this function. Referenced by the 'agent.skills' entry point in
+    pyproject.toml.
     """
     share = os.path.join(os.path.dirname(__file__), "share", "skills")
-    return [os.path.join(share, "dv-flow-manager")]
+    if not os.path.isdir(share):
+        return []
+    return [
+        os.path.join(share, name)
+        for name in sorted(os.listdir(share))
+        if os.path.isfile(os.path.join(share, name, "SKILL.md"))
+    ]
