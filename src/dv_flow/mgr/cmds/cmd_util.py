@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from ..package import Package
@@ -9,6 +10,26 @@ class CmdUtil(object):
 
         if args.cmd == "workspace":
             self.workspace(args)
+        elif args.cmd == "schema":
+            self.schema(args)
+        else:
+            raise Exception("Unknown util command '%s' (expected 'workspace' or 'schema')" % args.cmd)
+
+    def schema(self, args):
+        from ..util.cmds.cmd_schema import CmdSchema
+
+        parser = argparse.ArgumentParser(prog="dfm util schema",
+            description="Output JSON schema for DV Flow definitions")
+        parser.add_argument("-o", "--output",
+            help="Destination file (default: stdout)",
+            default="-")
+        parser.add_argument("--generate",
+            action="store_true",
+            help="Generate schema from Pydantic models instead of "
+                 "loading the canonical schema (development mode)")
+        schema_args = parser.parse_args(args.args)
+
+        CmdSchema()(schema_args)
 
     def workspace(self, args):
 

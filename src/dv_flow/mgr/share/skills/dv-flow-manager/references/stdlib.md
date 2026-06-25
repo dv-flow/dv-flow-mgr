@@ -78,10 +78,12 @@ Builds a list of include directories from a set of input files.
 
 ### std.Agent
 Runs an AI assistant with a prompt and collects a structured JSON result.
-Supported assistants include GitHub Copilot (`copilot`) and OpenAI Codex
-(`codex`); auto-probes if unspecified. The assistant must write a valid JSON
-result file or the task fails. Parameters include `system_prompt`, `prompt`,
-`assistant`, sandbox/approval modes, and `max_iterations`.
+Supported assistants include GitHub Copilot (`copilot`), OpenAI Codex (`codex`),
+`openai`, and `claude`; auto-probes (copilot → codex) if unspecified. The
+assistant must write a valid JSON result file or the task fails. Parameters:
+`system_prompt`, `user_prompt`, `result_file`, `assistant`, `model`,
+`sandbox_mode`, `approval_mode` (`suggest`/`auto-edit`/`full-auto`, codex only),
+`max_retries`, and `assistant_config`.
 
 ### std.Null
 A no-op task. Useful as an aggregation point or placeholder.
@@ -94,6 +96,9 @@ current execution, with proper dependencies (advanced).
 
 - **std.DataItem** — base data item (`type`).
 - **std.FileSet** — a set of files (`filetype`, `basedir`, `files`, ...).
+- **std.Env** — environment-variable settings emitted by `std.SetEnv`.
+- **std.TaskRunSpec** — describes a task to schedule dynamically; the input/output
+  type of `std.RunTasks`.
 - **std.Tag** and subtypes — classify tasks/data items:
   - `std.AgentSkillTag`, `std.AgentToolTag`, `std.AgentPersonaTag`,
     `std.AgentReferenceTag` — mark agent resources (see
