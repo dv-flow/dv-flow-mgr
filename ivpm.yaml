@@ -23,6 +23,8 @@ package:
       url: https://github.com/lnoor/sphinx-jsonschema.git
     - name: sphinxcontrib-mermaid
       src: pypi
+    - name: furo
+      src: pypi
     - name: toposort
       src: pypi
     - name: ply
@@ -50,6 +52,8 @@ package:
     - name: sphinx-jsonschema
       url: https://github.com/lnoor/sphinx-jsonschema.git
     - name: sphinxcontrib-mermaid
+      src: pypi
+    - name: furo
       src: pypi
     - name: toposort
       src: pypi

@@ -66,11 +66,11 @@ class CmdContext:
         if pkg is None:
             if getattr(args, 'json', False):
                 print(json.dumps({
-                    'error': 'No flow.dv/flow.yaml/flow.toml found',
+                    'error': 'No flow.yaml/flow.toml found',
                     'project': None
                 }, indent=2))
             else:
-                print("No flow.dv/flow.yaml/flow.toml found in current directory or parent directories")
+                print("No flow.yaml/flow.toml found in current directory or parent directories")
             return 1
         
         # Build context

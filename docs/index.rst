@@ -12,14 +12,27 @@ specification. This YAML-based format captures design and verification
 efficient avoidance of redundant work.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :maxdepth: 1
+   :caption: Getting Started
 
+   intro
+   install
    quickstart
-   userguide/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User Guide
+
+   guide/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: AI & Agent Integration
+
+   ai/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
    reference/index
-   reference/types_api
-   cmdref
-   llms
-   pytask_api
-   task_runners

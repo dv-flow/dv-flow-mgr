@@ -283,7 +283,7 @@ Create personas for common project roles:
     # In project/flow.yaml
     
     imports:
-    - pkg: mypackage
+    - name: mypackage
     
     tasks:
     # Import skills from packages
@@ -599,7 +599,7 @@ Complete Example: Verification Project
       desc: Hardware verification project
     
     imports:
-    - pkg: verification_lib
+    - name: verification_lib
     
     tasks:
     # Skills
@@ -739,7 +739,7 @@ A: Define personas in a shared package that projects can import:
 .. code-block:: yaml
 
     imports:
-    - pkg: company_agents
+    - name: company_agents
     
     tasks:
     - local: CompanyEngineer
@@ -774,7 +774,7 @@ See Also
 ========
 
 * :doc:`native_agent` — Native agent setup, provider configuration, and TUI reference
-* :doc:`llm_integration` - General LLM integration guide
-* :doc:`tasks_developing` - Creating tasks
-* :doc:`../cmdref` - Command reference
-* :doc:`stdlib` - Standard library reference
+* :doc:`using_with_agents` - Driving DFM from external LLM agents
+* :doc:`/guide/developing_tasks` - Creating tasks
+* :doc:`/reference/cli` - Command reference
+* :doc:`/guide/stdlib` - Standard library reference

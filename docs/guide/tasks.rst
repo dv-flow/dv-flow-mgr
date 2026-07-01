@@ -40,7 +40,17 @@ done via the `uses` clause.
 
 The example above creates a new task named `PrintHello` that
 inherits the parameters and implementation of the existing
-`std.Message` task. 
+`std.Message` task.
+
+.. note::
+
+   **``uses:`` vs ``type:``** -- you may see older flows select the base task
+   with ``type:`` instead of ``uses:`` (e.g. ``type: std.FileSet``). Both
+   select the base task, but ``type`` is also the name of a common *parameter*
+   (for example a ``FileSet``'s ``type: systemVerilogSource``), so the same key
+   can appear with two different meanings in one task. Prefer ``uses:`` for the
+   base task; it is unambiguous and is the canonical form used throughout this
+   guide.
 
 
 Specializing Task Parameters
@@ -108,7 +118,7 @@ DFM resolves transitive dependencies automatically -- if task C needs B and
 B needs A, then C receives the outputs of both A and B without listing A
 explicitly.
 
-**Co-location principle:** Define tasks in the same ``flow.dv`` file as the
+**Co-location principle:** Define tasks in the same ``flow.yaml`` file as the
 source files they describe. Use package fragments to link directories together.
 This keeps each directory's build logic close to its source and makes the
 dependency graph easy to reason about.
@@ -124,7 +134,7 @@ dependency graph easy to reason about.
     # GOOD: each task declares only direct deps
     # (defined in separate fragment files co-located with source)
 
-    # verification_ip/pkg_a/flow.dv
+    # verification_ip/pkg_a/flow.yaml
     - name: pkg_a_hdl
       uses: std.FileSet
       with:
@@ -137,7 +147,7 @@ dependency graph easy to reason about.
         type: systemVerilogSource
         include: "*.sv"
 
-    # tb/flow.dv
+    # tb/flow.yaml
     - name: hdl_top
       uses: std.FileSet
       needs: [pkg_a_hdl, pkg_b_hdl]
@@ -351,10 +361,15 @@ circumstances. The `iff` property of  tasks supports this use model.
         uses: hdlsim.vlt.SimImage
         needs: [SimOptions]
 
-The example above uses conditional execution to customize elaboration options. 
+The example above uses conditional execution to customize elaboration options.
 When the `debug_level` parameter's value is greater than 0, the `SimOptionsDebug` task
 sends the `--trace-fst` option to the simulator. Otherwise, no additional arguments are
 provided.
+
+``iff`` gates a single task on a condition. When you need richer branching or
+iteration -- choosing between bodies, matching cases, or looping until a
+condition is met -- use a ``control:`` block; see
+:doc:`control_flow`.
 
 
 Task Override

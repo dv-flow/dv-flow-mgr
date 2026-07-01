@@ -233,10 +233,10 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
                 dir = os.path.dirname(dir)
 
         if rootfile is None:
-            _log.debug("Failed to find flow.dv/flow.yaml/flow.toml with 'package' key")
+            _log.debug("Failed to find flow.yaml/flow.toml with 'package' key")
             if listener:
                 listener(TaskMarker(
-                    msg="Failed to find a 'flow.dv/flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
+                    msg="Failed to find a 'flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % path,
                     severity=SeverityE.Error))
     loader = None
     ret = None

@@ -2,7 +2,7 @@
 Integration tests for filter functionality.
 
 Tests that:
-1. filters.dv loads with std package
+1. filters.yaml loads with std package
 2. Filters can be resolved and invoked
 3. Standard library filters work correctly
 4. Filters work in task parameters (when that's implemented)
@@ -19,26 +19,26 @@ from dv_flow.mgr.expr_parser import ExprParser
 
 
 class TestFilterLoading:
-    """Test that filters.dv loads correctly with std package"""
-    
+    """Test that filters.yaml loads correctly with std package"""
+
     def test_std_package_loads_filters(self):
-        """Test that std package loads and includes filters from filters.dv"""
+        """Test that std package loads and includes filters from filters.yaml"""
         import dv_flow.mgr.std
         import pathlib
-        
+
         # Get the std package directory from __path__
         std_dir = pathlib.Path(list(dv_flow.mgr.std.__path__)[0])
-        
-        # Verify filters.dv exists
-        filters_file = std_dir / "filters.dv"
-        assert filters_file.exists(), f"filters.dv not found at {filters_file}"
-        
+
+        # Verify filters.yaml exists
+        filters_file = std_dir / "filters.yaml"
+        assert filters_file.exists(), f"filters.yaml not found at {filters_file}"
+
         # Verify it's a valid YAML fragment
         import yaml
         with open(filters_file) as f:
             data = yaml.safe_load(f)
-        
-        assert "fragment" in data, "filters.dv should contain 'fragment' key"
+
+        assert "fragment" in data, "filters.yaml should contain 'fragment' key"
         assert "filters" in data["fragment"], "fragment should contain 'filters' key"
         
         filters = data["fragment"]["filters"]
@@ -52,23 +52,23 @@ class TestFilterLoading:
             f"Missing expected filters. Found: {filter_names}, Expected: {expected}"
     
     def test_flow_dv_imports_filters(self):
-        """Test that flow.dv includes filters.dv fragment"""
+        """Test that the std flow file includes the filters fragment"""
         import dv_flow.mgr.std
         import pathlib
         import yaml
-        
+
         std_dir = pathlib.Path(list(dv_flow.mgr.std.__path__)[0])
-        flow_file = std_dir / "flow.dv"
-        
+        flow_file = std_dir / "flow.yaml"
+
         with open(flow_file) as f:
             data = yaml.safe_load(f)
-        
+
         assert "package" in data
-        assert "fragments" in data["package"], "flow.dv should have fragments section"
-        
+        assert "fragments" in data["package"], "std flow file should have fragments section"
+
         fragments = data["package"]["fragments"]
-        assert "filters.dv" in fragments, \
-            f"flow.dv should include filters.dv fragment. Found fragments: {fragments}"
+        assert "filters.yaml" in fragments, \
+            f"std flow file should include filters.yaml fragment. Found fragments: {fragments}"
 
 
 class TestFilterResolution:

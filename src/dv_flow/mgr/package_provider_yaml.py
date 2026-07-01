@@ -893,7 +893,7 @@ class PackageProviderYaml(PackageProvider):
         return sub_pkg
 
     def _findFlowDvInDir(self, base):
-        """Search down the tree looking for a <flow.dv> file"""
+        """Search down the tree looking for a <flow.yaml> file"""
         self._log.debug("--> _findFlowDvInDir (%s)" % base)
         imp_path = None
         if os.path.isfile(base):

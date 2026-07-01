@@ -145,7 +145,7 @@ class ExtRgy(PackageProvider):
         self._log.debug("--> discover_plugins")
         # Register built-in package
         self._pkg_m["std"] = PackageProviderYaml(
-            path=os.path.join(os.path.dirname(__file__), "std/flow.dv"))
+            path=os.path.join(os.path.dirname(__file__), "std/flow.yaml"))
 
         # Register built-in shells
         self._shell_m["shell"] = ShellCallable

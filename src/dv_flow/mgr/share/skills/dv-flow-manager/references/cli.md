@@ -1,7 +1,8 @@
 # CLI Reference (`dfm`)
 
 Global options (before the subcommand): `--log-level {NONE,INFO,DEBUG}`,
-`-D NAME=VALUE`, `-P FILE_OR_JSON`.
+`-D NAME=VALUE`, `-P FILE_OR_JSON`, `--package-map FILE` (map a package name to
+its flow file for resolving imports by name; repeatable).
 
 Top-level commands: `run`, `show`, `graph`, `validate`, `context`, `agent`,
 `mcp`, `cache`, `daemon`, `worker`, `complete`, `util`.
@@ -29,6 +30,7 @@ dfm run [tasks...]
 | `--runner NAME` | Runner backend (`local`, `lsf`, …; auto-detect by default). |
 | `--runner-opt KEY=VALUE` | Runner option. Repeatable. |
 | `--override TARGET=REPLACEMENT` | Replace a task (e.g. `pkg.Task=std.Null`). |
+| `--report DIR` | After the run, write a diagnostics bundle (per-task logs, markers, status) to `DIR` for publishing as a CI artifact. |
 
 ```bash
 dfm run build
@@ -126,10 +128,13 @@ dfm daemon stop
 
 ## util
 
-Utility subcommands, including the JSON schema for editor validation:
+Utility subcommands. `schema` emits the JSON schema for editor validation;
+`workspace` dumps the resolved project as JSON.
 
 ```bash
-dfm util schema > flow.schema.json
+dfm util schema -o flow.schema.json   # or: dfm util schema > flow.schema.json
+dfm util schema --generate            # regenerate from models (dev)
+dfm util workspace                    # resolved project as JSON
 ```
 
 ## complete

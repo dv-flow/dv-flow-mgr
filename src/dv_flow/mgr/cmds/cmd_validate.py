@@ -16,7 +16,7 @@
 #* limitations under the License.
 #*
 #****************************************************************************
-"""Validate command - checks flow.yaml/flow.dv for errors and warnings."""
+"""Validate command - checks flow.yaml for errors and warnings."""
 
 import json
 import logging
@@ -51,7 +51,7 @@ class ValidationMarkerListener:
 
 
 class CmdValidate:
-    """Validate flow.yaml/flow.dv files for errors and warnings.
+    """Validate flow.yaml files for errors and warnings.
     
     Performs the following checks:
     - Syntax validation (YAML/DV parsing)
@@ -117,7 +117,7 @@ class CmdValidate:
             if not errors:
                 errors.append({
                     'type': 'NoPackageFound',
-                    'message': f"No flow.dv/flow.yaml/flow.toml found in {root} or parent directories"
+                    'message': f"No flow.yaml/flow.toml found in {root} or parent directories"
                 })
         else:
             # Phase 2: Check for undefined task references

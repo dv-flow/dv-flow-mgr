@@ -114,6 +114,58 @@ def test_report_generate_unit(tmpdir):
     assert "FAIL" in md
 
 
+def test_report_markdown_markers_section(tmpdir):
+    """report.md carries a foldable Markers section grouped by severity."""
+    from dv_flow.mgr.task_data import TaskMarkerLoc
+
+    tmpdir = str(tmpdir)
+    report_dir = os.path.join(tmpdir, "report")
+
+    n1 = _mk_node("pkg.sim", os.path.join(tmpdir, "sim"), 1, markers=[
+        TaskMarker(msg="undefined ref foo", severity=SeverityE.Error,
+                   loc=TaskMarkerLoc(path="top.sv", line=42)),
+    ])
+    n2 = _mk_node("pkg.lint", os.path.join(tmpdir, "lint"), 0, markers=[
+        TaskMarker(msg="unused signal", severity=SeverityE.Warning),
+        TaskMarker(msg="cached result", severity=SeverityE.Info),
+    ])
+
+    rpt = TaskListenerReport(rundir=tmpdir, root_name="pkg")
+    rpt.event(n1, "leave")
+    rpt.event(n2, "leave")
+    rpt.generate(report_dir)
+
+    with open(os.path.join(report_dir, "report.md")) as f:
+        md = f.read()
+
+    # Foldable section with one <details> per non-empty severity.
+    assert "## Markers" in md
+    assert "<summary>Error (1)</summary>" in md
+    assert "<summary>Warning (1)</summary>" in md
+    assert "<summary>Info (1)</summary>" in md
+    assert md.count("<details>") == 3
+    # Error precedes Warning precedes Info.
+    assert md.index("Error (1)") < md.index("Warning (1)") < md.index("Info (1)")
+    # Marker location is rendered as path:line.
+    assert "(top.sv:42)" in md
+
+
+def test_report_markdown_no_markers_section(tmpdir):
+    """With no markers at all, the Markers section is omitted entirely."""
+    tmpdir = str(tmpdir)
+    report_dir = os.path.join(tmpdir, "report")
+    n = _mk_node("pkg.build", os.path.join(tmpdir, "build"), 0)
+
+    rpt = TaskListenerReport(rundir=tmpdir, root_name="pkg")
+    rpt.event(n, "leave")
+    rpt.generate(report_dir)
+
+    with open(os.path.join(report_dir, "report.md")) as f:
+        md = f.read()
+    assert "## Markers" not in md
+    assert "<details>" not in md
+
+
 def test_report_no_logfile(tmpdir):
     """A task with no logfile is still reported, with log == None."""
     tmpdir = str(tmpdir)

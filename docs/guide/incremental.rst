@@ -2,17 +2,20 @@
 Incremental Builds
 ==================
 
-DV Flow Manager supports incremental builds by tracking task execution 
+DV Flow Manager supports incremental builds by tracking task execution
 state and skipping tasks that are already up-to-date. This can significantly
 reduce build times when only a subset of inputs have changed.
+
+Incremental execution operates *within a rundir*. To reuse results across
+workspaces or machines -- for example a shared CI cache -- see :doc:`caching`.
 
 How It Works
 ============
 
-Tasks record their inputs, outputs, and parameters in an ``exec.json`` file
+Tasks record their inputs, outputs, and parameters in an ``exec_data.json`` file
 in their run directory. On subsequent runs, DV Flow Manager checks:
 
-1. **Exec record existence**: If no ``exec.json`` exists, the task must run.
+1. **Exec record existence**: If no ``exec_data.json`` exists, the task must run.
 2. **Parameter values**: If recorded parameters differ from current values, re-run.
 3. **Input data**: If any input dataset is marked as 'changed', re-run.
 4. **Input structure**: If the number, position, or elements of inputs differ, re-run.
@@ -91,7 +94,7 @@ is up-to-date:
         
         return True
 
-See :doc:`pytask_api` for complete documentation of the ``UpToDateCtxt`` class.
+See :doc:`/reference/python_api` for complete documentation of the ``UpToDateCtxt`` class.
 
 Task Output
 ===========
@@ -103,7 +106,7 @@ output:
 
     << [1] Task mypackage.compile (up-to-date) 0.05ms
 
-The previous output data is loaded from the task's ``exec.json`` file,
+The previous output data is loaded from the task's ``exec_data.json`` file,
 allowing downstream tasks to use cached results without re-executing.
 
 
@@ -121,7 +124,7 @@ When a task executes:
 
 1. Task runs and produces outputs
 2. Task optionally creates a memento (dictionary of state data)
-3. Memento is saved to the task's exec.json file
+3. Memento is saved to the task's exec_data.json file
 4. On next run, memento is passed to up-to-date check
 
 Mementos typically store:

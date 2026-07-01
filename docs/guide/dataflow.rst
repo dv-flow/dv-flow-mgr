@@ -1,6 +1,6 @@
-##################
+###################
 Dataflow & Produces
-##################
+###################
 
 DV Flow Manager uses **dataflow dependencies** to connect tasks together. Each task can:
 
@@ -658,8 +658,8 @@ See :doc:`filters` for details on defining and using custom filters.
 See Also
 ========
 
-* :doc:`tasks_using` - Using and customizing tasks
-* :doc:`tasks_developing` - Creating new tasks
+* :doc:`tasks` - Using and customizing tasks
+* :doc:`developing_tasks` - Creating new tasks
 * :doc:`expressions` - Parameter and expression syntax
 * :doc:`filters` - Filter reference and custom filter creation
-* :doc:`../cmdref` - Command reference for validate and show
+* :doc:`/reference/cli` - Command reference for validate and show

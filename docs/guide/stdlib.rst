@@ -148,12 +148,14 @@ Example
 Shell Tasks
 -----------
 
-Shell tasks support all standard shells. Common options:
+The ``shell:`` field selects the interpreter for the ``run:`` body. The
+registered shells are:
 
-* ``bash`` - Bourne Again Shell (most common)
-* ``sh`` - POSIX shell
-* ``python`` - Python interpreter
-* ``pytask`` - Python task with context (for custom tasks)
+* ``bash`` - Bourne Again Shell (the default)
+* ``shell`` - alias for ``bash``
+* ``csh`` - C shell
+* ``tcsh`` - TENEX C shell
+* ``pytask`` - run ``run:`` as Python with task context (for custom tasks)
 
 The ``run:`` field specifies the command or script to execute. For inline
 scripts, use YAML's multi-line syntax (``|`` or ``>``).

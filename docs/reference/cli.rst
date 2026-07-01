@@ -27,10 +27,25 @@ These options are available across multiple commands:
 ``-D NAME=VALUE``
     Override parameter values from the command line. Can be specified multiple
     times to override multiple parameters.
-    
+
     .. code-block:: bash
-    
+
         dfm run build -D debug=true -D optimization=O3
+
+    ``-D`` (and the ``-P`` JSON parameter file) are explained in full -- syntax,
+    targeting, and resolution order -- in :doc:`/guide/parameters`.
+
+``--package-map FILE``
+    Resolve imports by name using a package-map file (``name -> flow file``).
+    May be specified multiple times; earlier maps take precedence on name
+    collisions. A package map can also be supplied via the ``package-map:`` key
+    in a flow file or the ``DV_FLOW_PACKAGE_MAP`` environment variable
+    (colon-separated paths). See :doc:`/guide/packages` for the file format and
+    precedence rules.
+
+    .. code-block:: bash
+
+        dfm --package-map deps/flow-packages.yaml run build
 
 ``-c, --config NAME``
     Select a package configuration to use. Configurations allow switching between
@@ -42,7 +57,7 @@ These options are available across multiple commands:
 
 ``--root PATH``
     Specify the root directory for the flow. By default, dfm searches upward
-    from the current directory for a flow.yaml or flow.yaml file.
+    from the current directory for a flow.yaml file.
     
     .. code-block:: bash
     
@@ -153,7 +168,7 @@ Run Options
     The environment variable ``DFM_BASE_RUNDIR`` is exported to child
     processes when this option is set.
 
-    See :doc:`userguide/incremental` for full details on how base-rundir
+    See :doc:`/guide/incremental` for full details on how base-rundir
     satisfaction works.
 
 ``--report DIR``
@@ -352,7 +367,7 @@ The task detail output includes:
 * **Scope**: Visibility (root, export, local)
 * **Description and Documentation**: Task purpose and usage
 * **Parameters**: Task parameters with types and defaults
-* **Produces**: Output dataset patterns this task creates (see :doc:`userguide/dataflow`)
+* **Produces**: Output dataset patterns this task creates (see :doc:`/guide/dataflow`)
 * **Consumes**: Input dataset patterns this task accepts
 * **Direct Needs**: Immediate dependencies
 
@@ -529,7 +544,7 @@ Dataflow Validation
 -------------------
 
 The validator checks that produces patterns from producer tasks match the
-consumes patterns of consumer tasks. See :doc:`userguide/dataflow` for details
+consumes patterns of consumer tasks. See :doc:`/guide/dataflow` for details
 on compatibility rules.
 
 **Compatibility Rules:**
@@ -554,7 +569,7 @@ on compatibility rules.
 See Also
 --------
 
-* :doc:`userguide/dataflow` - Complete dataflow and produces documentation
+* :doc:`/guide/dataflow` - Complete dataflow and produces documentation
 * ``dfm show task <name>`` - View task produces/consumes patterns
 
 Agent Command
@@ -1057,7 +1072,7 @@ An execution is shown in the Perfetto UI below. In addition to seeing informatio
 about how tasks executed with respect to each other, data about individual
 tasks can be seen.
 
-.. image:: imgs/perfetto_trace_view.png
+.. image:: /imgs/perfetto_trace_view.png
 
 Common Patterns
 ===============

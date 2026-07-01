@@ -450,7 +450,7 @@ def get_parser():
 
     # Validate command
     validate_parser = subparsers.add_parser('validate',
-        help='Validate flow.yaml/flow.dv files for errors and warnings')
+        help='Validate flow.yaml files for errors and warnings')
     validate_parser.add_argument("flow_file",
                                  nargs='?',
                                  help="Flow file to validate (default: auto-detect)")

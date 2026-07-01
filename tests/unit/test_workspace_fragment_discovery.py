@@ -254,6 +254,59 @@ class TestCmdUtilWorkspace:
             # If package found, verify name
             if "name" in data:
                 assert data["name"] == "workspace_test"
-                
+
         finally:
             os.chdir(orig_cwd)
+
+
+class TestCmdUtilSchema:
+    """Tests for the 'dfm util schema' command (forwarded to CmdSchema)."""
+
+    def _run_schema(self, extra_args):
+        from argparse import Namespace
+        from dv_flow.mgr.cmds.cmd_util import CmdUtil
+        import sys
+        from io import StringIO
+
+        cmd = CmdUtil()
+        args = Namespace(cmd="schema", args=extra_args)
+
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        try:
+            cmd(args)
+            return sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+    def test_schema_to_stdout(self):
+        """'dfm util schema' emits the JSON schema to stdout."""
+        output = self._run_schema([])
+        data = json.loads(output)
+        assert data.get("title") == "DV Flow specification schema"
+        assert "defs" in data
+
+    def test_schema_to_output_file(self, tmpdir):
+        """'dfm util schema -o FILE' writes the schema to a file."""
+        out_path = os.path.join(str(tmpdir), "flow.schema.json")
+        self._run_schema(["-o", out_path])
+
+        assert os.path.isfile(out_path)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert data.get("title") == "DV Flow specification schema"
+
+    def test_schema_generate_flag(self):
+        """'dfm util schema --generate' builds the schema from the models."""
+        output = self._run_schema(["--generate"])
+        data = json.loads(output)
+        assert data.get("title") == "DV Flow specification schema"
+        assert "defs" in data
+
+    def test_unknown_util_command_raises(self):
+        """An unrecognized util subcommand raises a helpful error."""
+        from argparse import Namespace
+        from dv_flow.mgr.cmds.cmd_util import CmdUtil
+
+        with pytest.raises(Exception, match="Unknown util command"):
+            CmdUtil()(Namespace(cmd="bogus", args=[]))

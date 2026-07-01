@@ -41,5 +41,6 @@ dv-flow-manager = "dv_flow.mgr.skills:get_skill_dirs"
     'share/*.json',
     'share/prompts/*',
     'share/skills/**/*',
+    'std/*.yaml',
 ]
 

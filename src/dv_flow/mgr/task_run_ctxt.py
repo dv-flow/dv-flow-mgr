@@ -269,8 +269,7 @@ class TaskRunCtxt(object):
             tasks: TaskNode or list of TaskNodes to execute
             name: Optional name prefix for sub-tasks (for debugging)
             timeout: Optional timeout in seconds (None = no timeout)
-            max_failures: -1/0 = run all independent tasks even after failures;
-                          1 = stop on first failure; N > 1 = stop after N failures.
+            max_failures: -1/0 = run all independent tasks even after failures; 1 = stop on first failure; N > 1 = stop after N failures.
             
         Returns:
             TaskDataOutput or list of TaskDataOutput from terminal tasks
