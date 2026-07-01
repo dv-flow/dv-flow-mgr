@@ -186,19 +186,28 @@ class CmdValidate:
                 if need is None:
                     # This was an unresolved reference - already reported by loader
                     continue
-                
-                # Handle Task object or tuple (Task, ...)
+
+                # A need that already resolved to a concrete Task object is
+                # defined by construction: the loader's _findTask succeeded (and
+                # hard-errors, surfaced separately as a ParseError, when it does
+                # not). This includes exported tasks from packages pulled in via
+                # `uses:`/`needs:` FQN that are not listed in `pkg_m` -- e.g.
+                # `hdlsim.<sim>.SimLibUVM`. Don't second-guess a resolved
+                # reference with the (necessarily incomplete) local known-task
+                # set; doing so produced false "undefined task" errors.
                 if hasattr(need, 'name'):
-                    need_name = need.name
-                elif isinstance(need, tuple) and len(need) > 0 and hasattr(need[0], 'name'):
-                    need_name = need[0].name
-                else:
-                    need_name = str(need)
-                
+                    continue
+                if isinstance(need, tuple) and len(need) > 0 and hasattr(need[0], 'name'):
+                    continue
+
+                # Fallback: an unresolved bare-string reference. Validate it
+                # against the known-task set so genuine typos are still caught.
+                need_name = str(need)
+
                 # Handle relative references
                 if '.' not in need_name:
                     need_name = f"{pkg.name}.{need_name}"
-                
+
                 if need_name not in known_tasks:
                     # Try to find similar tasks
                     suggestions = self._find_similar(need_name, known_tasks)

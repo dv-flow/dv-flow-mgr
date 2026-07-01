@@ -668,11 +668,18 @@ class DfmCommandServer:
         for task in root_pkg.task_m.values():
             if hasattr(task, 'needs') and task.needs:
                 for need in task.needs:
-                    need_name = need if isinstance(need, str) else getattr(need, 'name', str(need))
+                    # A need that already resolved to a Task object is defined by
+                    # construction (incl. exported tasks from packages pulled in
+                    # via uses/needs FQN that aren't in root_pkg.task_m, e.g.
+                    # hdlsim.<sim>.SimLibUVM). Only validate bare-string needs so
+                    # genuine typos are still caught.
+                    if not isinstance(need, str):
+                        continue
+                    need_name = need
                     # Resolve full name
                     if '.' not in need_name:
                         need_name = f"{root_pkg.name}.{need_name}"
-                    
+
                     if need_name not in root_pkg.task_m:
                         errors.append({
                             "type": "UndefinedTask",
