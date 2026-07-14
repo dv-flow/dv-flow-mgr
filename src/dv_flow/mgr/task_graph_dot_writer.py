@@ -12,6 +12,7 @@ class TaskGraphDotWriter(object):
     _ind : str = ""
     _node_id_m : Dict[TaskNode, str] = dc.field(default_factory=dict)
     _processed_needs : Set[TaskNode] = dc.field(default_factory=set)
+    _processed_need_nodes : Set[int] = dc.field(default_factory=set)
     _node_id : int = 1
     _cluster_id : int = 1
     _log : ClassVar = logging.getLogger("TaskGraphDotWriter")
@@ -42,11 +43,20 @@ class TaskGraphDotWriter(object):
     def build_node(self, node):
         self._log.debug("--> build_node %s (%d)" % (node.name, len(node.needs),))
 
+        if node in self._node_id_m:
+            # Already rendered (e.g. reached again via a needs edge). Rendering
+            # it a second time would re-emit the whole compound subtree and, for
+            # a compound reached repeatedly through needs, blow up super-linearly.
+            return
+
         if isinstance(node, TaskNodeCompound):
             self._log.debug("-- compound node")
-            # Find the root and build out any expanded sub-nodes
+            # Find the root and build out any expanded sub-nodes. Guard the
+            # parent walk against pathological cycles in the parent chain.
             root = node
-            while root.parent is not None:
+            _seen = set()
+            while root.parent is not None and id(root) not in _seen:
+                _seen.add(id(root))
                 root = root.parent
             self.build_compound_node(root)
         else:
@@ -152,6 +162,12 @@ class TaskGraphDotWriter(object):
         return ret
 
     def process_needs(self, node):
+        # Guard on the entry node itself (keyed by identity): the per-`dep`
+        # guard below is not sufficient when the needs graph contains a cycle
+        # (or duplicate node objects), which would otherwise recurse forever.
+        if id(node) in self._processed_need_nodes:
+            return
+        self._processed_need_nodes.add(id(node))
         self._log.debug("--> process_needs %s (%d)" % (node.name, len(node.needs),))
 
         # if isinstance(node, TaskNodeCompound):
@@ -191,6 +207,10 @@ class TaskGraphDotWriter(object):
 
     def build_compound_node(self, node):
         """Hierarchical build of a compound root node"""
+
+        if node in self._node_id_m:
+            # Already rendered; don't re-emit the subtree.
+            return
 
         self._log.debug("--> build_compound_node %s (%d)" % (node.name, len(node.tasks),))
 

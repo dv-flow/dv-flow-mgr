@@ -40,7 +40,18 @@ class ParamRefEval(object):
     def set_name_resolution(self, ctx: 'NameResolutionContext'):
         self.expr_eval.set_name_resolution(ctx)
 
-    def eval(self, val : str) -> str:
+    def eval(self, val : str):
+        # Whole-value reference: if the entire string is exactly one ${{ ... }},
+        # return the raw resolved object so list/map-typed params keep their type
+        # instead of being JSON-stringified. (Partial or multi-ref strings still
+        # go through string splicing below.)
+        if isinstance(val, str):
+            stripped = val.strip()
+            if (stripped.startswith("${{") and stripped.endswith("}}")
+                    and stripped.count("${{") == 1 and stripped.count("}}") == 1):
+                ref = stripped[3:-2].strip()
+                return self.expr_eval.eval_obj(ref)
+
         idx = 0
 
         while True:

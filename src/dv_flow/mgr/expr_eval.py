@@ -81,6 +81,24 @@ class ExprEval(ExprVisitor):
             val = self._toString(self.value)
             return val
     
+    def eval_obj(self, expr_s):
+        """Like eval(), but returns the raw resolved object (list/dict/scalar)
+        instead of JSON-stringifying it. Used for whole-value ${{ }} references
+        so that list/map-typed params keep their type through the eval."""
+        if expr_s is None:
+            return None
+        elif isinstance(expr_s, Expr):
+            expr_s.accept(self)
+            return self._toObject(self.value)
+        elif isinstance(expr_s, bool):
+            return expr_s
+        else:
+            parser = ExprParser()
+            ast = parser.parse(expr_s)
+            self.value = None
+            ast.accept(self)
+            return self._toObject(self.value)
+
     def _toString(self, val):
         rval = val
         if type(val) != str:

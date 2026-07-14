@@ -2189,23 +2189,37 @@ class PackageProviderYaml(PackageProvider):
         Handles str, list, and dict types -- mirroring the top-level
         parameter expansion at ~line 1109.
         """
+        # NOTE: must NOT mutate `value` in place. `value` is aliased directly
+        # from the stored param_def (`param_def.value`), so mutating it would
+        # bake the template's *default*-context resolution back onto the shared
+        # Task definition, destroying the `${{ }}` template for every later
+        # instantiation (e.g. a compound reused with different param values).
+        # Always build and return a fresh container.
         if isinstance(value, list):
-            for i in range(len(value)):
-                if isinstance(value[i], str) and "${{" in value[i]:
+            result = []
+            for v in value:
+                if isinstance(v, str) and "${{" in v:
                     try:
-                        value[i] = loader.evalExpr(value[i])
+                        result.append(loader.evalExpr(v))
                     except:
-                        pass
+                        result.append(v)
+                else:
+                    result.append(v)
+            return result
         elif isinstance(value, dict):
-            for k in value:
-                if isinstance(value[k], str) and "${{" in value[k]:
+            result = {}
+            for k, v in value.items():
+                if isinstance(v, str) and "${{" in v:
                     try:
-                        value[k] = loader.evalExpr(value[k])
+                        result[k] = loader.evalExpr(v)
                     except:
-                        pass
+                        result[k] = v
+                else:
+                    result[k] = v
+            return result
         elif isinstance(value, str) and "${{" in value:
             try:
-                value = loader.evalExpr(value)
+                return loader.evalExpr(value)
             except:
-                pass
+                return value
         return value

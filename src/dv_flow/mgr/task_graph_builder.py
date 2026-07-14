@@ -1271,15 +1271,26 @@ class TaskGraphBuilder(object):
             node.input.save_exec_data = False
 
         self._log.debug("--> processing needs (%s) (%d)" % (task.name, len(task.needs)))
-        for need in task.needs:
-            need_n = self._getTaskNode(need.name)
-            if need_n is None:
-                raise Exception("Failed to find need %s" % need.name)
-            elif need_n.iff:
-                self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
-                node.input.needs.append((need_n, False))
-            else:
-                self._log.debug("Needed node %s is not enabled" % need_n.name)
+        # Resolve needs with THIS node off the task-node stack. A need is a
+        # dependency, not a hierarchical child: if the needed task has to be
+        # built here (not yet cached), it must not be mis-parented as a subtask
+        # of the needer. Leaving `node` on the stack would set the needed
+        # (possibly top-level) task's `.parent` to `node`, corrupting the
+        # hierarchy -- which breaks rundir nesting and sends the dot writer's
+        # parent-walk into the needer (an effectively unbounded render).
+        self._task_node_s.pop()
+        try:
+            for need in task.needs:
+                need_n = self._getTaskNode(need.name)
+                if need_n is None:
+                    raise Exception("Failed to find need %s" % need.name)
+                elif need_n.iff:
+                    self._log.debug("Add need %s with %d dependencies" % (need_n.name, len(need_n.needs)))
+                    node.input.needs.append((need_n, False))
+                else:
+                    self._log.debug("Needed node %s is not enabled" % need_n.name)
+        finally:
+            self._task_node_s.append(node)
         self._log.debug("<-- processing needs")
 
         # TODO: handle strategy
@@ -1288,27 +1299,28 @@ class TaskGraphBuilder(object):
         # For now, build out local tasks and link up the needs
         tasks = []
 
-        # Inject compound task params into eval context so body tasks
-        # can reference them via ${{ param_name }}.
-        eval_ctx = eval if eval is not None else self._eval
-        saved_vars = {}
+        # Inject compound task params into a CHILD eval context so body tasks
+        # can reference them via ${{ param_name }}. Using a fresh context (rather
+        # than mutating the shared eval in place) makes `eval is not self._eval`
+        # true when the subtasks are built, which forces their paramT to be
+        # re-evaluated against THESE param values instead of reusing a paramT
+        # cached from an earlier build with different values (e.g. the compound's
+        # own defaults, or a prior standalone build). This mirrors how the matrix
+        # strategy scopes its per-iteration variables.
+        base_eval = eval if eval is not None else self._eval
+        body_eval = ParamRefEval()
+        body_eval.expr_eval.variables = dict(base_eval.expr_eval.variables)
+        _name_res = getattr(base_eval.expr_eval, "name_resolution", None)
+        if _name_res is not None:
+            body_eval.set_name_resolution(_name_res)
         if params is not None:
             for field_name in type(params).model_fields.keys():
-                value = getattr(params, field_name)
-                saved_vars[field_name] = eval_ctx.expr_eval.variables.get(field_name)
-                eval_ctx.set(field_name, value)
+                body_eval.set(field_name, getattr(params, field_name))
 
         for t in task.subtasks:
-            nn = self._mkTaskNode(t, hierarchical=True, eval=eval)
+            nn = self._mkTaskNode(t, hierarchical=True, eval=body_eval)
             node.tasks.append(nn)
             tasks.append((t, nn))
-
-        # Restore previous eval context variables
-        for field_name, prev_val in saved_vars.items():
-            if prev_val is None:
-                eval_ctx.expr_eval.variables.pop(field_name, None)
-            else:
-                eval_ctx.set(field_name, prev_val)
 
         # Pop the node stack, since we're done constructing the body
         self._task_node_s.pop()
