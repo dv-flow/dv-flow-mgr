@@ -912,6 +912,23 @@
           "title": "With",
           "type": "object"
         },
+        "set": {
+          "description": "Scoped overrides applied to this task's subtree: a list whose items are either assignment maps ({name: value}) that rebind scoped variables read via ${{ pkg.var }}, or scope items ({uses?, path?, set: [...]}) that narrow/force by matcher. Outer overrides inner; CLI (-D) is the ceiling.",
+          "title": "Scoped Overrides",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "elaborate": {
+          "description": "Python callable ('module:function') that elaborates this task type at graph-build time, replacing the default node interior. Signature: elaborate(ctxt, task, name) -> TaskNode. Bound along the 'uses' chain (nearest declaration wins).",
+          "title": "Elaborate",
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
+        },
         "rundir": {
           "$ref": "#/defs/RundirE",
           "default": "unique",

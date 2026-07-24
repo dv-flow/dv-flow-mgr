@@ -187,6 +187,18 @@ Run Options
     writes to the shared rundir, so it works for any execution backend
     (local, daemon, or remote runners such as ``--runner lsf``).
 
+``--run-id ID``
+    Identifier for this run's output-data directory (``rundir/out/<ID>``),
+    shared by all ``std.Publish`` tasks (and ``dfm-out publish`` calls) in the
+    run. By default the runner allocates the next zero-padded counter
+    (``0001``, ``0002``, ...); pin it to a CI build number or git SHA to give
+    published deliverables a stable, meaningful location. Re-copies of
+    identical content are skipped when a run-id is reused.
+
+    .. code-block:: bash
+
+        dfm run release --run-id ${GITHUB_RUN_NUMBER}
+
 Run Examples
 ------------
 

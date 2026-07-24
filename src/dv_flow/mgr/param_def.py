@@ -25,20 +25,15 @@ from typing import Any, List, Union
 from pydantic import BaseModel, Field, model_validator
 
 class ListType(BaseModel):
-#    item : Union[str, 'ComplexType']
     item : Union[str, Any]
 
 class MapType(BaseModel):
-#    key : Union[str, 'ComplexType']
-#    item : Union[str, 'ComplexType']
     key : Union[str, Any]
     val : Union[str, Any]
 
 class ComplexType(BaseModel):
     list : Union[ListType, None] = None
     map : Union[MapType, None] = None
-#    list : Union[Any, None] = None
-#    map : Union[Any, None] = None
 
 class VisibilityE(enum.Enum):
     LOCAL = "local"
@@ -74,31 +69,43 @@ class ParamDef(BaseModel):
     srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
 
     def resolve_value(self, base_value):
-        """Apply append/prepend/value operations against *base_value*.
+        """Apply value/prepend/append/path-prepend/path-append against
+        *base_value*.
 
         When 'value' is set, it replaces base_value as the starting point.
-        Then prepend/append are applied on top of that base.
-        result = prepend + (value or base_value) + append.
+        Then the list ops are layered on top:
+            result = path_prepend + prepend + (value or base) + append + path_append
+
+        For list-typed params (the common case: `plusargs`, `incdirs`, ...) the
+        path-* ops add elements just like prepend/append. (OS-path-separator
+        *string* join for scalar PATH-like params is a documented follow-up in
+        docs/proposals/list_manipulation.md; no current flow relies on it.)
         """
+        def _as_items(v):
+            return v if isinstance(v, list) else [v]
+
         if self.value is not None:
             result = list(self.value) if isinstance(self.value, list) \
-                     else [self.value] if self.value is not None else []
+                     else [self.value]
         else:
-            result = list(base_value) if base_value else []
+            result = list(base_value) if isinstance(base_value, list) \
+                     else ([base_value] if base_value else [])
         if self.prepend is not None:
-            items = self.prepend if isinstance(self.prepend, list) \
-                    else [self.prepend]
-            result = items + result
+            result = _as_items(self.prepend) + result
         if self.append is not None:
-            items = self.append if isinstance(self.append, list) \
-                    else [self.append]
-            result = result + items
-        # If only value was set (no append/prepend), return as-is
+            result = result + _as_items(self.append)
+        if self.path_prepend is not None:
+            result = _as_items(self.path_prepend) + result
+        if self.path_append is not None:
+            result = result + _as_items(self.path_append)
+        # If only value was set (no list op), return as-is (preserve scalars).
         if not self.has_list_op() and self.value is not None:
             return self.value
         return result
 
     def has_list_op(self) -> bool:
-        """True when this ParamDef carries an append or prepend."""
-        return self.append is not None or self.prepend is not None
+        """True when this ParamDef carries a list op (append/prepend or their
+        path-* variants)."""
+        return (self.append is not None or self.prepend is not None
+                or self.path_append is not None or self.path_prepend is not None)
 

@@ -91,6 +91,25 @@ Task Definition
 
 .. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/TaskDef
 
+.. note::
+
+   The ``with`` field sets a task's own parameters. The ``set`` field shapes the
+   task's *subtree*: a **list** whose items are either assignment maps
+   (``{<name>: <value>}``) that rebind a scoped variable read via
+   ``${{ pkg.var }}``, or scope items (``{uses?, path?, set: [...]}``) that
+   narrow/force by matcher. Outer overrides inner; ``-D`` is the ceiling. See
+   :doc:`../guide/scoped_variables`.
+
+   The ``let`` field (scoped variables read via ``resolve()``) is **deprecated**
+   in favor of ``set``.
+
+   The ``elaborate`` field names a Python callable (``module:function``,
+   signature ``elaborate(ctxt, task, name) -> TaskNode``) that elaborates the
+   task type at graph-build time, replacing the default node interior. It is
+   bound along the ``uses`` chain (nearest declaration wins), so declaring it on
+   an abstract type covers every task that ``uses:`` it -- e.g. hdlsim's
+   simulator-backend selector.
+
 Strategy Definition
 -------------------
 

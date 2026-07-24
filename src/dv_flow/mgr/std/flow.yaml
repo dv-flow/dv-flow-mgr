@@ -122,6 +122,72 @@ package:
       Creates a list of include directories from a set of
       input files.
 
+  - name: PubSet
+    consumes:
+    - type: std.FileSet
+    desc: Binds a placement policy (dest/strip/flatten) to input FileSets
+    shell: pytask
+    run: dv_flow.mgr.std.publish.PubSetTask
+    doc: |
+      Consumes FileSets and emits std.PubSet items that carry a placement
+      policy (dest/strip/flatten) for consumption by std.Publish. Use this
+      when a single Publish must place different groups of files differently.
+    with:
+      dest:
+        doc: Additive destination sub-path under out/<run-id>.
+        type: str
+        value: ""
+      strip:
+        doc: |
+          Signed rebase of each file's basedir-relative path:
+          >0 drop N leading components; 0 keep; <0 graft basedir tail.
+        type: int
+        value: 0
+      flatten:
+        doc: Publish basename only (overrides strip).
+        type: bool
+        value: false
+
+  - name: Publish
+    consumes:
+    - type: std.FileSet
+    - type: std.PubSet
+    passthrough: all
+    desc: Copies input FileSets/PubSets into this run's output-data directory
+    shell: pytask
+    run: dv_flow.mgr.std.publish.Publish
+    # Publish on every run: a fresh out/<run-id> per invocation. Re-copies are
+    # still skipped by content hash when a run-id is reused (--run-id).
+    uptodate: false
+    doc: |
+      Copies the files of consumed FileSets and PubSets into this run's
+      output-data directory (rundir/out/<run-id>), recording provenance in
+      .dfm-publish.json and detecting when two sources publish conflicting
+      content to the same destination path. `dest` composes as a base prefix
+      in front of every input's placement; `strip`/`flatten` are the default
+      policy for bare FileSet inputs (a PubSet carries its own).
+    with:
+      dest:
+        doc: Additive base prefix under out/<run-id>, joined in front of all inputs.
+        type: str
+        value: ""
+      strip:
+        doc: Default rebase for bare FileSet inputs (signed; see PubSet).
+        type: int
+        value: 0
+      flatten:
+        doc: Default for bare FileSets — publish basename only.
+        type: bool
+        value: false
+      on_conflict:
+        doc: "error | warn | replace | skip (default: error)"
+        type: str
+        value: "error"
+      include:
+        doc: Optional glob(s) selecting a subset of each input's files.
+        type: list
+        value: []
+
   - name: Agent
     desc: |
       Executes an AI assistant with a specified prompt and collects 
@@ -317,6 +383,22 @@ package:
         type:
           list:
             item: str
+
+  - name: PubSet
+    uses: std.FileSet
+    doc: |
+      A FileSet that carries a placement policy for std.Publish: the files map
+      to destinations under out/<run-id> via dest/strip/flatten (see std.Publish).
+    with:
+      dest:
+        type: str
+        value: ""
+      strip:
+        type: int
+        value: 0
+      flatten:
+        type: bool
+        value: false
 
   - name: Env
     doc: |

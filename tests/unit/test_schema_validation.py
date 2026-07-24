@@ -58,3 +58,33 @@ package:
     assert "descr" in error_msg.lower()
     # Should suggest 'desc' as a similar field
     assert "desc" in error_msg.lower()
+
+def test_let_field_accepted(tmpdir):
+    """Test that TaskDef accepts a `let:` scoped-variable block."""
+    flow_dv = """
+package:
+    name: test-pkg
+
+    tasks:
+    - name: top
+      let:
+        sim: vlt
+      body:
+      - name: run
+        uses: std.Message
+        with:
+          msg: "SIM=${{ resolve('sim', 'none') }}"
+"""
+
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as f:
+        f.write(flow_dv)
+
+    marker_collector = MarkerCollector()
+    pkg = PackageLoader(
+        marker_listeners=[marker_collector]).load(
+            os.path.join(tmpdir, "flow.dv"))
+
+    # `let` is a valid field: no validation errors
+    errors = [m for m in marker_collector.markers
+              if "error" in str(m.severity).lower()]
+    assert len(errors) == 0, [m.msg for m in errors]

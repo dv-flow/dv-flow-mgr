@@ -54,4 +54,29 @@ package:
 
     assert len(markers.markers) == 1
     # Message should include the evaluated need name, not the raw template
-    assert "failed to find task nope" in markers.markers[0].msg
+    assert "failed to find task 'nope'" in markers.markers[0].msg
+
+
+def test_failed_needs_suggests_close_match(tmpdir):
+    # A typo'd needs reference should report a clean error (no NoneType crash from
+    # a dangling None appended to task.needs) AND suggest the closest task name.
+    flow_dv = """
+package:
+  name: foo
+
+  tasks:
+  - name: build-image
+  - name: run
+    needs: [build-imag]
+"""
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    markers = MarkerCollector()
+    _ = PackageLoader(marker_listeners=[markers]).load(os.path.join(tmpdir, "flow.dv"))
+
+    # Exactly one clean error marker -- not an opaque parse crash.
+    assert len(markers.markers) == 1
+    msg = markers.markers[0].msg
+    assert "failed to find task 'build-imag'" in msg
+    assert "did you mean 'build-image'?" in msg

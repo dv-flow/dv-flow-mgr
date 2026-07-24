@@ -88,3 +88,16 @@ def test_hier_path_obj_obj():
     result = eval.eval(expr)
 
     assert result == '/home/user'
+def test_resolve_builtin_dispatch():
+    # resolve is registered and both single-arg (implicit name) and two-arg
+    # (explicit name) dispatch work.
+    eval = ExprEval()
+    assert 'resolve' in eval.methods
+
+    eval.current_param_name = 'sim'
+    eval.variables['__let__'] = {'sim': 'mti'}
+
+    # single-arg: implicit name 'sim' -> scoped binding wins
+    assert eval.eval(ExprParser().parse("resolve('vlt')")) == 'mti'
+    # two-arg: explicit name, no binding -> default
+    assert eval.eval(ExprParser().parse("resolve('other', 'dflt')")) == 'dflt'

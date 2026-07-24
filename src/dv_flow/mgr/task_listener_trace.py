@@ -124,10 +124,14 @@ class TaskListenerTrace(object):
                 args["status"] = task.result.status
                 args["changed"] = task.result.changed
                 
-                # Add output data if present
+                # Add output data if present. Use model_dump() (recursive, like
+                # the input path above) rather than __dict__ (shallow) so nested
+                # pydantic items -- e.g. FileSet objects inside a DataItem's
+                # `artifacts` list -- serialize to JSON instead of raising.
                 if hasattr(task.result, 'output') and task.result.output:
                     args["output"] = [
-                        out.__dict__ if hasattr(out, '__dict__') else out 
+                        out.model_dump() if hasattr(out, 'model_dump')
+                        else (out.__dict__ if hasattr(out, '__dict__') else out)
                         for out in task.result.output
                     ]
 

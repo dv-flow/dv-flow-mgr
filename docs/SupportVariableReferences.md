@@ -51,4 +51,17 @@ Variables are expanded in _expandParams. Update this to use the name resolution 
   You can check for the existence of the variable using hasattr
 - Look for the package name in hierarchical references in the _pkg_m dict.
 
+## Scoped variables (`let:` + `resolve()`)
+
+In addition to the global/`with` mechanisms above, a task may provide *scoped
+variables* to its subtree with a `let:` block, consumed opt-in by the
+`resolve()` expression function. This is a separate, additive channel: `let`
+bindings live in a reserved `__let__` dict on the eval context and are read
+**only** by `resolve()` — a bare `${{ name }}` never sees them. See the user
+guide (`docs/guide/scoped_variables.rst` and the "Scoped Resolution" section of
+`docs/guide/expressions.rst`) for authoring, and
+`docs/proposals/scoped_variable_overrides.md` /
+`docs/proposals/scoped_variables_impl_plan.md` for the design and
+implementation record.
+
 

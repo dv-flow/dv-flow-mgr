@@ -116,9 +116,44 @@ paths from its own environment, and is placed on ``PATH`` for shell tasks):
    dfm-out path /opt/tools/bin                               # → $DFM_PATH
    dfm-out error "synthesis failed" --file top.sv --line 10  # → $DFM_MARKERS
    dfm-out item --type my_pkg.Report key=val n:=3           # n:= ⇒ JSON-typed value
+   dfm-out publish --dest pub/rtl --strip 1 rtl/top.sv      # → $DFM_OUT_DIR
 
 ``python -m dv_flow.mgr.out`` is an equivalent fallback. Scripts may always
 fall back to raw ``echo >> "$DFM_OUTPUT"``.
+
+``dfm-out`` resolves without the console script being installed: the runner
+materializes a ``<rundir>/bin`` directory holding ``dfm-out`` and ``dfm`` shims
+that re-invoke the current interpreter (``python -m dv_flow.mgr.out``) and puts
+it on the task ``PATH``. Only the interpreter and the importable ``dv_flow.mgr``
+package are required.
+
+Publishing deliverables
+=======================
+
+``dfm-out publish`` copies files into this run's **output-data directory**
+(``$DFM_OUT_DIR``, i.e. ``<rundir>/out/<run-id>``), the shell-task equivalent of
+the ``std.Publish`` task (see :doc:`stdlib`). The runner exports:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - Env var
+     - Meaning
+   * - ``DFM_OUT_DIR``
+     - This run's output-data directory (``<rundir>/out/<run-id>``)
+   * - ``DFM_RUN_ID``
+     - The run identifier shared by all publishers this run
+
+The same path algebra as ``std.Publish`` applies (``--dest`` adds structure,
+``--strip`` rebases, ``--flatten`` collapses to basename), provenance is recorded
+in ``.dfm-publish.json``, ``out/latest`` is repointed, and a ``std.FileSet``
+rooted at the output directory is emitted to ``$DFM_OUTPUT``:
+
+.. code-block:: bash
+
+   dfm-out publish --dest pub/include --strip 1 include/*.h
+   dfm-out publish --dest pub --on-conflict warn README.md LICENSE
 
 Worked example
 ==============

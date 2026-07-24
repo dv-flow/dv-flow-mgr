@@ -66,9 +66,9 @@ class StrategyDef(BaseModel):
     generate: Union[GenerateSpec, None] = dc.Field(
         default=None,
         description="Enable generate strategy: dynamically create tasks by running a shell command that outputs task definitions")
-    matrix : Union[Dict[str,List[Any]],None] = dc.Field(
+    matrix : Union[Dict[str,Union[str,List[Any]]],None] = dc.Field(
         default=None,
-        description="Matrix of parameter values to explore. Creates one task instance per combination of values")
+        description="Matrix of parameter values to explore. Creates one task instance per combination of values. An axis value may be a `${{ }}` expression that resolves to a list (e.g. `image: \"${{ images }}\"`), evaluated at graph-build.")
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
         description="Body tasks for strategy execution. Used with chain and matrix strategies")
@@ -197,6 +197,50 @@ class Tasks(BaseModel):
         default_factory=list,
         description="Sub-tasks")
 
+#: Keys allowed on a `set:` scope item (a list element that has a `set` key).
+_SET_SCOPE_KEYS = ("uses", "path", "set")
+
+
+def _validate_set_list(items, ctx="set"):
+    """Validate the shape of a `set:` list (recursively). Each element is either:
+      * an assignment map ({name: value, ...}) — rebinds scoped variables, or
+      * a scope item ({uses?, path?, set: [...]}) — identified by a `set` key.
+    Raises ValueError with a user-facing message on any malformed element."""
+    if not isinstance(items, list):
+        raise ValueError(
+            "'%s' must be a list of assignment maps and/or scope items" % ctx)
+    for i, elem in enumerate(items):
+        where = "%s[%d]" % (ctx, i)
+        if not isinstance(elem, dict):
+            raise ValueError(
+                "%s must be a map (assignment {name: value} or scope "
+                "{uses/path, set: [...]}), got %s" % (where, type(elem).__name__))
+        if "set" in elem:
+            # Scope item. Its `set` value must be a list; a task parameter may
+            # not be named 'set' (the key is reserved for nested scope items).
+            if not isinstance(elem["set"], list):
+                raise ValueError(
+                    "%s: the 'set' key is reserved for nested scope items and "
+                    "must be a list; a task parameter may not be named 'set'" % where)
+            for k in elem.keys():
+                if k not in _SET_SCOPE_KEYS:
+                    raise ValueError(
+                        "%s: unexpected key '%s' in a scope item; only %s are "
+                        "allowed" % (where, k, "/".join(_SET_SCOPE_KEYS)))
+            for mk in ("uses", "path"):
+                if mk in elem and not isinstance(elem[mk], str):
+                    raise ValueError(
+                        "%s: '%s' matcher must be a string glob" % (where, mk))
+            _validate_set_list(elem["set"], "%s.set" % where)
+        else:
+            # Assignment map — keys are variable/param names (strings).
+            for k in elem.keys():
+                if not isinstance(k, str):
+                    raise ValueError(
+                        "%s: assignment key %r must be a string name" % (where, k))
+    return items
+
+
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     model_config = ConfigDict(extra='forbid')
@@ -248,6 +292,12 @@ class TaskDef(BaseModel):
     template : bool = dc.Field(
         default=False,
         description="Template task: run expression deferred to graph-build time")
+    elaborate : Union[str, None] = dc.Field(
+        default=None,
+        description="Python callable ('module:function') that elaborates this "
+                    "task type at graph-build time, replacing the default node "
+                    "interior. Signature: elaborate(ctxt, task, name) -> TaskNode. "
+                    "Bound along the 'uses' chain (nearest declaration wins).")
     strategy : StrategyDef = dc.Field(
         default=None)
     control : Union[ControlDef, None] = dc.Field(
@@ -268,9 +318,23 @@ class TaskDef(BaseModel):
         default_factory=list,
         description="List of tasks that depend on this task (inverse of needs)")
     params: Dict[str,Union[str,list,int,bool,dict]] = dc.Field(
-        default_factory=dict, 
+        default_factory=dict,
         alias="with",
         description="Parameters for the task")
+    let: Dict[str,Union[str,int,bool,float,list,dict]] = dc.Field(
+        default_factory=dict,
+        alias="let",
+        description="(DEPRECATED — use 'set') Scoped variables provided to this task's "
+                    "subtree, read via resolve(). Does not set this task's own "
+                    "parameters (see 'with').")
+    set_defs: List[Any] = dc.Field(
+        default_factory=list,
+        alias="set",
+        description="Scoped overrides applied to this task's subtree: a list whose "
+                    "items are either assignment maps ({name: value}) that rebind "
+                    "scoped variables read via ${{ pkg.var }}, or scope items "
+                    "({uses?, path?, set: [...]}) that narrow/force by matcher. "
+                    "Outer overrides inner; CLI (-D) is the ceiling.")
     rundir : RundirE = dc.Field(
         default=RundirE.Unique,
         description="Specifies handling of this tasks's run directory")
@@ -312,6 +376,13 @@ class TaskDef(BaseModel):
         # Normalize cache field: convert bool to CacheDef
         if 'cache' in data and isinstance(data['cache'], bool):
             data['cache'] = {'enabled': data['cache']}
+
+        # 'provide' is a deprecated alias of 'set'.
+        if 'provide' in data:
+            if 'set' in data and data['set']:
+                raise ValueError("Task cannot specify both 'set' and its deprecated "
+                                 "alias 'provide'")
+            data['set'] = data.pop('provide')
         
         # Count how many name-defining fields are set in the input
         name_fields = []
@@ -355,6 +426,13 @@ class TaskDef(BaseModel):
             raise ValueError("Task cannot have both 'control' and 'strategy' fields. They are mutually exclusive.")
         if self.template and self.override is not None:
             raise ValueError("Task cannot have both 'template' and 'override' fields.")
+        return self
+
+    @model_validator(mode='after')
+    def validate_set_defs(self):
+        """Validate the shape of the `set:` scoped-override list."""
+        if self.set_defs:
+            _validate_set_list(self.set_defs, "set")
         return self
 
 TaskDef.model_rebuild()

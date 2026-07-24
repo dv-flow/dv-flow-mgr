@@ -50,7 +50,17 @@ class TaskRunCtxt(object):
     @property
     def root_rundir(self):
         return self.ctxt.root_rundir
-    
+
+    @property
+    def run_id(self):
+        """The output-data run-id shared by all std.Publish tasks in this run."""
+        return self.ctxt.run_id if self.ctxt is not None else ""
+
+    @property
+    def out_dir(self):
+        """This run's output-data directory: <root_rundir>/out/<run_id>."""
+        return os.path.join(self.root_rundir, "out", self.run_id)
+
     @property
     def env(self):
         return self.ctxt.env if self.ctxt is not None else os.environ

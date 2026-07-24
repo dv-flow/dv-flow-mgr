@@ -35,8 +35,47 @@ exit with a clear message.
 import argparse
 import json
 import os
+import stat
 import sys
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+
+# Console-script name -> module runnable via `python -m <module>`. The runner
+# materializes a shim for each into <rundir>/bin so shell tasks can invoke them
+# without the entry-point scripts being installed on PATH.
+_SHIM_MODULES = {
+    "dfm-out": "dv_flow.mgr.out",
+    "dfm": "dv_flow.mgr",
+}
+
+
+def install_run_bin(rundir: str, python: Optional[str] = None) -> str:
+    """Materialize ``<rundir>/bin`` with shims (``dfm-out``, ``dfm``) that invoke
+    the *current* interpreter's ``dv_flow.mgr`` modules. This frees shell tasks
+    from depending on the console-script entry points being installed/on PATH --
+    only the interpreter and the importable package are required, both of which
+    are present by construction (the runner is running from them).
+
+    Returns the absolute bin directory. Shims are rewritten only when their
+    content changes, so the directory is stable across runs.
+    """
+    python = python or sys.executable
+    bindir = os.path.join(rundir, "bin")
+    os.makedirs(bindir, exist_ok=True)
+    for name, module in _SHIM_MODULES.items():
+        path = os.path.join(bindir, name)
+        content = '#!/bin/sh\nexec "%s" -m %s "$@"\n' % (python, module)
+        try:
+            with open(path) as fp:
+                if fp.read() == content:
+                    continue
+        except OSError:
+            pass
+        with open(path, "w") as fp:
+            fp.write(content)
+        st = os.stat(path).st_mode
+        os.chmod(path, st | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return bindir
 
 
 def _append_line(env_var: str, line: str) -> int:
@@ -78,6 +117,36 @@ def _cmd_fileset(args) -> int:
     if args.incdir:
         item["incdirs"] = list(args.incdir)
     return _append_line("DFM_OUTPUT", json.dumps(item, separators=(",", ":")))
+
+
+def _cmd_publish(args) -> int:
+    """Copy files into this run's output-data directory ($DFM_OUT_DIR)."""
+    out_dir = os.environ.get("DFM_OUT_DIR")
+    if not out_dir:
+        sys.stderr.write(
+            "dfm-out publish: $DFM_OUT_DIR is not set -- are you running inside "
+            "a DFM task?\n")
+        return 2
+    run_id = os.environ.get("DFM_RUN_ID") or os.path.basename(out_dir.rstrip(os.sep))
+    task = args.src or os.environ.get("DFM_TASK_NAME", "")
+    basedir = args.basedir or os.getcwd()
+
+    from .std.publish import run_publish_cli
+    status, published, markers = run_publish_cli(
+        out_dir=out_dir, run_id=run_id, files=args.files, basedir=basedir,
+        dest=args.dest, strip=args.strip, flatten=args.flatten,
+        include=[], on_conflict=args.on_conflict, filetype=args.filetype,
+        src=task, publish_task=task)
+
+    for sev, msg in markers:
+        sys.stderr.write("dfm-out publish [%s]: %s\n" % (sev, msg))
+    # Mirror the std.Publish task: emit a FileSet rooted at the output dir so a
+    # shell task's published files flow downstream like any other output.
+    if published:
+        item = {"type": "std.FileSet", "filetype": args.filetype or "",
+                "basedir": out_dir, "files": published}
+        _append_line("DFM_OUTPUT", json.dumps(item, separators=(",", ":")))
+    return status
 
 
 def _cmd_item(args) -> int:
@@ -146,6 +215,27 @@ def _build_parser() -> argparse.ArgumentParser:
     p_it.add_argument("--type", required=True, help="data item type name")
     p_it.add_argument("assignments", nargs="*", help="key=val (string) or key:=json (typed)")
     p_it.set_defaults(func=_cmd_item)
+
+    p_pub = sub.add_parser("publish",
+        help="copy files into this run's output-data dir ($DFM_OUT_DIR)")
+    p_pub.add_argument("--dest", default="",
+        help="additive destination sub-path under out/<run-id>")
+    p_pub.add_argument("--strip", type=int, default=0,
+        help="signed rebase of each file's basedir-relative path "
+             "(>0 drop N leading dirs; <0 graft basedir tail)")
+    p_pub.add_argument("--flatten", action="store_true",
+        help="publish basename only (overrides --strip)")
+    p_pub.add_argument("--basedir", default=None,
+        help="base dir the files are relative to (default: cwd / rundir)")
+    p_pub.add_argument("--filetype", default="",
+        help="filetype for the emitted std.FileSet")
+    p_pub.add_argument("--on-conflict", dest="on_conflict", default="error",
+        choices=["error", "warn", "replace", "skip"],
+        help="behavior when a destination already has different content")
+    p_pub.add_argument("--src", default=None,
+        help="provenance source/task name (default: $DFM_TASK_NAME)")
+    p_pub.add_argument("files", nargs="+", help="files to publish (relative to basedir)")
+    p_pub.set_defaults(func=_cmd_publish)
 
     p_env = sub.add_parser("env", help="append KEY=VALUE lines to $DFM_ENV")
     p_env.add_argument("assignments", nargs="+", help="KEY=VALUE")

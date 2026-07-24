@@ -190,12 +190,17 @@ class TaskGraphDotWriter(object):
         for dep,_ in node.needs:
             if dep not in self._node_id_m.keys():
                 self.build_node(dep)
-            if dep not in self._node_id_m.keys():
-                self._log.error("Dep-node not built: %s" % dep.name)
             if node not in self._node_id_m.keys():
                 self.build_node(node)
-            if node not in self._node_id_m.keys():
-                self._log.error("Dep-node not built: %s" % node.name)
+            # If either endpoint still has no id after attempting to build it,
+            # the edge can't be rendered. Skip it with a readable warning rather
+            # than indexing _node_id_m and raising a KeyError whose key (a
+            # TaskNode) can itself fail to stringify on a cyclic graph.
+            if dep not in self._node_id_m.keys() or node not in self._node_id_m.keys():
+                missing = dep if dep not in self._node_id_m.keys() else node
+                self._log.error("Skipping need edge: node %s not built" %
+                                getattr(missing, 'name', '<unknown>'))
+                continue
             self.println("%s -> %s;" % (
                 self._node_id_m[dep],
                 self._node_id_m[node]))

@@ -31,10 +31,10 @@ from .package_def import PackageDef, PackageSpec
 from .package_loader_p import PackageLoaderP
 from .param_ref_eval import ParamRefEval
 from .param_builder import ParamBuilder
-from .name_resolution import NameResolutionContext, TaskNameResolutionScope
+from .name_resolution import NameResolutionContext, TaskNameResolutionScope, SetScope, node_matches
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
-from .task import Task
+from .task import Task, Need, iter_uses_chain
 from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE, TaskDataItem
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
@@ -49,9 +49,14 @@ from .exec_callable import ExecCallable
 from .null_callable import NullCallable
 from .shell_callable import ShellCallable
 from .deferred_expr import DeferredExpr, references_runtime_data
+from .param_types import (TypeKind, ParamTypeError, normalize_type,
+                          coerce_to_kind, coerce_cli_value)
 from .expr_parser import ExprParser
 from .filter_registry import FilterRegistry
 from .naming_scheme import NamingScheme, NamingSchemeRegistry, TaskNamingContext, MatrixNamingContext
+from .task_elaborator import (
+    TaskElaborator, DefaultLeafElaborator, DefaultCompoundElaborator,
+    DefaultStrategyElaborator, DefaultControlElaborator)
 
 @dc.dataclass
 class TaskNamespaceScope(object):
@@ -67,6 +72,109 @@ class CompoundTaskCtxt(object):
 
 
 @dc.dataclass
+class BuilderElabCtxt(object):
+    """Concrete ElabCtxt (see task_elaborator.ElabCtxt) that adapts the builder's
+    internals for a TaskElaborator. Constructed per elaborate() call with the
+    build parameters (srcdir/params/hierarchical/eval) captured from
+    `_mkTaskNode` so `buildDefault` reproduces the standard interior exactly."""
+    builder : 'TaskGraphBuilder'
+    srcdir : Any = None
+    params : Any = None
+    hierarchical : bool = False
+    eval : Any = None
+    is_root : bool = False
+
+    # --- default interior -------------------------------------------------
+    def buildDefault(self, task, name, select_needs=None):
+        """Run the standard kind-based interior (control/strategy/compound/leaf)
+        and needs wiring for `task`. `select_needs` filters declared needs."""
+        return self.builder._build_default_interior(
+            task, name, self.srcdir, self.params, self.hierarchical, self.eval,
+            select_needs=select_needs)
+
+    # --- params -----------------------------------------------------------
+    def mkParams(self, task):
+        """Build and return `task`'s params instance (resolve() evaluated)."""
+        return self.builder._build_task_params(task, self.eval)
+
+    def resolveParam(self, task, name, default=None):
+        """Convenience: build params and read one field, with a default."""
+        params = self.mkParams(task)
+        if params is None:
+            return default
+        return getattr(params, name, default)
+
+    # --- node construction ------------------------------------------------
+    def mkTaskNode(self, name_or_task, name=None, srcdir=None, needs=None, **kwargs):
+        """Build another task's node (by name), honoring overrides/memoization."""
+        return self.builder.mkTaskNode(
+            name_or_task, name=name, srcdir=srcdir, needs=needs, **kwargs)
+
+    def resolveNeed(self, name):
+        """Memoized lazy need resolution (== builder._getTaskNode)."""
+        return self.builder._getTaskNode(name)
+
+    def getTask(self, name):
+        """Resolve a task *type* by name without building it (for rebinding)."""
+        return self.builder.lookupTask(name)
+
+    def declaredNeeds(self, task):
+        """The task's declared needs (list of Need)."""
+        return list(task.needs)
+
+    # --- needs wiring primitives -----------------------------------------
+    def wireNeed(self, node, need, block=False):
+        need_n = need if isinstance(need, TaskNode) else self.resolveNeed(
+            need.name if isinstance(need, Need) else need)
+        node.needs.append((need_n, block))
+        return need_n
+
+    def wireNeeds(self, node, needs):
+        for n in needs:
+            self.wireNeed(node, n)
+
+    def wireBody(self, node, task):
+        """Reserved. The standard body construction is complex and stateful;
+        obtain it via buildDefault(task, name) (optionally with a selectNeeds
+        subclass) rather than re-implementing it here."""
+        raise NotImplementedError(
+            "wireBody: build the standard body via buildDefault(task, name); "
+            "use a DefaultCompoundElaborator.selectNeeds subclass to filter needs")
+
+    # --- diagnostics ------------------------------------------------------
+    def error(self, msg, loc=None):
+        self.builder.error(msg, loc)
+
+    def marker(self, marker):
+        self.builder.marker(marker)
+
+    # --- cross-elaborator communication (A2.3) ---------------------------
+    def publish(self, key, value):
+        if self.builder._elab_ctxt_s:
+            self.builder._elab_ctxt_s[-1][key] = value
+
+    def lookup(self, key, default=None):
+        for scope in reversed(self.builder._elab_ctxt_s):
+            if key in scope:
+                return scope[key]
+        return default
+
+    @property
+    def args(self):
+        """Build-global args (root package params). Root-only: a non-root
+        elaborator reading args is a build error (invariant #4), because its
+        output would then vary by context and break name-keyed memoization."""
+        if not self.is_root:
+            raise Exception(
+                "elaborator context error: only the root task's elaborator may "
+                "read `args` (invariant #4: root-only parameterization keeps the "
+                "elaboration context build-global-constant). Use publish()/lookup() "
+                "to pass values down, or bind the varying decision at the root.")
+        rp = self.builder.root_pkg
+        return self.builder._pkg_params_m.get(rp.name) if rp is not None else None
+
+
+@dc.dataclass
 class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
     root_pkg : Package
@@ -77,6 +185,10 @@ class TaskGraphBuilder(object):
     task_param_overrides : Dict[str, Dict[str, Any]] = dc.field(default_factory=dict)  # task name → {param: value}
     leaf_param_overrides : Dict[str, Any] = dc.field(default_factory=dict)  # NEW: leaf param names to try on tasks
     naming_scheme : Union[str, NamingScheme] = "legacy"
+    # Per-run output-data identity (see run_id.py). None -> allocate the next
+    # counter by scanning <rundir>/out. Threaded into TaskNodeCtxt so
+    # std.Publish tasks share one output directory across the run.
+    run_id : str = None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
     _pkg_params_m : Dict[str,Any] = dc.field(default_factory=dict)
     _pkg_spec_s : List[PackageDef] = dc.field(default_factory=list)
@@ -90,8 +202,40 @@ class TaskGraphBuilder(object):
     _compound_task_ctxt_s : List[CompoundTaskCtxt] = dc.field(default_factory=list)
     _task_rundir_s : List[List[str]] = dc.field(default_factory=list)
     _name_resolution_stack : List[NameResolutionContext] = dc.field(default_factory=list)
+    # Dynamic `set:` override stack (design §R2 / set_overrides_impl_plan Phase
+    # 2/4). Pushed on entry to a compound/matrix subtree that declares `set:`,
+    # popped on exit; scanned outermost-first by resolve_variable so an ancestor
+    # `set:` beats a nested one. Lives on the builder (not a name-resolution
+    # context) so it survives package-context switches.
+    _set_scopes : List['SetScope'] = dc.field(default_factory=list)
+    # Current (uses_chain, path) of the node whose params are being evaluated,
+    # so resolve_variable can narrow a matcher-gated `set:` rebind. None outside
+    # a node build. Saved/restored around each _mkTaskNode (recursion-safe).
+    _cur_build_ctx : Any = dc.field(default=None)
     _task_node_s : List[TaskNode] = dc.field(default_factory=list)
     _eval : ParamRefEval = dc.field(default_factory=ParamRefEval)
+    # Per-type TaskElaborator registry (Feature A). Keyed by task type full
+    # name; resolution walks the `uses` chain. Empty by default -> every task
+    # uses the standard kind-based interior.
+    _elaborator_m : Dict[str,Any] = dc.field(default_factory=dict)
+    # Cache of resolved `elaborate:` clause callables, keyed by 'module:function'.
+    _elaborate_fn_cache : Dict[str,Any] = dc.field(default_factory=dict)
+    # Elaboration context stack for publish()/lookup() (A2.3). Each entry is a
+    # dict scoped to a subtree; lookup walks outward, publish writes the top.
+    _elab_ctxt_s : List[Dict[str,Any]] = dc.field(default_factory=list)
+    # Type names whose elaborator is currently running -- a re-entrancy guard so
+    # an elaborator that builds a task of its own bound type (e.g. a backend
+    # selector building the concrete backend, which `uses:` the abstract type)
+    # falls through to the default interior instead of re-firing forever.
+    _elab_active : set = dc.field(default_factory=set)
+    # Companion to _elab_active keyed on the NODE name currently being
+    # elaborated. _elab_active keys on the elaborator TYPE name, but a
+    # `uses:`-based package inheritance chain can expose the same abstract type
+    # under several qualified names; a rebuilt variant can then reach the
+    # `elaborate:` clause under a name not yet in _elab_active and re-fire
+    # forever. The node name is stable across those aliases, so gating on it too
+    # makes the re-entrancy guard alias-proof (critical for package-uses-package).
+    _elab_active_names : set = dc.field(default_factory=set)
     _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
     _inherit_rundir_depth : int = 0
@@ -103,6 +247,9 @@ class TaskGraphBuilder(object):
         # Initialize the overrides from the global registry
         self._log = logging.getLogger(type(self).__name__)
         self._shell_m.update(ExtRgy.inst()._shell_m)
+        # Per-type elaborators are bound declaratively via a task's `elaborate:`
+        # clause (resolved in _resolve_elaborator) or programmatically via
+        # register_elaborator; there is no global entry-point registry.
         self._task_rundir_s.append([self.rundir])
 
         # Resolve naming scheme from string or instance
@@ -113,6 +260,10 @@ class TaskGraphBuilder(object):
 
         if self.env is None:
             self.env = os.environ.copy()
+
+        if self.run_id is None:
+            from .run_id import alloc_run_id
+            self.run_id = alloc_run_id(self.rundir)
 
         self._eval.set("env", self.env)
         
@@ -132,7 +283,8 @@ class TaskGraphBuilder(object):
                 root_rundir=self.rundir,
                 env=self.env,
                 naming_scheme=self._naming_scheme,
-                root_package_name=self.root_pkg.name)
+                root_package_name=self.root_pkg.name,
+                run_id=self.run_id)
 
             # Set built-in directory variables for task graph building
             # root: full path to the package file
@@ -147,6 +299,9 @@ class TaskGraphBuilder(object):
             if self.root_pkg.paramT:
                 params = self.root_pkg.paramT()
                 self._expandParams(params, self._eval)
+                # Re-apply CLI/-D package-var overrides AFTER _expandParams (which
+                # would otherwise re-apply the declared `value:` and mask them).
+                self._apply_cli_var_overrides(self.root_pkg, params)
                 for key in self.root_pkg.paramT.model_fields.keys():
                     self._eval.set(key, getattr(params, key))
                 self._pkg_params_m[self.root_pkg.name] = params
@@ -166,11 +321,53 @@ class TaskGraphBuilder(object):
                 root_rundir=self.rundir,
                 env=self.env,
                 naming_scheme=self._naming_scheme,
-                root_package_name="")
+                root_package_name="",
+                run_id=self.run_id)
 
 
     def setEnv(self, env):
         self.env.update(env)
+
+    def _apply_cli_var_overrides(self, pkg, params):
+        """Re-apply CLI/-D package-variable overrides onto a freshly built
+        package-params instance. The load step records the overridden names on
+        `pkg.cli_var_overrides` and stashes the parsed value on the paramT field
+        default; but pydantic v2 does not honor a post-hoc default change at
+        instantiation, so the instance must be corrected here. This makes
+        `-D pkg.var` reach ordinary `${{ pkg.var }}` reads (and keeps the CLI the
+        precedence ceiling over `set:`)."""
+        for vn in getattr(pkg, 'cli_var_overrides', ()) or ():
+            field = pkg.paramT.model_fields.get(vn) if pkg.paramT else None
+            if field is not None and hasattr(params, vn):
+                setattr(params, vn, field.default)
+
+    def _ensure_pkg_vars(self, pkg_name):
+        """Make package `pkg_name`'s variables resolvable for a `${{ pkg.var }}`
+        reference, loading the package on demand if it was never statically
+        imported. This covers a concrete backend (e.g. hdlsim.vlt) pulled in
+        dynamically by an elaborator rather than via `imports:` -- there is no
+        import edge to walk, but the loader can still find it by name. Variable
+        substitution thus triggers the load; the package's param *instance*
+        (honoring -D, and the only place pydantic-v2 fields are readable) is
+        built into `_pkg_params_m`. Idempotent -- a no-op once registered.
+        Returns the Package or None."""
+        if pkg_name in self._pkg_m:
+            return self._pkg_m[pkg_name]
+        if self.loader is None:
+            return None
+        pkg = self.loader.findPackage(pkg_name)
+        if pkg is None:
+            return None
+        # Register before expanding params so a self-referential var can't
+        # re-enter this load for the same package.
+        self._pkg_m[pkg_name] = pkg
+        if getattr(pkg, 'paramT', None) is not None and pkg_name not in self._pkg_params_m:
+            params = pkg.paramT()
+            self._expandParams(params, self._eval)
+            self._apply_cli_var_overrides(pkg, params)
+            self._pkg_params_m[pkg_name] = params
+            self._eval.set(pkg_name, params)
+        return pkg
 
     def setParam(self, name, value):
         if self.root_pkg is None:
@@ -204,6 +401,7 @@ class TaskGraphBuilder(object):
         if pkg.paramT:
             params = pkg.paramT()
             self._expandParams(params, self._eval)
+            self._apply_cli_var_overrides(pkg, params)
             self._pkg_params_m[pkg.name] = params
             self._eval.set(pkg.name, params)
         else:
@@ -369,11 +567,17 @@ class TaskGraphBuilder(object):
             builder=self,
             package=pkg)
         self._name_resolution_stack.append(ctx)
+        # Keep the shared eval's resolver synced to the stack top so resolve()'s
+        # package fall-through (Feature B) can walk `uses`-chain package vars via
+        # NameResolutionContext.pkg_var. Body/matrix/needs evals already do this.
+        self._eval.set_name_resolution(ctx)
 
     def pop_name_resolution_context(self):
         """Pop the current name resolution context"""
         if self._name_resolution_stack:
             self._name_resolution_stack.pop()
+        self._eval.set_name_resolution(
+            self._name_resolution_stack[-1] if self._name_resolution_stack else None)
 
     def push_task_scope(self, task: TaskNode):
         """Push a new task scope onto the current context"""
@@ -396,6 +600,7 @@ class TaskGraphBuilder(object):
 
     def resolve_variable(self, name: str) -> Any:
         """Resolve a variable using the current name resolution context"""
+        ret = None
         if self._name_resolution_stack:
             ret = self._name_resolution_stack[-1].resolve_variable(name)
         return ret
@@ -567,9 +772,6 @@ class TaskGraphBuilder(object):
         if tt.uses is not None:
             self._mkDataItemI(tt.uses, field_m, exclude_s)
 
-    def _applyParameterOverrides(self, obj, **kwargs):
-        pass
-    
     def _findTask(self, pkg, name):
         task = None
         if name in pkg.task_m.keys():
@@ -609,6 +811,17 @@ class TaskGraphBuilder(object):
         # Apply override substitution before anything else
         task = self._findOverride(task)
 
+        # Compute the `uses`-chain task type-names once (reused for the build
+        # context below and the node stamp at exit).
+        _chain = self._uses_chain_task_names(task)
+
+        # Publish this node's (uses-chain, path) as the current build context so
+        # a matcher-gated `set:` rebind can narrow to it while its params are
+        # evaluated. Saved/restored (recursion-safe) below.
+        _saved_build_ctx = self._cur_build_ctx
+        self._cur_build_ctx = (
+            _chain, name if name is not None else getattr(task, 'name', None))
+
         if not hierarchical:
             self._task_rundir_s.append([self.rundir])
 
@@ -624,30 +837,50 @@ class TaskGraphBuilder(object):
             else:
                 self._log.debug("Condition \"%s\" is false" % task.iff)
 
-        # Determine how to build this node
+        # Determine how to build this node. Cross-cutting concerns (override,
+        # iff, memoization) have already been handled above; now select an
+        # elaborator. A type may bind a custom TaskElaborator (resolved along the
+        # `uses` chain); otherwise the standard kind-based interior is used. The
+        # default path is byte-identical to the pre-elaborator behavior, so any
+        # flow that binds no elaborator is unaffected (Feature A invariant #1).
         if iff:
-            if hasattr(task, 'control') and task.control is not None:
-                # Runtime control flow construct
-                ret = self._buildControlNode(task, name, srcdir, params, hierarchical, eval)
-            elif task.strategy is not None:
-                ret = self._applyStrategy(task, name, srcdir, params, hierarchical, eval)
+            elab_name, elaborator = self._resolve_elaborator(task)
+            # Alias-proof re-entrancy guard: an elaborator (e.g. hdlsim's
+            # backend_select) rebuilds the SAME node name via ctxt.buildDefault
+            # after rebinding `uses`. If that node name is already being
+            # elaborated higher in the stack, this is a self-typed rebuild --
+            # fall through to the default interior rather than re-fire (which,
+            # under package-uses-package type aliasing, would loop forever and
+            # exhaust memory). Complements the type-name _elab_active guard.
+            _eff_name = name if name is not None else getattr(task, 'name', None)
+            if elaborator is not None and _eff_name is not None \
+                    and _eff_name in self._elab_active_names:
+                elaborator = None
+            if elaborator is not None:
+                # Push an elaboration scope for publish()/lookup(); the first
+                # elaborator in the chain sees build-global-constant context and
+                # is the only one permitted to read `args` (invariant #4). Mark
+                # the bound type active so a self-typed rebuild doesn't re-fire.
+                self._elab_ctxt_s.append({})
+                self._elab_active.add(elab_name)
+                if _eff_name is not None:
+                    self._elab_active_names.add(_eff_name)
+                is_root_elab = (len(self._elab_ctxt_s) == 1)
+                try:
+                    ctxt = BuilderElabCtxt(
+                        builder=self, srcdir=srcdir, params=params,
+                        hierarchical=hierarchical, eval=eval,
+                        is_root=is_root_elab)
+                    ret = elaborator(
+                        ctxt, task, _eff_name if _eff_name is not None else task.name)
+                finally:
+                    self._elab_active.discard(elab_name)
+                    if _eff_name is not None:
+                        self._elab_active_names.discard(_eff_name)
+                    self._elab_ctxt_s.pop()
             else:
-                if self._isCompound(task):
-                    ret = self._mkTaskCompoundNode(
-                        task, 
-                        name=name,
-                        srcdir=srcdir,
-                        params=params,
-                        hierarchical=hierarchical,
-                        eval=eval)
-                else:
-                    ret = self._mkTaskLeafNode(
-                        task, 
-                        name=name,
-                        srcdir=srcdir,
-                        params=params,
-                        hierarchical=hierarchical,
-                        eval=eval)
+                ret = self._build_default_interior(
+                    task, name, srcdir, params, hierarchical, eval)
         else:
             if name is None:
                 name = task.name
@@ -682,8 +915,135 @@ class TaskGraphBuilder(object):
         if not hierarchical:
             self._task_rundir_s.pop()
 
-        return ret        
-    
+        # Restore the enclosing build context.
+        self._cur_build_ctx = _saved_build_ctx
+
+        # Stamp the node's `uses`-chain task type-names (most-derived first) so
+        # the `set:` `uses:` matcher can test is-a against it (Phase 3/4). Only
+        # set when empty so a custom elaborator that already populated it wins.
+        if ret is not None and hasattr(ret, "uses_chain") and not ret.uses_chain:
+            ret.uses_chain = _chain
+
+        # Apply forceful `set:` param rules (bare names under a scope item) that
+        # select this node (overrides `with:`, yields to CLI; Phase 4).
+        if ret is not None and hasattr(ret, "params") and self._set_scopes:
+            self._apply_set_force_rules(ret, task, name)
+
+        return ret
+
+    def _uses_chain_task_names(self, task) -> List[str]:
+        """Ordered, de-duplicated task TYPE names along `task`'s `uses` chain
+        (most-derived first — e.g. [foo.Run, hdlsim.SimRun]). Mirrors
+        ParamBuilder._uses_chain_pkg_names but collects task names, giving the
+        `set:` `uses:` matcher its is-a set (Phase 3)."""
+        names = []
+        seen = set()
+        for current in iter_uses_chain(task):
+            nm = getattr(current, 'name', None)
+            if nm is not None and nm not in seen:
+                seen.add(nm)
+                names.append(nm)
+        return names
+
+    def _build_default_interior(self, task, name, srcdir, params, hierarchical,
+                                eval, select_needs=None):
+        """The standard kind-based node construction (control / strategy /
+        compound / leaf) plus needs wiring. This is the default elaborator's
+        implementation; it is also what `ElabCtxt.buildDefault` invokes, so a
+        custom elaborator can delegate to it. `select_needs`, when provided,
+        filters a compound/leaf/strategy task's declared needs before wiring
+        (the DefaultCompoundElaborator.selectNeeds hook)."""
+        if hasattr(task, 'control') and task.control is not None:
+            # Runtime control flow construct (needs-filtering N/A)
+            return self._buildControlNode(
+                task, name, srcdir, params, hierarchical, eval)
+        elif task.strategy is not None:
+            return self._applyStrategy(
+                task, name, srcdir, params, hierarchical, eval,
+                select_needs=select_needs)
+        elif self._isCompound(task):
+            return self._mkTaskCompoundNode(
+                task, name=name, srcdir=srcdir, params=params,
+                hierarchical=hierarchical, eval=eval, select_needs=select_needs)
+        else:
+            return self._mkTaskLeafNode(
+                task, name=name, srcdir=srcdir, params=params,
+                hierarchical=hierarchical, eval=eval, select_needs=select_needs)
+
+    def _build_task_params(self, task, eval=None):
+        """Build and return a task's params instance (evaluating ${{ }} incl.
+        resolve()), without constructing a node. Used by ElabCtxt so a custom
+        elaborator can read a resolved param (e.g. hdlsim's `sim`) to decide how
+        to build the node."""
+        ev = eval if eval is not None else self._eval
+        if task.paramT is None:
+            if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                paramT = ParamBuilder(ev).build_param_type(task)
+                if ev is self._eval:
+                    task.paramT = paramT
+            else:
+                paramT = None
+        else:
+            paramT = task.paramT
+        params = paramT() if paramT else None
+        if params is not None:
+            self._expandParams(params, ev)
+        return params
+
+    def lookupTask(self, name):
+        """Resolve a task *type* by full name without building a node. Used by
+        elaborators (e.g. backend selection) that need the concrete task to
+        rebind `uses`."""
+        t = self._task_m.get(name)
+        if t is None and self.loader is not None:
+            t = self.loader.findTask(name)
+        return t
+
+    def register_elaborator(self, type_name: str, elaborator):
+        """Bind a TaskElaborator to a task *type* (by full name). Resolution
+        walks the `uses` chain, so binding an abstract type covers every task
+        that `uses:` it. Packages that ship elaborators call this at
+        package-add time (see Feature C / hdlsim)."""
+        self._elaborator_m[type_name] = elaborator
+
+    def _resolve_elaborator(self, task):
+        """Resolve the elaborator bound to `task`'s type, walking the `uses`
+        chain (nearest declaration wins). Returns (type_name, callable) where
+        `callable(ctxt, task, name) -> TaskNode`, or (None, None) when nothing is
+        bound -- the common case, which uses the default interior.
+
+        Two binding sources, checked per chain node (nearest wins):
+          * a declarative ``elaborate: <module>:<function>`` clause on the task
+            type (the function *is* the elaborator); and
+          * a programmatic binding registered via ``register_elaborator`` (a
+            ``TaskElaborator`` object -- its ``.elaborate`` bound method is
+            returned).
+        A binding whose type is currently being elaborated (`_elab_active`) is
+        skipped, so a self-typed rebuild falls through (re-entrancy guard)."""
+        for current in iter_uses_chain(task):
+            name = getattr(current, 'name', None)
+            if name is not None and name not in self._elab_active:
+                ref = getattr(current, 'elaborate', None)
+                if ref:
+                    return name, self._load_elaborate_fn(ref)
+                obj = self._elaborator_m.get(name)
+                if obj is not None:
+                    return name, obj.elaborate
+        return None, None
+
+    def _load_elaborate_fn(self, ref):
+        """Import and cache the ``module:function`` (or ``module.function``)
+        callable named by an ``elaborate:`` clause."""
+        fn = self._elaborate_fn_cache.get(ref)
+        if fn is None:
+            import importlib
+            sep = ':' if ':' in ref else '.'
+            module_name, func_name = ref.rsplit(sep, 1)
+            mod = importlib.import_module(module_name)
+            fn = getattr(mod, func_name)
+            self._elaborate_fn_cache[ref] = fn
+        return fn
+
     def _buildControlNode(self, task, name, srcdir, params, hierarchical, eval):
         """
         Build a runtime control flow node (if, while, do-while, repeat, match).
@@ -774,7 +1134,7 @@ class TaskGraphBuilder(object):
         self._log.debug(f"<-- _buildControlNode {task.name}")
         return node
     
-    def _applyStrategy(self, task, name, srcdir, params, hierarchical, eval):
+    def _applyStrategy(self, task, name, srcdir, params, hierarchical, eval, select_needs=None):
         self._log.debug("--> _applyStrategy %s" % task.name)
 
         if name is None:
@@ -802,7 +1162,7 @@ class TaskGraphBuilder(object):
         if ret.input is None:
             raise Exception("Task %s does not have an input" % task.name)
 
-        self._gatherNeeds(task, ret)
+        self._gatherNeeds(task, ret, select_needs)
 
         ret.input.needs.extend(ret.needs)
 
@@ -825,15 +1185,26 @@ class TaskGraphBuilder(object):
         elif len(task.strategy.matrix):
             matrix = {}
             matrix_items = []
+            _axis_eval = eval if eval is not None else self._eval
             for k in task.strategy.matrix.keys():
                 matrix[k] = None
-                matrix_items.append((k, task.strategy.matrix[k]))
+                axis = task.strategy.matrix[k]
+                # An axis value may be a `${{ }}` expression resolving to a list
+                # (e.g. `image: "${{ images }}"`) -- evaluate it here so a single
+                # package var can drive the fan-out (and be `-D`-overridden).
+                if isinstance(axis, str):
+                    resolved = _axis_eval.eval(axis) if "${{" in axis else axis
+                    if not isinstance(resolved, list):
+                        raise Exception(
+                            "matrix axis '%s' expression '%s' resolved to %r, "
+                            "which is not a list" % (k, axis, resolved))
+                    axis = resolved
+                matrix_items.append((k, axis))
 
-            res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name)
-            pass
+            res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name,
+                                            parent_let=self._get_let(task),
+                                            parent_set=self._get_set(task))
 
-
-#        tasks = [ret.input]
         tasks = []
         tasks.extend(ret.tasks[1:])
 
@@ -887,7 +1258,177 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _applyStrategy %s" % task.name)
         return ret
     
-    def _applyStrategyMatrix(self, subtasks, matrix_items, idx, parent_name=None):
+    def _get_let(self, task):
+        """Return the `let` (scoped-variable) block declared on a task, or None.
+        The runtime Task carries it directly (populated from its TaskDef)."""
+        return getattr(task, 'let', None)
+
+    def _get_set(self, task):
+        """Return the `set:` scoped-override list declared on a task, or None.
+        The runtime Task carries it directly (populated from its TaskDef)."""
+        return getattr(task, 'set_defs', None)
+
+    def _apply_set(self, eval, set_defs, task_name):
+        """Evaluate a task's `set:` list and push a SetScope frame onto the
+        builder's dynamic override stack (`_set_scopes`), returning the frame so
+        the caller can pop it once the subtree is built (see _pop_set_scope).
+        Returns None (pushes nothing) when there is nothing to apply.
+
+        Each list item is either an *assignment map* or a *scope item*
+        (`{uses?, path?, set: [...]}`). Semantics (design §R2.3):
+          * qualified name (has '.') -> variable REBIND read via ${{ pkg.var }};
+            narrowed to matched readers when it appears under a scope item.
+          * bare name UNDER a scope item -> forceful param SET on matched nodes.
+          * bare name at TOP level (no matcher) -> no-op + Info marker.
+        A fresh frame is always created so a child subtree never mutates an
+        ancestor's bindings."""
+        if not set_defs:
+            return None
+
+        scope = SetScope(task_name=task_name)
+        self._collect_set_items(eval, set_defs, task_name, matchers=[], depth=0,
+                                scope=scope)
+        if not scope.rebinds and not scope.rules:
+            return None
+        self._set_scopes.append(scope)
+        return scope
+
+    def _collect_set_items(self, eval, items, task_name, matchers, depth, scope):
+        """Walk a `set:` list (recursively through scope items), accumulating
+        `uses:`/`path:` matchers, and record rebinds/rules onto `scope`."""
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if 'set' in item:
+                sub = list(matchers)
+                if item.get('uses'):
+                    sub.append(('uses', item['uses']))
+                if item.get('path'):
+                    sub.append(('path', item['path']))
+                self._collect_set_items(eval, item['set'], task_name, sub,
+                                        depth + 1, scope)
+                continue
+            for name, expr in item.items():
+                val = expr
+                if isinstance(expr, str) and "${{" in expr:
+                    val = eval.eval(expr)
+                if '.' in name:
+                    # Qualified -> variable rebind (narrowed by any matchers).
+                    scope.rebinds.append((name, val, list(matchers)))
+                elif matchers:
+                    # Bare name under a scope item -> forceful param rule.
+                    scope.rules.append((name, val, list(matchers), depth))
+                else:
+                    # Bare name at top level, no matcher -> no-op.
+                    self.marker(TaskMarker(
+                        msg=("`set:` on task '%s' assigns bare name '%s' with no "
+                             "matcher; use a package-qualified name (pkg.%s) to "
+                             "rebind a scoped variable, or wrap it in a scope item "
+                             "(uses:/path:) to force a parameter" %
+                             (task_name, name, name)),
+                        severity=SeverityE.Info))
+
+    def _pop_set_scope(self, scope):
+        """Pop a SetScope frame pushed by _apply_set (no-op if scope is None)."""
+        if scope is not None and self._set_scopes and self._set_scopes[-1] is scope:
+            self._set_scopes.pop()
+
+    def _apply_set_force_rules(self, node, task, name):
+        """Apply forceful `set:` param rules (bare names under a scope item) to a
+        newly created node whose matchers select it. Overrides the instance's
+        `with:` but NOT a CLI/-D value; for the same param, the OUTER frame /
+        shallower nesting wins (design §R2.4)."""
+        if not self._set_scopes:
+            return
+        params = getattr(node, 'params', None)
+        if params is None:
+            return
+        uses_chain = getattr(node, 'uses_chain', None) or \
+            self._uses_chain_task_names(task)
+        node_name = getattr(node, 'name', None) or name
+        # Gather matching candidates, then pick the outermost per param.
+        cands = {}   # param_name -> (frame_idx, depth, value)
+        for fi, scope in enumerate(self._set_scopes):          # outer-first
+            for pname, pval, matchers, depth in scope.rules:
+                if not node_matches(matchers, uses_chain, node_name):
+                    continue
+                key = (fi, depth)
+                if pname not in cands or key < cands[pname][:2]:
+                    cands[pname] = (fi, depth, pval)
+        for pname, (_fi, _d, pval) in cands.items():
+            if not hasattr(params, pname):
+                continue           # rule may target other matched nodes; skip
+            if self._param_cli_pinned(node_name, pname):
+                continue           # CLI is the ceiling
+            self._force_node_param(node, pname, pval)
+
+    def _param_cli_pinned(self, node_name, param_name) -> bool:
+        """True if `param_name` on the node named `node_name` was pinned from the
+        CLI (-D/-P), so a `set:` force rule must yield to it. Matched by full
+        instance name, leaf name, and bare leaf-param name."""
+        leaf = node_name.split('.')[-1] if node_name else None
+        for key in (node_name, leaf):
+            if key in self.task_param_overrides and \
+                    param_name in self.task_param_overrides[key]:
+                return True
+        if self.leaf_param_overrides and param_name in self.leaf_param_overrides:
+            return True
+        return False
+
+    def _force_node_param(self, node, param_name, value):
+        """Coerce and set a forced param value on a node, using the built
+        params model's field type (which includes inherited params)."""
+        params = node.params
+        field = type(params).model_fields.get(param_name)
+        param_type = field.annotation if field is not None else None
+        coerced = self._coerce_param_value(value, param_type, param_name,
+                                           getattr(node, 'name', '?'))
+        setattr(params, param_name, coerced)
+
+    def _apply_let(self, eval, let_defs, task_name):
+        """Evaluate `let` bindings in declaration order and layer them into the
+        eval context's reserved __let__ dict. Later entries may reference earlier
+        ones by bare name (within the block only). Returns nothing; mutates `eval`.
+
+        A fresh merged dict is always created ({**parent, **new}) so a child
+        subtree never mutates an ancestor's bindings (invariant §0.3).
+
+        The bindings live ONLY in __let__ — read via resolve(). They are exposed
+        as plain variables *while the block is being evaluated* (so a later entry
+        can reference an earlier one by bare name), then removed, so a bare
+        ${{ name }} in the subtree does NOT see a let binding (invariant §0.1)."""
+        if not let_defs:
+            return
+        parent = eval.expr_eval.variables.get('__let__') or {}
+        merged = dict(parent)                      # fresh dict — never mutate parent
+        variables = eval.expr_eval.variables
+        saved = {}                                 # keys we shadowed: restore after
+        added = []                                 # keys we introduced: pop after
+        for name, expr in let_defs.items():
+            val = expr
+            if isinstance(expr, str) and "${{" in expr:
+                # Allow resolve() inside a let value (implicit-name form binds to
+                # this let entry's name).
+                eval.expr_eval.current_param_name = name
+                val = eval.eval(expr)
+                eval.expr_eval.current_param_name = None
+            merged[name] = val
+            # Temporarily expose so a later let entry can reference this one by
+            # bare name during THIS block's evaluation only.
+            if name in variables:
+                if name not in saved:
+                    saved[name] = variables[name]
+            elif name not in added:
+                added.append(name)
+            variables[name] = val
+        # Withdraw the temporary plain vars so the bindings live only in __let__.
+        for name in added:
+            variables.pop(name, None)
+        for name, v in saved.items():
+            variables[name] = v
+        variables['__let__'] = merged
+
+    def _applyStrategyMatrix(self, subtasks, matrix_items, idx, parent_name=None, parent_let=None, parent_set=None):
         """
         Expand matrix combinations and create task nodes.
         
@@ -947,45 +1488,162 @@ class TaskGraphBuilder(object):
                 # Also expose under 'matrix' so ${{ matrix.key }} works
                 eval_ctx.expr_eval.variables['matrix'] = dict(matrix_dict)
 
-                # Build params with matrix-specific eval context
-                param_builder = ParamBuilder(eval_ctx)
-                paramT = param_builder.build_param_type(subtask)
-                params = paramT()
-                
-                # Generate unique name using indices
-                matrix_bindings = tuple(zip(keys, combo_values))
-                matrix_indices = tuple(zip(keys, indices))
-                pkg_name = subtask.package.name if hasattr(subtask, 'package') and subtask.package else ""
-                root_pkg_name = self.root_pkg.name if self.root_pkg else ""
-                parent_leaf = None
-                parent_fq = parent_name
-                if parent_name:
-                    parent_leaf = parent_name.rsplit(".", 1)[-1] if "." in parent_name else parent_name
-                matrix_ctx = MatrixNamingContext(
-                    fq_name=subtask.name,
-                    leaf_name=subtask.leafname,
-                    package_name=pkg_name,
-                    root_package_name=root_pkg_name,
-                    parent_leaf=parent_leaf,
-                    parent_fq=parent_fq,
-                    matrix_bindings=matrix_bindings,
-                    matrix_indices=matrix_indices,
-                )
-                name = self._naming_scheme.matrix_task_node_name(matrix_ctx)
-                
-                # Build the task node with matrix-specific params
-                node = self._mkTaskNode(
-                    subtask,
-                    name=name,
-                    params=params,
-                    hierarchical=True,
-                    eval=eval_ctx
-                )
-                result.append(node)
-        
+                # Layer the parent's `let` bindings into this cell's scope so
+                # resolve() in the subtree picks up per-cell values
+                # (e.g. let: sim: "${{ matrix.sim }}").
+                self._apply_let(eval_ctx, parent_let, parent_name)
+
+                # Push the parent's `set:` overrides for this cell so ordinary
+                # ${{ pkg.var }} references (in this subtask's params and its
+                # whole subtree) resolve to per-cell rebinds
+                # (e.g. set: [{ hdlsim.sim: "${{ matrix.sim }}" }]). Popped after
+                # the cell's node is fully built.
+                _set_scope = self._apply_set(eval_ctx, parent_set, parent_name)
+                try:
+                    # Resolve a deferred (matrix-driven) `uses` for this cell: the
+                    # body task's `uses` expression (e.g. uvm-${{ this.test }}) is
+                    # evaluated against this cell's matrix bindings, the referenced
+                    # task type is looked up, and the node is built from a per-cell
+                    # copy so the shared subtask template is not mutated.
+                    eff_subtask = subtask
+                    if getattr(subtask, 'uses_expr', None) and subtask.uses is None:
+                        # Evaluate the `uses` expression against this cell's
+                        # matrix bindings (see _eval_in_cell for the dropped
+                        # name-resolution rationale).
+                        uses_name = self._eval_in_cell(eval_ctx, subtask.uses_expr)
+                        uses_task = self._resolveDeferredUses(uses_name, subtask)
+                        if uses_task is None:
+                            raise Exception(
+                                "matrix 'uses' expression '%s' resolved to '%s', "
+                                "which is not a known task" % (
+                                    subtask.uses_expr, uses_name))
+                        import copy as _copy
+                        eff_subtask = _copy.copy(subtask)
+                        eff_subtask.uses = uses_task
+
+                    # Build params with matrix-specific eval context
+                    param_builder = ParamBuilder(eval_ctx)
+                    paramT = param_builder.build_param_type(eff_subtask)
+                    params = paramT()
+
+                    # Generate unique name using indices
+                    matrix_bindings = tuple(zip(keys, combo_values))
+                    matrix_indices = tuple(zip(keys, indices))
+                    pkg_name = subtask.package.name if hasattr(subtask, 'package') and subtask.package else ""
+                    root_pkg_name = self.root_pkg.name if self.root_pkg else ""
+                    parent_leaf = None
+                    parent_fq = parent_name
+                    if parent_name:
+                        parent_leaf = parent_name.rsplit(".", 1)[-1] if "." in parent_name else parent_name
+                    # A body task's name may itself be an expression over the
+                    # matrix variables (e.g. `name: "${{ this.test }}"`). Evaluate
+                    # it against this cell's bindings so the node name and its
+                    # rundir segment read `...uvm-test.wb-smoke` rather than the
+                    # raw `...uvm-test.${{ this.test }}` template (see
+                    # _eval_in_cell for the dropped name-resolution rationale).
+                    fq_name = subtask.name
+                    leaf_name = subtask.leafname
+                    if isinstance(fq_name, str) and "${{" in fq_name:
+                        try:
+                            fq_name = self._eval_in_cell(eval_ctx, fq_name)
+                            leaf_name = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
+                        except Exception:
+                            fq_name = subtask.name
+                            leaf_name = subtask.leafname
+                    matrix_ctx = MatrixNamingContext(
+                        fq_name=fq_name,
+                        leaf_name=leaf_name,
+                        package_name=pkg_name,
+                        root_package_name=root_pkg_name,
+                        parent_leaf=parent_leaf,
+                        parent_fq=parent_fq,
+                        matrix_bindings=matrix_bindings,
+                        matrix_indices=matrix_indices,
+                    )
+                    name = self._naming_scheme.matrix_task_node_name(matrix_ctx)
+
+                    # Build the task node with matrix-specific params
+                    node = self._mkTaskNode(
+                        eff_subtask,
+                        name=name,
+                        params=params,
+                        hierarchical=True,
+                        eval=eval_ctx
+                    )
+
+                    # Resolve any matrix-driven `needs` for this cell: evaluate
+                    # each deferred need expression against this cell's bindings
+                    # (see _eval_in_cell), look up the referenced task, and wire
+                    # its node in.
+                    for need_expr in getattr(eff_subtask, 'needs_expr', None) or []:
+                        need_name = self._eval_in_cell(eval_ctx, need_expr)
+                        need_task = self._resolveDeferredUses(
+                            need_name, eff_subtask,
+                            fragment=getattr(eff_subtask, 'needs_expr_fragment', None))
+                        if need_task is None:
+                            raise Exception(
+                                "matrix 'needs' expression '%s' resolved to '%s', "
+                                "which is not a known task" % (need_expr, need_name))
+                        need_node = self._getTaskNode(need_task.name)
+                        node.needs.append((need_node, False))
+
+                    result.append(node)
+                finally:
+                    self._pop_set_scope(_set_scope)
+
         return result
 
     
+    def _eval_in_cell(self, eval_ctx, expr):
+        """Evaluate `expr` against a matrix cell's bindings with the
+        name-resolution context dropped, so `this`/`matrix` resolve to the cell
+        variables (which carry the matrix values) rather than an enclosing
+        compound's own `this` scope, which would otherwise shadow them. The
+        context is always restored. Used for a cell's deferred `uses`, its
+        computed node `name`, and its deferred `needs`."""
+        saved_nr = eval_ctx.expr_eval.name_resolution
+        eval_ctx.expr_eval.name_resolution = None
+        try:
+            return eval_ctx.eval(expr)
+        finally:
+            eval_ctx.expr_eval.name_resolution = saved_nr
+
+    def _resolveDeferredUses(self, name, subtask, fragment=None):
+        """Resolve a matrix-driven `uses`/`needs` name (evaluated per cell) to a
+        Task type.
+
+        Mirrors the load-time resolution: try the name as given, then qualified
+        by the root package and the subtask's fragment. Returns the Task, or
+        None if no candidate matches. `fragment` overrides the subtask's
+        `uses_expr_fragment` (used for deferred needs, which carry their own).
+        """
+        frag = fragment if fragment is not None \
+            else getattr(subtask, 'uses_expr_fragment', None)
+        root = self.root_pkg.name if self.root_pkg else None
+        candidates = [name]
+        if root:
+            candidates.append("%s.%s" % (root, name))
+            if frag:
+                candidates.append("%s.%s.%s" % (root, frag, name))
+        if frag:
+            candidates.append("%s.%s" % (frag, name))
+        for cand in candidates:
+            if self.root_pkg is not None and cand in self.root_pkg.task_m:
+                return self.root_pkg.task_m[cand]
+            if cand in self._task_m:
+                return self._task_m[cand]
+        # Fall back to a leaf-name match: fragment-qualified tasks are keyed as
+        # `<pkg>.<fragment>.<leaf>`, and the fragment segment is not always known
+        # at the point the expression is stashed. Match the trailing leaf name.
+        suffix = ".%s" % name
+        for task_m in (getattr(self.root_pkg, 'task_m', None), self._task_m):
+            if not task_m:
+                continue
+            matches = [t for k, t in task_m.items() if k == name or k.endswith(suffix)]
+            if len(matches) == 1:
+                return matches[0]
+        return None
+
     def _isCompound(self, task):
         if isinstance(task, Task):
             if task.subtasks is not None and len(task.subtasks):
@@ -1001,14 +1659,22 @@ class TaskGraphBuilder(object):
         else:
             return self.mkTaskNode(name)
     
-    def _mkTaskLeafNode(self, 
-                        task : Task, 
-                        name=None, 
-                        srcdir=None, 
-                        params=None, 
+    def _mkTaskLeafNode(self,
+                        task : Task,
+                        name=None,
+                        srcdir=None,
+                        params=None,
                         hierarchical=False,
-                        eval=None) -> TaskNode:
+                        eval=None,
+                        select_needs=None) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
+
+        # A `let` block only affects a task's subtree; a leaf has none.
+        _let = self._get_let(task)
+        if _let:
+            self.marker(TaskMarker(
+                msg="`let` on task '%s' has no subtree; it will have no effect" % task.name,
+                severity=SeverityE.Warning))
 
         if name is None:
             name = task.name
@@ -1132,7 +1798,7 @@ class TaskGraphBuilder(object):
 
         # Now, link up the needs
         self._log.debug("--> processing needs")
-        self._gatherNeeds(task, node)
+        self._gatherNeeds(task, node, select_needs)
         self._log.debug("<-- processing needs")
 
         if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
@@ -1144,13 +1810,14 @@ class TaskGraphBuilder(object):
         self._log.debug("<-- _mkTaskLeafNode %s" % task.name)
         return node
     
-    def _mkTaskCompoundNode(self, 
-                            task : Task, 
-                            name=None, 
-                            srcdir=None, 
-                            params=None, 
+    def _mkTaskCompoundNode(self,
+                            task : Task,
+                            name=None,
+                            srcdir=None,
+                            params=None,
                             hierarchical=False,
-                            eval=None) -> TaskNode:
+                            eval=None,
+                            select_needs=None) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
 
         if name is None:
@@ -1196,11 +1863,25 @@ class TaskGraphBuilder(object):
         # Restore previous srcdir after all parameter evaluation
         self._eval.set("srcdir", prev_srcdir)
 
+        # Push this compound's rundir segment. All compounds in a single `uses`
+        # chain are the same logical task and are built with the same `name`, so
+        # each Unique link would otherwise re-push an identical segment -- nesting
+        # the rundir one extra level per chain link (e.g.
+        # `.../wb-smoke_0/wb-smoke_0/wb-smoke_0/...`). Skip the push when the
+        # segment already sits at the top of the stack, collapsing those
+        # consecutive duplicates to a single directory while still nesting
+        # genuinely distinct parents. (A guard on in_uses() would over-suppress:
+        # the most-derived task in the chain may not itself be Unique, so the one
+        # legitimate push can come from a base link.)
+        _pushed_compound_rundir = False
         if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
             _compound_ctx = self._build_task_naming_context(task, name)
             _compound_segment = self._naming_scheme.rundir_segment(_compound_ctx)
-            if _compound_segment is not None:
+            _cur_rundir = self._task_rundir_s[-1]
+            _dup_top = (len(_cur_rundir) > 0 and _cur_rundir[-1] == _compound_segment)
+            if _compound_segment is not None and not _dup_top:
                 self.enter_rundir(_compound_segment)
+                _pushed_compound_rundir = True
 
         if task.uses is not None:
             # This is a compound task that is based on
@@ -1280,7 +1961,8 @@ class TaskGraphBuilder(object):
         # parent-walk into the needer (an effectively unbounded render).
         self._task_node_s.pop()
         try:
-            for need in task.needs:
+            _needs = select_needs(task.needs) if select_needs is not None else task.needs
+            for need in _needs:
                 need_n = self._getTaskNode(need.name)
                 if need_n is None:
                     raise Exception("Failed to find need %s" % need.name)
@@ -1317,10 +1999,38 @@ class TaskGraphBuilder(object):
             for field_name in type(params).model_fields.keys():
                 body_eval.set(field_name, getattr(params, field_name))
 
-        for t in task.subtasks:
-            nn = self._mkTaskNode(t, hierarchical=True, eval=body_eval)
-            node.tasks.append(nn)
-            tasks.append((t, nn))
+        # Layer this compound's `let` bindings into the body eval context so
+        # resolve() in the subtree reads them.
+        self._apply_let(body_eval, self._get_let(task), task.name)
+
+        # Push this compound's `set:` overrides so ordinary ${{ pkg.var }}
+        # references in the subtree resolve to them (design §R2). Popped after
+        # the body is built.
+        _set_scope = self._apply_set(body_eval, self._get_set(task), task.name)
+
+        try:
+            for t in task.subtasks:
+                nn = self._mkTaskNode(t, hierarchical=True, eval=body_eval)
+                # A compound that `uses` another compound adopts the base's
+                # subtask nodes (node.tasks = uses_node.tasks, above). If this
+                # compound declares a subtask with the SAME name, it OVERRIDES
+                # the adopted one rather than adding a duplicate. This is the
+                # normal same-name override semantic, and it is what keeps the
+                # package-uses-package re-export from double-instantiating:
+                # `<pkg>.uvm-sim-run` uses `<base>.uvm-sim-run` and re-exports a
+                # copy of the base's `sim-run` subtask, so without this the
+                # single `sim-run` would appear twice (adopted + re-exported).
+                _replaced = False
+                for _i, _existing in enumerate(node.tasks):
+                    if _existing.name == nn.name:
+                        node.tasks[_i] = nn
+                        _replaced = True
+                        break
+                if not _replaced:
+                    node.tasks.append(nn)
+                tasks.append((t, nn))
+        finally:
+            self._pop_set_scope(_set_scope)
 
         # Pop the node stack, since we're done constructing the body
         self._task_node_s.pop()
@@ -1365,7 +2075,7 @@ class TaskGraphBuilder(object):
                 self._log.debug("Add node %s as a top-level dependency" % tn.name)
                 node.needs.append((tn, False))
 
-        if task.rundir == RundirE.Unique and self._inherit_rundir_depth == 0:
+        if _pushed_compound_rundir:
             self.leave_rundir()
 
         # Clean up task scope if we created one for a non-uses compound task
@@ -1375,36 +2085,43 @@ class TaskGraphBuilder(object):
         return node
 
     def _convertValueToType(self, value, target_type):
-        """Convert a value to the target type if needed.
-        
-        This is necessary because eval() returns strings for all values,
-        but we need to preserve the actual Python types (bool, int, float, etc.)
-        for proper type checking and behavior.
+        """Convert an expanded value to the destination type.
+
+        eval() returns strings for spliced values, so scalar destinations
+        (bool/int/float) still need string->scalar conversion here. Container
+        destinations (list/map) and stringification are delegated to the shared
+        coerce_to_kind() so both expansion sites behave identically. See
+        docs/proposals/typed_param_expansion.md §5.2.
         """
-        # If value is already the right type, return it as-is
-        if type(value) == target_type:
+        # DeferredExpr values are resolved at runtime; the dst kind travels with
+        # them (see _expandParam) so we must not coerce the placeholder now.
+        if isinstance(value, DeferredExpr):
             return value
-        
-        # If value is a string and target is bool, convert string bool representations
-        if target_type == bool and isinstance(value, str):
-            if value.lower() in ('true', '1', 'yes', 'on'):
+
+        kind = normalize_type(target_type)
+
+        # Scalar string coercions kept here — coerce_to_kind defers these to us.
+        if kind is TypeKind.BOOL and isinstance(value, str):
+            low = value.lower()
+            if low in ('true', '1', 'yes', 'on'):
                 return True
-            elif value.lower() in ('false', '0', 'no', 'off', ''):
+            elif low in ('false', '0', 'no', 'off', ''):
                 return False
             else:
-                # Let pydantic handle the conversion/validation
-                return value
-        
-        # If value is a string and target is int or float, try to convert
-        if target_type in (int, float) and isinstance(value, str):
+                return value  # let pydantic report it
+        if kind in (TypeKind.INT, TypeKind.FLOAT) and isinstance(value, str):
             try:
-                return target_type(value)
+                return (int if kind is TypeKind.INT else float)(value)
             except (ValueError, TypeError):
-                # Let pydantic handle the conversion/validation
-                return value
-        
-        # For other cases, return value as-is and let pydantic handle it
-        return value
+                return value  # let pydantic report it
+
+        # LIST / MAP / STR / ANY -> deterministic, dst-driven coercion.
+        try:
+            return coerce_to_kind(value, kind)
+        except ParamTypeError:
+            # Preserve leniency at this site: let downstream pydantic surface it
+            # rather than hard-failing graph construction.
+            return value
 
     def _expandParams(self, params, eval):
         for name in type(params).model_fields.keys():
@@ -1558,12 +2275,13 @@ class TaskGraphBuilder(object):
                     new_val[k] = v
         return new_val
 
-    def _gatherNeeds(self, task_t, node):
+    def _gatherNeeds(self, task_t, node, select_needs=None):
         self._log.debug("--> _gatherNeeds %s (%s %d)" % (task_t.name, node.name, len(task_t.needs)))
         if task_t.uses is not None and isinstance(task_t.uses, Task) and not getattr(task_t, 'inherited', False):
-            self._gatherNeeds(task_t.uses, node)
+            self._gatherNeeds(task_t.uses, node, select_needs)
 
-        for need in task_t.needs:
+        _needs = select_needs(task_t.needs) if select_needs is not None else task_t.needs
+        for need in _needs:
             need_n = self._getTaskNode(need.name)
             if need_n is None:
                 raise Exception("Failed to find need %s" % need.name)
@@ -1758,70 +2476,14 @@ class TaskGraphBuilder(object):
         param_def.value = coerced_value
     
     def _coerce_param_value(self, value, param_type, param_name, task_name):
-        """Coerce string value to target type with proper error handling."""
-        import typing
-        
-        # Already correct type (from JSON file)
-        if param_type and not isinstance(param_type, type):
-            # Handle typing generics
-            origin = typing.get_origin(param_type)
-            if origin is None and isinstance(value, param_type):
-                return value
-        elif param_type and isinstance(value, param_type):
-            return value
-        
-        # Get origin type for generics (List, Dict, etc.)
-        origin = typing.get_origin(param_type) if param_type else None
-        
-        if origin is list or param_type is list:
-            # List type: "item" → ["item"], ["a", "b"] → ["a", "b"]
-            if isinstance(value, str):
-                return [value]
-            elif isinstance(value, list):
-                return value
-            else:
-                return [str(value)]
-        
-        elif origin is typing.Union:
-            # Union type: check if it contains a list member (e.g. Union[str, List])
-            args = typing.get_args(param_type)
-            if any(typing.get_origin(a) is list or a is list for a in args):
-                # CLI overrides: wrap str in a list (consistent with plain list behaviour)
-                if isinstance(value, str):
-                    return [value]
-                return value
-            # Otherwise fall through to the else branch below
-        
-        elif param_type is bool:
-            if isinstance(value, bool):
-                return value
-            s = str(value).lower().strip()
-            return s in ("1", "true", "yes", "y", "on")
-        
-        elif param_type is int:
-            try:
-                return int(value)
-            except ValueError:
-                raise ValueError(f"Cannot convert '{value}' to int for parameter '{param_name}' on task '{task_name}'")
-        
-        elif param_type is float:
-            try:
-                return float(value)
-            except ValueError:
-                raise ValueError(f"Cannot convert '{value}' to float for parameter '{param_name}' on task '{task_name}'")
-        
-        elif param_type is str:
-            return str(value)
-        
-        elif param_type is None:
-            # No type specified, return as-is
-            return value
-        
-        else:
-            # Complex type - must come from JSON
-            if isinstance(value, str):
-                raise ValueError(
-                    f"Parameter '{param_name}' on task '{task_name}' requires complex type {param_type}. "
-                    f"Use -P/--param-file with JSON format."
-                )
-            return value
+        """Coerce a CLI/-D (or set:-forced) value to `param_type`.
+
+        Delegates to the single engine-wide policy in
+        `param_types.coerce_cli_value` (comma-split for a bare list string,
+        TRUTHY bool, int base-0). `strict=True` so a bad int/float fails loudly
+        for a task-param override, re-raised as a located ValueError."""
+        try:
+            return coerce_cli_value(value, param_type, strict=True)
+        except ParamTypeError as e:
+            raise ValueError(
+                "Parameter '%s' on task '%s': %s" % (param_name, task_name, e))

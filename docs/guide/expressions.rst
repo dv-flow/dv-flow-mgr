@@ -207,6 +207,10 @@ When using matrix strategy, expressions can reference matrix variables:
 
 This generates 9 tasks (3 tests × 3 seeds) with appropriate parameter values.
 
+To push a matrix value *down into a subtree* of tasks (rather than referencing
+it directly in each body task), combine ``matrix`` with a ``let:`` block and read
+it with :ref:`resolve() <scoped-resolution>`. See :doc:`scoped_variables`.
+
 Advanced Features
 =================
 
@@ -282,6 +286,73 @@ Available functions:
 * ``str(x)``: Convert to string
 * ``int(x)``: Convert to integer
 * ``bool(x)``: Convert to boolean
+
+.. _scoped-resolution:
+
+Scoped Resolution
+-----------------
+
+.. deprecated:: use ``set:`` + an ordinary ``${{ pkg.var }}`` reference
+
+   ``resolve()`` and the ``let:`` block are superseded by the ``set:`` block: an
+   axis is declared as a package variable, read by an ordinary ``${{ pkg.var }}``
+   reference, and rebound over a subtree with ``set:``. See
+   :doc:`scoped_variables` (and its migration table). ``resolve()``/``let:``
+   still work but should not be used in new flows.
+
+``resolve()`` reads a *scoped variable* provided by an enclosing ``let:`` block,
+falling back to a default when none is present. It is the read half of the
+scoped-variable feature; the provide half is the ``let:`` block documented in
+:doc:`scoped_variables`.
+
+A task author uses ``resolve()`` to make one of a task's own parameters
+overridable from an enclosing scope, without requiring every caller to pass it
+explicitly:
+
+.. code-block:: yaml
+
+    # A task author makes 'sim' overridable from an enclosing scope:
+    - name: SimRun
+      with:
+        sim:
+          type: str
+          value: "${{ resolve('vlt') }}"   # scoped 'sim' if provided, else 'vlt'
+
+``resolve()`` has three forms:
+
+* ``resolve()`` — look up a scoped variable **named after the current
+  parameter**; error if it is unbound (no default).
+* ``resolve(default)`` — look up a scoped variable named after the current
+  parameter; use ``default`` if unbound.
+* ``resolve(name, default)`` — look up the scoped variable ``name`` explicitly;
+  use ``default`` if unbound.
+
+The implicit-name forms (``resolve()`` and ``resolve(default)``) only work while
+evaluating a ``with:`` parameter value — that is where the "current parameter
+name" is defined. Outside that context, pass an explicit name.
+
+When a scoped (``let:``) binding is not found, ``resolve()`` does **not** jump
+straight to its literal default. It first walks the task's ``uses``-chain
+**packages** — the instance task's own package, then each ``uses`` ancestor's
+package — looking for a package-level variable of that name, and only then falls
+back to the literal default:
+
+.. code-block:: text
+
+    explicit with:  >  let: (scoped)  >  package vars along the uses chain  >  literal default
+
+Because each package in that walk can be set with ``-D <pkg>.<name>=<value>``,
+a package variable such as ``hdlsim.sim`` becomes a global control: writing
+``value: "${{ resolve('sim', 'unset') }}"`` on an abstract task lets
+``-D hdlsim.sim=vlt`` (or a nearer package's ``sim`` var, or a ``let:`` scope)
+drive it, with ``'unset'`` as the last-resort default. See
+:doc:`scoped_variables` for the full precedence ladder and a worked example.
+
+.. note::
+
+   A bare ``${{ sim }}`` does **not** read scoped variables — ``resolve()`` is
+   the explicit opt-in. This keeps ordinary parameter references unambiguous and
+   makes it clear which parameters participate in scoped overriding.
 
 Expression Evaluation Order
 ============================

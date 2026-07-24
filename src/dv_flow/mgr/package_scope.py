@@ -48,6 +48,18 @@ class PackageScope(SymbolScope):
         if ret is None and name in self.pkg.task_m.keys():
             ret = self.pkg.task_m[name]
 
+        # Try the package-qualified form. An unqualified reference to a
+        # package-level task -- including tasks inherited/aliased from a used
+        # package (keyed as "<pkg>.<name>") -- lives in task_m under its
+        # fully-qualified name. Resolving this here, before descending into
+        # sub-packages, makes the nearest enclosing namespace win: the current
+        # package's own (possibly inherited) task shadows a same-named task in
+        # a used/imported package.
+        if ret is None and '.' not in name:
+            qname = "%s.%s" % (self.pkg.name, name)
+            if qname in self.pkg.task_m.keys():
+                ret = self.pkg.task_m[qname]
+
         if ret is None:
             for pkg in self.pkg.pkg_m.values():
                 self._log.debug("Searching pkg %s for %s" % (pkg.name, name))
@@ -77,6 +89,13 @@ class PackageScope(SymbolScope):
         if ret is None and name in self.pkg.type_m.keys():
             ret = self.pkg.type_m[name]
 
+        # Package-qualified fallback (see findTask): nearest enclosing namespace
+        # wins over used/imported packages for an unqualified reference.
+        if ret is None and '.' not in name:
+            qname = "%s.%s" % (self.pkg.name, name)
+            if qname in self.pkg.type_m.keys():
+                ret = self.pkg.type_m[qname]
+
         if ret is None:
             for pkg in self.pkg.pkg_m.values():
                 self._log.debug("Searching pkg %s for %s" % (pkg.name, name))
@@ -92,6 +111,13 @@ class PackageScope(SymbolScope):
         return ret
     
     def resolve_variable(self, name):
+        """LOAD-time variable resolver: reads class-level
+        `paramT.model_fields[...].default` (a -D override is baked into that
+        default at load, so -D is honored) plus subpackage/alias-qualified
+        `pkg.var`. There are no materialized param instances yet; the build-time
+        counterpart NameResolutionContext.resolve_variable reads instances (for
+        expanded/templated values) and owns the authoritative precedence ladder.
+        This phase split is intentional -- see that method's docstring."""
         self._log.debug("--> %s::resolve_variable %s" % (self.pkg.name, name))
         ret = None
         # Support qualified lookup: foo.DEBUG

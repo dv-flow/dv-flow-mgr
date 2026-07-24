@@ -52,6 +52,11 @@ class Package(object):
     tags : List[Type] = dc.field(default_factory=list)
     substitution_m : Dict[str, str] = dc.field(default_factory=dict)
     pkg_override_m : Dict[str, str] = dc.field(default_factory=dict)
+    # Names of package variables that were overridden from the CLI/-D (or a
+    # -P param file) at load. These are baked into paramT defaults, but are also
+    # recorded here so a subtree `set:` rebind yields to them: the CLI is the
+    # precedence ceiling (design §R2.4). Holds the bare var name.
+    cli_var_overrides : set = dc.field(default_factory=set)
     all_configs : list = dc.field(default_factory=list)  # Unified configs from package + fragments
     srcinfo : SrcInfo = None
     _log : ClassVar = logging.getLogger("Package")

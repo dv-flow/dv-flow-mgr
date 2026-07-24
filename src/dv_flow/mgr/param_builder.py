@@ -24,6 +24,9 @@ import pydantic
 from typing import Any, Dict, List, Tuple, Optional, TYPE_CHECKING
 from .param_def import ParamDef
 from .param_def_collection import ParamDefCollection
+from .param_types import TypeKind, ParamTypeError, normalize_type, coerce_to_kind
+from .expr_eval import ResolveError
+from .task import iter_uses_chain
 
 if TYPE_CHECKING:
     from .task import Task
@@ -55,7 +58,7 @@ class ParamBuilder:
         merged_defs = self._merge_param_defs(param_chain)
         
         # Step 3: Evaluate template expressions in order
-        evaluated_params = self._evaluate_params(merged_defs, task.name)
+        evaluated_params = self._evaluate_params(merged_defs, task.name, task)
         
         # Step 4: Create Pydantic model
         result = self._create_pydantic_model(task.name, evaluated_params)
@@ -69,16 +72,8 @@ class ParamBuilder:
         Returns list in order: [DerivedTask, BaseTask, ..., RootTask]
         """
         chain = []
-        current = task
-        visited = set()
-        
-        while current is not None:
-            # Prevent infinite loops
-            if id(current) in visited:
-                self._log.warning(f"Circular inheritance detected for task {task.name}")
-                break
-            visited.add(id(current))
-            
+
+        for current in iter_uses_chain(task):
             if hasattr(current, 'param_defs') and current.param_defs:
                 self._log.debug(f"  Adding param_defs from {current.name}: {len(current.param_defs.definitions)} params")
                 chain.append(current.param_defs)
@@ -87,10 +82,7 @@ class ParamBuilder:
                 self._log.debug(f"  Converting paramT to param_defs for {current.name}")
                 param_defs = self._paramT_to_param_defs(current.paramT, current.name)
                 chain.append(param_defs)
-            
-            # Move to next in chain
-            current = getattr(current, 'uses', None)
-        
+
         self._log.debug(f"Collected {len(chain)} param collections from inheritance chain")
         return chain
     
@@ -145,27 +137,59 @@ class ParamBuilder:
         
         return merged
     
-    def _evaluate_params(self, merged_defs: Dict[str, Tuple[ParamDef, type]], task_name: str) -> Dict[str, Tuple[type, Any]]:
+    def _uses_chain_pkg_names(self, task: 'Task') -> List[str]:
+        """Ordered, de-duplicated package names along the task's `uses` chain
+        (most-derived first — e.g. [foo, hdlsim]). This is the same chain that
+        binds elaborators and assembles paramT; resolve()'s package fall-through
+        walks it (see docs/proposals/task_elaboration_impl_plan.md §B.3)."""
+        names = []
+        seen = set()
+        for current in iter_uses_chain(task):
+            pkg = getattr(current, 'package', None)
+            pname = getattr(pkg, 'name', None) if pkg is not None else None
+            if pname is not None and pname not in seen:
+                seen.add(pname)
+                names.append(pname)
+        return names
+
+    def _evaluate_params(self, merged_defs: Dict[str, Tuple[ParamDef, type]], task_name: str, task: 'Task' = None) -> Dict[str, Tuple[type, Any]]:
         """
         Evaluate parameter values in definition order.
         As each parameter is evaluated, add it to eval context for subsequent refs.
         Returns: {param_name: (type, evaluated_value)}
         """
         evaluated = {}
-        
+
         # Save current eval state to restore later
         saved_vars = self.eval.expr_eval.variables.copy()
-        
+
+        # Expose the instance task's `uses`-chain package names so resolve() can
+        # fall through to package-level variables (Feature B). Reset in finally.
+        self.eval.expr_eval.uses_chain_pkgs = \
+            self._uses_chain_pkg_names(task) if task is not None else None
+
         try:
             # Process parameters in order they appear (dict maintains insertion order in Python 3.7+)
             for name, (param_def, ptype) in merged_defs.items():
                 value = param_def.value
-                
+
+                # Expose the parameter name so the implicit-name forms of
+                # resolve() (resolve() / resolve(default)) know which parameter
+                # they are defining.
+                self.eval.expr_eval.current_param_name = name
+
                 # Evaluate template expressions
                 if isinstance(value, str) and "${{" in value:
                     try:
                         value = self.eval.eval(value)
                         self._log.debug(f"  Evaluated param {name}: {param_def.value} -> {value}")
+                    except ResolveError as e:
+                        # Scoped-variable errors are real errors: a misused or
+                        # unresolvable resolve() must surface, not silently leave
+                        # the literal "${{ resolve(...) }}" string in place.
+                        raise ParamTypeError(
+                            "task '%s' parameter '%s': %s" % (task_name, name, e),
+                            getattr(e, "srcinfo", None))
                     except Exception as e:
                         self._log.debug(f"  Failed to evaluate param {name}: {e}")
                         # Keep original value on error
@@ -174,9 +198,24 @@ class ParamBuilder:
                     for v in value:
                         if isinstance(v, str) and "${{" in v:
                             try:
-                                new_list.append(self.eval.eval(v))
+                                ev = self.eval.eval(v)
+                            except ResolveError as e:
+                                raise ParamTypeError(
+                                    "task '%s' parameter '%s': %s" % (task_name, name, e),
+                                    getattr(e, "srcinfo", None))
                             except:
-                                new_list.append(v)
+                                ev = v
+                            # A whole-value ref that resolves to a list is
+                            # SPLICED into the parent list (typed-param
+                            # expansion) rather than nested as one element. This
+                            # is what makes list-op composition flat, e.g.
+                            # `plusargs: { prepend: "${{ lead }}", value:
+                            # "${{ plusargs }}" }` -> [lead..., plusargs...]
+                            # instead of [[lead...], [plusargs...]].
+                            if isinstance(ev, list):
+                                new_list.extend(ev)
+                            else:
+                                new_list.append(ev)
                         else:
                             new_list.append(v)
                     value = new_list
@@ -186,27 +225,56 @@ class ParamBuilder:
                         if isinstance(v, str) and "${{" in v:
                             try:
                                 new_dict[k] = self.eval.eval(v)
+                            except ResolveError as e:
+                                raise ParamTypeError(
+                                    "task '%s' parameter '%s': %s" % (task_name, name, e),
+                                    getattr(e, "srcinfo", None))
                             except:
                                 new_dict[k] = v
                         else:
                             new_dict[k] = v
                     value = new_dict
                 
+                # Coerce the evaluated value to the destination kind before it
+                # is modeled/validated. Only LIST/MAP/STR do real work; scalar
+                # kinds and ANY pass through (pydantic still validates scalars).
+                # This is where a whole-value list ref keeps its list type and a
+                # scalar into a list slot is wrapped. See proposal §5.2/§5.3.
+                kind = normalize_type(ptype)
+                if kind is not TypeKind.ANY:
+                    try:
+                        value = coerce_to_kind(value, kind)
+                    except ParamTypeError as e:
+                        raise ParamTypeError(
+                            "task '%s' parameter '%s': %s" % (
+                                task_name, name, e), getattr(e, "srcinfo", None))
+
                 # Store evaluated value
                 evaluated[name] = (ptype, value)
-                
+
                 # Update eval context so subsequent params can reference this value
                 self.eval.set(name, value)
         finally:
             # Restore eval state
             self.eval.expr_eval.variables = saved_vars
-        
+            self.eval.expr_eval.current_param_name = None
+            self.eval.expr_eval.uses_chain_pkgs = None
+
         return evaluated
     
     def _create_pydantic_model(self, task_name: str, evaluated_params: Dict[str, Tuple[type, Any]]) -> type:
         """Create Pydantic model from evaluated parameters"""
         field_dict = {}
         for name, (ptype, value) in evaluated_params.items():
+            # ANY floor: a declared param whose destination type couldn't be
+            # resolved (e.g. an override across a compound/paramT seam) arrives
+            # here with ptype=None. Emitting (None, value) types the pydantic
+            # field as NoneType, which rejects every value ("Expected none").
+            # Degrade unresolved types to typing.Any (permissive passthrough)
+            # so a carried list/map override validates instead of crashing.
+            # See docs/proposals/typed_param_expansion.md §5.1.
+            if ptype is None:
+                ptype = Any
             field_dict[name] = (ptype, value)
         
         # Clean task name for model name (replace dots with underscores)

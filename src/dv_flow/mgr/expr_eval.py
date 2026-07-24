@@ -31,6 +31,16 @@ from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt, ExprUna
 from .name_resolution import VarResolver
 from .filter_registry import FilterRegistry
 
+
+class ResolveError(Exception):
+    """Raised when resolve() is misused or cannot find a scoped binding and
+    has no default. Unlike most expression-evaluation errors (which are
+    swallowed so the original literal is kept), ResolveError is a real error
+    that param_builder must surface to the user. See
+    docs/proposals/scoped_variables_impl_plan.md §A1.2."""
+    pass
+
+
 @dc.dataclass
 class ExprEval(ExprVisitor):
     methods: Dict[str, Callable] = dc.field(default_factory=dict)
@@ -39,6 +49,15 @@ class ExprEval(ExprVisitor):
     value: Any = None
     filter_registry: Optional[FilterRegistry] = None
     current_package: Optional[str] = None
+    # Name of the parameter currently being evaluated. Enables the implicit-name
+    # forms of resolve() (resolve() and resolve(default)). Set by param_builder
+    # while evaluating each param; None outside a parameter-evaluation context.
+    current_param_name: Optional[str] = None
+    # Ordered, de-duplicated package names along the instance task's `uses`
+    # chain (most-derived first — e.g. [foo, hdlsim]). Set by param_builder for
+    # the duration of a task's param evaluation; drives the resolve() package
+    # fall-through walk (see docs/proposals/task_elaboration_impl_plan.md §B.3).
+    uses_chain_pkgs: Optional[List[str]] = None
 
     def __post_init__(self):
         self.methods['shell'] = self._builtin_shell
@@ -57,9 +76,77 @@ class ExprEval(ExprVisitor):
         self.methods['type'] = self._builtin_type
         self.methods['split'] = self._builtin_split
         self.methods['group_by'] = self._builtin_group_by
+        self.methods['resolve'] = self._builtin_resolve
+        self.methods['contains'] = self._builtin_contains
 
     def set(self, name: str, value: object):
         self.variables[name] = value
+
+    def _lookup_scoped(self, name):
+        """Look up a scoped ('let') variable by name in the reserved __let__
+        carrier. Returns (found: bool, value)."""
+        let = self.variables.get('__let__')
+        if isinstance(let, dict) and name in let:
+            return True, let[name]
+        return False, None
+
+    def _uses_chain_pkgs(self):
+        """The instance task's ordered `uses`-chain package names, or [] when no
+        chain is in scope (bare-eval / non-param contexts)."""
+        return self.uses_chain_pkgs or []
+
+    def _lookup_pkg_chain(self, name):
+        """Walk the task's `uses`-chain packages (most-derived first) looking for
+        a package-level variable named `name`. Returns (found: bool, value).
+
+        Reads each package's *instance* params (so `-D <pkg>.<name>` is honored),
+        falling back to the class default; the first package that carries the
+        variable wins. See docs/proposals/task_elaboration_impl_plan.md §B.1."""
+        if self.name_resolution is None:
+            return False, None
+        for pkg_name in self._uses_chain_pkgs():
+            found, value = self.name_resolution.pkg_var(pkg_name, name)
+            if found:
+                return True, value
+        return False, None
+
+    def _builtin_resolve(self, in_value, args):
+        """resolve() - read a scoped ('let') variable with a fallback default.
+
+        Arities (see design §3.1):
+          resolve()                -> name = current param, no default (error if unbound)
+          resolve(default)         -> name = current param, fallback = default
+          resolve(name, default)   -> explicit name, fallback = default
+        """
+        if len(args) > 2:
+            raise ResolveError(
+                "resolve() takes at most two arguments "
+                "(name, default); got %d" % len(args))
+        if len(args) == 2:
+            name, has_default, default = args[0], True, args[1]
+        elif len(args) == 1:
+            name, has_default, default = self.current_param_name, True, args[0]
+        else:
+            name, has_default, default = self.current_param_name, False, None
+        if name is None:
+            raise ResolveError(
+                "resolve() used with an implicit parameter name outside a "
+                "parameter-evaluation context; pass an explicit name: "
+                "resolve('<name>', <default>)")
+        # Precedence ladder (design §B): let: (scoped) > package variables walked
+        # along the task's `uses` chain (instance package first, then each `uses`
+        # ancestor) > literal default. The `-D <pkg>.<name>` override is picked
+        # up wherever that package appears in the walk (pkg_var reads instances).
+        found, value = self._lookup_scoped(name)          # 1. let: (scoped)
+        if not found:
+            found, value = self._lookup_pkg_chain(name)   # 2. uses-chain pkg vars
+        if found:
+            return value
+        if has_default:
+            return default                                # 3. literal default (last)
+        raise ResolveError(
+            "resolve('%s') found no scoped binding, no package variable along "
+            "the 'uses' chain, and no default was given" % name)
 
     def set_name_resolution(self, ctx: VarResolver):
         self.name_resolution = ctx
@@ -246,9 +333,9 @@ class ExprEval(ExprVisitor):
                         args[f"arg{i}"] = self.value
                     self.value = self._apply_filter(e.rhs.id, lhs_val, args)
             else:
-                # For backward compatibility, evaluate RHS
+                # For backward compatibility, evaluate RHS (result flows through
+                # self.value; no separate binding needed here).
                 e.rhs.accept(self)
-                rhs_val = self.value
         else:
             # All other operators need RHS evaluated
             e.rhs.accept(self)
@@ -563,6 +650,17 @@ class ExprEval(ExprVisitor):
     
     # ========== JQ-style Builtin Methods ==========
     
+    def _builtin_contains(self, in_value, args):
+        """contains(item) - membership test. `list | contains(x)` -> True if x is
+        in the list (also works for a string subsequence or a dict key). Enables
+        e.g. `iff: "${{ images | contains('tlm') }}"`."""
+        if len(args) != 1:
+            raise Exception("contains() takes exactly one argument")
+        item = args[0]
+        if isinstance(in_value, (list, tuple, str, dict)):
+            return item in in_value
+        return False
+
     def _builtin_length(self, in_value, args):
         """length() - Get length of array/object/string"""
         # When called as length(arr), arr is passed as arg

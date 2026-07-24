@@ -29,6 +29,7 @@ from ..util import loadProjPkgDef, parse_parameter_overrides
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
+from ..task_data import SeverityE
 from ..task_graph_dot_writer import TaskGraphDotWriter
 from ..cli_task_resolver import CLITaskResolver, TaskResolutionError
 from .util import get_rootdir, get_naming_scheme
@@ -43,11 +44,19 @@ class CmdGraph(object):
 
     def __call__(self, args):
 
-        # First, find the project we're working with
+        # First, find the project we're working with. Pass a listener so a flow
+        # file parse error is reported cleanly (with source location) instead of
+        # surfacing as a traceback or the misleading "no flow.yaml found".
+        listener = TaskListenerLog()
         loader, pkg = loadProjPkgDef(
             get_rootdir(args),
+            listener=listener.marker,
             parameter_overrides=parse_parameter_overrides(getattr(args, "param_overrides", [])),
             config=getattr(args, "config", None))
+
+        if listener.has_severity[SeverityE.Error] > 0:
+            print("Error(s) encountered while loading package definition")
+            return 1
 
         if pkg is None:
             raise Exception("Failed to find a 'flow.yaml/flow.toml' file that defines a package in %s or its parent directories" % os.getcwd())

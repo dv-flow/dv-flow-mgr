@@ -222,6 +222,13 @@ def get_parser():
                         metavar="DIR",
                         help="After the run, write a diagnostics bundle (per-task logs, "
                              "markers, status) to DIR for publishing as a CI artifact.")
+    run_parser.add_argument("--run-id",
+                        dest="run_id",
+                        default=None,
+                        metavar="ID",
+                        help="Identifier for this run's output-data directory "
+                             "(rundir/out/<ID>), shared by all std.Publish tasks. "
+                             "Default: next zero-padded counter.")
     run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"))
 
     # Completion command

@@ -19,6 +19,8 @@ from .package_provider import PackageProvider
 from .package_scope import PackageScope
 from .param_def import ComplexType, ParamDef
 from .param_def_collection import ParamDefCollection
+from .param_types import (KEYWORD_TYPE, TypeKind, coerce_cli_value,
+                          keyword_default, normalize_type)
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
 from .task import Task, Strategy, StrategyGenerate
@@ -27,6 +29,15 @@ from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
 from .type_def import TypeDef
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
+
+def _taskdef_has_matrix(taskdef) -> bool:
+    """True if `taskdef` declares a matrix strategy. A matrix body's `uses`/
+    `needs` may reference a matrix variable whose binding only exists once the
+    strategy fans out at graph-build; such expressions are deferred rather than
+    resolved at load. Single predicate for both defer sites."""
+    return (taskdef.strategy is not None and
+            bool(getattr(taskdef.strategy, 'matrix', None)))
+
 
 def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
     """Suggest similar valid field names using similarity matching"""
@@ -300,30 +311,31 @@ class PackageProviderYaml(PackageProvider):
             import yaml
             for k, v in loader.param_overrides.items():
                 if '.' in k:
-                    pkg_name, pname = k.split('.',1)
+                    # Split on the LAST dot: the trailing segment is the param
+                    # name; everything before it is the (possibly dotted, e.g.
+                    # `hdlsim.vlt`) package name. Splitting on the first dot
+                    # mis-parsed `-D hdlsim.vlt.trace_fmt=...` as pkg=`hdlsim`.
+                    pkg_name, pname = k.rsplit('.',1)
                     if pkg_name != pkg.name:
                         continue
                 else:
                     pname = k
                 if pname in pkg.paramT.model_fields:
                     ann_t = pkg.paramT.model_fields[pname].annotation
-                    # Coerce value similar to main loader
+                    # Pre-parse YAML so `[a,b]` / `{k: v}` / `42` literals become
+                    # real objects, then apply the single CLI coercion policy
+                    # (comma-split for a bare list string, TRUTHY bool, int base-0;
+                    # lenient int/float fallback -- CLI package vars, not strict).
+                    # See param_types.coerce_cli_value.
                     try:
                         parsed = yaml.safe_load(v) if isinstance(v, str) else v
                     except Exception:
                         parsed = v
-                    if ann_t is int and not isinstance(parsed, int):
-                        try: parsed = int(str(v),0)
-                        except Exception: parsed = 0
-                    elif ann_t is float and not isinstance(parsed,(int,float)):
-                        try: parsed = float(str(v))
-                        except Exception: parsed = 0.0
-                    elif ann_t is bool and not isinstance(parsed,bool):
-                        s=str(v).lower().strip()
-                        parsed = s in ("1","true","yes","y","on")
-                    elif ann_t is str and not isinstance(parsed,str):
-                        parsed = str(parsed)
+                    parsed = coerce_cli_value(parsed, ann_t)
                     pkg.paramT.model_fields[pname].default = parsed
+                    # Record that this var was CLI/-D overridden so a subtree
+                    # `set:` rebind yields to it (CLI is the ceiling, §R2.4).
+                    pkg.cli_var_overrides.add(pname)
 
         # Apply any overrides from above
 
@@ -395,15 +407,30 @@ class PackageProviderYaml(PackageProvider):
             # Store unified configs on package for show commands / introspection
             pkg.all_configs = all_configs
 
-            # Select and apply configuration (if any) prior to elaborating types/tasks
-            cfg = self._selectConfig(all_configs, pkg_def.name, loader)
+            # Select and apply configuration (if any) prior to elaborating types/tasks.
+            # A config named on the command line may be defined not on this package
+            # but on a `uses:` base package (applied when that base loads). Collect
+            # base-package config names so root config-selection doesn't spuriously
+            # fail when the config lives in the base.
+            base_config_names = set()
+            if pkg_def.uses is not None and pkg_def.uses in pkg.pkg_m:
+                base_cfg_pkg = pkg.pkg_m[pkg_def.uses]
+                for c in getattr(base_cfg_pkg, 'all_configs', []) or []:
+                    base_config_names.add(c.name)
+            cfg = self._selectConfig(all_configs, pkg_def.name, loader,
+                                     base_config_names=base_config_names)
             if cfg is not None:
                 self._applyConfig(pkg_def, cfg, all_configs, loader, pkg, taskdefs, typedefs)
 
-            # Validate task overrides against base (uses) package when not in config
+            # Validate task overrides against the base (uses) package or the
+            # current package. A config may override a task defined in THIS
+            # package (e.g. a `flags-*` task overridden by a `debug` config), not
+            # only a task inherited from a `uses:` base -- so search both.
             base_pkg = None
             if pkg_def.uses is not None and pkg_def.uses in pkg.pkg_m:
                 base_pkg = pkg.pkg_m[pkg_def.uses]
+            own_task_names = set(
+                t.name for t in pkg_def.tasks if getattr(t, 'name', None))
             for td in taskdefs:
                 if hasattr(td, 'override') and td.override:
                     target = td.override
@@ -418,14 +445,39 @@ class PackageProviderYaml(PackageProvider):
                             base_pkg = pkg.pkg_m[pkg_def.uses]
                             fq = f"{base_pkg.name}.{target}"
                             found = fq in base_pkg.task_m
+                    # Fall back to a task declared in the current package.
+                    if not found and target in own_task_names:
+                        found = True
                     if not found:
-                        loader.error(f"override target task '{target}' not found in base (uses) package", td.srcinfo)
+                        loader.error(f"override target task '{target}' not found in base (uses) package or current package '{pkg.name}'", td.srcinfo)
                     # Ensure the override task takes the target name
                     if td.name is None or td.name != target:
                         td.name = target
                     # Implicitly inherit from overridden task if no explicit 'uses'
                     if td.uses is None and base_pkg is not None:
                         td.uses = f"{base_pkg.name}.{target}"
+                    # Inherit visibility scope and description from the overridden
+                    # base task when the override does not specify its own. The
+                    # 'override:' form carries no inline scope marker (unlike
+                    # root:/export:/local:), so without this an override silently
+                    # drops the base task's export/root/local scope (and desc/doc).
+                    if found and base_pkg is not None:
+                        base_task = base_pkg.task_m.get(f"{base_pkg.name}.{target}")
+                        if base_task is not None:
+                            if td.scope is None:
+                                inherited_scope = []
+                                if getattr(base_task, 'is_root', False):
+                                    inherited_scope.append('root')
+                                if getattr(base_task, 'is_export', False):
+                                    inherited_scope.append('export')
+                                if getattr(base_task, 'is_local', False):
+                                    inherited_scope.append('local')
+                                if inherited_scope:
+                                    td.scope = inherited_scope
+                            if not td.desc and base_task.desc:
+                                td.desc = base_task.desc
+                            if not td.doc and base_task.doc:
+                                td.doc = base_task.doc
             # Alias inherited base-package tasks into root package namespace
             if base_pkg is not None:
                 override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
@@ -451,9 +503,25 @@ class PackageProviderYaml(PackageProvider):
                     alias.passthrough = getattr(task, 'passthrough', None)
                     alias.consumes = getattr(task, 'consumes', None)
                     alias.rundir = getattr(task, 'rundir', None)
-                    # Shallow-copy needs/subtasks for graph continuity
+                    # Carry the base task's visibility scope forward. is_export/
+                    # is_root/is_local are per-Task booleans that are never walked
+                    # up the 'uses' chain, so without this an aliased base task
+                    # loses its export/root/local scope in the deriving package.
+                    alias.is_root = getattr(task, 'is_root', False)
+                    alias.is_export = getattr(task, 'is_export', False)
+                    alias.is_local = getattr(task, 'is_local', False)
+                    # Shallow-copy needs for graph continuity. Needs must be
+                    # copied because `_gatherNeeds` short-circuits on the
+                    # `inherited` flag below (it does NOT walk into the aliased
+                    # base for needs), so a leaf alias would otherwise lose them.
                     alias.needs = list(getattr(task, 'needs', []))
-                    alias.subtasks = list(getattr(task, 'subtasks', []))
+                    # Do NOT copy `subtasks`: the alias already inherits the base
+                    # via `uses` (above), and the compound-node builder adopts the
+                    # base compound's subtask nodes through that uses chain
+                    # (node.tasks = uses_node.tasks). Copying them here as well
+                    # made a re-exported compound (e.g. `<pkg>.uvm-sim-run` uses
+                    # `<base>.uvm-sim-run`) instantiate each subtask twice.
+                    alias.subtasks = []
                     # Mark alias so we don't recurse into base 'uses' when gathering needs
                     alias.inherited = True
                     pkg.task_m[alias.name] = alias
@@ -519,7 +587,7 @@ class PackageProviderYaml(PackageProvider):
             loader._eval.set_name_resolution(prev_name_res)
             self.pop_package_scope()
 
-    def _selectConfig(self, configs, pkg_name, loader):
+    def _selectConfig(self, configs, pkg_name, loader, base_config_names=None):
         # Explicit config from loader overrides implicit selection
         cfg_name = getattr(loader, 'config_name', None)
         if cfg_name is not None:
@@ -533,6 +601,10 @@ class PackageProviderYaml(PackageProvider):
             for c in configs:
                 if c.name == cfg_name:
                     return c
+            # A `uses:` base package may define (and apply) the config even though
+            # this package does not -- don't fail the root in that case.
+            if base_config_names and cfg_name in base_config_names:
+                return None
             if is_root:
                 loader.error(f"Configuration '{cfg_name}' not found in package {pkg_name}")
             return None
@@ -607,16 +679,35 @@ class PackageProviderYaml(PackageProvider):
             for td in lst:
                 if hasattr(td, 'override') and td.override:
                     target = td.override
-                    # Remove any prior taskdef with same name
+                    # Remove any prior taskdef with same name, capturing it so
+                    # the override can inherit attributes it does not respecify.
+                    base_td = None
                     for i in range(len(taskdefs)-1, -1, -1):
                         if taskdefs[i].name == target:
-                            taskdefs.pop(i)
+                            base_td = taskdefs.pop(i)
                             break
                     td.name = target if td.name is None else td.name
                     if td.name != target:
                         td.name = target
-                    # Implicitly inherit from overridden task (base package) if no explicit 'uses'
-                    if td.uses is None and pkg_def.uses is not None:
+                    # A config `override:` is a PARTIAL redefinition: it replaces
+                    # only the attributes it names and inherits the rest from the
+                    # task it overrides. Carry forward the overridden task's
+                    # `with:` params (e.g. a `sim: "${{ sim }}"` binding) for any
+                    # key the override does not set, so an override that swaps
+                    # only `uses` (e.g. Opt->Dbg args) does not silently drop the
+                    # local param bindings and leave `sim` unresolved. The
+                    # override always wins on conflicting keys.
+                    if base_td is not None and getattr(base_td, 'params', None):
+                        merged = dict(base_td.params)
+                        merged.update(td.params or {})
+                        td.params = merged
+                    # Inherit `uses` from the overridden task (or, failing that,
+                    # the base package) when the override does not specify its
+                    # own -- an override with no `uses:` is a pure param/attribute
+                    # tweak of the existing task, not a from-scratch redefinition.
+                    if td.uses is None and base_td is not None and base_td.uses is not None:
+                        td.uses = base_td.uses
+                    elif td.uses is None and pkg_def.uses is not None:
                         td.uses = f"{pkg_def.uses}.{target}"
                 taskdefs.append(td)
         if base_cfg is not None:
@@ -768,6 +859,54 @@ class PackageProviderYaml(PackageProvider):
         else:
             ret = loader.findTask(name)
         return ret
+
+    def _suggestTaskNames(self, name):
+        """Return up to 3 candidate task names for a "did you mean ...?" hint on a
+        failed needs/uses reference. Candidates are the names visible from the
+        current package, presented in their in-package-referenceable form (the
+        owning package prefix stripped). A very common mistake is referencing a
+        task that lives in a fragment namespace by its bare leaf name (e.g.
+        `uvm-tests` instead of `uvm.uvm-tests`), so same-leaf matches in a
+        namespace are preferred over fuzzy typo matches."""
+        if not len(self._pkg_s):
+            return []
+        # _pkg_s holds PackageScope wrappers; the Package (with task_m/pkg_m) is
+        # its `.pkg`. Building suggestions must never raise -- a failure here would
+        # mask the real "task not found" error -- so stay defensive.
+        try:
+            scope = self._pkg_s[-1]
+            pkg = getattr(scope, "pkg", scope)
+            cands = set()
+            def add_from(p):
+                prefix = p.name + "."
+                for k in p.task_m.keys():
+                    cands.add(k[len(prefix):] if k.startswith(prefix) else k)
+            add_from(pkg)
+            for sub in pkg.pkg_m.values():
+                add_from(sub)
+            cands.discard(name)
+            # 1) Same leaf name, but reachable only via a namespace -- the classic
+            #    "you forgot to qualify it" case.
+            leaf = name.split('.')[-1]
+            same_leaf = sorted(c for c in cands if c.split('.')[-1] == leaf)
+            if same_leaf:
+                return same_leaf[:3]
+            # 2) Otherwise fall back to fuzzy matching for typos.
+            import difflib
+            return difflib.get_close_matches(name, sorted(cands), n=3, cutoff=0.6)
+        except Exception:
+            return []
+
+    def _taskNotFound(self, loader, need_name, srcinfo):
+        """Emit a clean, actionable 'failed to find task' error (with a suggestion
+        when one is available). Callers MUST NOT proceed to dereference the missing
+        task -- `error()` only records a marker, so continuing would append/deref a
+        None and crash with an opaque 'NoneType' error downstream."""
+        suggestions = self._suggestTaskNames(need_name)
+        hint = ""
+        if suggestions:
+            hint = " (did you mean %s?)" % " or ".join("'%s'" % s for s in suggestions)
+        loader.error("failed to find task '%s'%s" % (need_name, hint), srcinfo)
 
     def _findTaskOrType(self, name, loader):
         self._log.debug("--> _findTaskOrType %s" % name)
@@ -1122,7 +1261,10 @@ class PackageProviderYaml(PackageProvider):
                 doc=doc,
                 package=pkg,
                 srcinfo=taskdef.srcinfo,
-                taskdef=taskdef)
+                taskdef=taskdef,
+                let=dict(getattr(taskdef, "let", {}) or {}),
+                set_defs=list(getattr(taskdef, "set_defs", []) or []),
+                elaborate=getattr(taskdef, "elaborate", None))
 
             if taskdef.iff is not None:
                 task.iff = taskdef.iff
@@ -1216,23 +1358,6 @@ class PackageProviderYaml(PackageProvider):
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
 
-        ptype_m = {
-            "str" : str,
-            "int" : int,
-            "float" : float,
-            "bool" : bool,
-            "list" : Union[str, List],
-            "map" : Dict
-        }
-        pdflt_m = {
-            "str" : "",
-            "int" : 0,
-            "float" : 0.0,
-            "bool" : False,
-            "list" : [],
-            "map" : {}
-        }
-
         fields = []
         field_m : Dict[str,int] = {}
 
@@ -1283,10 +1408,10 @@ class PackageProviderYaml(PackageProvider):
                     pass
                 else:
                     ptype_s = param.type
-                    if ptype_s not in ptype_m.keys():
+                    if ptype_s not in KEYWORD_TYPE:
                         raise Exception("Unknown type %s" % ptype_s)
-                    ptype = ptype_m[ptype_s]
-                    pdflt = pdflt_m[ptype_s]
+                    ptype = KEYWORD_TYPE[ptype_s]
+                    pdflt = keyword_default(ptype_s)
 
                 if p in field_m.keys():
                     # Allow overriding inherited parameters
@@ -1294,7 +1419,13 @@ class PackageProviderYaml(PackageProvider):
                 if param.value is not None:
                     val = param.value
                     if isinstance(val, str) and "${{" in val:
-                        val = loader.evalExpr(val)
+                        try:
+                            val = loader.evalExpr(val)
+                        except Exception as e:
+                            loader.error(
+                                "failed to evaluate default for parameter '%s' (%s): %s" % (
+                                    p, val, str(e)),
+                                getattr(taskdef, "srcinfo", None))
                     # If declaration also has append/prepend (from extension),
                     # resolve against the declared value.
                     if isinstance(param, ParamDef) and param.has_list_op():
@@ -1382,24 +1513,7 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("--> _collectParamDefs %s (%s)" % (taskdef.name, str(taskdef.params)))
         
         collection = ParamDefCollection(srcinfo=taskdef.srcinfo)
-        
-        ptype_m = {
-            "str" : str,
-            "int" : int,
-            "float" : float,
-            "bool" : bool,
-            "list" : Union[str, List],
-            "map" : Dict
-        }
-        pdflt_m = {
-            "str" : "",
-            "int" : 0,
-            "float" : 0.0,
-            "bool" : False,
-            "list" : [],
-            "map" : {}
-        }
-        
+
         for p in taskdef.params.keys():
             param = taskdef.params[p]
             self._log.debug("param: %s %s (%s)" % (p, str(param), str(type(param))))
@@ -1427,10 +1541,10 @@ class PackageProviderYaml(PackageProvider):
                         raise Exception("Complex type %s not supported" % str(param.type))
                 else:
                     ptype_s = param.type
-                    if ptype_s not in ptype_m.keys():
+                    if ptype_s not in KEYWORD_TYPE:
                         raise Exception("Unknown type %s" % ptype_s)
-                    ptype = ptype_m[ptype_s]
-                    pdflt = pdflt_m[ptype_s]
+                    ptype = KEYWORD_TYPE[ptype_s]
+                    pdflt = keyword_default(ptype_s)
                 
                 if collection.has_param(p):
                     raise Exception("Duplicate field %s" % p)
@@ -1470,21 +1584,10 @@ class PackageProviderYaml(PackageProvider):
                         taskdef.srcinfo)
                     continue
 
-                # Validate that the target is list-typed.
-                # The list type can appear as: list, List, Union[str, List], etc.
-                import typing as _typing
-                def _is_list_type(t):
-                    if t is list or t is List:
-                        return True
-                    origin = _typing.get_origin(t)
-                    if origin is list:
-                        return True
-                    # Union[str, List] is the standard list param type
-                    if origin is Union:
-                        return any(_is_list_type(a) for a in _typing.get_args(t))
-                    return False
-
-                if ptype is not None and not _is_list_type(ptype):
+                # Validate that the target is list-typed. The list type can
+                # appear as list, List, or the dfm Union[str, List] encoding --
+                # normalize_type collapses all of them to TypeKind.LIST.
+                if ptype is not None and normalize_type(ptype) is not TypeKind.LIST:
                     loader.error(
                         "'append'/'prepend' used on non-list parameter "
                         "'%s' (type: %s) in task '%s'" % (
@@ -1664,13 +1767,20 @@ class PackageProviderYaml(PackageProvider):
             uses_name = taskdef.uses
             if isinstance(uses_name, str):
                 uses_name = loader.evalExpr(uses_name)
-            task.uses = self._findTaskOrType(uses_name, loader)
-
-            # If unqualified and from a fragment, try fragment-qualified name
+            # Resolve unqualified names innermost-first so the nearest enclosing
+            # namespace wins: a fragment adds a level to the namespace stack, so
+            # try the fragment-qualified name before falling back to the package
+            # (and, via _findTaskOrType, used/imported packages). This mirrors the
+            # ordering used for 'needs' resolution below.
             fragment_name = getattr(taskdef, '_fragment_name', None)
-            if task.uses is None and fragment_name and '.' not in uses_name:
+            if fragment_name and '.' not in uses_name:
                 task.uses = self._findTaskOrType(
                     f"{fragment_name}.{uses_name}", loader)
+            else:
+                task.uses = None
+
+            if task.uses is None:
+                task.uses = self._findTaskOrType(uses_name, loader)
 
             if task.uses is None:
                 similar = loader.getSimilarNamesError(uses_name)
@@ -1741,7 +1851,8 @@ class PackageProviderYaml(PackageProvider):
                 if nt is None:
                     nt = self._findTask(need_base, loader)
                 if nt is None:
-                    loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
+                    self._taskNotFound(loader, need_name, taskdef.srcinfo)
+                    continue
                 for nn in nt.needs:
                     task.needs.append(nn)
             else:
@@ -1752,15 +1863,15 @@ class PackageProviderYaml(PackageProvider):
                     nt = self._findTask(need_name, loader)
             
                 if nt is None:
-                    loader.error("failed to find task %s" % need_name, taskdef.srcinfo)
-                else:
-                    # Check visibility: warn if referencing non-export task from another package
-                    if nt.package != task.package and not nt.is_export:
-                        from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
-                        loader.marker(TaskMarker(
-                            msg=f"Task '{task.name}' references task '{nt.name}' in package '{nt.package.name}' that is not marked 'export'",
-                            severity=SeverityE.Warning,
-                            loc=TaskMarkerLoc(path=taskdef.srcinfo.file, line=taskdef.srcinfo.lineno, pos=taskdef.srcinfo.linepos)))
+                    self._taskNotFound(loader, need_name, taskdef.srcinfo)
+                    continue
+                # Check visibility: warn if referencing non-export task from another package
+                if nt.package != task.package and not nt.is_export:
+                    from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
+                    loader.marker(TaskMarker(
+                        msg=f"Task '{task.name}' references task '{nt.name}' in package '{nt.package.name}' that is not marked 'export'",
+                        severity=SeverityE.Warning,
+                        loc=TaskMarkerLoc(path=taskdef.srcinfo.file, line=taskdef.srcinfo.lineno, pos=taskdef.srcinfo.linepos)))
                 task.needs.append(nt)
 
         if taskdef.strategy is not None:
@@ -1872,7 +1983,11 @@ class PackageProviderYaml(PackageProvider):
                 desc=desc,
                 doc=doc,
                 package=pkg.pkg,
-                srcinfo=td.srcinfo)
+                srcinfo=td.srcinfo,
+                taskdef=td,
+                let=dict(getattr(td, "let", {}) or {}),
+                set_defs=list(getattr(td, "set_defs", []) or []),
+                elaborate=getattr(td, "elaborate", None))
 
             if td.iff is not None:
                 st.iff = td.iff
@@ -1899,7 +2014,22 @@ class PackageProviderYaml(PackageProvider):
                 if st.uses is None:
                     uses_name = td.uses
                     if "${{" in uses_name:
-                        uses_name = loader.evalExpr(uses_name)
+                        try:
+                            uses_name = loader.evalExpr(uses_name)
+                        except Exception as e:
+                            # A matrix-strategy body may compute `uses` from a
+                            # matrix variable (e.g. `uses: uvm-${{ this.test }}`).
+                            # Those bindings only exist when the strategy fans out
+                            # at graph-build, so defer resolution to that point
+                            # rather than failing here.
+                            if _taskdef_has_matrix(taskdef):
+                                st.uses_expr = td.uses
+                                st.uses_expr_fragment = fragment_name
+                                continue
+                            loader.error(
+                                "failed to evaluate 'uses' expression %s: %s" % (td.uses, str(e)),
+                                td.srcinfo)
+                            continue
                     st.uses = self._findTask(uses_name, loader)
                     if st.uses is None and fragment_name and '.' not in uses_name:
                         st.uses = self._findTask(f"{fragment_name}.{uses_name}", loader)
@@ -1926,7 +2056,22 @@ class PackageProviderYaml(PackageProvider):
                 if isinstance(need, str):
                     need_name = need
                     if "${{" in need_name:
-                        need_name = loader.evalExpr(need_name)
+                        try:
+                            need_name = loader.evalExpr(need_name)
+                        except Exception as e:
+                            # A matrix body may compute a need from a matrix
+                            # variable (e.g. `needs: ["${{ this.image }}"]`). Those
+                            # bindings only exist when the strategy fans out at
+                            # graph-build, so defer resolution to that point rather
+                            # than failing here (mirrors deferred `uses`).
+                            if _taskdef_has_matrix(taskdef):
+                                st.needs_expr.append(need)
+                                st.needs_expr_fragment = fragment_name
+                                continue
+                            loader.error(
+                                "failed to evaluate 'needs' expression %s: %s" % (need, str(e)),
+                                td.srcinfo)
+                            continue
                     nn = self._findTask(need_name, loader)
                     if nn is None and fragment_name and '.' not in need_name:
                         nn = self._findTask(f"{fragment_name}.{need_name}", loader)
@@ -1934,11 +2079,14 @@ class PackageProviderYaml(PackageProvider):
                     nn = self._findTask(need.name, loader)
                 else:
                     raise Exception("Unknown need type %s" % str(type(need)))
-                
+
                 if nn is None:
-                    loader.error("failed to find task %s" % need, td.srcinfo)
-#                    raise Exception("failed to find task %s" % need)
-                
+                    self._taskNotFound(
+                        loader,
+                        need_name if isinstance(need, str) else need.name,
+                        td.srcinfo)
+                    continue
+
                 st.needs.append(nn)
 
             # Build parameter definitions (lazy evaluation)
@@ -1977,6 +2125,28 @@ class PackageProviderYaml(PackageProvider):
             
             # Update 'this' with subtask params
             loader._eval.set("this", this_vars)
+
+            # Propagate a nested subtask's own strategy (matrix / generate).
+            # Top-level tasks get this in _elabTask, but nested compound subtasks
+            # are elaborated directly via _mkTaskBody below, which never sets up
+            # the strategy -- so a matrix on a nested subtask would otherwise be
+            # silently dropped and never fan out at graph-build.
+            if getattr(td, "strategy", None) is not None:
+                st.strategy = Strategy()
+                if td.strategy.matrix is not None:
+                    st.strategy.matrix = td.strategy.matrix
+                if td.strategy.generate is not None:
+                    shell = td.strategy.generate.shell
+                    if shell is None:
+                        shell = "pytask"
+                    st.strategy.generate = StrategyGenerate(
+                        shell=shell,
+                        run=td.strategy.generate.run)
+                # A matrix strategy may carry its body under strategy.body
+                if td.strategy.body and len(td.strategy.body) > 0:
+                    temp_td = td.model_copy()
+                    temp_td.body = td.strategy.body
+                    self._mkTaskBody(st, loader, temp_td)
 
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)

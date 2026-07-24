@@ -220,10 +220,26 @@ class CmdRun(object):
             backend = runner_cls(config=runner_config, project_root=project_root)
             self._log.info("Using %s runner backend (--runner %s)", cli_runner, cli_runner)
 
+        # Resolve this run's output-data identity. All std.Publish tasks in the
+        # run share it (out/<run_id>); export it so shell tasks can publish too.
+        from ..run_id import alloc_run_id
+        run_id = getattr(args, "run_id", None) or alloc_run_id(rundir)
+        run_env = os.environ.copy()
+        run_env["DFM_RUN_ID"] = run_id
+        run_env["DFM_OUT_DIR"] = os.path.join(rundir, "out", run_id)
+
+        # Materialize <rundir>/bin (dfm-out, dfm shims) and put it on PATH so
+        # shell tasks can invoke them without the entry-point scripts installed.
+        from ..out import install_run_bin
+        bindir = install_run_bin(rundir)
+        run_env["PATH"] = bindir + os.pathsep + run_env.get("PATH", "")
+
         builder = TaskGraphBuilder(
-            root_pkg=pkg, 
-            rundir=rundir, 
+            root_pkg=pkg,
+            rundir=rundir,
             loader=loader,
+            env=run_env,
+            run_id=run_id,
             task_param_overrides=task_overrides,
             leaf_param_overrides=leaf_overrides,
             naming_scheme=get_naming_scheme())

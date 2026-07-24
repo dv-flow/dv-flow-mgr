@@ -6,6 +6,21 @@ from .task_def import TaskDef, RundirE, PassthroughE, ConsumesE
 if TYPE_CHECKING:
     from .param_def_collection import ParamDefCollection
 
+
+def iter_uses_chain(task):
+    """Yield each task along the `uses` chain, most-derived first, guarding
+    against cycles. Single source of truth for the `while current: ... current =
+    current.uses` walk that was copied across the builder and param-builder
+    (param collection, package-name/task-name chains, elaborator lookup)."""
+    current = task
+    visited = set()
+    while current is not None:
+        if id(current) in visited:
+            break
+        visited.add(id(current))
+        yield current
+        current = getattr(current, 'uses', None)
+
 @dc.dataclass
 class Need(object):
     task : 'Task'
@@ -51,14 +66,40 @@ class Task(object):
     is_export : bool = False
     is_local : bool = False
     strategy : Strategy = dc.field(default=None)
+    # Deferred `uses` for matrix-strategy body subtasks: when a body task computes
+    # its `uses` from a matrix variable (e.g. `uses: uvm-${{ this.test }}`), the
+    # binding only exists once the strategy fans out at graph-build time. The raw
+    # expression (and its fragment context for name resolution) is stashed here and
+    # resolved per matrix cell in TaskGraphBuilder._applyStrategyMatrix.
+    uses_expr : str = None
+    uses_expr_fragment : str = None
+    # Same deferral for `needs`: a matrix body may compute a need from a matrix
+    # variable (e.g. `needs: ["${{ this.image }}"]`). Such needs can't resolve at
+    # parse time (the binding only exists when the strategy fans out), so the raw
+    # expressions are stashed here and resolved per cell in _applyStrategyMatrix.
+    needs_expr : List[str] = dc.field(default_factory=list)
+    needs_expr_fragment : str = None
     run : str = None
     shell : str = "bash"
     template : bool = False
+    # Python callable ('module:function') that elaborates this task type at
+    # graph-build time (populated from TaskDef.elaborate). Resolved along the
+    # `uses` chain by TaskGraphBuilder._resolve_elaborator.
+    elaborate : str = None
     tags : List['Type'] = dc.field(default_factory=list)
     max_failures : int = -1
     on_error : str = None
     srcinfo : SrcInfo = None
     taskdef : 'TaskDef' = None
+    # Scoped variables (`let:`) provided to this task's subtree, read via
+    # resolve(). Layered into the eval context's __let__ carrier during graph
+    # build (see TaskGraphBuilder._apply_let). DEPRECATED — see `set_defs`.
+    let : Dict[str, Any] = dc.field(default_factory=dict)
+    # Scoped overrides (`set:`) applied to this task's subtree: a list of
+    # assignment maps (rebind scoped vars read via ${{ pkg.var }}) and/or scope
+    # items ({uses?, path?, set: [...]}). Applied during graph build by
+    # TaskGraphBuilder._apply_set. Outer overrides inner; CLI (-D) is the ceiling.
+    set_defs : List[Any] = dc.field(default_factory=list)
 
     @property
     def leafname(self):

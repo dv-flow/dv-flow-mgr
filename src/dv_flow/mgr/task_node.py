@@ -66,6 +66,10 @@ class TaskNode(object):
     parent : 'TaskNode' = dc.field(default=None)
     in_params : List[Any] = dc.field(default=None)
     inherits_rundir : bool = dc.field(default=False)
+    # Ordered, de-duplicated task TYPE names along this node's `uses` chain
+    # (most-derived first — e.g. [foo.Run, hdlsim.SimRun]). Populated at node
+    # creation; consumed by the `set:` `uses:` matcher (design §R2 / Phase 4).
+    uses_chain : List[str] = dc.field(default_factory=list)
 
     _log : ClassVar = logging.getLogger("TaskNode")
 

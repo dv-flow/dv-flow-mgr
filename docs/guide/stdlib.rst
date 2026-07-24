@@ -118,6 +118,126 @@ Parameters
 * **attributes** - [Optional] Set of attributes to tag the fileset with (e.g., ['uvm', 'testbench'])
 
 
+std.Publish
+===========
+Copies the files of consumed ``std.FileSet`` / ``std.PubSet`` inputs into this
+run's **output-data directory** and records their provenance. Every run has a
+designated output directory ``<rundir>/out/<run-id>``, and ``<rundir>/out/latest``
+is a symlink to the most recent one. Because the directory is per-run, ``Publish``
+also detects when two sources write conflicting content to the same destination.
+
+Example
+-------
+.. code-block:: yaml
+
+    package:
+        name: publish.example
+
+        tasks:
+        - name: rtl
+          uses: std.FileSet
+          with: { type: verilogSource, base: src/rtl, include: '*.v' }
+
+        - name: publish
+          uses: std.Publish
+          needs: [rtl]
+          with:
+            dest: pub/rtl      # files land under out/<run-id>/pub/rtl/...
+            strip: 0
+
+Path mapping
+------------
+Each source file has a basedir-relative path ``f``; its destination is
+``dst_rel = dest / rebase(f, strip)``:
+
+* **dest** - additive base sub-path (composed in front of a PubSet's own ``dest``)
+* **strip** - signed rebase of ``f``: ``>0`` drops N leading path components,
+  ``0`` keeps it, ``<0`` grafts the last ``|N|`` components of ``basedir`` on front
+* **flatten** - publish basename only (overrides ``strip``)
+
+.. code-block:: text
+
+    dest    strip   core/top.sv  maps to
+    ----    -----   ----------------------
+    ""      0       core/top.sv
+    rtl     0       rtl/core/top.sv
+    rtl     1       rtl/top.sv
+    ""      2       top.sv
+
+Consumes
+--------
+``std.FileSet`` and ``std.PubSet`` (also passes them through unchanged).
+
+Produces
+--------
+A ``std.FileSet`` rooted at the output-data directory, listing the published
+(copied) files. A provenance manifest ``.dfm-publish.json`` is written into the
+output directory recording, per file, the publishing task, the originating task
+(``src_task``), source path, content ``sha256``, and size.
+
+Parameters
+----------
+
+* **dest** - [Optional] Additive base prefix under ``out/<run-id>``, joined in
+  front of every input's placement. Default: root
+* **strip** - [Optional] Default signed rebase for bare ``std.FileSet`` inputs
+  (a ``std.PubSet`` carries its own). Default: 0
+* **flatten** - [Optional] Default for bare filesets; publish basename only
+* **on_conflict** - [Optional] ``error`` (default), ``warn``, ``replace``, or
+  ``skip`` when a destination already holds different content
+* **include** - [Optional] Glob(s) selecting a subset of each input's files
+
+.. note::
+
+   The run-id is a zero-padded counter allocated per ``dfm run`` (``0001``,
+   ``0002``, ...). Override it with ``dfm run --run-id <ID>`` to pin the output
+   directory to, e.g., a CI build number. Re-copies of identical content are
+   skipped when a run-id is reused.
+
+
+std.PubSet
+==========
+Binds a placement policy (``dest`` / ``strip`` / ``flatten``) to input FileSets,
+emitting ``std.PubSet`` items for consumption by ``std.Publish``. Use this when a
+single ``Publish`` step must place different groups of files differently: the
+task-level ``dest`` of ``Publish`` composes as a base prefix in front of each
+PubSet's own ``dest``.
+
+Example
+-------
+.. code-block:: yaml
+
+    package:
+        name: pubset.example
+
+        tasks:
+        - name: hdr_pubset       # headers -> include/, strip the leading include/
+          uses: std.PubSet
+          needs: [headers]
+          with: { dest: include, strip: 1 }
+
+        - name: publish          # dest: pub is the base namespace for the step
+          uses: std.Publish
+          needs: [hdr_pubset, readme]   # readme is a bare FileSet
+          with: { dest: pub }
+          # -> pub/include/<hdr>   and   pub/<readme>
+
+Consumes
+--------
+``std.FileSet``
+
+Produces
+--------
+``std.PubSet`` items (a ``std.FileSet`` subtype carrying the placement policy).
+
+Parameters
+----------
+
+* **dest** - [Optional] Additive destination sub-path
+* **strip** - [Optional] Signed rebase of each file's basedir-relative path
+* **flatten** - [Optional] Publish basename only (overrides ``strip``)
+
+
 Running Shell Commands
 ======================
 

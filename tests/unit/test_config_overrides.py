@@ -377,6 +377,85 @@ package:
     assert "entry_msg" in captured.out
 
 
+def test_config_task_override_inherits_with_params(tmp_path, capsys):
+    """A config `tasks: - override:` is a PARTIAL redefinition: swapping only
+    `uses` (e.g. Opt->Dbg args) must NOT drop the overridden task's `with:`
+    param bindings. Regression for the case where a `flags-*` task bound a
+    package var (`sim: "${{ sim }}"`) that a debug-config override silently
+    dropped, leaving the value unresolved."""
+    (tmp_path / "flow.dv").write_text("""\
+package:
+    name: pkg
+    with:
+        topmsg:
+            type: str
+            value: "bound_from_var"
+    tasks:
+    - name: t
+      uses: std.Message
+      with:
+        msg: "${{ topmsg }}"
+    - name: entry
+      passthrough: all
+      consumes: none
+      needs: [t]
+    configs:
+    - name: dbg
+      tasks:
+      - override: t
+        uses: std.Message
+""")
+    loader, pkg = loadProjPkgDef(str(tmp_path), config="dbg")
+    assert pkg is not None
+    rundir = str(tmp_path / "rundir")
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
+    runner = TaskSetRunner(rundir=rundir)
+    node = builder.mkTaskNode("pkg.entry")
+    output = asyncio.run(runner.run(node))
+    assert runner.status == 0
+    captured = capsys.readouterr()
+    # The `msg: "${{ topmsg }}"` binding on `t` survives the override, so the
+    # package var resolves through it rather than the override dropping it.
+    assert "bound_from_var" in captured.out
+
+
+def test_config_task_override_inherits_uses(tmp_path, capsys):
+    """A config `tasks: - override:` with no `uses:` of its own (a pure `with:`
+    tweak) inherits the overridden task's `uses`, rather than becoming an
+    un-typed from-scratch redefinition."""
+    (tmp_path / "flow.dv").write_text("""\
+package:
+    name: pkg
+    tasks:
+    - name: t
+      uses: std.Message
+      with:
+        msg: "original_msg"
+    - name: entry
+      passthrough: all
+      consumes: none
+      needs: [t]
+    configs:
+    - name: dbg
+      tasks:
+      - override: t
+        with:
+          msg: "override_msg"
+""")
+    loader, pkg = loadProjPkgDef(str(tmp_path), config="dbg")
+    assert pkg is not None
+    rundir = str(tmp_path / "rundir")
+    builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader)
+    runner = TaskSetRunner(rundir=rundir)
+    node = builder.mkTaskNode("pkg.entry")
+    output = asyncio.run(runner.run(node))
+    assert runner.status == 0
+    captured = capsys.readouterr()
+    # `uses: std.Message` inherited from `t`; the override's `msg` wins.
+    assert "override_msg" in captured.out
+    assert "original_msg" not in captured.out
+
+
 def test_override_addoverride_api(tmp_path, capsys):
     """Test addOverride API directly on the builder."""
     (tmp_path / "flow.dv").write_text("""\

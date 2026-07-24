@@ -18,6 +18,7 @@ User Guide
    parameters
    configurations
    expressions
+   scoped_variables
    control_flow
    filters
    visibility
@@ -40,6 +41,7 @@ User Guide
    developing_tasks
    script_io
    python_tasks
+   task_elaboration
    advanced
 
 This User Guide is organized by what you are doing: understanding the

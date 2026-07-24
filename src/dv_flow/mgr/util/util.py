@@ -78,8 +78,14 @@ def parse_parameter_overrides(def_list):
                 task_ov[task_name] = {}
             task_ov[task_name][param_name] = value
         else:
-            # Two+ dots: pkg.task.param or longer
-            # Extract last part as param, rest as task name
+            # Two+ dots: ambiguous. Could be `pkg.task.param` (task override) OR
+            # `<dotted.pkg>.var` -- a package var of a multi-segment package
+            # (e.g. `hdlsim.vlt.trace_fmt`). Offer BOTH candidates (as the 1-dot
+            # case does): the package-override consumer matches the whole name
+            # against actual package names (rsplit), binding only if such a
+            # package+var exists; otherwise it is ignored, leaving the task
+            # override to apply.
+            package_ov[name] = value
             parts = name.rsplit('.', 1)
             task_name = parts[0]
             param_name = parts[1]
@@ -176,8 +182,29 @@ def merge_parameter_overrides(cli_overrides, file_overrides):
     
     return merged
 
-def _is_package_file(fpath: str) -> bool:
-    """Check if a flow file contains a 'package' key (not a fragment)."""
+def _yaml_error_loc(exc, fpath: str):
+    """Build a TaskMarkerLoc for a flow-file parse error. A yaml
+    MarkedYAMLError carries a `problem_mark` with 0-based line/column; convert to
+    1-based for display. Falls back to just the path for non-YAML errors."""
+    mark = getattr(exc, "problem_mark", None) or getattr(exc, "context_mark", None)
+    if mark is not None:
+        return TaskMarkerLoc(
+            path=getattr(mark, "name", None) or fpath,
+            line=getattr(mark, "line", -1) + 1,
+            pos=getattr(mark, "column", -1) + 1)
+    return TaskMarkerLoc(path=fpath)
+
+
+def _classify_flow_file(fpath: str):
+    """Classify a candidate flow file. Returns (is_package, parse_error):
+
+      * (True, None)   -- parsed OK and has a 'package' key (a package root).
+      * (False, None)  -- parsed OK but no 'package' key (a fragment) -> skip.
+      * (False, exc)   -- FAILED to parse. The exception is the *real* error the
+                          user needs to see; the caller must surface it rather
+                          than silently skipping the file (which would later be
+                          mis-reported as "no flow.yaml found").
+    """
     try:
         if fpath.endswith(".toml"):
             import tomllib
@@ -186,9 +213,17 @@ def _is_package_file(fpath: str) -> bool:
         else:
             with open(fpath, "r") as fp:
                 doc = yaml.safe_load(fp)
-        return doc is not None and "package" in doc
-    except Exception:
-        return False
+    except Exception as e:
+        return False, e
+    return (doc is not None and "package" in doc), None
+
+
+def _is_package_file(fpath: str) -> bool:
+    """Check if a flow file parses and contains a 'package' key (not a fragment).
+    A parse error is treated as "not a package file" (returns False); callers
+    that must distinguish a parse error from a fragment use _classify_flow_file."""
+    is_pkg, _ = _classify_flow_file(fpath)
+    return is_pkg
 
 
 def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None,
@@ -222,7 +257,18 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
                     fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
                 if os.path.exists(fpath):
                     # Check if this is actually a package file, not a fragment
-                    if _is_package_file(fpath):
+                    is_pkg, parse_error = _classify_flow_file(fpath)
+                    if parse_error is not None:
+                        # The file exists but does not parse. Select it as the
+                        # rootfile so the full loader below re-parses it and
+                        # reports the real syntax error *with source location*,
+                        # instead of silently skipping it and mis-reporting
+                        # "no flow.yaml found" once the search runs out.
+                        _log.debug("Flow file %s failed to parse: %s" % (
+                            fpath, parse_error))
+                        rootfile = fpath
+                        break
+                    elif is_pkg:
                         rootfile = fpath
                         break
                     else:
@@ -257,9 +303,23 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
                 param_overrides=pkg_overrides,
                 package_maps=list(package_maps) if package_maps else [])
             ret = loader.load(rootfile, config=config)
-        except Exception:
-            print("Fatal Error: while parsing %s" % rootfile)
-            raise
+        except Exception as e:
+            # A parse/scan error while reading the selected flow file. Report the
+            # *real* error (with source location when available) rather than
+            # letting the search fall through to the misleading "no flow.yaml
+            # found". When a listener is present (the CLI path), emit a located
+            # Error marker and return None so the caller reports it cleanly; with
+            # no listener (programmatic callers / tests) re-raise so the
+            # exception is still observable.
+            if listener is not None:
+                listener(TaskMarker(
+                    msg="Failed to parse %s: %s" % (rootfile, e),
+                    severity=SeverityE.Error,
+                    loc=_yaml_error_loc(e, rootfile)))
+                ret = None
+            else:
+                print("Fatal Error: while parsing %s" % rootfile)
+                raise
 
     _log.debug("<-- loadProjPkgDef %s" % path)
     
