@@ -84,8 +84,24 @@ class DefaultCompoundElaborator(TaskElaborator):
         return self.selectNeeds(needs)
 
     def selectNeeds(self, needs):
-        """Hook: given the task's declared needs (list of Need), return the
-        subset to wire. Default: all of them."""
+        """Hook: given the task's declared needs, return the subset to wire.
+        Default: all of them.
+
+        `needs` is a list of **Task** objects (see ElabCtxt.declaredNeeds), so a
+        filter may match on `.name`, `.tags`, or the `uses` chain.
+
+        Two contract points, both easy to get wrong:
+
+        * **Invoked once per `uses`-chain level.** `_gatherNeeds` recurses into
+          `task.uses` *before* filtering, so a task whose base also declares
+          needs calls this several times, each with one level's needs. A filter
+          must be idempotent and must not assume it sees the full set at once.
+        * **A pruned need is never built.** Filtering happens before the need is
+          resolved into a node, so everything reachable only through that edge
+          drops out of the graph -- unlike `iff:`, which builds a disabled stub.
+          That is the point: deselecting a test also skips building whatever
+          only it needed.
+        """
         return needs
 
 

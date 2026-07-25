@@ -142,8 +142,16 @@ class TaskListenerReport(object):
         except Exception:
             return "%s.log" % task.name
 
-    def generate(self, report_dir: str, generated_unix: Optional[int] = None) -> int:
+    def generate(self, report_dir: str, generated_unix: Optional[int] = None,
+                 summary_md: Optional[str] = None) -> int:
         """Write the report bundle to report_dir.
+
+        `summary_md`, when given, is the run's end-of-run summary rendered as
+        markdown. It is written as `summary.md` and inlined at the top of
+        `report.md`. That inlining is the point: the GitHub Action already
+        appends `report.md` to `$GITHUB_STEP_SUMMARY`, so a project that adopts
+        `summary:` gets its domain roll-up in the job summary with no new Action
+        inputs and no workflow edits.
 
         Returns the number of tasks with a non-zero status.
         """
@@ -219,7 +227,12 @@ class TaskListenerReport(object):
                 f.write(json.dumps(m))
                 f.write("\n")
 
-        self._write_markdown(os.path.join(report_dir, "report.md"), report)
+        if summary_md:
+            with open(os.path.join(report_dir, "summary.md"), "w") as f:
+                f.write(summary_md if summary_md.endswith("\n") else summary_md + "\n")
+
+        self._write_markdown(os.path.join(report_dir, "report.md"), report,
+                             summary_md=summary_md)
 
         return failed
 
@@ -301,7 +314,8 @@ class TaskListenerReport(object):
             lines.append("</details>")
             lines.append("")
 
-    def _write_markdown(self, path: str, report: dict):
+    def _write_markdown(self, path: str, report: dict,
+                        summary_md: Optional[str] = None):
         """Write a human-readable summary suitable for a CI job summary."""
         counts = report["counts"]
         markers = counts["markers"]
@@ -317,6 +331,14 @@ class TaskListenerReport(object):
         lines.append("- **Markers:** %d error, %d warning, %d info" % (
             markers.get("error", 0), markers.get("warning", 0), markers.get("info", 0)))
         lines.append("")
+
+        # The domain summary leads the body: it is what a human scanning a job
+        # summary actually wants ("48/50 passed"), ahead of the generic
+        # diagnostics. It goes after the metadata bullets rather than before
+        # them, so it does not split that list in two.
+        if summary_md:
+            lines.append(summary_md.rstrip())
+            lines.append("")
 
         self._write_markers_section(lines, report)
 

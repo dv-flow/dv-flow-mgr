@@ -1,5 +1,19 @@
 import os
+from dv_flow.mgr import TaskGraphBuilder
 from dv_flow.mgr.util import loadProjPkgDef
+
+
+def _body(pkg, task_name, rundir):
+    """The body of the built *node*.
+
+    `Task.run` is the raw authored text -- it is expanded once per node at
+    graph build, from that node's final parameter values (see
+    run_body_expansion_plan.md Phase B). Reading it off the Task would test
+    the template, not the substitution.
+    """
+    builder = TaskGraphBuilder(
+        root_pkg=pkg, rundir=os.path.join(str(rundir), "rundir"))
+    return builder.mkTaskNode(task_name).task.body
 
 def test_parameter_overrides_apply_before_elaboration(tmpdir):
     flow_dv = """
@@ -34,12 +48,14 @@ package:
     assert pkg.paramT.model_fields["x"].default == 5
     assert pkg.paramT.model_fields["flag"].default is True
 
-    # Find the task and ensure expansion uses overridden values
-    t = pkg.task_m["foo.show"]
-    # run is evaluated at elaboration time using ParamRefEval + resolver
-    assert "echo" in t.run
+    # The authored body is stored raw...
+    assert "${{ x }}" in pkg.task_m["foo.show"].run
+
+    # ...and expansion at graph build uses the overridden values.
+    body = _body(pkg, "foo.show", tmpdir)
+    assert "echo" in body
     # Booleans stringify via JSON ('true'/'false')
-    assert "5 true" in t.run
+    assert "5 true" in body
 
 def test_parameter_overrides_package_qualified(tmpdir):
     flow_dv = """
@@ -67,5 +83,5 @@ package:
     )
     assert pkg is not None
     assert pkg.paramT.model_fields["s"].default == "ovr"
-    t = pkg.task_m["mypkg.show"]
-    assert "ovr" in t.run
+    assert "${{ s }}" in pkg.task_m["mypkg.show"].run
+    assert "ovr" in _body(pkg, "mypkg.show", tmpdir)

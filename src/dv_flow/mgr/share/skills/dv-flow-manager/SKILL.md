@@ -180,9 +180,11 @@ See [references/agent_runtime.md](references/agent_runtime.md).
 ## Essential commands
 
 ```bash
-dfm run [tasks...]           # execute tasks (default = listed root tasks)
+dfm run                      # list the root tasks
+dfm run <task>               # run one root task
 dfm run -c debug build       # run with the 'debug' config
 dfm run -D name=value task   # override a parameter
+dfm run <task> --help        # the task's own arguments (its `cli:` block)
 dfm show tasks               # list visible tasks
 dfm show task <name>         # task detail (params, needs, produces)
 dfm show project             # project structure

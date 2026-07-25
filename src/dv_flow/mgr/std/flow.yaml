@@ -292,6 +292,122 @@ package:
         type: float
         doc: Optional timeout in seconds for all dynamic tasks
 
+  - name: TestRunner
+    passthrough: all
+    consumes: none
+    desc: "Base for a test-running root: selection, arguments, and a report"
+    doc: |
+      Base task for a project's test-execution command. A root `uses:` it,
+      wires the available cases and suites as `needs:`, and gets:
+
+        * command-line **selection** (`--tests`, `--views`), applied by pruning
+          the need-set at graph build -- a deselected test is never built, and
+          neither is anything reachable only through it;
+        * an end-of-run **report** of per-case status, with `--detail`
+          controlling how much is shown.
+
+      A case declares its identity with a `std.Test` tag; a suite is a matrix
+      task whose cells carry a `name` field (see `test_key`). Needs that are
+      neither -- an image, a flags item, a helper -- are always kept, so
+      selecting tests never breaks the build.
+
+      Selection is deliberately strict: naming a test that does not exist, or a
+      selection that matches nothing, is an error rather than a quietly green
+      run that tested less than was asked for.
+    elaborate: dv_flow.mgr.std.test_select:TestSelect
+    summary: dv_flow.mgr.std.test_summary:test_summary
+    cli:
+      args:
+      - name: tests
+        short: t
+      - name: views
+      - name: detail
+    with:
+      tests:
+        type: list
+        value: []
+        doc: |
+          Cases to run, by name. Empty (the default) runs all of them.
+      views:
+        type: list
+        value: []
+        doc: |
+          Variants/configurations to run the cases on. Empty runs all of them.
+      detail:
+        type: str
+        value: normal
+        doc: Report verbosity.
+        values:
+        - {value: quiet,  desc: "the headline only"}
+        - {value: normal, desc: "the headline, plus every failing case"}
+        - {value: full,   desc: "every case, after the generic task summary"}
+      test_key:
+        type: str
+        value: name
+        doc: |
+          The field in a suite matrix cell that names the case. Cells carrying
+          it are what `--tests` selects over.
+      view_axis:
+        type: str
+        value: view
+        doc: |
+          The suite matrix axis that names the variant. `--views` selects over
+          its values.
+
+  - name: TestInfo
+    passthrough: none
+    consumes: none
+    uptodate: false
+    desc: "Introspect a test-running root: what cases and views does it offer?"
+    doc: |
+      The companion to `std.TestRunner`: it reports the inventory the runner
+      selects over -- the case names `--tests` accepts and the view names
+      `--views` accepts -- and builds nothing.
+
+      The inventory is read off the runner named by `target`, NOT off a
+      duplicate `needs:` list; a copy would drift as soon as a suite was added.
+      Every need this task declares is dropped at graph build, so introspection
+      never triggers a compile.
+
+      ```yaml
+      - root: tests-info
+        uses: std.TestInfo
+        with: { target: tests }
+      ```
+
+      `tests-info.json` is written to the rundir for scripted use; the console
+      report is the same data.
+    shell: pytask
+    run: dv_flow.mgr.std.test_info.TestInfoRun
+    elaborate: dv_flow.mgr.std.test_info:TestInfo
+    summary: dv_flow.mgr.std.test_info:test_info_summary
+    with:
+      target:
+        type: str
+        value: tests
+        doc: |
+          The test-running root to introspect. A bare name resolves in this
+          task's own package first, so a base project can write `target: tests`
+          once and have it bind in every leaf.
+      test_key:
+        type: str
+        value: name
+        doc: |
+          The field in a suite matrix cell that names the case. Must match the
+          target runner's `test_key`.
+      view_axis:
+        type: str
+        value: view
+        doc: |
+          The suite matrix axis that names the variant. Must match the target
+          runner's `view_axis`.
+      inventory:
+        type: str
+        value: ""
+        doc: |
+          Set by the elaborator: the enumerated inventory, as JSON. Not a user
+          parameter.
+
   types:
   - name: Tag
     doc: |
@@ -301,6 +417,23 @@ package:
         type: str
         value: ""
       value:
+        type: str
+        value: ""
+
+  - name: Test
+    uses: std.Tag
+    doc: |
+      Marks a task as a test case and gives it the identity `std.TestRunner`
+      selects on. `case` is the short name the user types (`--tests arb`);
+      `view` is the variant it runs on, when a project has more than one.
+    with:
+      case:
+        type: str
+        value: ""
+      view:
+        type: str
+        value: ""
+      group:
         type: str
         value: ""
 

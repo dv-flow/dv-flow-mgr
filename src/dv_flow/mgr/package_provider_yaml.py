@@ -19,11 +19,11 @@ from .package_provider import PackageProvider
 from .package_scope import PackageScope
 from .param_def import ComplexType, ParamDef
 from .param_def_collection import ParamDefCollection
-from .param_types import (KEYWORD_TYPE, TypeKind, coerce_cli_value,
-                          keyword_default, normalize_type)
+from .param_types import (KEYWORD_TYPE, TypeKind, check_value_set,
+                          coerce_cli_value, keyword_default, normalize_type)
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
-from .task import Task, Strategy, StrategyGenerate
+from .task import Task, Strategy, StrategyGenerate, collect_task_params
 from .task_def import TaskDef, ConsumesE, RundirE, PassthroughE, StrategyDef, CacheDef
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
@@ -71,12 +71,29 @@ def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
 _PARAMDEF_KEYS = frozenset({
     'type', 'value', 'append', 'prepend',
     'path-append', 'path-prepend',
-    'doc', 'desc', 'srcinfo',
+    'doc', 'desc', 'srcinfo', 'values',
 })
 
 def _is_paramdef_dict(d: dict) -> bool:
     """Return True if *d* looks like a ParamDef specification."""
     return bool(d.keys() & _PARAMDEF_KEYS)
+
+def _param_value_set(param):
+    """The `values:` set of a package-var declaration, whichever shape it is in.
+
+    Package params reach this point either as a parsed ParamDef or as the raw
+    dict, depending on how the package was assembled.
+    """
+    if param is None:
+        return None
+    if isinstance(param, dict):
+        if 'values' not in param:
+            return None
+        try:
+            param = ParamDef(**param)
+        except Exception:
+            return None
+    return getattr(param, 'values', None)
 
 @dc.dataclass
 class PackageProviderYaml(PackageProvider):
@@ -332,10 +349,24 @@ class PackageProviderYaml(PackageProvider):
                     except Exception:
                         parsed = v
                     parsed = coerce_cli_value(parsed, ann_t)
+                    # A package var may declare a value set too; check it here,
+                    # the one place a `-D` reaches a package var.
+                    vs = _param_value_set(pkg_def.params.get(pname))
+                    if vs is not None:
+                        warning = check_value_set(
+                            parsed, vs, ann_t,
+                            name="package '%s' variable '%s'" % (pkg.name, pname))
+                        if warning is not None:
+                            self._log.warning(warning)
                     pkg.paramT.model_fields[pname].default = parsed
                     # Record that this var was CLI/-D overridden so a subtree
                     # `set:` rebind yields to it (CLI is the ceiling, §R2.4).
                     pkg.cli_var_overrides.add(pname)
+                    # Diagnostics: note that this `-D` key found a home, so the
+                    # CLI can warn about the keys that found none.
+                    tracker = getattr(loader, 'override_tracker', None)
+                    if tracker is not None:
+                        tracker.note_package_bind(k, pkg.name)
 
         # Apply any overrides from above
 
@@ -1264,7 +1295,10 @@ class PackageProviderYaml(PackageProvider):
                 taskdef=taskdef,
                 let=dict(getattr(taskdef, "let", {}) or {}),
                 set_defs=list(getattr(taskdef, "set_defs", []) or []),
-                elaborate=getattr(taskdef, "elaborate", None))
+                elaborate=getattr(taskdef, "elaborate", None),
+                summary=getattr(taskdef, "summary", None),
+                cli=getattr(taskdef, "cli", None),
+                abstract=getattr(taskdef, "abstract", False))
 
             if taskdef.iff is not None:
                 task.iff = taskdef.iff
@@ -1551,14 +1585,24 @@ class PackageProviderYaml(PackageProvider):
                 
                 # Store raw value - DON'T evaluate template expressions
                 val = param.value if param.value is not None else pdflt
+                # Carry the authored `doc:`/`desc:`/`values:` onto the stored
+                # ParamDef. Only `value` used to survive, so a documented
+                # parameter arrived at `show task` with an empty description --
+                # and a declared value set would likewise never reach the sites
+                # that enforce it.
+                # These fields have a None *default*: the default bypasses
+                # validation but passing None explicitly does not, so only pass
+                # what was actually authored.
+                docs = {k: getattr(param, k) for k in ("doc", "desc", "values")
+                        if getattr(param, k, None) is not None}
                 if isinstance(param, ParamDef) and param.has_list_op():
                     # Declaration with append/prepend (e.g. from extension merge).
                     # Resolve immediately since base value is known here.
                     resolved = param.resolve_value(val)
-                    collection.add_param(p, ParamDef(value=resolved), ptype)
+                    collection.add_param(p, ParamDef(value=resolved, **docs), ptype)
                     self._log.debug("  Added param %s: type=%s, resolved=%s" % (p, ptype, resolved))
                 else:
-                    collection.add_param(p, ParamDef(value=val), ptype)
+                    collection.add_param(p, ParamDef(value=val, **docs), ptype)
                     self._log.debug("  Added param %s: type=%s, raw_value=%s" % (p, ptype, val))
                 
             elif isinstance(param, ParamDef) and param.has_list_op():
@@ -1754,7 +1798,22 @@ class PackageProviderYaml(PackageProvider):
         
         return params
     
-    def _elabTask(self, 
+    def _validate_refs(self, task, loader, taskdef, run_text=None, enclosing=None):
+        """The load-time call site for reference validation.
+
+        Deliberately the *only* one: `ref_validate` is a standalone module
+        with no loader state, and `dfm validate` calls it independently. If
+        description validation later becomes opt-in (explicit `dfm validate`
+        only), turning it off at load is switching `loader.validate_refs`,
+        not unpicking checks from the loader.
+        """
+        if not getattr(loader, "validate_refs", True):
+            return
+        from .ref_validate import validate_task_refs
+        for f in validate_task_refs(task, run_text=run_text, enclosing=enclosing):
+            loader.error(f.message, taskdef.srcinfo)
+
+    def _elabTask(self,
                   task,
                   loader : PackageLoaderP):
         self._log.debug("--> _elabTask %s" % task.name)
@@ -1816,9 +1875,20 @@ class PackageProviderYaml(PackageProvider):
         # NEW: Collect parameter definitions without evaluating
         task.param_defs = self._collectParamDefs(
             loader,
-            taskdef, 
+            taskdef,
             task.uses if task.uses is not None else None)
-        
+
+        # A `cli:` block references params and dfm option names, so it can only
+        # be checked once param_defs and `uses` are in place -- which is here.
+        # Problems surface as markers, like every other load diagnostic.
+        if getattr(task, 'cli', None):
+            from .cli_args import validate_task_cli
+            validate_task_cli(
+                task,
+                lambda msg: loader.error(msg, taskdef.srcinfo))
+
+        self._validate_refs(task, loader, taskdef, run_text=taskdef.run)
+
         # NOTE: paramT will be built lazily during task graph construction
         # For now, we don't set 'this' in eval context since params aren't evaluated yet
 
@@ -1898,27 +1968,22 @@ class PackageProviderYaml(PackageProvider):
         if taskdef.body is not None and len(taskdef.body) > 0:
             self._mkTaskBody(task, loader, taskdef)
         elif taskdef.run is not None:
-            if getattr(taskdef, "template", False):
-                # Template task: store run unexpanded for graph-build-time expansion
-                task.run = taskdef.run
-                task.template = True
-                if taskdef.shell is not None:
-                    task.shell = taskdef.shell
-            else:
-                # Add inherited parameters to eval scope before evaluating 'run'
-                # This allows base task parameters to be referenced in 'run' expressions
-                inherited_params = self._collect_inherited_param_defaults(task)
-                loader.pushEvalScope(inherited_params)
-                task.run = loader.evalExpr(taskdef.run)
-                loader.popEvalScope()
-                self._log.debug("Task %s run: %s (%s)" % (task.name, str(task.run), str(taskdef.run)))
-                if taskdef.shell is not None:
-                    task.shell = taskdef.shell
+            # Store the body RAW. It is expanded once per node at graph build,
+            # from that node's final (post-override) parameter values -- see
+            # TaskGraphBuilder._mkTaskLeafNode. Expanding here would bake the
+            # declared defaults into a per-*type* string, which is both stale
+            # (no override has been applied yet) and shared across every node
+            # built from this task.
+            task.run = taskdef.run
+            task.run_srcdir = os.path.dirname(taskdef.srcinfo.file)
+            if taskdef.shell is not None:
+                task.shell = taskdef.shell
         elif taskdef.pytask is not None: # Deprecated case
             task.run = taskdef.pytask
             task.shell = "pytask"
         elif task.uses is not None and isinstance(task.uses, Task) and task.uses.run is not None:
             task.run = task.uses.run
+            task.run_srcdir = task.uses.run_srcdir
             task.shell = task.uses.shell
 
         self._log.debug("<-- _elabTask %s" % task.name)
@@ -1987,7 +2052,10 @@ class PackageProviderYaml(PackageProvider):
                 taskdef=td,
                 let=dict(getattr(td, "let", {}) or {}),
                 set_defs=list(getattr(td, "set_defs", []) or []),
-                elaborate=getattr(td, "elaborate", None))
+                elaborate=getattr(td, "elaborate", None),
+                summary=getattr(td, "summary", None),
+                cli=getattr(td, "cli", None),
+                abstract=getattr(td, "abstract", False))
 
             if td.iff is not None:
                 st.iff = td.iff
@@ -2095,6 +2163,13 @@ class PackageProviderYaml(PackageProvider):
                 td, 
                 st.uses if st.uses is not None else None)
             
+            # A compound body binds the parent's parameters as bare names
+            # (see the loader._eval.set(pname, ...) loop below), so they are
+            # part of this subtask's scope.
+            parent_params, _ = collect_task_params(task)
+            self._validate_refs(st, loader, td, run_text=td.run,
+                                enclosing=parent_params.keys())
+
             # Build 'this' context from param_defs for run command evaluation
             # Include both parent task params and subtask params
             this_vars = {}
@@ -2151,22 +2226,16 @@ class PackageProviderYaml(PackageProvider):
             if td.body is not None and len(td.body) > 0:
                 self._mkTaskBody(st, loader, td)
             elif td.run is not None:
-                if getattr(td, "template", False):
-                    # Template subtask: store run unexpanded
-                    st.run = td.run
-                    st.template = True
-                    st.shell = getattr(td, "shell", None)
-                else:
-                    loader.pushEvalScope(dict(srcdir=os.path.dirname(td.srcinfo.file)))
-                    _expanded = loader.evalExpr(td.run)
-                    st.run = _expanded
-                    loader.popEvalScope()
-                    st.shell = getattr(td, "shell", None)
+                # Raw, for per-node expansion at graph build (see _elabTask).
+                st.run = td.run
+                st.run_srcdir = os.path.dirname(td.srcinfo.file)
+                st.shell = getattr(td, "shell", None)
             elif td.pytask is not None:
                 st.run = td.pytask
                 st.shell = "pytask"
             elif st.uses is not None and st.uses.run is not None:
                 st.run = st.uses.run
+                st.run_srcdir = st.uses.run_srcdir
                 st.shell = st.uses.shell
 
         for td, st in subtasks:

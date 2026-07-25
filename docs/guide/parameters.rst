@@ -71,6 +71,124 @@ The following parameter types are supported:
 * **map**
 * **str**
 
+Value Sets
+----------
+
+A parameter can declare the values it accepts with ``values``:
+
+.. code-block:: YAML
+
+    with:
+      detail:
+        type: str
+        value: normal
+        values: [quiet, normal, full]
+
+The set is attached to the *parameter*, so it is enforced everywhere the
+parameter can be set -- the declaration's own default, a ``with:`` override in
+a task that ``uses:`` this one, ``-D task.detail=...``, a first-class
+``--detail`` flag, and a package variable. An invalid value is reported where
+it was written, with the alternatives and a guess:
+
+.. code-block:: text
+
+    flow.yaml:41: task 'tests' parameter 'detail': 'ful' is not a valid value.
+                  Valid values: quiet, normal, full. Did you mean 'full'?
+
+Documenting the values
+~~~~~~~~~~~~~~~~~~~~~~
+
+Because the value set replaces prose describing the legal values, each value
+can carry its own description. These appear in ``dfm show task <name> --usage``
+and ``dfm run <task> --help``:
+
+.. code-block:: YAML
+
+    with:
+      detail:
+        type: str
+        value: normal
+        doc: Report verbosity.
+        values:
+        - {value: quiet,  desc: "the headline only"}
+        - {value: normal, desc: "the headline, plus every failing case"}
+        - {value: full,   desc: "every case, after the generic task summary"}
+
+The two forms can be mixed: any element that is not a ``{value: ..., desc: ...}``
+map is taken as a bare value.
+
+Open Sets
+~~~~~~~~~
+
+A plain list is a *closed* set: anything else is an error. Some sets are
+instead a list of *known* values that a downstream flow may legitimately extend
+-- the simulator backends a library ships with, for instance. Declare those as
+open:
+
+.. code-block:: YAML
+
+    with:
+      sim:
+        type: str
+        value: vlt
+        values: {of: [vlt, vcs, mti, xcm, xsm, ivl], open: true}
+
+An open set still drives help and shell completion, but an unlisted value
+produces a warning rather than an error, so a site that adds a backend is not
+blocked by a declaration it does not own.
+
+List Parameters
+~~~~~~~~~~~~~~~
+
+On a ``list`` parameter the set constrains the **elements**, which is what a
+multi-valued selector needs:
+
+.. code-block:: YAML
+
+    with:
+      views:
+        type: list
+        value: []
+        values: [rtl, tlm, gate]
+
+``--views rtl,gate`` is accepted; ``--views rtl,bogus`` fails naming ``bogus``.
+Value sets are not supported on ``map`` parameters.
+
+Inheritance
+~~~~~~~~~~~
+
+A value set is inherited along ``uses:`` **independently of the value**. A task
+that re-declares a parameter only to change its default keeps the base's set
+and is checked against it:
+
+.. code-block:: YAML
+
+    - name: quick-tests
+      uses: std.TestRunner
+      with:
+        detail: quiet          # checked against TestRunner's set
+
+A task that re-declares ``values:`` replaces the inherited set outright, either
+narrowing or widening it. This is whole-set replacement rather than a per-value
+merge, matching how ``cli:`` blocks are inherited.
+
+Command-Line Surfaces
+~~~~~~~~~~~~~~~~~~~~~
+
+Declaring a value set is what populates:
+
+* the ``(quiet, normal, full)`` annotation and the per-value descriptions in
+  ``dfm show task <name> --usage`` and ``dfm run <task> --help``;
+* ``choices`` in the ``--usage --json`` document, alongside ``choices_doc`` and
+  ``choices_open``;
+* ``argparse`` validation for a scalar flag declared in a ``cli:`` block;
+* value completion -- ``dfm complete --task tests --flag detail`` lists the
+  accepted values.
+
+A ``cli:`` block may still declare its own ``choices:``, which wins for that
+flag. Use it only to *narrow* what a flag accepts relative to the parameter;
+the parameter's ``values`` is what every other path enforces.
+
 Overrides
 =========
 

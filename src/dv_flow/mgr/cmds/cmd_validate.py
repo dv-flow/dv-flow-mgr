@@ -124,6 +124,11 @@ class CmdValidate:
             undefined_refs = self._check_undefined_refs(pkg, loader)
             errors.extend(undefined_refs)
             
+            # Phase 2b: Check for undefined *variable* references. The other
+            # half of phase 2 -- that one checks task names in `needs:`,
+            # this one checks ${{ }} names.
+            errors.extend(self._check_undefined_var_refs(pkg))
+
             # Phase 3: Check for circular dependencies
             circular_deps = self._check_circular_deps(pkg, loader)
             errors.extend(circular_deps)
@@ -223,6 +228,28 @@ class CmdValidate:
         
         return errors
     
+    def _check_undefined_var_refs(self, pkg) -> List[Dict[str, Any]]:
+        """Check for dangling ${{ }} variable references.
+
+        Shares its implementation with the load-time check, so `dfm validate`
+        and a plain load report the same findings. It is a separate call
+        site rather than a re-read of load markers so that it keeps working
+        if load-time validation is ever made opt-in.
+        """
+        from ..ref_validate import validate_task_refs
+
+        errors = []
+        for task_name, task in (getattr(pkg, 'task_m', None) or {}).items():
+            for finding in validate_task_refs(task):
+                errors.append({
+                    'type': 'UndefinedVariableReference',
+                    'task': task_name,
+                    'reference': finding.ref.path,
+                    'where': finding.where,
+                    'message': finding.message,
+                })
+        return errors
+
     def _check_circular_deps(self, pkg, loader) -> List[Dict[str, Any]]:
         """Check for circular dependencies between tasks."""
         errors = []

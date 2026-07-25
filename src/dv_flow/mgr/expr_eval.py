@@ -26,7 +26,7 @@ import re
 import tempfile
 import os
 from typing import Any, Callable, Dict, List, Optional
-from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp
+from .expr_parser import ExprParser, ExprVisitor, Expr, ExprBin, ExprBinOp, parse_expr
 from .expr_parser import ExprCall, ExprHId, ExprId, ExprString, ExprInt, ExprUnary, ExprUnaryOp, ExprBool, ExprVar
 from .name_resolution import VarResolver
 from .filter_registry import FilterRegistry
@@ -160,8 +160,7 @@ class ExprEval(ExprVisitor):
         elif isinstance(expr_s, bool):
             return expr_s
         else:
-            parser = ExprParser()
-            ast = parser.parse(expr_s)
+            ast = parse_expr(expr_s)
 
             self.value = None
             ast.accept(self)
@@ -180,8 +179,7 @@ class ExprEval(ExprVisitor):
         elif isinstance(expr_s, bool):
             return expr_s
         else:
-            parser = ExprParser()
-            ast = parser.parse(expr_s)
+            ast = parse_expr(expr_s)
             self.value = None
             ast.accept(self)
             return self._toObject(self.value)

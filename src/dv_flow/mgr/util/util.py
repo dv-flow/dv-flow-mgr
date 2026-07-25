@@ -95,6 +95,28 @@ def parse_parameter_overrides(def_list):
     
     return {'package': package_ov, 'task': task_ov, 'leaf': leaf_ov}
 
+def parameter_override_keys(def_list):
+    """Return the raw `-D name=value` keys, in command-line order.
+
+    The categorized dict from parse_parameter_overrides() cannot answer "which
+    keys did the user actually type": it rewrites a bare key into both a package
+    and a leaf entry, and splits a dotted key into a package entry plus a
+    task/param pair. Diagnostics need the original spelling, so they get it from
+    here. Malformed entries (no '=', empty name) are skipped, exactly as
+    parse_parameter_overrides skips them.
+    """
+    ret = []
+    for item in (def_list or []):
+        s = item.strip()
+        if s.startswith("-D"):
+            s = s[2:]
+        if "=" not in s:
+            continue
+        name = s.split("=", 1)[0].strip()
+        if name and name not in ret:
+            ret.append(name)
+    return ret
+
 def load_param_file(filepath):
     """Load parameter overrides from JSON file or inline JSON string.
     
@@ -227,7 +249,7 @@ def _is_package_file(fpath: str) -> bool:
 
 
 def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None,
-                   package_maps=None):
+                   package_maps=None, override_tracker=None):
     """Locates the project's flow spec and returns the PackageDef.
     
     Searches for a flow file containing a 'package' key. Fragment files
@@ -301,7 +323,8 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
             loader = PackageLoader(
                 marker_listeners=listeners,
                 param_overrides=pkg_overrides,
-                package_maps=list(package_maps) if package_maps else [])
+                package_maps=list(package_maps) if package_maps else [],
+                override_tracker=override_tracker)
             ret = loader.load(rootfile, config=config)
         except Exception as e:
             # A parse/scan error while reading the selected flow file. Report the

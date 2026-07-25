@@ -21,8 +21,40 @@
 #****************************************************************************
 import enum
 import logging as _logging
-from typing import Any, List, Union
-from pydantic import BaseModel, Field, model_validator
+from typing import Annotated, Any, Dict, List, Union
+from pydantic import (BaseModel, Field, WithJsonSchema, field_validator,
+                      model_validator)
+
+class ValueDef(BaseModel):
+    """One member of a parameter's value set."""
+    value : Any = Field(
+        description="The accepted value")
+    desc : str = Field(
+        default=None,
+        description="What selecting this value means. Shown in help.")
+
+class ValueSet(BaseModel):
+    """The set of values a parameter accepts.
+
+    Authored either as a plain list (closed set) or as `{of: [...], open: true}`.
+    An *open* set is a set of **known** values: it drives help and completion,
+    but an unlisted value warns instead of failing -- which is what a downstream
+    site adding, say, a simulator backend to a library's list needs.
+    """
+    of : List[ValueDef] = Field(
+        default_factory=list,
+        description="The accepted values")
+    open : bool = Field(
+        default=False,
+        description="When true, an unlisted value warns rather than errors")
+
+    def values(self) -> List[Any]:
+        return [v.value for v in self.of]
+
+    def describe(self) -> str:
+        """'quiet, normal, full' -- the value list as it appears in messages."""
+        text = ", ".join(str(v.value) for v in self.of)
+        return (text + ", ...") if self.open else text
 
 class ListType(BaseModel):
     item : Union[str, Any]
@@ -66,7 +98,71 @@ class ParamDef(BaseModel):
         alias="path-prepend", 
         default=None,
         description="Path to prepend to path-type parameters (OS-specific separator)")
+    # The annotation is the *stored* shape (always a ValueSet -- see the
+    # normalizing validator below), but a flow may author either form, so the
+    # published JSON schema has to describe both or an editor will flag the
+    # short one.
+    values : Annotated[Union[ValueSet, None], WithJsonSchema({
+        "anyOf": [
+            {"type": "array",
+             "description": "Closed set: the accepted values, each either a "
+                            "bare value or {value: v, desc: ...}"},
+            {"type": "object",
+             "properties": {
+                 "of": {"type": "array"},
+                 "open": {"type": "boolean"},
+             },
+             "required": ["of"],
+             "description": "{of: [...], open: true} -- an open set warns on an "
+                            "unlisted value instead of failing"},
+            {"type": "null"},
+        ],
+        "default": None,
+    })] = Field(
+        default=None,
+        description="The set of values this parameter accepts. Either a plain "
+                    "list ([a, b, c] -- closed) or {of: [...], open: true}. "
+                    "List elements may be bare values or {value: v, desc: ...}.")
     srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
+
+    @field_validator('values', mode='before')
+    @classmethod
+    def _normalize_values(cls, v):
+        """Accept every authoring form and store one shape.
+
+        Normalizing here rather than at each read site is what lets the rest of
+        the engine -- validation, help, completion, the JSON schema -- see a
+        single `ValueSet` regardless of how terse the declaration was.
+        """
+        if v is None or isinstance(v, ValueSet):
+            return v
+
+        def _entries(seq):
+            out = []
+            for e in seq:
+                if isinstance(e, ValueDef):
+                    out.append(e)
+                elif isinstance(e, dict) and 'value' in e:
+                    out.append(ValueDef(**e))
+                else:
+                    out.append(ValueDef(value=e))
+            return out
+
+        if isinstance(v, (list, tuple)):
+            return ValueSet(of=_entries(v))
+        if isinstance(v, dict):
+            if 'of' not in v:
+                raise ValueError(
+                    "a 'values' map must have an 'of' key listing the values "
+                    "(got keys: %s)" % sorted(v.keys()))
+            return ValueSet(of=_entries(v['of']), open=bool(v.get('open', False)))
+        raise ValueError(
+            "'values' must be a list of values or a {of: [...], open: bool} "
+            "map, not %s" % type(v).__name__)
+
+    def value_set(self) -> Union[ValueSet, None]:
+        """This declaration's value set, if it declares one."""
+        return self.values
 
     def resolve_value(self, base_value):
         """Apply value/prepend/append/path-prepend/path-append against

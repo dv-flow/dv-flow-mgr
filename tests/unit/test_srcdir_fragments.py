@@ -289,9 +289,17 @@ package:
     # Should not have errors - srcdir should resolve to fragment directory
     assert len(markers.markers) == 0, f"Unexpected markers: {[m.msg for m in markers.markers]}"
     
-    # Verify the path was expanded correctly
-    # The task should be able to execute successfully, which means srcdir was resolved correctly
+    # The body is stored raw and expanded per node at graph build
+    # (run_body_expansion_plan.md Phase B), so the resolved path lives on
+    # the node, not on the Task.
     task = pkg.task_m['test_pkg.test_frag.pytask_test']
+    assert task.run == "${{ srcdir }}/my_module.py::MyTask"
+
+    # srcdir must bind to the *fragment* directory -- where the body was
+    # written -- not to the using package's directory.
+    builder = TaskGraphBuilder(
+        root_pkg=pkg, rundir=os.path.join(str(tmpdir), "rundir"))
+    node = builder.mkTaskNode('test_pkg.test_frag.pytask_test')
     expected_path = os.path.join(frag_dir, "my_module.py") + "::MyTask"
-    assert task.run == expected_path, \
-        f"Expected run path to be {expected_path}, but got {task.run}"
+    assert node.task.body == expected_path, \
+        f"Expected run path to be {expected_path}, but got {node.task.body}"

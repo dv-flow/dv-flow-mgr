@@ -32,6 +32,17 @@ class PackageLoader(PackageLoaderP):
     env : Optional[Dict[str, str]] = dc.field(default=None)
     param_overrides : Dict[str, Any] = dc.field(default_factory=dict)
     package_maps : List[str] = dc.field(default_factory=list)
+    # Optional OverrideBindingTracker. When present, the package provider notes
+    # each `-D` key that binds a package variable so the CLI can report keys
+    # that bound nowhere. None for programmatic callers, which do not want
+    # diagnostics.
+    override_tracker : Optional[Any] = dc.field(default=None)
+    # Report dangling ${{ }} references as load-time errors. On by default:
+    # deferred evaluation means a typo'd reference no longer announces itself
+    # by failing to expand, so something has to check. The flag exists so
+    # that check can later move to explicit `dfm validate` without unpicking
+    # it from the loader -- see PackageProviderYaml._validate_refs.
+    validate_refs : bool = True
     _log : ClassVar = logging.getLogger("PackageLoader")
     _file_s : List[str] = dc.field(default_factory=list)
     _pkg_m : Dict[str, Package] = dc.field(default_factory=dict)

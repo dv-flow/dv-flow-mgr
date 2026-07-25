@@ -95,6 +95,111 @@ def _get_skill_path():
     pkg_dir = os.path.dirname(os.path.abspath(dv_flow.mgr.__file__))
     return os.path.join(pkg_dir, "share", "skills", "dv-flow-manager", "SKILL.md")
 
+def _add_run_opts(p):
+    """Add the `run` options.
+
+    Kept as a helper -- rather than inlined -- because `reserved_options()`
+    derives the set of option strings a task's `cli:` block may not claim from
+    the live parser, and because callers add their own task positional first so
+    the help text keeps positionals ahead of options.
+    """
+    p.add_argument("-j",
+                        help="Specifies degree of parallelism. Uses all cores by default",
+                        type=int, default=-1)
+    p.add_argument("--clean",
+                            action="store_true",
+                            help="Cleans the rundir before running")
+    p.add_argument("--base-rundir",
+                            dest="base_rundir",
+                            default=None,
+                            metavar="PATH",
+                            help="Reuse artifacts from a pre-built rundir. Tasks present in "
+                                 "this directory are assumed up-to-date and not re-executed.")
+    p.add_argument("-f", "--force",
+                            action="store_true",
+                            help="Force all tasks to run, ignoring up-to-date status")
+    p.add_argument("-v", "--verbose",
+                            action="store_true",
+                            help="Show all tasks including up-to-date ones")
+    p.add_argument("--root",
+                              help="Specifies the root directory for the flow")
+    p.add_argument("-c", "--config",
+                            help="Specifies the active configuration for the root package")
+    p.add_argument("-u", "--ui",
+                        help="Console UI style (log, progress, progressbar, tui). Default: progress if terminal else log",
+                        choices=("log","progress","progressbar","tui"),
+                        default=None)
+    p.add_argument("-D",
+                        dest="param_overrides",
+                        action="append",
+                        default=[],
+                        metavar="NAME=VALUE",
+                        help="Parameter override. For package params: -D param=value. "
+                             "For task params: -D task.param=value. "
+                             "May be used multiple times")
+    p.add_argument("-P", "--param-file",
+                        dest="param_file",
+                        metavar="FILE_OR_JSON",
+                       help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
+    p.add_argument("--runner",
+                        help="Runner backend: 'local' (in-process), 'lsf' (embedded LSF pool), "
+                             "or omit for auto-detect (daemon if running, else local)",
+                        default=None)
+    p.add_argument("--runner-opt",
+                        dest="runner_opts",
+                        action="append",
+                        default=[],
+                        metavar="KEY=VALUE",
+                        help="Runner backend option (key=value). May be used multiple times")
+    p.add_argument("--override",
+                        dest="overrides",
+                        action="append",
+                        default=[],
+                        metavar="TARGET=REPLACEMENT",
+                        help="Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)")
+    p.add_argument("--report",
+                        dest="report_dir",
+                        default=None,
+                        metavar="DIR",
+                        help="After the run, write a diagnostics bundle (per-task logs, "
+                             "markers, status) to DIR for publishing as a CI artifact.")
+    p.add_argument("--no-summary",
+                        dest="no_summary",
+                        action="store_true",
+                        help="Suppress the end-of-run task summary on the console. "
+                             "Does not affect --summary-file.")
+    p.add_argument("--summary-file",
+                        dest="summary_file",
+                        default=None,
+                        metavar="PATH",
+                        help="Also write the end-of-run summary to PATH. Format follows "
+                             "the extension: '.md' writes markdown, anything else plain "
+                             "text. Written even with --no-summary.")
+    p.add_argument("--run-id",
+                        dest="run_id",
+                        default=None,
+                        metavar="ID",
+                        help="Identifier for this run's output-data directory "
+                             "(rundir/out/<ID>), shared by all std.Publish tasks. "
+                             "Default: next zero-padded counter.")
+    return p
+
+
+def reserved_option_strings(*parsers):
+    """Every option string claimed by the given parsers (e.g. {'-j', '--clean'}).
+
+    Derived rather than hand-listed on purpose: a task that declares its own
+    `cli:` flags must not shadow a dfm option, and deriving the set means adding
+    a new run option later turns a colliding task flag into a load-time marker
+    instead of silently stealing the flag.
+    """
+    ret = set()
+    for parser in parsers:
+        for action in parser._actions:
+            ret.update(action.option_strings)
+    return ret
+
+
 def get_parser():
     skill_path = _get_skill_path()
     parser = argparse.ArgumentParser(
@@ -160,82 +265,36 @@ def get_parser():
                         help="Output graph wrapped in JSON with markers for programmatic consumption")
     graph_parser.set_defaults(func=_lazy(".cmds.cmd_graph", "CmdGraph"))
 
-    run_parser = subparsers.add_parser('run', help='run a flow')
-    run_parser.add_argument("tasks", nargs='*', help="tasks to run")
-    run_parser.add_argument("-j",
-                        help="Specifies degree of parallelism. Uses all cores by default",
-                        type=int, default=-1)
-    run_parser.add_argument("--clean",
-                            action="store_true",
-                            help="Cleans the rundir before running")
-    run_parser.add_argument("--base-rundir",
-                            dest="base_rundir",
-                            default=None,
-                            metavar="PATH",
-                            help="Reuse artifacts from a pre-built rundir. Tasks present in "
-                                 "this directory are assumed up-to-date and not re-executed.")
-    run_parser.add_argument("-f", "--force",
-                            action="store_true",
-                            help="Force all tasks to run, ignoring up-to-date status")
-    run_parser.add_argument("-v", "--verbose",
-                            action="store_true",
-                            help="Show all tasks including up-to-date ones")
-    run_parser.add_argument("--root", 
-                              help="Specifies the root directory for the flow")
-    run_parser.add_argument("-c", "--config",
-                            help="Specifies the active configuration for the root package")
-    run_parser.add_argument("-u", "--ui",
-                        help="Console UI style (log, progress, progressbar, tui). Default: progress if terminal else log",
-                        choices=("log","progress","progressbar","tui"),
-                        default=None)
-    run_parser.add_argument("-D",
-                        dest="param_overrides",
-                        action="append",
-                        default=[],
-                        metavar="NAME=VALUE",
-                        help="Parameter override. For package params: -D param=value. "
-                             "For task params: -D task.param=value. "
-                             "May be used multiple times")
-    run_parser.add_argument("-P", "--param-file",
-                        dest="param_file",
-                        metavar="FILE_OR_JSON",
-                       help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
-    run_parser.add_argument("--runner",
-                        help="Runner backend: 'local' (in-process), 'lsf' (embedded LSF pool), "
-                             "or omit for auto-detect (daemon if running, else local)",
-                        default=None)
-    run_parser.add_argument("--runner-opt",
-                        dest="runner_opts",
-                        action="append",
-                        default=[],
-                        metavar="KEY=VALUE",
-                        help="Runner backend option (key=value). May be used multiple times")
-    run_parser.add_argument("--override",
-                        dest="overrides",
-                        action="append",
-                        default=[],
-                        metavar="TARGET=REPLACEMENT",
-                        help="Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)")
-    run_parser.add_argument("--report",
-                        dest="report_dir",
-                        default=None,
-                        metavar="DIR",
-                        help="After the run, write a diagnostics bundle (per-task logs, "
-                             "markers, status) to DIR for publishing as a CI artifact.")
-    run_parser.add_argument("--run-id",
-                        dest="run_id",
-                        default=None,
-                        metavar="ID",
-                        help="Identifier for this run's output-data directory "
-                             "(rundir/out/<ID>), shared by all std.Publish tasks. "
-                             "Default: next zero-padded counter.")
-    run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"))
+    # `run` takes exactly one task. The restriction is what makes per-task
+    # front-end behavior (argument help, a task-declared summary) well defined:
+    # with several roots there is no single task to take those from.
+    #
+    # `-h/--help` is handled by hand (add_help=False) because it has two
+    # meanings: with no task it is this parser's help, and with a task it is
+    # *that task's* argument help, which cannot be known until the flow loads.
+    # `task` is nargs='?' for the same reason -- `dfm run --help` must not fail
+    # on a missing positional.
+    run_parser = subparsers.add_parser('run',
+        help='run a root task',
+        add_help=False)
+    run_parser.add_argument("task", nargs='?', help="task to run")
+    run_parser.add_argument("-h", "--help",
+        dest="task_help", action="store_true",
+        help="Show the task's arguments (or this help, with no task)")
+    _add_run_opts(run_parser)
+    run_parser.set_defaults(func=_lazy(".cmds.cmd_run", "CmdRun"),
+                            run_parser=run_parser)
 
     # Completion command
     complete_parser = subparsers.add_parser('complete',
         help='Print tab-completion candidates for task names')
     complete_parser.add_argument('prefix', nargs='?', default='',
-        help='Partial task name to complete')
+        help='Partial task name (or, with --task, partial flag) to complete')
+    complete_parser.add_argument('--task',
+        help="Complete that task's cli: flags instead of task names")
+    complete_parser.add_argument('--flag',
+        help="With --task: complete the values that flag accepts, from the "
+             "parameter's declared value set")
     complete_parser.add_argument('--root',
         help='Specifies the root directory for the flow')
     complete_parser.add_argument('-c', '--config',
@@ -303,6 +362,10 @@ def get_parser():
                                   type=int,
                                   metavar="DEPTH",
                                   help="Show dependency chain. Optional DEPTH limits levels (-1=unlimited)")
+    show_task_parser.add_argument("--usage",
+                                  action="store_true",
+                                  help="Show the CLI-shaped view: how to invoke the task "
+                                       "and what arguments it takes")
     show_task_parser.add_argument("--json",
                                   action="store_true",
                                   help="Output in JSON format")
@@ -641,7 +704,7 @@ def _run_client_mode(socket_path: str) -> int:
             cmd = args[0]
             
             if cmd == "run":
-                # dfm run task1 task2 ...
+                # dfm run task
                 tasks = []
                 param_overrides = {}
                 timeout = None
@@ -667,7 +730,19 @@ def _run_client_mode(socket_path: str) -> int:
                 if not tasks:
                     print("Error: No tasks specified", file=sys.stderr)
                     return 1
-                
+
+                if len(tasks) > 1:
+                    # In client mode there is no local package to resolve
+                    # task-declared `cli:` args against, and the server protocol
+                    # carries only (tasks, overrides, timeout). Rather than
+                    # silently running the extra tokens as tasks, say so.
+                    print("Error: 'dfm run' takes one task; got: %s. "
+                          "Task arguments are not yet supported over "
+                          "DFM_SERVER_SOCKET -- use '-D name=value'." % (
+                              " ".join(tasks)),
+                          file=sys.stderr)
+                    return 1
+
                 result = await client.run(tasks, param_overrides, timeout)
                 print(json.dumps(result, indent=2))
                 return result.get("status", 0)
@@ -749,7 +824,22 @@ def main():
         return _run_client_mode(socket_path)
     
     parser = get_parser()
-    args = parser.parse_args()
+
+    # Phase 1 of the two-phase parse. Only `run` can have leftovers -- they are
+    # the task's own arguments, and which flags a task accepts is not knowable
+    # until the flow has loaded. For every other subcommand an unrecognized
+    # argument is still an error, exactly as with plain parse_args.
+    args, extra = parser.parse_known_args()
+    # `run_parser` is set as a default only by the run subparser. Sniffing for
+    # a `task` attribute instead would also match `graph` and `complete --task`.
+    is_run = hasattr(args, "run_parser")
+    if extra and not is_run:
+        parser.error("unrecognized arguments: %s" % " ".join(extra))
+    if is_run:
+        args.task_args = extra
+        if args.task_help and args.task is None:
+            args.run_parser.print_help()
+            return 0
 
     if args.log_level is not None and args.log_level != "NONE":
         opt_m = {

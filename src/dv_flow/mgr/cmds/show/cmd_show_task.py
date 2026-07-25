@@ -27,6 +27,7 @@ from ..util import get_rootdir, get_naming_scheme
 from ...util import loadProjPkgDef, parse_parameter_overrides
 from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
 from ...ext_rgy import ExtRgy
+from ...task import collect_task_params
 
 
 class CmdShowTask:
@@ -49,13 +50,31 @@ class CmdShowTask:
         except Exception as e:
             self._log.debug(f"No project context: {e}")
         
+        # `--usage` renders the CLI-shaped view (what you can pass the task)
+        # instead of the data-shaped detail view (what the task is). Same
+        # resolution path; different renderer.
+        if getattr(args, 'usage', False):
+            resolved = self._resolve_task(task_name, pkg, loader)
+            if resolved is None:
+                print(f"Error: Task '{task_name}' not found")
+                return 1
+            task, _ = resolved
+            from .usage import build_usage_info, render_usage
+            if getattr(args, 'json', False):
+                # `--json` is a format switch here, exactly as it is for every
+                # other show subcommand -- not an alternative to --usage.
+                print(json.dumps(build_usage_info(task), indent=2, default=str))
+            else:
+                render_usage(task)
+            return 0
+
         # Find the task
         task_info = self._find_task(task_name, pkg, loader)
-        
+
         if task_info is None:
             print(f"Error: Task '{task_name}' not found")
             return 1
-        
+
         # Get needs chain if requested
         needs_depth = getattr(args, 'needs', None)
         if needs_depth is not None and pkg and loader:
@@ -72,14 +91,27 @@ class CmdShowTask:
         return 0
     
     def _find_task(self, task_name: str, pkg, loader) -> Optional[Dict[str, Any]]:
-        """Find a task by name."""
+        """Find a task by name and describe it."""
+        resolved = self._resolve_task(task_name, pkg, loader)
+        if resolved is None:
+            return None
+        task, pkg_name = resolved
+        return self._task_to_info(task, pkg_name)
+
+    def _resolve_task(self, task_name: str, pkg, loader):
+        """Resolve a name to (Task, package name), or None.
+
+        Split out of _find_task so `--usage` reaches the same resolution --
+        including the installed-package fallback -- without going through the
+        detail-view dict.
+        """
         # Use CLITaskResolver for flexible suffix matching when project pkg available
         if pkg:
             resolver = CLITaskResolver.from_package(pkg)
             try:
                 task = resolver.resolve(task_name)
                 pkg_name = task.package.name if hasattr(task, 'package') and task.package else pkg.name
-                return self._task_to_info(task, pkg_name)
+                return task, pkg_name
             except TaskResolutionError:
                 pass
 
@@ -100,13 +132,12 @@ class CmdShowTask:
                 if loaded_pkg and hasattr(loaded_pkg, 'task_m') and loaded_pkg.task_m:
                     full_task_name = f"{pkg_name}.{short_name}"
                     if full_task_name in loaded_pkg.task_m:
-                        task = loaded_pkg.task_m[full_task_name]
-                        return self._task_to_info(task, pkg_name)
+                        return loaded_pkg.task_m[full_task_name], pkg_name
             except Exception as e:
                 self._log.debug(f"Could not load package {pkg_name}: {e}")
 
         return None
-    
+
     def _task_to_info(self, task, pkg_name: str) -> Dict[str, Any]:
         """Convert Task object to detailed info dict."""
         short_name = task.name.split('.')[-1] if '.' in task.name else task.name
@@ -146,16 +177,22 @@ class CmdShowTask:
         return info
     
     def _get_params(self, task) -> Dict[str, Dict[str, Any]]:
-        """Extract parameters from a task."""
+        """Extract parameters from a task, including those inherited via `uses:`.
+
+        A derived task really has its base's params (they are merged into the
+        node's paramT and are settable with `-D`), so listing only its own
+        declarations under-reported it.
+        """
         params = {}
-        if hasattr(task, 'param_defs') and task.param_defs:
-            for name, pdef in task.param_defs.definitions.items():
-                ptype = task.param_defs.types.get(name, 'any')
-                params[name] = {
-                    'type': str(ptype) if ptype else 'any',
-                    'value': pdef.value if hasattr(pdef, 'value') else '',
-                    'doc': (pdef.doc or pdef.desc or '') if hasattr(pdef, 'doc') else ''
-                }
+        definitions, types = collect_task_params(task)
+        for name in definitions:
+            pdef = definitions[name]
+            ptype = types.get(name, 'any')
+            params[name] = {
+                'type': str(ptype) if ptype else 'any',
+                'value': pdef.value if hasattr(pdef, 'value') else '',
+                'doc': (pdef.doc or pdef.desc or '') if hasattr(pdef, 'doc') else ''
+            }
         return params
     
     def _tags_to_list(self, tags):

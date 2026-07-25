@@ -24,6 +24,7 @@ import pydantic.dataclasses as dc
 import enum
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices, field_validator, model_validator
 from typing import Any, Dict, List, Union, Tuple
+from .cli_def import CliDef
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
 from .task_output import TaskOutput
@@ -241,6 +242,13 @@ def _validate_set_list(items, ctx="set"):
     return items
 
 
+class SummaryDef(BaseModel):
+    """Selects a framework-provided summary renderer."""
+    model_config = ConfigDict(extra='forbid')
+    builtin : str = dc.Field(
+        description="Name of a built-in summary renderer. Currently: 'task-summary'")
+
+
 class TaskDef(BaseModel):
     """Holds definition information (ie the YAML view) for a task"""
     model_config = ConfigDict(extra='forbid')
@@ -289,15 +297,28 @@ class TaskDef(BaseModel):
     shell: str = dc.Field(
         default="bash",
         description="Shell to use for shell-based implementation")
-    template : bool = dc.Field(
+    abstract : bool = dc.Field(
         default=False,
-        description="Template task: run expression deferred to graph-build time")
+        description="Abstract task: may only be reached via 'uses:' or as an "
+                    "override replacement, never invoked directly")
     elaborate : Union[str, None] = dc.Field(
         default=None,
         description="Python callable ('module:function') that elaborates this "
                     "task type at graph-build time, replacing the default node "
                     "interior. Signature: elaborate(ctxt, task, name) -> TaskNode. "
                     "Bound along the 'uses' chain (nearest declaration wins).")
+    cli : Union[CliDef, None] = dc.Field(
+        default=None,
+        description="Command-line arguments this task accepts when run with "
+                    "'dfm run'. Bound along the 'uses' chain (nearest "
+                    "declaration wins, whole-block replacement).")
+    summary : Union[str, SummaryDef, None] = dc.Field(
+        default=None,
+        description="End-of-run summary for this task when it is the task being "
+                    "run. Either a Python callable ('module:function') receiving "
+                    "a summary context and returning a renderable/str/None, or "
+                    "{builtin: task-summary}. Bound along the 'uses' chain "
+                    "(nearest declaration wins, whole-value replacement).")
     strategy : StrategyDef = dc.Field(
         default=None)
     control : Union[ControlDef, None] = dc.Field(
@@ -424,8 +445,8 @@ class TaskDef(BaseModel):
         """Ensure control and strategy are mutually exclusive"""
         if self.control is not None and self.strategy is not None:
             raise ValueError("Task cannot have both 'control' and 'strategy' fields. They are mutually exclusive.")
-        if self.template and self.override is not None:
-            raise ValueError("Task cannot have both 'template' and 'override' fields.")
+        if self.abstract and self.override is not None:
+            raise ValueError("Task cannot have both 'abstract' and 'override' fields.")
         return self
 
     @model_validator(mode='after')

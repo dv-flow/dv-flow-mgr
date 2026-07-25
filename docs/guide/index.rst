@@ -30,6 +30,7 @@ User Guide
    :caption: Running Flows
 
    running
+   running_tests
    incremental
    caching
    runners

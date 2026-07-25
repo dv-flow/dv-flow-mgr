@@ -38,7 +38,7 @@ See ``docs/proposals/typed_param_expansion.md`` (§5.0, §5.2).
 import json
 import typing
 from enum import Enum, auto
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class TypeKind(Enum):
@@ -67,6 +67,14 @@ class ParamTypeError(Exception):
     def __init__(self, message: str, srcinfo: Any = None):
         super().__init__(message)
         self.srcinfo = srcinfo
+
+
+class ParamValueError(ParamTypeError):
+    """A value outside the parameter's declared value set.
+
+    A subclass of :class:`ParamTypeError` so every site that already reports a
+    located type problem reports this one the same way, with no new handling.
+    """
 
 
 _KEYWORD_KIND = {
@@ -332,3 +340,118 @@ def coerce_cli_value(value, t, *, strict: bool = False, srcinfo: Any = None):
         return value if isinstance(value, str) else str(value)
 
     return value
+
+
+#---------------------------------------------------------------------------
+# Value sets
+#
+# A parameter may declare the values it accepts (`values:` on its ParamDef).
+# This is the single enforcement policy, called from every site that can set a
+# parameter: the declaration/`uses:`-override pass, `-D`, a task's own `--flag`,
+# and package vars. Duck-typed against `param_def.ValueSet` so this module stays
+# free of dv_flow.mgr imports (see the module docstring).
+#---------------------------------------------------------------------------
+
+def value_set_members(valueset) -> Tuple[List[Any], bool]:
+    """(members, is_open) for a ValueSet-like object or a plain list."""
+    if valueset is None:
+        return [], False
+    of = getattr(valueset, "of", None)
+    if of is None:
+        if isinstance(valueset, (list, tuple)):
+            return list(valueset), False
+        return [], False
+    members = [getattr(e, "value", e) for e in of]
+    return members, bool(getattr(valueset, "open", False))
+
+
+def _member_of(value, members) -> bool:
+    """Exact membership. `bool` is compared only against `bool`, because
+    `True == 1` would otherwise make a boolean a member of any set containing 1."""
+    for m in members:
+        if isinstance(m, bool) != isinstance(value, bool):
+            continue
+        if m == value:
+            return True
+    return False
+
+
+def _items_to_check(value, kind: TypeKind) -> List[Any]:
+    """The individual values a set applies to.
+
+    For a list-typed parameter the set constrains the **elements** -- a
+    multi-valued selector like `views: [rtl, tlm]` is the whole point. A bare
+    string in a list slot is an accepted alternate form (see `coerce_to_kind`),
+    so it is split the same way the value itself will be.
+    """
+    if value is None:
+        return []
+    if kind is TypeKind.LIST:
+        if isinstance(value, list):
+            return list(value)
+        if isinstance(value, str):
+            return [e for e in
+                    (s.strip() for part in value.split(",") for s in part.split())
+                    if e]
+        return [value]
+    # An empty string is how an unset scalar is spelled, and a value set must
+    # not turn "not chosen" into an error.
+    if value == "":
+        return []
+    return [value]
+
+
+def format_value_error(name: str, bad: Any, valueset) -> str:
+    """The diagnostic for a value outside the set, with a suggestion.
+
+    Naming the alternatives is the entire benefit of declaring a value set, so
+    the message always lists them and guesses at a near miss.
+    """
+    import difflib
+    members, is_open = value_set_members(valueset)
+    listing = ", ".join(str(m) for m in members)
+    if is_open:
+        # An open set does not forbid anything, so the wording says "unknown",
+        # not "invalid" -- the value may well be right.
+        msg = "%s'%s' is not a known value. Known values: %s, ..." % (
+            ("%s: " % name) if name else "", bad, listing)
+    else:
+        msg = "%s'%s' is not a valid value. Valid values: %s" % (
+            ("%s: " % name) if name else "", bad, listing)
+    close = difflib.get_close_matches(
+        str(bad), [str(m) for m in members], n=1, cutoff=0.6)
+    if close:
+        msg += ". Did you mean '%s'?" % close[0]
+    return msg
+
+
+def check_value_set(value, valueset, kind=TypeKind.ANY, *,
+                    name: str = "", srcinfo: Any = None) -> Optional[str]:
+    """Check `value` against a declared value set.
+
+    Returns ``None`` when the value is acceptable, or a **warning message** when
+    an *open* set does not list it -- an open set enumerates the known values
+    without forbidding the rest, so the caller logs and carries on. A *closed*
+    set raises :class:`ParamValueError` citing `srcinfo`.
+
+    Never modifies the value: a value set accepts or rejects, it does not
+    normalize. Callers run it after `coerce_to_kind`, so it always sees the
+    final typed value.
+    """
+    members, is_open = value_set_members(valueset)
+    if not members:
+        return None
+
+    kind = normalize_type(kind)
+    if kind is TypeKind.MAP:
+        raise ParamValueError(
+            "%svalue sets are not supported for map-typed parameters" % (
+                ("%s: " % name) if name else ""), srcinfo)
+
+    for item in _items_to_check(value, kind):
+        if not _member_of(item, members):
+            msg = format_value_error(name, item, valueset)
+            if is_open:
+                return msg
+            raise ParamValueError(msg, srcinfo)
+    return None

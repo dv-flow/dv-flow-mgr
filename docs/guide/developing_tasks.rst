@@ -266,19 +266,12 @@ For larger Python implementations -- the class-based ``PyTask`` API and the
 ``PyPkg`` package factory -- see :doc:`python_tasks`.
 
 
-Template Tasks
+Abstract Tasks
 ==============
 
-A template task defers expansion of its ``run`` expression from load time
-to graph-build time.  This is useful for reusable building blocks whose
-``run`` expression references variables that only exist in the use context
-(matrix variables, compound parameters, package parameters of the
-consuming package, etc.).
-
-Declaring a Template Task
--------------------------
-
-Add ``template: true`` to the task definition:
+An abstract task can only be reached through ``uses:`` (or as an override
+replacement); invoking it directly is an error.  Use it for a reusable
+building block that is not a runnable entry point on its own.
 
 .. code-block:: yaml
 
@@ -287,20 +280,13 @@ Add ``template: true`` to the task definition:
 
       tasks:
       - name: CompileStub
-        template: true
+        abstract: true
         shell: bash
         run: "echo Skipping compile for ${{ matrix.variant }}"
         passthrough: all
         consumes: none
 
-The ``run`` string is stored verbatim at load time.  When the task is
-instantiated (via ``uses:`` or as an override replacement), the graph
-builder expands ``${{ }}`` expressions using the instantiation context.
-
-Using a Template Task
----------------------
-
-A template task is consumed through ``uses:``, just like any other task:
+Consume it through ``uses:``, like any other task:
 
 .. code-block:: yaml
 
@@ -308,43 +294,61 @@ A template task is consumed through ``uses:``, just like any other task:
     - name: MyCompile
       uses: sim_pkg.CompileStub
 
-At graph-build time, ``${{ matrix.variant }}`` (or whichever variables
-appear in ``run``) are resolved against the current context.
-
-Template tasks work naturally inside ``strategy.matrix``:
-
-.. code-block:: yaml
-
-    tasks:
-    - name: StubMatrix
-      strategy:
-        matrix:
-          variant: [rtl, gate]
-      body:
-      - name: Step
-        uses: sim_pkg.CompileStub
-
-Each matrix cell gets its own expansion, so ``${{ matrix.variant }}``
-resolves to ``rtl`` and ``gate`` respectively.
-
 Constraints
 -----------
 
-* A template task **cannot be invoked directly** from the CLI or as a
+* An abstract task **cannot be invoked directly** from the CLI or as a
   top-level entry point.  Doing so raises an error.
-* ``template: true`` and ``override:`` are mutually exclusive on the same
+* ``abstract: true`` and ``override:`` are mutually exclusive on the same
   task definition.
-* Parameter definitions (``with:``) are unaffected -- they are already
-  expanded lazily at graph-build time regardless of the ``template`` flag.
 
-When to Use Templates
----------------------
+.. note::
 
-Use ``template: true`` when:
+   ``abstract:`` replaces the abstract-task half of the former
+   ``template: true`` flag.  The other half -- deferring ``run`` expansion
+   to graph-build time -- is no longer a flag, because it is now how
+   **every** task works.  See :ref:`run-expansion-phases` below.  A stale
+   ``template: true`` is reported as an unknown field rather than silently
+   ignored.
 
-* The ``run`` expression references variables that are not available at
-  load time (e.g. ``${{ matrix.variant }}``, ``${{ this.some_param }}``).
-* You are building a reusable task that will be consumed by multiple
-  packages with different parameter contexts.
-* You need the same task definition to produce different shell commands
-  depending on where it is instantiated.
+.. _run-expansion-phases:
+
+When ``${{ }}`` in ``run:`` Is Expanded
+=======================================
+
+A task's ``run:`` body is stored verbatim at load time and expanded
+**once per node** at graph build, from that node's final parameter values.
+Two consequences worth relying on:
+
+* Parameter overrides reach the body.  ``-D``, ``-P``, ``set:`` and a
+  ``cli:`` ``--flag`` all apply before expansion, so
+  ``run: echo ${{ seed }}`` and ``$DFM_PARAM_seed`` always agree.
+* One task definition instantiated twice gets two independent bodies --
+  including one matrix cell per axis value, and ``${{ this.<param> }}`` /
+  ``${{ matrix.<axis> }}`` references that only make sense per instance.
+
+Names resolve in the phase where they *become* bound, and never earlier:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Phase
+     - Binds
+     - Examples
+   * - Load
+     - file and environment facts
+     - ``srcdir``, ``rootdir``, ``root``, ``env.*``
+   * - Build
+     - per-node values, after overrides
+     - task parameters, matrix cell values, ``set:`` rebinds
+   * - Run
+     - execution facts
+     - ``rundir``, ``inputs``, ``name``, ``result_file``, ``memento``
+
+``${{ srcdir }}`` in a body means the directory of the file that *wrote*
+the body, which is not the same as the using task's directory when the
+body is inherited through ``uses:``.
+
+Because expansion happens at build rather than inside the shell, it is
+uniform across implementations -- ``shell:`` and ``pytask`` bodies behave
+identically.

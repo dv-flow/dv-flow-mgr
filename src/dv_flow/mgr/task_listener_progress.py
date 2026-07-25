@@ -23,7 +23,6 @@ import dataclasses as dc
 from typing import ClassVar, Dict, Any, Optional
 from rich.console import Console, Group
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
 from rich.table import Table
 from rich.live import Live
 from .task_data import SeverityE
@@ -89,11 +88,14 @@ class TaskListenerProgress(object):
         self._running = True
 
     def leave(self):
-        # Freeze the final display: stop live refresh but leave content
+        # Freeze the final display: stop live refresh but leave content.
+        # The end-of-run summary panel is NOT printed here -- CmdRun renders it
+        # once, from the node graph, so every UI gets the same summary and there
+        # is one implementation to maintain (summary_builtin.build_task_summary).
+        # Stopping Live here is what keeps that later print from landing inside
+        # the live region.
         if self._live is not None:
             self._live.stop()
-            # Re-render final static panel so it persists after stop
-            self.console.print(self._final_panel())
             self._live.__exit__(None, None, None)
             self._live = None
         self._running = False
@@ -261,42 +263,8 @@ class TaskListenerProgress(object):
         renderables = []
         if self._checking_spinner is not None:
             renderables.append(self._checking_spinner)
-        renderables.append(self._progress if self._running else self._final_panel())
+        renderables.append(self._progress)
         return Group(*renderables)
-
-    def _final_panel(self):
-        # Create a static panel summarizing all tasks with final statuses + markers
-        table = Table.grid(padding=(0,1))
-        table.add_column(justify="left")
-        if self._progress is not None:
-            for t in self._order:
-                info = self._task_row_map[t]
-                task_r = self._progress.tasks[ info['progress_id'] ]
-                table.add_row(f"{task_r.fields['status']} {task_r.fields['name']}")
-                if info.get('markers'):
-                    for m in info['markers']:
-                        table.add_row("  " + self._format_marker_line(m, t.name))
-        
-        # Build summary statistics
-        summary_parts = [f"Total: {self._total_tasks}"]
-        if self._uptodate_count > 0:
-            summary_parts.append(f"Up-to-date: {self._uptodate_count}")
-        if self._base_hit_count > 0:
-            summary_parts.append(f"Base: {self._base_hit_count}")
-        if self._cache_enabled:
-            cache_miss = self._done_count + self._error_count + self._warning_count
-            summary_parts.append(f"Cache: {self._cache_hit_count} hit / {cache_miss} miss")
-        if self._done_count > 0:
-            summary_parts.append(f"Done: {self._done_count}")
-        if self._error_count > 0:
-            summary_parts.append(f"[red]Errors: {self._error_count}[/red]")
-        if self._warning_count > 0:
-            summary_parts.append(f"[yellow]Warnings: {self._warning_count}[/yellow]")
-        
-        summary = " | ".join(summary_parts)
-        title = f"Task Summary ({summary})"
-        
-        return Panel(table, title=title, border_style="blue")
 
     # Marker formatting similar to log listener
     def show_marker(self, m, name=None, rundir=None):

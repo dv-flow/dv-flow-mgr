@@ -59,6 +59,124 @@
       "type": "object",
       "$$target": "#/defs/CacheDef"
     },
+    "CliArgDef": {
+      "additionalProperties": false,
+      "description": "One command-line argument of a task.",
+      "properties": {
+        "name": {
+          "description": "Long-option name, without the leading '--' (e.g. 'seed' -> --seed)",
+          "title": "Name",
+          "type": "string"
+        },
+        "param": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Task parameter this argument sets. Defaults to 'name'.",
+          "title": "Param"
+        },
+        "short": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Single-character short option, without the leading '-'",
+          "title": "Short"
+        },
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Help text. Defaults to the parameter's desc/doc.",
+          "title": "Help"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Argument type ('str', 'int', 'bool', 'list'). Defaults to the parameter's declared type.",
+          "title": "Type"
+        },
+        "default": {
+          "default": null,
+          "description": "Default value. Defaults to the parameter's value.",
+          "title": "Default"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Restrict the argument to these values",
+          "title": "Choices"
+        },
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "argparse action ('store_true', 'append', 'count'). Defaults from the parameter's type.",
+          "title": "Action"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "CliArgDef",
+      "type": "object",
+      "$$target": "#/defs/CliArgDef"
+    },
+    "CliDef": {
+      "additionalProperties": false,
+      "description": "The `cli:` block: a task's command-line interface.",
+      "properties": {
+        "args": {
+          "description": "Command-line arguments this task accepts under 'dfm run'",
+          "items": {
+            "$ref": "#/defs/CliArgDef"
+          },
+          "title": "Args",
+          "type": "array"
+        }
+      },
+      "title": "CliDef",
+      "type": "object",
+      "$$target": "#/defs/CliDef"
+    },
     "ComplexType": {
       "properties": {
         "list": {
@@ -193,6 +311,184 @@
       "type": "string",
       "$$target": "#/defs/ConsumesE"
     },
+    "ControlCaseDef": {
+      "description": "Definition for a single case in a match control construct",
+      "properties": {
+        "when": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Condition expression for this case",
+          "title": "When"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mark this case as the default/fallback",
+          "title": "Default"
+        },
+        "body": {
+          "description": "Tasks to execute if this case matches",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Body",
+          "type": "array"
+        }
+      },
+      "title": "ControlCaseDef",
+      "type": "object",
+      "$$target": "#/defs/ControlCaseDef"
+    },
+    "ControlDef": {
+      "description": "Runtime control flow definition",
+      "properties": {
+        "type": {
+          "description": "Control flow type: if, match, while, do-while, or repeat",
+          "title": "Type",
+          "type": "string"
+        },
+        "cond": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Condition expression for if/while constructs",
+          "title": "Cond"
+        },
+        "until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Early exit condition for do-while/repeat loops",
+          "title": "Until"
+        },
+        "max_iter": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum iteration count for loops (safety bound)",
+          "title": "Max Iter"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Exact iteration count for repeat loops",
+          "title": "Count"
+        },
+        "cases": {
+          "description": "Cases for match construct",
+          "items": {
+            "$ref": "#/defs/ControlCaseDef"
+          },
+          "title": "Cases",
+          "type": "array"
+        },
+        "else": {
+          "description": "Tasks to execute for else branch of if construct",
+          "items": {
+            "$ref": "#/defs/TaskDef"
+          },
+          "title": "Else",
+          "type": "array"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/ControlStateDef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "State management configuration for loops"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ControlDef",
+      "type": "object",
+      "$$target": "#/defs/ControlDef"
+    },
+    "ControlStateDef": {
+      "description": "Definition for loop state management",
+      "properties": {
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type reference for state validation",
+          "title": "Type"
+        },
+        "init": {
+          "additionalProperties": true,
+          "description": "Initial state values for first iteration",
+          "title": "Init",
+          "type": "object"
+        },
+        "feedback": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expression to transform iteration output to next iteration input",
+          "title": "Feedback"
+        }
+      },
+      "title": "ControlStateDef",
+      "type": "object",
+      "$$target": "#/defs/ControlStateDef"
+    },
     "ExtendDef": {
       "description": "Extension definition",
       "properties": {
@@ -202,12 +498,30 @@
           "type": "string"
         },
         "with": {
-          "description": "Parameter extensions to apply to the task",
-          "items": {
-            "$ref": "#/defs/ParamDef"
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
           },
+          "description": "Parameter modifications to apply to the task",
           "title": "With",
-          "type": "array"
+          "type": "object"
         },
         "uses": {
           "default": null,
@@ -216,7 +530,7 @@
           "type": "string"
         },
         "needs": {
-          "description": "List of tasks to depend on",
+          "description": "Additional task dependencies to inject",
           "items": {
             "type": "string"
           },
@@ -231,14 +545,183 @@
       "type": "object",
       "$$target": "#/defs/ExtendDef"
     },
-    "FragmentDef": {
+    "FilterDef": {
+      "additionalProperties": false,
+      "description": "Package-level filter definition.\n\nFilters enable reusable data transformations in expressions:\n    ${{ inputs | filter_name(arg1, key: val) }}\n\nVisibility control matches task visibility:\n- name: Default visibility (visible within package and to root)\n- local: Fragment-only filter\n- export: Visible to downstream packages\n- root: Root package only",
       "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the filter (default visibility)",
+          "title": "Filter Name"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the filter (marked as root scope)",
+          "title": "Root Filter Name"
+        },
+        "export": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the filter (marked as export scope)",
+          "title": "Export Filter Name"
+        },
+        "local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the filter (marked as local scope)",
+          "title": "Local Filter Name"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Visibility scope: 'root', 'export', 'local', or list of package names",
+          "title": "Filter visibility scope"
+        },
+        "with": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/defs/ParamDef"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter parameters. Keys are parameter names, values are ParamDef specifications",
+          "title": "With"
+        },
+        "desc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "",
+          "description": "Short description of the filter's purpose",
+          "title": "Filter description"
+        },
+        "doc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "",
+          "description": "Full documentation of the filter",
+          "title": "Filter documentation"
+        },
+        "expr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "jq-style expression implementation (default)",
+          "title": "Expr"
+        },
+        "run": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shell or Python script implementation",
+          "title": "Run"
+        },
+        "shell": {
+          "default": "bash",
+          "description": "Interpreter for 'run' implementation (bash, python, python3, etc.)",
+          "title": "Shell",
+          "type": "string"
+        }
+      },
+      "title": "FilterDef",
+      "type": "object",
+      "$$target": "#/defs/FilterDef"
+    },
+    "FragmentDef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "default": null,
+          "description": "Optional name for this fragment. If present, all tasks are prefixed with <package>.<name>.<task>",
+          "title": "Name",
+          "type": "string"
+        },
         "tasks": {
           "description": "List of tasks defined in this fragment",
           "items": {
             "$ref": "#/defs/TaskDef"
           },
           "title": "Tasks",
+          "type": "array"
+        },
+        "filters": {
+          "description": "List of filters defined in this fragment",
+          "items": {
+            "$ref": "#/defs/FilterDef"
+          },
+          "title": "Filters",
           "type": "array"
         },
         "imports": {
@@ -270,6 +753,14 @@
             "$ref": "#/defs/TypeDef"
           },
           "title": "Types",
+          "type": "array"
+        },
+        "configs": {
+          "description": "List of configuration definitions for this fragment",
+          "items": {
+            "$ref": "#/defs/ConfigDef"
+          },
+          "title": "Configs",
           "type": "array"
         }
       },
@@ -354,8 +845,34 @@
       "$$target": "#/defs/MapType"
     },
     "OverrideDef": {
-      "description": "Override definition",
+      "description": "Override definition for task or package substitution.\n\nExactly one of 'task', 'package', or 'override' (deprecated) must be set.",
       "properties": {
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fully-qualified name of task to override",
+          "title": "Task"
+        },
+        "package": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of package to override",
+          "title": "Package"
+        },
         "override": {
           "anyOf": [
             {
@@ -365,17 +882,25 @@
               "type": "null"
             }
           ],
-          "description": "Task or package to override",
+          "default": null,
+          "description": "(Deprecated) Task or package to override",
           "title": "Override"
         },
         "with": {
-          "description": "Override to use",
-          "title": "With",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          ],
+          "description": "Replacement task name (str) or inline task definition (dict)",
+          "title": "With"
         }
       },
       "required": [
-        "override",
         "with"
       ],
       "title": "OverrideDef",
@@ -383,6 +908,7 @@
       "$$target": "#/defs/OverrideDef"
     },
     "PackageDef": {
+      "additionalProperties": false,
       "properties": {
         "name": {
           "description": "Name of the package",
@@ -411,6 +937,14 @@
           "title": "Tasks",
           "type": "array"
         },
+        "filters": {
+          "description": "List of filters defined in the package. Filters are reusable data transformations usable in expressions",
+          "items": {
+            "$ref": "#/defs/FilterDef"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
         "imports": {
           "description": "List of packages to import. Can be package names (strings) or import specifications with configuration",
           "items": {
@@ -426,11 +960,35 @@
           "title": "Imports",
           "type": "array"
         },
+        "package-map": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "default": null,
+          "description": "One or more package-map files (name -> flow file) consulted when resolving imports by name",
+          "title": "Package-Map"
+        },
         "overrides": {
           "additionalProperties": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
           },
-          "description": "Parameter and package overrides. Maps override targets to replacement values",
+          "description": "Task overrides. Maps target task name to a replacement task name (str) or an inline task definition (dict)",
           "title": "Overrides",
           "type": "object"
         },
@@ -498,25 +1056,6 @@
           },
           "title": "Tags",
           "type": "array"
-        },
-        "package-map": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "One or more package-map files (name -> flow file) consulted when resolving imports by name",
-          "title": "Package Map"
         }
       },
       "required": [
@@ -528,6 +1067,12 @@
     },
     "PackageImportSpec": {
       "properties": {
+        "name": {
+          "default": null,
+          "description": "Package name to import (alternative to 'from')",
+          "title": "Name",
+          "type": "string"
+        },
         "from": {
           "default": null,
           "description": "Package identifier or file path to import",
@@ -638,6 +1183,34 @@
           "default": null,
           "description": "Path to prepend to path-type parameters (OS-specific separator)",
           "title": "Path-Prepend"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "description": "Closed set: the accepted values, each either a bare value or {value: v, desc: ...}",
+              "type": "array"
+            },
+            {
+              "description": "{of: [...], open: true} -- an open set warns on an unlisted value instead of failing",
+              "properties": {
+                "of": {
+                  "type": "array"
+                },
+                "open": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "of"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The set of values this parameter accepts. Either a plain list ([a, b, c] -- closed) or {of: [...], open: true}. List elements may be bare values or {value: v, desc: ...}."
         }
       },
       "title": "ParamDef",
@@ -694,8 +1267,15 @@
           "anyOf": [
             {
               "additionalProperties": {
-                "items": {},
-                "type": "array"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {},
+                    "type": "array"
+                  }
+                ]
               },
               "type": "object"
             },
@@ -704,7 +1284,7 @@
             }
           ],
           "default": null,
-          "description": "Matrix of parameter values to explore. Creates one task instance per combination of values",
+          "description": "Matrix of parameter values to explore. Creates one task instance per combination of values. An axis value may be a `${{ }}` expression that resolves to a list (e.g. `image: \"${{ images }}\"`), evaluated at graph-build.",
           "title": "Matrix"
         },
         "body": {
@@ -719,6 +1299,23 @@
       "title": "StrategyDef",
       "type": "object",
       "$$target": "#/defs/StrategyDef"
+    },
+    "SummaryDef": {
+      "additionalProperties": false,
+      "description": "Selects a framework-provided summary renderer.",
+      "properties": {
+        "builtin": {
+          "description": "Name of a built-in summary renderer. Currently: 'task-summary'",
+          "title": "Builtin",
+          "type": "string"
+        }
+      },
+      "required": [
+        "builtin"
+      ],
+      "title": "SummaryDef",
+      "type": "object",
+      "$$target": "#/defs/SummaryDef"
     },
     "TaskDef": {
       "additionalProperties": false,
@@ -854,9 +1451,68 @@
           "title": "Shell",
           "type": "string"
         },
+        "abstract": {
+          "default": false,
+          "description": "Abstract task: may only be reached via 'uses:' or as an override replacement, never invoked directly",
+          "title": "Abstract",
+          "type": "boolean"
+        },
+        "elaborate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Python callable ('module:function') that elaborates this task type at graph-build time, replacing the default node interior. Signature: elaborate(ctxt, task, name) -> TaskNode. Bound along the 'uses' chain (nearest declaration wins).",
+          "title": "Elaborate"
+        },
+        "cli": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/CliDef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Command-line arguments this task accepts when run with 'dfm run'. Bound along the 'uses' chain (nearest declaration wins, whole-block replacement)."
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/defs/SummaryDef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "End-of-run summary for this task when it is the task being run. Either a Python callable ('module:function') receiving a summary context and returning a renderable/str/None, or {builtin: task-summary}. Bound along the 'uses' chain (nearest declaration wins, whole-value replacement).",
+          "title": "Summary"
+        },
         "strategy": {
           "$ref": "#/defs/StrategyDef",
           "default": null
+        },
+        "control": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/ControlDef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Runtime control flow definition (mutually exclusive with strategy)"
         },
         "desc": {
           "default": "",
@@ -912,22 +1568,40 @@
           "title": "With",
           "type": "object"
         },
+        "let": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "description": "(DEPRECATED \u2014 use 'set') Scoped variables provided to this task's subtree, read via resolve(). Does not set this task's own parameters (see 'with').",
+          "title": "Let",
+          "type": "object"
+        },
         "set": {
           "description": "Scoped overrides applied to this task's subtree: a list whose items are either assignment maps ({name: value}) that rebind scoped variables read via ${{ pkg.var }}, or scope items ({uses?, path?, set: [...]}) that narrow/force by matcher. Outer overrides inner; CLI (-D) is the ceiling.",
-          "title": "Scoped Overrides",
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "elaborate": {
-          "description": "Python callable ('module:function') that elaborates this task type at graph-build time, replacing the default node interior. Signature: elaborate(ctxt, task, name) -> TaskNode. Bound along the 'uses' chain (nearest declaration wins).",
-          "title": "Elaborate",
-          "anyOf": [
-            { "type": "string" },
-            { "type": "null" }
-          ]
+          "items": {},
+          "title": "Set",
+          "type": "array"
         },
         "rundir": {
           "$ref": "#/defs/RundirE",
@@ -967,6 +1641,23 @@
           "default": null,
           "description": "Specifies matching patterns for parameter sets that this task consumes",
           "title": "Consumes"
+        },
+        "produces": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies matching patterns for datasets that this task produces",
+          "title": "Produces"
         },
         "uptodate": {
           "anyOf": [
@@ -1015,6 +1706,25 @@
           },
           "title": "Tags",
           "type": "array"
+        },
+        "max_failures": {
+          "default": -1,
+          "description": "Max direct-subtask failures before independent subtasks are skipped. -1 or 0 = run all; 1 = stop on first; N > 1 = stop after N.",
+          "title": "Max Failures",
+          "type": "integer"
+        },
+        "on_error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Python callable (module:function) invoked as the compound's run hook when all direct subtasks complete.",
+          "title": "On Error"
         }
       },
       "title": "TaskDef",

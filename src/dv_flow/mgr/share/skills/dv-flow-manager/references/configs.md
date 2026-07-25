@@ -54,6 +54,35 @@ being visible through an inline-shell `${{ }}` echo.)
 For path-style variables there are also `path-append` / `path-prepend` (joined
 with the OS path separator) — see `std.SetEnv`.
 
+## values: restricting what a parameter accepts
+
+A parameter declaration can list the values it accepts. The set is enforced on
+every path that sets the parameter — the default, a `with:` override in a task
+that `uses:` this one, `-D`, and a `cli:` flag — and it drives `--usage` help
+and shell completion:
+
+```yaml
+with:
+  detail:
+    type: str
+    value: normal
+    values: [quiet, normal, full]          # closed: anything else is an error
+  sim:
+    type: str
+    value: vlt
+    values: {of: [vlt, vcs], open: true}   # open: unlisted values warn only
+  views:
+    type: list
+    value: []
+    values: [rtl, tlm]                     # on a list, constrains ELEMENTS
+```
+
+Values may carry documentation — `{value: quiet, desc: "headline only"}` — which
+`dfm show task <name> --usage` prints. A value set is inherited along `uses:`
+independently of the value, so a task re-declaring only the default is checked
+against the base's set; re-declaring `values:` replaces the set outright. Not
+supported on `map` parameters.
+
 ## Configurations
 
 A **configuration** customizes a package for a scenario (debug/release,

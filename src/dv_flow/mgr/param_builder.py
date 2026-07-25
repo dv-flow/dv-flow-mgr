@@ -24,7 +24,8 @@ import pydantic
 from typing import Any, Dict, List, Tuple, Optional, TYPE_CHECKING
 from .param_def import ParamDef
 from .param_def_collection import ParamDefCollection
-from .param_types import TypeKind, ParamTypeError, normalize_type, coerce_to_kind
+from .param_types import (TypeKind, ParamTypeError, normalize_type,
+                          coerce_to_kind, check_value_set)
 from .expr_eval import ResolveError
 from .task import iter_uses_chain
 
@@ -57,8 +58,14 @@ class ParamBuilder:
         # Step 2: Merge definitions (first wins - child overrides parent)
         merged_defs = self._merge_param_defs(param_chain)
         
+        # Step 2b: Value sets inherit independently of values (see
+        # task.collect_param_value_sets), so they are collected from the chain
+        # rather than read off the winning ParamDef.
+        value_sets = self._collect_value_sets(param_chain)
+
         # Step 3: Evaluate template expressions in order
-        evaluated_params = self._evaluate_params(merged_defs, task.name, task)
+        evaluated_params = self._evaluate_params(
+            merged_defs, task.name, task, value_sets)
         
         # Step 4: Create Pydantic model
         result = self._create_pydantic_model(task.name, evaluated_params)
@@ -137,6 +144,21 @@ class ParamBuilder:
         
         return merged
     
+    def _collect_value_sets(self, chain: List[ParamDefCollection]) -> Dict[str, Any]:
+        """{param: ValueSet} from the inheritance chain, nearest winning.
+
+        `chain` is derived-first, so walking it in reverse lets a derived
+        declaration replace the inherited set while a declaration that is silent
+        about `values:` keeps it.
+        """
+        sets = {}
+        for collection in reversed(chain):
+            for name, param_def in collection.definitions.items():
+                vs = getattr(param_def, 'values', None)
+                if vs is not None:
+                    sets[name] = vs
+        return sets
+
     def _uses_chain_pkg_names(self, task: 'Task') -> List[str]:
         """Ordered, de-duplicated package names along the task's `uses` chain
         (most-derived first — e.g. [foo, hdlsim]). This is the same chain that
@@ -152,7 +174,7 @@ class ParamBuilder:
                 names.append(pname)
         return names
 
-    def _evaluate_params(self, merged_defs: Dict[str, Tuple[ParamDef, type]], task_name: str, task: 'Task' = None) -> Dict[str, Tuple[type, Any]]:
+    def _evaluate_params(self, merged_defs: Dict[str, Tuple[ParamDef, type]], task_name: str, task: 'Task' = None, value_sets: Dict[str, Any] = None) -> Dict[str, Tuple[type, Any]]:
         """
         Evaluate parameter values in definition order.
         As each parameter is evaluated, add it to eval context for subsequent refs.
@@ -248,6 +270,18 @@ class ParamBuilder:
                         raise ParamTypeError(
                             "task '%s' parameter '%s': %s" % (
                                 task_name, name, e), getattr(e, "srcinfo", None))
+
+                # Value set, checked AFTER coercion so it always sees the final
+                # typed value. This covers both the declaration's own default
+                # and any `uses:`/`with:` override layered onto it.
+                vs = (value_sets or {}).get(name)
+                if vs is not None:
+                    warning = check_value_set(
+                        value, vs, kind,
+                        name="task '%s' parameter '%s'" % (task_name, name),
+                        srcinfo=getattr(param_def, "srcinfo", None))
+                    if warning is not None:
+                        self._log.warning(warning)
 
                 # Store evaluated value
                 evaluated[name] = (ptype, value)

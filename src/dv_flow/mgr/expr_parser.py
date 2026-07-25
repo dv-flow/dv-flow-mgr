@@ -457,4 +457,34 @@ class ExprParser(object):
 
     def parse(self, input):
         return self.parser.parse(input, lexer=self.lexer)
-    
+
+
+# Building an ExprParser costs ~221us (PLY constructs a lexer and an LALR
+# table), while an actual parse costs ~2us. Expression text repeats heavily
+# across a graph -- the same param default is evaluated once per node -- so
+# both the parser and the resulting AST are shared.
+#
+# Sharing ASTs is safe because the visitors never mutate them: ExprEval
+# copies before touching an ExprHId's id list, and no other visitor writes
+# to a node. Anything that starts mutating an AST in place must copy first.
+_parse_cache = {}
+_PARSE_CACHE_MAX = 4096
+
+
+def parse_expr(text):
+    """Parse an expression, reusing both the parser and previously-parsed
+    ASTs. Returns the same AST object for the same text -- treat it as
+    read-only."""
+    ast = _parse_cache.get(text)
+    if ast is None:
+        ast = ExprParser.inst().parse(text)
+        if len(_parse_cache) >= _PARSE_CACHE_MAX:
+            _parse_cache.clear()
+        _parse_cache[text] = ast
+    return ast
+
+
+def clear_parse_cache():
+    """Drop the memoized ASTs. Exposed for tests."""
+    _parse_cache.clear()
+

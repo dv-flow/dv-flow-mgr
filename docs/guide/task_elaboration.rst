@@ -56,10 +56,21 @@ The ``ctxt`` (an ``ElabCtxt``) is how an elaborator builds nodes:
     Run the standard kind-based interior (leaf/compound/strategy/control) and
     needs wiring. Delegating to this is how you reuse normal behavior.
 ``mkParams(task)`` / ``resolveParam(task, name, default)``
-    Build the task's params (evaluating ``resolve()``) and read one.
-``mkTaskNode(name, …)`` / ``resolveNeed(name)`` / ``getTask(name)``
+    Build the task's params and read one. Values are **final**: ``${{ }}`` and
+    ``resolve()`` are evaluated and the full override ladder
+    (``default -> with:/kwargs -> -P -> -D -> --flag``) is applied, so an
+    elaborator decides from what the user actually asked for rather than from a
+    declared default.
+``mkTaskNode(name_or_task, …)`` / ``resolveNeed(name)`` / ``getTask(name)``
     Build another task's node, resolve a need (memoized), or look up a task type
-    without building it.
+    without building it. ``mkTaskNode`` accepts a name **or** a ``Task``; the
+    latter is how you build a locally-derived variant
+    (``dc.replace(need, strategy=…)``).
+``expand(expr)``
+    Evaluate a ``${{ }}`` expression in this elaboration's context — useful to
+    inspect a declaration that is still an expression, such as a matrix axis
+    written ``"${{ views }}"``. Returns the input unchanged if it cannot be
+    evaluated, so a caller can fall back rather than fail.
 ``wireNeed`` / ``wireNeeds``
     Wire ``needs`` onto a node you built yourself.
 ``error(msg)`` / ``marker(marker)``
@@ -89,6 +100,28 @@ built in full):
     class RunSelected(DefaultCompoundElaborator):
         def selectNeeds(self, needs):
             return [n for n in needs if n.name in self._chosen]
+
+``needs`` is a list of ``Task`` objects, so a filter can match on ``.name``,
+``.tags``, or the ``uses`` chain.
+
+Two contract points:
+
+* **A pruned need is never built.** Filtering happens before the need is
+  resolved into a node, so everything reachable only through that edge drops
+  out of the graph too. This is the difference from ``iff:``, which builds a
+  disabled stub and still builds its upstream — and it is what lets deselecting
+  a test also skip building the image only it needed.
+* **It is invoked once per** ``uses`` **-chain level.** Needs are gathered by
+  recursing into ``task.uses`` before filtering, so a task whose base also
+  declares needs calls the hook several times, each with one level's needs. A
+  filter must be idempotent and must not assume it sees the whole set at once.
+
+``std.TestRunner`` is the built-in example: it prunes a test root's needs from a
+command-line selection. See :ref:`running_tests`. Note that a *strategy* node is
+not registered in the builder's node memo, so an elaborator that substitutes a
+filtered variant of a matrix task must withhold the original via ``selectNeeds``
+and wire the variant itself with ``wireNeed`` — building it "under the same
+name" will not be picked up.
 
 Registering an elaborator
 -------------------------

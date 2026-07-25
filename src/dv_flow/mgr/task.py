@@ -21,6 +21,54 @@ def iter_uses_chain(task):
         yield current
         current = getattr(current, 'uses', None)
 
+def collect_task_params(task):
+    """Return (definitions, types) for `task`, **including params inherited via
+    `uses:`**, nearest declaration winning.
+
+    `Task.param_defs` holds only the params the task declares itself; the
+    inherited ones are merged later, when the node's `paramT` is built. So a
+    task's own `param_defs` is not the set of params it actually has, and code
+    that treats it that way under-reports a derived task (it will not list, and
+    will refuse to override, anything the base declared). This walks the chain
+    base-first so a derived declaration overwrites the inherited one.
+    """
+    definitions = {}
+    types = {}
+    for t in reversed(list(iter_uses_chain(task))):
+        param_defs = getattr(t, 'param_defs', None)
+        if param_defs is None:
+            continue
+        definitions.update(param_defs.definitions)
+        types.update(param_defs.types)
+    return definitions, types
+
+
+def collect_param_value_sets(task):
+    """{param: ValueSet} in effect for `task`, nearest declaration winning.
+
+    Separate from `collect_task_params` because a value set **inherits
+    independently of the value**: a derived task that re-declares a param to
+    change its default, and says nothing about `values:`, keeps the base's set
+    and is checked against it. That is precisely the case that goes unchecked
+    when the set lives on a `cli:` block instead of the parameter.
+
+    A task that does re-declare `values:` replaces the inherited set outright
+    (narrowing or widening it) -- the same whole-block rule `cli:` follows, and
+    for the same reason: per-value merging has no answer for "how do I remove an
+    inherited value?".
+    """
+    sets = {}
+    for t in reversed(list(iter_uses_chain(task))):
+        param_defs = getattr(t, 'param_defs', None)
+        if param_defs is None:
+            continue
+        for name, pdef in param_defs.definitions.items():
+            vs = getattr(pdef, 'values', None)
+            if vs is not None:
+                sets[name] = vs
+    return sets
+
+
 @dc.dataclass
 class Need(object):
     task : 'Task'
@@ -80,12 +128,30 @@ class Task(object):
     needs_expr : List[str] = dc.field(default_factory=list)
     needs_expr_fragment : str = None
     run : str = None
+    # Directory of the file that *declared* `run`, which is not necessarily
+    # this task's own srcdir: an inherited body carries its author's
+    # directory along the `uses` chain. Load-time expansion used to get this
+    # for free by evaluating the body where it was written; now that the
+    # body is expanded per node at graph build, the binding has to be
+    # carried explicitly or `${{ srcdir }}` silently resolves to the *using*
+    # task's directory.
+    run_srcdir : str = None
     shell : str = "bash"
-    template : bool = False
+    # May only be reached via `uses:` or as an override replacement.
+    # (Formerly one half of `template:`, which also meant "defer run
+    # expansion" -- that half is now how every task works.)
+    abstract : bool = False
     # Python callable ('module:function') that elaborates this task type at
     # graph-build time (populated from TaskDef.elaborate). Resolved along the
     # `uses` chain by TaskGraphBuilder._resolve_elaborator.
     elaborate : str = None
+    # End-of-run summary for this task when it is the task being run: either a
+    # 'module:function' string or a SummaryDef (populated from TaskDef.summary).
+    # Resolved along the `uses` chain by resolve_task_summary.
+    summary : Any = None
+    # Command-line arguments this task accepts under `dfm run` (populated from
+    # TaskDef.cli). Resolved along the `uses` chain by cli_args.resolve_task_cli.
+    cli : Any = None
     tags : List['Type'] = dc.field(default_factory=list)
     max_failures : int = -1
     on_error : str = None

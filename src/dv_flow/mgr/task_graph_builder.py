@@ -34,7 +34,8 @@ from .param_builder import ParamBuilder
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope, SetScope, node_matches
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
-from .task import Task, Need, iter_uses_chain
+from .task import (Task, Need, iter_uses_chain, collect_task_params,
+                   collect_param_value_sets)
 from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE, TaskDataItem
 from .task_gen_ctxt import TaskGenCtxt, TaskGenInputData
@@ -50,8 +51,8 @@ from .null_callable import NullCallable
 from .shell_callable import ShellCallable
 from .deferred_expr import DeferredExpr, references_runtime_data
 from .param_types import (TypeKind, ParamTypeError, normalize_type,
-                          coerce_to_kind, coerce_cli_value)
-from .expr_parser import ExprParser
+                          coerce_to_kind, coerce_cli_value, check_value_set)
+from .expr_parser import parse_expr
 from .filter_registry import FilterRegistry
 from .naming_scheme import NamingScheme, NamingSchemeRegistry, TaskNamingContext, MatrixNamingContext
 from .task_elaborator import (
@@ -72,6 +73,14 @@ class CompoundTaskCtxt(object):
 
 
 @dc.dataclass
+class _ParamsHolder(object):
+    """Adapts a bare params instance to the `.params` shape that
+    `_apply_task_param_overrides` expects, so the override pass can run against
+    params that do not (yet) belong to a node -- the pre-elaboration case."""
+    params : Any
+
+
+@dc.dataclass
 class BuilderElabCtxt(object):
     """Concrete ElabCtxt (see task_elaborator.ElabCtxt) that adapts the builder's
     internals for a TaskElaborator. Constructed per elaborate() call with the
@@ -83,6 +92,13 @@ class BuilderElabCtxt(object):
     hierarchical : bool = False
     eval : Any = None
     is_root : bool = False
+    # Programmatic mkTaskNode(**kwargs) for the node being elaborated, so
+    # mkParams can apply the full ladder. None when this is not the node the
+    # caller asked for (same meaning as `node_params` in the builder).
+    node_params : Any = None
+    # The task being elaborated -- kwargs apply only to it, not to some other
+    # task an elaborator happens to call mkParams() on.
+    task : Any = None
 
     # --- default interior -------------------------------------------------
     def buildDefault(self, task, name, select_needs=None):
@@ -94,8 +110,13 @@ class BuilderElabCtxt(object):
 
     # --- params -----------------------------------------------------------
     def mkParams(self, task):
-        """Build and return `task`'s params instance (resolve() evaluated)."""
-        return self.builder._build_task_params(task, self.eval)
+        """Build and return `task`'s params instance, with `${{ }}`/resolve()
+        evaluated **and** the override ladder applied -- so what an elaborator
+        reads is what the node will settle on. kwargs are applied only for the
+        node actually being elaborated."""
+        return self.builder._build_task_params(
+            task, self.eval,
+            node_params=(self.node_params if task is self.task else None))
 
     def resolveParam(self, task, name, default=None):
         """Convenience: build params and read one field, with a default."""
@@ -106,7 +127,22 @@ class BuilderElabCtxt(object):
 
     # --- node construction ------------------------------------------------
     def mkTaskNode(self, name_or_task, name=None, srcdir=None, needs=None, **kwargs):
-        """Build another task's node (by name), honoring overrides/memoization."""
+        """Build another task's node, honoring overrides/memoization.
+
+        Accepts a task *name* or a `Task` object. The Task form is what lets an
+        elaborator build a locally-derived variant (e.g. `dc.replace(need,
+        strategy=<filtered matrix>)`) and register it under the original name,
+        so the standard needs-gathering picks the variant up from the node memo
+        instead of rebuilding the original.
+        """
+        if isinstance(name_or_task, Task):
+            # `eval` must be threaded: without it a variant of a task that
+            # carries an `iff:` (or any expression evaluated during node build)
+            # hits a None evaluation context.
+            return self.builder._mkTaskNode(
+                name_or_task,
+                name=name if name is not None else name_or_task.name,
+                srcdir=srcdir, eval=self.eval, **kwargs)
         return self.builder.mkTaskNode(
             name_or_task, name=name, srcdir=srcdir, needs=needs, **kwargs)
 
@@ -114,12 +150,28 @@ class BuilderElabCtxt(object):
         """Memoized lazy need resolution (== builder._getTaskNode)."""
         return self.builder._getTaskNode(name)
 
+    def expand(self, expr):
+        """Evaluate a `${{ }}` expression in this elaboration's context.
+
+        Lets an elaborator inspect a declaration that is still an expression --
+        e.g. a matrix axis written `"${{ images }}"`, whose members it would
+        otherwise have to treat as unknowable. Returns the expression unchanged
+        if it cannot be evaluated, so a caller can fall back rather than fail.
+        """
+        try:
+            return self.builder._expandParam(expr, self.eval)
+        except Exception:
+            return expr
+
     def getTask(self, name):
         """Resolve a task *type* by name without building it (for rebinding)."""
         return self.builder.lookupTask(name)
 
     def declaredNeeds(self, task):
-        """The task's declared needs (list of Need)."""
+        """The task's declared needs, as a list of **Task** objects (not `Need`
+        -- `Task.needs` holds resolved Tasks, which `_gatherNeeds` reads
+        `.name` off directly). A filter therefore sees the whole task and can
+        match on `.name`, `.tags`, or the `uses` chain."""
         return list(task.needs)
 
     # --- needs wiring primitives -----------------------------------------
@@ -185,6 +237,10 @@ class TaskGraphBuilder(object):
     task_param_overrides : Dict[str, Dict[str, Any]] = dc.field(default_factory=dict)  # task name → {param: value}
     leaf_param_overrides : Dict[str, Any] = dc.field(default_factory=dict)  # NEW: leaf param names to try on tasks
     naming_scheme : Union[str, NamingScheme] = "legacy"
+    # Optional OverrideBindingTracker (param_override_tracker.py). When present,
+    # each task-param override that actually binds is recorded, so the CLI can
+    # report `-D` keys that bound nowhere. None for programmatic callers.
+    override_tracker : Any = dc.field(default=None)
     # Per-run output-data identity (see run_id.py). None -> allocate the next
     # counter by scanning <rundir>/out. Threaded into TaskNodeCtxt so
     # std.Publish tasks share one output directory across the run.
@@ -676,27 +732,27 @@ class TaskGraphBuilder(object):
             self.push_name_resolution_context(task.package)
 
             try:
-                # Reject direct invocation of template tasks
-                if getattr(task, "template", False) and not self.in_uses():
-                    raise Exception("Cannot invoke template task '%s' directly; use it via 'uses:' or as an override replacement" % task.name)
+                # Reject direct invocation of abstract tasks
+                if getattr(task, "abstract", False) and not self.in_uses():
+                    raise Exception("Cannot invoke abstract task '%s' directly; use it via 'uses:' or as an override replacement" % task.name)
+                # `node_params` carries the programmatic kwargs down to where
+                # the node's params are built, and marks this as the node that
+                # -D/-P overrides apply to. Both used to be applied *here*,
+                # after the node came back fully built -- which was too late
+                # for a `run:` body that references an overridden parameter.
+                # Passing a dict (empty is fine) is the "top node" signal;
+                # recursive _mkTaskNode calls pass None and are untouched, so
+                # the set of nodes that receive overrides is unchanged.
                 ret = self._mkTaskNode(
-                    task, 
-                    name=name, 
+                    task,
+                    name=name,
                     srcdir=srcdir,
-                    eval=self._eval)
+                    eval=self._eval,
+                    node_params=kwargs)
 
                 if needs is not None:
                     for need in needs:
                         ret.needs.append((need, False))
-
-                for k,v in kwargs.items():
-                    if hasattr(ret.params, k):
-                        setattr(ret.params, k, v)
-                    else:
-                        raise Exception("Task %s parameters do not include %s" % (task.name, k))
-                
-                # NEW: Apply task parameter overrides from -D/-P
-                self._apply_task_param_overrides(ret, task)
             finally:
                 # Clean up package context if we created one
                 self.pop_name_resolution_context()
@@ -800,13 +856,14 @@ class TaskGraphBuilder(object):
         mod = importlib.import_module(module_name)
         return getattr(mod, func_name)
 
-    def _mkTaskNode(self, 
-                    task : Task, 
-                    name=None, 
-                    srcdir=None, 
-                    params=None, 
+    def _mkTaskNode(self,
+                    task : Task,
+                    name=None,
+                    srcdir=None,
+                    params=None,
                     hierarchical=False,
-                    eval=None):
+                    eval=None,
+                    node_params=None):
 
         # Apply override substitution before anything else
         task = self._findOverride(task)
@@ -870,7 +927,8 @@ class TaskGraphBuilder(object):
                     ctxt = BuilderElabCtxt(
                         builder=self, srcdir=srcdir, params=params,
                         hierarchical=hierarchical, eval=eval,
-                        is_root=is_root_elab)
+                        is_root=is_root_elab,
+                        node_params=node_params, task=task)
                     ret = elaborator(
                         ctxt, task, _eff_name if _eff_name is not None else task.name)
                 finally:
@@ -878,9 +936,14 @@ class TaskGraphBuilder(object):
                     if _eff_name is not None:
                         self._elab_active_names.discard(_eff_name)
                     self._elab_ctxt_s.pop()
+                # A custom elaborator builds its own interior, which this
+                # method cannot reach into, so its node settles params after
+                # the fact -- unchanged from before Phase C.
+                self._apply_node_params(ret, task, node_params)
             else:
                 ret = self._build_default_interior(
-                    task, name, srcdir, params, hierarchical, eval)
+                    task, name, srcdir, params, hierarchical, eval,
+                    node_params=node_params)
         else:
             if name is None:
                 name = task.name
@@ -910,6 +973,7 @@ class TaskGraphBuilder(object):
                 ctxt=None,
                 iff=False)
             self._task_node_m[name] = ret
+            self._apply_node_params(ret, task, node_params)
 
 
         if not hierarchical:
@@ -946,7 +1010,7 @@ class TaskGraphBuilder(object):
         return names
 
     def _build_default_interior(self, task, name, srcdir, params, hierarchical,
-                                eval, select_needs=None):
+                                eval, select_needs=None, node_params=None):
         """The standard kind-based node construction (control / strategy /
         compound / leaf) plus needs wiring. This is the default elaborator's
         implementation; it is also what `ElabCtxt.buildDefault` invokes, so a
@@ -955,26 +1019,65 @@ class TaskGraphBuilder(object):
         (the DefaultCompoundElaborator.selectNeeds hook)."""
         if hasattr(task, 'control') and task.control is not None:
             # Runtime control flow construct (needs-filtering N/A)
-            return self._buildControlNode(
+            node = self._buildControlNode(
                 task, name, srcdir, params, hierarchical, eval)
+            # These two kinds build no `run:` body of their own, so there is
+            # nothing here that has to see the final values first; they keep
+            # the post-hoc application.
+            self._apply_node_params(node, task, node_params)
+            return node
         elif task.strategy is not None:
-            return self._applyStrategy(
+            node = self._applyStrategy(
                 task, name, srcdir, params, hierarchical, eval,
                 select_needs=select_needs)
+            self._apply_node_params(node, task, node_params)
+            return node
         elif self._isCompound(task):
             return self._mkTaskCompoundNode(
                 task, name=name, srcdir=srcdir, params=params,
-                hierarchical=hierarchical, eval=eval, select_needs=select_needs)
+                hierarchical=hierarchical, eval=eval, select_needs=select_needs,
+                node_params=node_params)
         else:
             return self._mkTaskLeafNode(
                 task, name=name, srcdir=srcdir, params=params,
-                hierarchical=hierarchical, eval=eval, select_needs=select_needs)
+                hierarchical=hierarchical, eval=eval, select_needs=select_needs,
+                node_params=node_params)
 
-    def _build_task_params(self, task, eval=None):
+    def _apply_node_params(self, node, task, node_params):
+        """Settle a node's parameters: programmatic kwargs first, then -D/-P.
+
+        Precedence is `default -> with:/kwargs -> -P -> -D -> --flag`: a
+        `mkTaskNode(**kwargs)` value is how the *description* constructs the
+        node, and `-D` is the user overriding the description from outside,
+        so `-D` wins. `node_params is None` means this is not the node the
+        caller asked for (a recursive build), and nothing is applied.
+        """
+        if node_params is None:
+            return
+        params = getattr(node, "params", None)
+        for k, v in node_params.items():
+            if params is not None and hasattr(params, k):
+                setattr(params, k, v)
+            else:
+                raise Exception(
+                    "Task %s parameters do not include %s" % (task.name, k))
+        self._apply_task_param_overrides(node, task)
+
+    def _build_task_params(self, task, eval=None, node_params=None):
         """Build and return a task's params instance (evaluating ${{ }} incl.
         resolve()), without constructing a node. Used by ElabCtxt so a custom
         elaborator can read a resolved param (e.g. hdlsim's `sim`) to decide how
-        to build the node."""
+        to build the node.
+
+        The full precedence ladder is applied here -- `default -> with:/kwargs
+        -> -P -> -D -> --flag` -- so an elaborator reads the *same* value the
+        node will settle on. Without this an elaborator that decides from a
+        parameter would silently decide from the declared default, which is
+        exactly what a `-D` is meant to change (see
+        docs/proposals/expansion_phase_ladder.md: load is the one moment when
+        values are guaranteed not to be final; elaboration must not repeat that
+        mistake).
+        """
         ev = eval if eval is not None else self._eval
         if task.paramT is None:
             if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
@@ -988,6 +1091,12 @@ class TaskGraphBuilder(object):
         params = paramT() if paramT else None
         if params is not None:
             self._expandParams(params, ev)
+            # kwargs first, then -P/-D/--flag, mirroring _apply_node_params.
+            if node_params:
+                for k, v in node_params.items():
+                    if hasattr(params, k):
+                        setattr(params, k, v)
+            self._apply_task_param_overrides(_ParamsHolder(params), task)
         return params
 
     def lookupTask(self, name):
@@ -1666,7 +1775,8 @@ class TaskGraphBuilder(object):
                         params=None,
                         hierarchical=False,
                         eval=None,
-                        select_needs=None) -> TaskNode:
+                        select_needs=None,
+                        node_params=None) -> TaskNode:
         self._log.debug("--> _mkTaskLeafNode %s" % task.name)
 
         # A `let` block only affects a task's subtree; a leaf has none.
@@ -1741,12 +1851,47 @@ class TaskGraphBuilder(object):
         # need to handle runtime-only variables like 'rundir'
         self._expandParams(params, eval)
 
+        # Settle the parameters -- kwargs, then -D/-P -- BEFORE the body is
+        # expanded. This is the ordering fix: overrides used to land after
+        # the whole node was built, so `run: echo ${{ seed }}` rendered the
+        # declared default while `node.params.seed` carried the override.
+        self._apply_node_params(node, task, node_params)
+
         # Evaluate produces patterns after params are set
         if task.produces is not None:
             from .produces_eval import ProducesEvaluator
             evaluator = ProducesEvaluator(self._eval)
             node.produces = evaluator.evaluate(task.produces, params)
-        
+
+        # Expand the body, once per node, from this node's evaluated params.
+        # Position matters twice over: the task scope pushed above is what
+        # makes `${{ <param> }}` resolve to *this* node's value, and `srcdir`
+        # is still the task's own directory (it is restored just below).
+        task_run = task.run
+        if task_run is not None and "${{" in task_run:
+            # `${{ srcdir }}` in a body means the directory of the file that
+            # *wrote* the body -- which differs from this node's srcdir when
+            # the body is inherited through `uses:`.
+            run_srcdir = getattr(task, "run_srcdir", None)
+            if run_srcdir is not None and run_srcdir != srcdir:
+                self._eval.set("srcdir", run_srcdir)
+
+            # `rundir` is a phase-3 (run) name: the node's final rundir is not
+            # settled here -- the Unique segment is pushed below -- and the
+            # callable resolves it at execution. Bind it to its own literal
+            # for the duration, exactly as PackageLoader.__post_init__ does,
+            # so the reference survives expansion instead of picking up the
+            # parent's rundir from the task scope.
+            _scope_vars = self.task_scope().variables
+            _prev_rundir = _scope_vars.get("rundir")
+            _scope_vars["rundir"] = "${{ rundir }}"
+            try:
+                task_run = self._expandParam(
+                    task_run, eval if eval is not None else self._eval)
+            finally:
+                _scope_vars["rundir"] = _prev_rundir
+                self._eval.set("srcdir", srcdir)
+
         # Restore previous srcdir after all parameter evaluation is complete
         self._eval.set("srcdir", prev_srcdir)
 
@@ -1756,12 +1901,6 @@ class TaskGraphBuilder(object):
             _leaf_segment = self._naming_scheme.rundir_segment(_leaf_ctx)
             if _leaf_segment is not None:
                 self.enter_rundir(_leaf_segment)
-
-        # Expand template run expression at graph-build time
-        task_run = task.run
-        if getattr(task, "template", False) and task_run and "${{" in task_run:
-            eval_ctx = eval if eval is not None else self._eval
-            task_run = self._expandParam(task_run, eval_ctx)
 
         callable = None
 
@@ -1817,7 +1956,8 @@ class TaskGraphBuilder(object):
                             params=None,
                             hierarchical=False,
                             eval=None,
-                            select_needs=None) -> TaskNode:
+                            select_needs=None,
+                            node_params=None) -> TaskNode:
         self._log.debug("--> _mkTaskCompoundNode %s" % task.name)
 
         if name is None:
@@ -1859,7 +1999,12 @@ class TaskGraphBuilder(object):
             ctxt=self._ctxt,
             max_failures=getattr(task, 'max_failures', -1),
             run=self._resolve_on_error(task, srcdir))
-        
+
+        # Settle kwargs and -D/-P before the body is built: a compound's
+        # subtasks read the parent's params (via `this` and as bare names),
+        # so they must be final before descending.
+        self._apply_node_params(node, task, node_params)
+
         # Restore previous srcdir after all parameter evaluation
         self._eval.set("srcdir", prev_srcdir)
 
@@ -2141,10 +2286,9 @@ class TaskGraphBuilder(object):
         """Extract expressions from ${{ }} delimiters, parse each, and
         check whether any references runtime data (inputs, memento).
         Returns (True, ast) for the first match, or (False, None)."""
-        parser = ExprParser()
         for m in self._TMPL_EXPR_RE.finditer(text):
             try:
-                ast = parser.parse(m.group(1))
+                ast = parse_expr(m.group(1))
                 if ast and references_runtime_data(ast):
                     return True, ast
             except:
@@ -2419,24 +2563,42 @@ class TaskGraphBuilder(object):
         3. Leaf parameter names (for -D param=value)
         """
         overrides = {}
-        
+        # param name -> the raw `-D` key that supplied it, for diagnostics. The
+        # key is reconstructible because parse_parameter_overrides splits a
+        # dotted key into (task_key, param) and leaves a bare key as-is.
+        origin = {}
+
         # Try full task name first
         if task.name in self.task_param_overrides:
-            overrides.update(self.task_param_overrides[task.name])
-        
+            for pname, pvalue in self.task_param_overrides[task.name].items():
+                overrides[pname] = pvalue
+                origin[pname] = "%s.%s" % (task.name, pname)
+
         # Also try leaf name
         leaf_name = task.leafname if hasattr(task, 'leafname') else task.name.split('.')[-1]
         if leaf_name in self.task_param_overrides:
-            overrides.update(self.task_param_overrides[leaf_name])
-        
-        # Also try leaf parameter names (from -D param=value without task name)
+            for pname, pvalue in self.task_param_overrides[leaf_name].items():
+                overrides[pname] = pvalue
+                origin[pname] = "%s.%s" % (leaf_name, pname)
+
+        # Also try leaf parameter names (from -D param=value without task name).
+        # "Has this parameter" spans the `uses:` chain, so the bare form and the
+        # qualified form agree about which params a derived task has.
+        # Keys that named a real param but lost to a higher-precedence entry.
+        # They still "found a target", so the diagnostics must not call them
+        # unmatched -- that would report a typo where there is none.
+        shadowed = []
         if self.leaf_param_overrides and hasattr(task, 'param_defs'):
+            task_param_names, _ = collect_task_params(task)
             for param_name, param_value in self.leaf_param_overrides.items():
                 # Only apply if this task has this parameter
-                if param_name in task.param_defs.definitions:
+                if param_name in task_param_names:
                     if param_name not in overrides:  # Don't override explicit task overrides
                         overrides[param_name] = param_value
-        
+                        origin[param_name] = param_name
+                    else:
+                        shadowed.append(param_name)
+
         # Apply each override
         for param_name, param_value in overrides.items():
             try:
@@ -2444,6 +2606,12 @@ class TaskGraphBuilder(object):
             except Exception as e:
                 self.error(f"Failed to apply override for parameter '{param_name}' on task '{task.name}': {e}")
                 raise
+            if self.override_tracker is not None and param_name in origin:
+                self.override_tracker.note_task_bind(origin[param_name], task.name)
+
+        if self.override_tracker is not None:
+            for param_name in shadowed:
+                self.override_tracker.note_task_bind(param_name, task.name)
     
     def _apply_task_param_override(self, task_node, task, param_name, value):
         """Apply a single parameter override with type coercion.
@@ -2454,26 +2622,46 @@ class TaskGraphBuilder(object):
             param_name: Parameter name (must exist in task.param_defs)
             value: Value from -D (string) or -P (any JSON type)
         """
-        # Check param exists in task definition
-        if not hasattr(task, 'param_defs') or param_name not in task.param_defs.definitions:
-            available_params = list(task.param_defs.definitions.keys()) if hasattr(task, 'param_defs') else []
+        # Check param exists in task definition. Params inherited via `uses:`
+        # count: the node really has them (they are merged into paramT), so
+        # refusing to override one would make `-D` unusable on any derived task.
+        definitions, types = collect_task_params(task)
+        if param_name not in definitions:
             raise ValueError(
                 f"Parameter '{param_name}' not found in task '{task.name}'. "
-                f"Available parameters: {available_params}"
+                f"Available parameters: {sorted(definitions.keys())}"
             )
-        
-        param_def = task.param_defs.definitions[param_name]
-        param_type = task.param_defs.types.get(param_name)
-        
+
+        param_type = types.get(param_name)
+
         # Coerce value to correct type
         coerced_value = self._coerce_param_value(value, param_type, param_name, task.name)
-        
+
+        # ... then check it against the parameter's declared value set, if any.
+        # This is what makes `-D task.detail=ful` fail the way `--detail ful`
+        # already does, instead of running the whole flow and degrading later.
+        value_set = collect_param_value_sets(task).get(param_name)
+        if value_set is not None:
+            try:
+                warning = check_value_set(
+                    coerced_value, value_set, param_type,
+                    name="parameter '%s' on task '%s'" % (param_name, task.name))
+            except ParamTypeError as e:
+                raise ValueError(str(e))
+            if warning is not None:
+                self._log.warning(warning)
+
         # Apply to task_node.params
         if hasattr(task_node, 'params') and hasattr(task_node.params, param_name):
             setattr(task_node.params, param_name, coerced_value)
-        
-        # Also update param_def.value for consistency
-        param_def.value = coerced_value
+
+        # Also update param_def.value for consistency -- but only for a param
+        # this task declares itself. An inherited ParamDef is the *base's*
+        # object, shared by every task deriving from it, so writing to it would
+        # leak this task's override into all of its siblings.
+        own_defs = getattr(task, 'param_defs', None)
+        if own_defs is not None and param_name in own_defs.definitions:
+            own_defs.definitions[param_name].value = coerced_value
     
     def _coerce_param_value(self, value, param_type, param_name, task_name):
         """Coerce a CLI/-D (or set:-forced) value to `param_type`.
