@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+
+#****************************************************************************
+#* checks.yaml
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+fragment:
+  name: check
+
+  types:
+  #------------------------------------------------------------------
+  # Checks -- a task's CONTRACT, evaluated at graph build.
+  #
+  # A check is an ordinary type carrying a `check:` callable, and a task lists
+  # the ones it must satisfy under `requires:`. The shape is deliberately
+  # identical to `tags:` (a list of parameterized type instances): a tag is
+  # something a task *is*, a requirement is something it must *satisfy*, and
+  # there is no reason for those to be two different mechanisms.
+  #
+  # Requirements attach to the TYPE and are enforced on every NODE built from
+  # it, after override resolution -- so a base task can state a contract that
+  # whatever overrides it has to meet.
+  #------------------------------------------------------------------
+  - name: Implemented
+    uses: std.Check
+    check: dv_flow.mgr.std.checks:implemented
+    doc: |
+      The task must do something: have a `run:`, a body, or at least one need.
+      A slot that a base project declared and a leaf never filled is the
+      failure this catches -- it otherwise runs and reports success.
+
+  - name: Needs
+    uses: std.Check
+    check: dv_flow.mgr.std.checks:needs
+    doc: |
+      Constrains what the task depends on.
+
+      `produces:` names a PATTERN that something reachable through this task's
+      needs must produce. Same shape and same subset-match rule as a
+      `consumes:` pattern: every attribute named here must appear on a produced
+      item with the same value, and the producer may carry more.
+
+          requires:
+          - std.check.Needs:
+              produces: {type: hdlsim.SimRun}
+
+      **This is a COARSE, STATIC gate -- not a proof.** It checks what tasks
+      *declare*, at graph build, before anything runs. That is deliberately
+      where the value is: it is cheap, it catches a miswired flow early rather
+      than after a compile, and it tells a reader (or a tool assembling a flow)
+      what kind of input a task expects. It is not, and should not become, a
+      substitute for the task checking its actual inputs.
+
+      So keep the requirement at the level that is genuinely knowable
+      statically -- usually the type. A profile analyzer requires a
+      `hdlsim.SimRun`; whether that run actually emitted profile data is a
+      property of the data, which exists only once the run has happened. The
+      task checks that itself, at runtime, and fails with a message about the
+      data. Writing the fine-grained condition here instead would be a
+      guarantee this cannot make.
+
+      Attributes are worth naming when the producer really does declare them
+      up front -- a build variant an image advertises, say. Matching is
+      TRANSITIVE, so such an attribute may be declared by the need itself or by
+      anything upstream of it.
+
+      A task that emits items at runtime without a `produces:` entry is
+      invisible here (`std.FileSet` tasks are the common example), which is
+      another reason to keep static requirements coarse.
+    with:
+      min:
+        type: int
+        value: 1
+        doc: Minimum number of needs (0 to not constrain the count)
+      max:
+        type: int
+        value: -1
+        doc: Maximum number of needs (-1 for unbounded)
+      produces:
+        type: map
+        doc: |
+          A produce pattern that must be reachable through this task's needs,
+          e.g. `{type: hdlsim.SimRun}`. A bare string is shorthand for
+          `{type: <string>}`. Keep it coarse -- see the note above.
+      named:
+        type: list
+        value: []
+        doc: Need names (or name suffixes) that must be present

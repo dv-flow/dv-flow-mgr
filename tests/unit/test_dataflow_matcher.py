@@ -68,7 +68,13 @@ def test_consumes_all_always_matches():
 
 
 def test_consumes_none_with_consumes():
-    """Test ConsumesE with None consumes accepts anything."""
+    """An UNDECLARED `consumes` is not a claim of compatibility.
+
+    The matcher does not report a mismatch (it has nothing to check against),
+    but `dfm validate` reports the gap separately -- the whole point of keeping
+    "never said" distinct from "said all" is that silence should not read as a
+    positive answer.
+    """
     matcher = DataflowMatcher()
     produces = [{"type": "std.FileSet"}]
     
@@ -78,7 +84,14 @@ def test_consumes_none_with_consumes():
 
 
 def test_consumes_no_requires_empty():
-    """Test ConsumesE.No requires empty produces."""
+    """`consumes: none` and a producing input.
+
+    `consumes: none` means "I do not READ these inputs", not "nothing may flow
+    to me". A task that forwards what it does not consume is the ordinary
+    aggregator idiom (`std.FileSet` with `passthrough: all` collecting other
+    filesets), so the items are not dropped and there is nothing to report --
+    `passthrough` is what distinguishes the two cases.
+    """
     matcher = DataflowMatcher()
     
     # Empty produces - compatible
@@ -91,11 +104,20 @@ def test_consumes_no_requires_empty():
         None, ConsumesE.No, "Producer", "Consumer")
     assert compatible
     
-    # Non-empty produces - incompatible
+    # Non-empty produces and the task DOES forward (the default): the items
+    # are not dropped, so there is nothing to report. This is the aggregator.
     compatible, msg = matcher.check_compatibility(
         [{"type": "std.FileSet"}], ConsumesE.No, "Producer", "Consumer")
+    assert compatible
+
+    # Non-empty produces and the task does NOT forward: the producer's output
+    # really is discarded here, which is worth reporting.
+    from dv_flow.mgr.task_def import PassthroughE
+    compatible, msg = matcher.check_compatibility(
+        [{"type": "std.FileSet"}], ConsumesE.No, "Producer", "Consumer",
+        passthrough=PassthroughE.No)
     assert not compatible
-    assert "consumes=none" in msg
+    assert "discarded" in msg
 
 
 def test_no_produces_assumed_compatible():

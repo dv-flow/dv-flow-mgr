@@ -40,4 +40,11 @@ class TypeDef(BaseModel):
     tags : List[Union[str, Dict[str, Any]]] = Field(
         default_factory=list,
         description="Tags as type references with optional parameter overrides")
+    check : Union[str, None] = Field(
+        default=None,
+        description="Python callable ('module:function') implementing this type "
+                    "as a graph-build CHECK, invoked for every node built from a "
+                    "task that `requires:` it. Signature: check(ctxt) -> None; "
+                    "report with ctxt.error()/ctxt.warning(). Inherited along "
+                    "the type's `uses:` chain.")
     srcinfo : SrcInfo = None

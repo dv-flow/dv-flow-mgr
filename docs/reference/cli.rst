@@ -135,6 +135,21 @@ Run Options
     
         dfm run build --override pkg.TaskA=std.Null --override pkg.TaskB=std.Null
 
+``--needs TASK``
+    Supply an additional input to the task being run, as if it were in that
+    task's ``needs:``. May be repeated. Applies only to the invoked task, and
+    adds to its declared needs rather than replacing them. The name resolves
+    like any task name on the command line, so a partial name or a variant cell
+    key works.
+
+    .. code-block:: bash
+
+        dfm run hdlsim.prof.Analyze --needs my-proj.sim-img.prof
+
+    Not supported when running against a daemon (``DFM_SERVER_SOCKET``): the
+    server protocol carries only tasks, ``-D`` overrides and ``--timeout``, so
+    the option is rejected rather than silently dropped.
+
 ``--runner BACKEND``
     Runner backend to use. ``local`` runs tasks in-process. Other backends
     (e.g. ``lsf``) require a running daemon. If omitted, auto-detects

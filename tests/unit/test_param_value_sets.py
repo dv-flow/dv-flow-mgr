@@ -159,14 +159,11 @@ package:
   tasks:
   - name: base
     scope: root
-    cli:
-      args:
-      - name: mode
-      - name: views
     with:
       mode:
         type: str
         value: fast
+        cli: true
         doc: How to run
         values:
         - {value: fast, desc: "skip the slow checks"}
@@ -174,6 +171,7 @@ package:
       views:
         type: list
         value: []
+        cli: true
         values: [rtl, tlm]
       backend:
         type: str
@@ -270,12 +268,13 @@ def test_a_bad_inherited_default_is_rejected(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(Exception) as e:
         _build(tmp_path, 'p.bad')
-    # The case that goes entirely unchecked when the set lives on a `cli:` block.
+    # The case that goes entirely unchecked when the set lives anywhere but
+    # on the parameter itself.
     assert "not a valid value" in str(e.value)
 
 
 def test_a_derived_task_replaces_the_set(proj):
-    # Whole-set replacement, like `cli:` blocks: `narrowed` accepts only 'fast'.
+    # Whole-set replacement: `narrowed` accepts only 'fast'.
     _, pkg = loadProjPkgDef(str(proj))
     assert collect_param_value_sets(pkg.task_m['p.narrowed'])['mode'].values() == ["fast"]
     with pytest.raises(Exception):
@@ -331,26 +330,33 @@ def test_usage_reports_the_set_and_its_documentation(proj):
     assert "(local, lsf, ...)" in text
 
 
-def test_a_cli_choices_narrowing_still_wins(tmp_path, monkeypatch):
+def test_the_parameter_is_the_only_place_a_set_is_declared(tmp_path, monkeypatch):
+    """There is no second place a flag could narrow the accepted values, so the
+    flag, `-D`, and a `with:` override are all checked against one set. Narrowing
+    is done by re-declaring `values:` on a derived task
+    (test_a_derived_task_replaces_the_set), which narrows *every* path at once
+    rather than only the flag."""
     (tmp_path / 'flow.yaml').write_text(textwrap.dedent('''\
     package:
       name: p
       tasks:
       - name: t
         scope: root
-        cli:
-          args:
-          - name: mode
-            choices: [fast]
         with:
-          mode: { type: str, value: fast, values: [fast, slow] }
+          mode: { type: str, value: fast, cli: true, values: [fast, slow] }
         run: echo t
     '''))
     monkeypatch.chdir(tmp_path)
     from dv_flow.mgr.cmds.show.usage import build_usage_info
+    from dv_flow.mgr.cli_args import resolve_task_cli, build_arg_parser
     _, pkg = loadProjPkgDef(str(tmp_path))
-    info = build_usage_info(pkg.task_m['p.t'])
-    assert [a for a in info['args'] if a['param'] == 'mode'][0]['choices'] == ["fast"]
+    task = pkg.task_m['p.t']
+    info = build_usage_info(task)
+    assert [a for a in info['args'] if a['param'] == 'mode'][0]['choices'] == \
+        ["fast", "slow"]
+    parser, _ = build_arg_parser(task, resolve_task_cli(task), "dfm run p.t")
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--mode", "medium"])
 
 
 def test_value_completion(proj):

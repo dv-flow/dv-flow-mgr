@@ -170,7 +170,8 @@ and is checked against it:
 
 A task that re-declares ``values:`` replaces the inherited set outright, either
 narrowing or widening it. This is whole-set replacement rather than a per-value
-merge, matching how ``cli:`` blocks are inherited.
+merge: per-value merging has no answer for "how do I remove an inherited
+value?".
 
 Command-Line Surfaces
 ~~~~~~~~~~~~~~~~~~~~~
@@ -181,13 +182,143 @@ Declaring a value set is what populates:
   ``dfm show task <name> --usage`` and ``dfm run <task> --help``;
 * ``choices`` in the ``--usage --json`` document, alongside ``choices_doc`` and
   ``choices_open``;
-* ``argparse`` validation for a scalar flag declared in a ``cli:`` block;
+* ``argparse`` validation for a scalar flag (see `Exposing a Parameter on the
+  Command Line`_);
 * value completion -- ``dfm complete --task tests --flag detail`` lists the
   accepted values.
 
-A ``cli:`` block may still declare its own ``choices:``, which wins for that
-flag. Use it only to *narrow* what a flag accepts relative to the parameter;
-the parameter's ``values`` is what every other path enforces.
+The parameter's ``values`` is the *only* place the accepted set is declared, so
+the flag, ``-D``, and a ``with:`` override are all checked against the same set.
+To narrow what a task accepts, re-declare ``values:`` on the derived task --
+that narrows every path at once, not just the flag.
+
+Exposing a Parameter on the Command Line
+========================================
+
+A parameter is settable from the command line when its declaration says so:
+
+.. code-block:: YAML
+
+    - name: sim-img
+      scope: root
+      with:
+        build:
+          type: str
+          value: opt
+          cli: true                        # -> --build
+          desc: Build variant
+          values: [opt, dbg, prof, cov]
+
+.. code-block:: bash
+
+    dfm run sim-img --build prof
+
+``cli: true`` is the whole declaration for the common case: the flag takes the
+parameter's own name, and its type, default, help text and accepted values come
+from the parameter. There is nothing to restate, and so nothing that can drift.
+
+Use the map form when the flag needs more than its name:
+
+.. code-block:: YAML
+
+    with:
+      tests:         { type: list, value: [], cli: {short: t} }
+      build_variant: { type: str,  value: opt, cli: {name: build} }
+      internal:      { type: str,  value: "",  cli: {hidden: true} }
+
+``short`` adds a single-character option, ``name`` renames the flag (the
+parameter it sets is unchanged), and ``hidden`` accepts the option but keeps it
+out of help and completion.
+
+How the Type Shapes the Flag
+----------------------------
+
+The parameter's declared type decides how the option behaves:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 85
+
+   * - Type
+     - Flag
+   * - ``str``, ``int``, ``float``
+     - takes a value, converted to the declared type
+   * - ``bool``
+     - a switch: ``--fast`` sets it true, absence leaves the default alone
+   * - ``list``
+     - repeatable and comma-splitting: ``--views rtl --views tlm`` and
+       ``--views rtl,tlm`` are equivalent
+
+Inheritance
+-----------
+
+``cli:`` is inherited along ``uses:`` **per parameter**, like ``values:``. A
+task that re-declares a parameter to change its default keeps the base's flag.
+To remove an inherited flag, re-declare the parameter with ``cli: false``:
+
+.. code-block:: YAML
+
+    - name: quiet-tests
+      uses: std.TestRunner
+      with:
+        detail: { type: str, value: quiet, cli: false }
+
+Project-Wide Flags
+------------------
+
+A **package** variable takes the same declaration, and means a project-wide
+knob rather than one task's argument -- so its flag applies to whatever task is
+being run:
+
+.. code-block:: YAML
+
+    package:
+      name: my-proj
+      with:
+        build:
+          type: str
+          value: opt
+          cli: true
+          desc: Build variant for every image and run in this project
+          values: [opt, dbg, cov, prof]
+
+.. code-block:: bash
+
+    dfm run tests --build dbg          # the whole project
+    dfm run sim-img --build dbg        # ...and any other task in it
+
+``cli:`` on a package variable is collected along the package ``uses:`` chain,
+so a **base project can define a command-line interface its leaves inherit** --
+which is how a family of projects gets the same flags without restating them.
+
+``dfm run <task> --help`` lists these under **Project options**, because from
+the command line they are indistinguishable from the task's own.
+
+If a task parameter and a package variable claim the same flag, the **task
+parameter wins** and a warning names both. Neither declaration can see the
+other, so the rule is stated once rather than resolved silently; the package
+variable stays reachable as ``-D <name>=<value>``.
+
+Scope and Precedence
+--------------------
+
+A flag applies **only when its task is the invoked root**. It is inert when the
+task is reached as a dependency, so exposing a parameter never changes how a
+flow composes.
+
+``-D`` remains the universal escape hatch: it reaches any parameter, exposed or
+not. When both are given for the same parameter, the flag wins:
+
+.. code-block:: text
+
+    declared default  <  -P param-file  <  -D  <  --flag
+
+Note the two mechanisms scope differently, deliberately. ``--seed 42`` sets only
+the invoked root, while a bare ``-D seed=42`` reaches every task in the graph
+with a ``seed`` parameter.
+
+A flag that would collide with one of ``dfm``'s own options is a load-time
+error naming both, rather than a flag that silently never reaches the task.
 
 Overrides
 =========

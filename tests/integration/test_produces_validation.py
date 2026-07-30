@@ -113,7 +113,13 @@ package:
 
 
 def test_produces_inheritance_validation(tmpdir, capsys):
-    """Test produces inheritance works with validation."""
+    """A derived task's `produces:` replaces its base's, and validation sees it.
+
+    The consumer here asks for `verilog`, which only the BASE declared. Under
+    the old extend-the-base rule it matched an inherited claim the derived task
+    never honors; under nearest-wins the mismatch is reported, which is the
+    whole point of the dataflow check.
+    """
     flow_yaml = """
 package:
   name: test_inherit
@@ -153,11 +159,11 @@ package:
     output = json.loads(captured.out)
     
     assert result == 0
-    assert output['valid'] is True
-    
-    # Should have no dataflow warnings (derived inherits verilog from base)
+
+    # `derived` produces only vhdl, so a consumer wanting verilog is a real
+    # mismatch and is reported.
     dataflow_warnings = [w for w in output['warnings'] if w['type'] == 'DataflowMismatch']
-    assert len(dataflow_warnings) == 0
+    assert len(dataflow_warnings) == 1
 
 
 def test_chain_of_tasks(tmpdir, capsys):

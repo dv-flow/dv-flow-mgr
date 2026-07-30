@@ -29,11 +29,13 @@ package:
 
   fragments:
     - filters.yaml
+    - checks.yaml
 
   tasks:
   - name: Message
     shell: pytask
     run: dv_flow.mgr.std.message.Message
+    produces: []
     with:
       msg:
         type: str
@@ -46,6 +48,12 @@ package:
     uptodate: dv_flow.mgr.std.fileset.FileSetUpToDate
     passthrough: all
     consumes: none
+    produces:
+    # `type:` here is the ITEM type; the fileset's CONTENT type is the task's
+    # `type` parameter, which the item calls `filetype`. Propagating it is what
+    # lets a consumer require `{type: std.FileSet, filetype: verilogSource}`.
+    - type: std.FileSet
+      filetype: "${{ type }}"
     with:
       base:
         doc: |
@@ -76,6 +84,9 @@ package:
     run: dv_flow.mgr.std.create_file.CreateFile
     passthrough: all
     consumes: none
+    produces:
+    - type: std.FileSet
+      filetype: "${{ type }}"
     doc: |
       Creates one or more files in the run directory from 
       literal content in the .dv file. Outputs a fileset 
@@ -97,6 +108,8 @@ package:
     shell: pytask
     run: dv_flow.mgr.std.setenv.SetEnv
     uptodate: dv_flow.mgr.std.setenv.SetEnvUpToDate
+    produces:
+    - type: std.Env
     with:
       setenv:
         type: map
@@ -111,6 +124,9 @@ package:
     desc: Outputs all input filesets with the specified filetype
     shell: pytask
     run: dv_flow.mgr.std.set_file_type.SetFileType
+    produces:
+    - type: std.FileSet
+      filetype: "${{ filetype }}"
     with:
       filetype:
         type: str
@@ -118,6 +134,9 @@ package:
   - name: IncDirs
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs
+    produces:
+    # Carries incdirs only -- no content type to state.
+    - type: std.FileSet
     doc: |
       Creates a list of include directories from a set of
       input files.
@@ -128,6 +147,11 @@ package:
     desc: Binds a placement policy (dest/strip/flatten) to input FileSets
     shell: pytask
     run: dv_flow.mgr.std.publish.PubSetTask
+    produces:
+    # A PubSet is-a FileSet, so a consumer asking for either matches.
+    # `filetype` comes from the input being re-emitted, not from a parameter,
+    # so there is nothing statically true to say about it.
+    - type: std.PubSet
     doc: |
       Consumes FileSets and emits std.PubSet items that carry a placement
       policy (dest/strip/flatten) for consumption by std.Publish. Use this
@@ -156,6 +180,9 @@ package:
     desc: Copies input FileSets/PubSets into this run's output-data directory
     shell: pytask
     run: dv_flow.mgr.std.publish.Publish
+    # Copies files into the output directory; contributes no item of its own.
+    # Declared empty rather than left unsaid -- see the note on `produces:`.
+    produces: []
     # Publish on every run: a fresh out/<run-id> per invocation. Re-copies are
     # still skipped by content hash when a run-id is reused (--run-id).
     uptodate: false
@@ -200,6 +227,8 @@ package:
       in priority order: copilot, codex.
     shell: pytask
     run: dv_flow.mgr.std.agent.Agent
+    # The agent's result is written to a file, not emitted as a data item.
+    produces: []
     with:
       system_prompt:
         type: str
@@ -270,11 +299,14 @@ package:
     run: dv_flow.mgr.std.task_null.TaskNull
     passthrough: all
     consumes: none
+    # Forwards its inputs unchanged; adds nothing.
+    produces: []
     desc: "No-op task that passes inputs through unchanged"
 
   - name: RunTasks
     shell: pytask
     run: dv_flow.mgr.std.run_tasks.RunTasks
+    produces: []
     doc: |
       Dynamically executes tasks specified by TaskRunSpec input items.
       Tasks are scheduled into the current execution with proper dependencies.
@@ -316,26 +348,23 @@ package:
       run that tested less than was asked for.
     elaborate: dv_flow.mgr.std.test_select:TestSelect
     summary: dv_flow.mgr.std.test_summary:test_summary
-    cli:
-      args:
-      - name: tests
-        short: t
-      - name: views
-      - name: detail
     with:
       tests:
         type: list
         value: []
+        cli: {short: t}
         doc: |
           Cases to run, by name. Empty (the default) runs all of them.
       views:
         type: list
         value: []
+        cli: true
         doc: |
           Variants/configurations to run the cases on. Empty runs all of them.
       detail:
         type: str
         value: normal
+        cli: true
         doc: Report verbosity.
         values:
         - {value: quiet,  desc: "the headline only"}
@@ -409,6 +438,40 @@ package:
           parameter.
 
   types:
+  - name: Check
+    doc: |
+      Base type for graph-build task requirements. Derive from it and bind an
+      implementation with `check: module:function`.
+    with:
+      severity:
+        type: str
+        value: error
+        values:
+        - {value: error,   desc: "fails the build"}
+        - {value: warning, desc: "reported, the build continues"}
+        - {value: "off",   desc: "not evaluated"}
+        doc: |
+          How a violation is reported. `off` is the documented way for a
+          project that cannot satisfy an inherited requirement to say so: it
+          leaves an auditable record in the flow file, which a silent pass or a
+          command-line flag would not.
+      id:
+        type: str
+        value: ""
+        doc: |
+          Distinguishes two instances of the same check type on one task.
+          Requirements are accumulated along the `uses:` chain with
+          nearest-wins per (check type, id), so an `id` is what lets a task
+          carry two different `std.check.Needs` requirements -- and what lets a
+          derived task replace one of them without touching the other.
+      hint:
+        type: str
+        value: ""
+        doc: |
+          Remediation text shown verbatim after the generic diagnostic. This is
+          where the author of a requirement writes the lines the reader should
+          actually type.
+
   - name: Tag
     doc: |
       Base type for all tags. Tags are used to categorize and filter tasks and packages.

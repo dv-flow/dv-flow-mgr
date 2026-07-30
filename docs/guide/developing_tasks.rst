@@ -294,6 +294,36 @@ Consume it through ``uses:``, like any other task:
     - name: MyCompile
       uses: sim_pkg.CompileStub
 
+How Many Cores a Task May Use
+-----------------------------
+
+A task that shells out to something with a parallelism flag should ask, rather
+than assume:
+
+.. code-block:: YAML
+
+    - name: build
+      shell: bash
+      run: make -j $DFM_CORES
+
+``$DFM_CORES`` is exported into every task's environment; a Python task reads
+the same value as ``ctxt.cores``.
+
+Do not use the machine's CPU count. Under a batch scheduler that is the
+**node's** core count, not this job's allocation, and using it oversubscribes
+the node -- several tasks each spawning a node's worth of compilers is how a
+build gets its compiler killed by the OOM killer. ``DFM_CORES`` reports the
+actual allocation (LSF, SLURM) when running under one, and the ``-j`` budget
+otherwise.
+
+Nor should you pass a bare ``-j``: to GNU make that means *unlimited*.
+
+.. note::
+
+   Locally, the ``-j`` budget is not yet divided among concurrently running
+   tasks, so several heavy builds can still oversubscribe. Set ``DFM_CORES``
+   explicitly, or lower ``-j``, where that matters.
+
 Constraints
 -----------
 
@@ -321,7 +351,7 @@ A task's ``run:`` body is stored verbatim at load time and expanded
 Two consequences worth relying on:
 
 * Parameter overrides reach the body.  ``-D``, ``-P``, ``set:`` and a
-  ``cli:`` ``--flag`` all apply before expansion, so
+  task ``--flag`` all apply before expansion, so
   ``run: echo ${{ seed }}`` and ``$DFM_PARAM_seed`` always agree.
 * One task definition instantiated twice gets two independent bodies --
   including one matrix cell per axis value, and ``${{ this.<param> }}`` /

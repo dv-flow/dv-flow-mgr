@@ -21,15 +21,26 @@ from typing import Dict, List, Optional, Tuple, Union
 from .task_def import ConsumesE
 
 class DataflowMatcher:
-    """Matches producer outputs against consumer inputs."""
-    
+    """Matches producer outputs against consumer inputs.
+
+    `resolve_type(name) -> Type | None` enables IS-A matching on `type`, so a
+    consumer asking for `std.FileSet` accepts a `std.PubSet`. Without it,
+    matching falls back to string equality -- the honest answer when no type
+    registry is available, since a matcher with no way to reason about
+    inheritance should not start rejecting things.
+    """
+
     _log = logging.getLogger("DataflowMatcher")
+
+    def __init__(self, resolve_type=None):
+        self.resolve_type = resolve_type
     
-    def check_compatibility(self, 
+    def check_compatibility(self,
                           produces: Optional[List[Dict]],
                           consumes: Union[ConsumesE, List[Dict], None],
                           producer_name: str,
-                          consumer_name: str) -> Tuple[bool, Optional[str]]:
+                          consumer_name: str,
+                          passthrough=None) -> Tuple[bool, Optional[str]]:
         """
         Checks if producer's produces is compatible with consumer's consumes.
         
@@ -57,13 +68,21 @@ class DataflowMatcher:
             if consumes == ConsumesE.All:
                 return (True, None)
             elif consumes == ConsumesE.No:
-                # Expects no dataflow
                 if produces is None or len(produces) == 0:
                     return (True, None)
-                else:
-                    return (False, 
-                           f"Task '{consumer_name}' has consumes=none but "
-                           f"'{producer_name}' produces {produces}")
+                # `consumes: none` means "I do not READ these inputs" -- not
+                # "nothing may flow to me". A task that forwards what it does
+                # not consume is the ordinary aggregator idiom (`std.FileSet`
+                # with `passthrough: all` collecting other filesets), so the
+                # items are not dropped and there is nothing to report.
+                if self._forwards(passthrough):
+                    return (True, None)
+                # Neither read nor forwarded: the producer's output really is
+                # discarded here, which is worth saying.
+                return (False,
+                       f"Task '{consumer_name}' consumes none of its inputs and "
+                       f"does not pass them through, so the output of "
+                       f"'{producer_name}' ({produces}) is discarded")
         
         # No produces specified - unknown outputs (assume compatible)
         if produces is None or len(produces) == 0:
@@ -84,6 +103,17 @@ class DataflowMatcher:
         
         return (True, None)
     
+    @staticmethod
+    def _forwards(passthrough) -> bool:
+        """Whether a task forwards inputs it did not consume.
+
+        Unspecified means the engine default (`unused`), which forwards.
+        """
+        if passthrough is None:
+            return True
+        value = getattr(passthrough, 'value', passthrough)
+        return str(value).lower() not in ("none", "false")
+
     def _find_matching_produce(self, 
                                consume_pattern: Dict, 
                                produces: List[Dict]) -> bool:
@@ -101,15 +131,10 @@ class DataflowMatcher:
     def _pattern_matches(self, consume: Dict, produce: Dict) -> bool:
         """
         Checks if a produce pattern satisfies a consume pattern.
-        
-        All attributes in consume must exist in produce with same value.
-        Produce can have additional attributes (subset match).
+
+        Subset match on attributes, IS-A match on `type` -- see
+        `type_match.pattern_matches`, which is shared with `std.check.Needs` so
+        the two cannot disagree about what satisfies what.
         """
-        for key, value in consume.items():
-            if key not in produce:
-                self._log.debug(f"  Key '{key}' not in produce")
-                return False
-            if produce[key] != value:
-                self._log.debug(f"  Value mismatch: {produce[key]} != {value}")
-                return False
-        return True
+        from .type_match import pattern_matches
+        return pattern_matches(consume, produce, self.resolve_type)

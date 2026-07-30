@@ -157,6 +157,15 @@ def _add_run_opts(p):
                         default=[],
                         metavar="TARGET=REPLACEMENT",
                         help="Override a task: TARGET=REPLACEMENT (e.g. pkg.Task=std.Null)")
+    p.add_argument("--needs",
+                        dest="needs",
+                        action="append",
+                        default=[],
+                        metavar="TASK",
+                        help="Supply an additional input to the task being run, as if "
+                             "it were in that task's `needs:`. May be used multiple "
+                             "times. Applies only to the invoked task, and adds to its "
+                             "declared needs rather than replacing them.")
     p.add_argument("--report",
                         dest="report_dir",
                         default=None,
@@ -721,6 +730,18 @@ def _run_client_mode(socket_path: str) -> int:
                     elif args[i] == "--timeout" and i + 1 < len(args):
                         timeout = float(args[i + 1])
                         i += 2
+                    elif args[i] == "--needs":
+                        # The server protocol carries only (tasks, overrides,
+                        # timeout), so an extra input edge cannot be forwarded.
+                        # Say so rather than drop it: a silently unwired --needs
+                        # produces a run that looks fine and used the wrong
+                        # input.
+                        print("Error: --needs is not supported over "
+                              "DFM_SERVER_SOCKET; the server protocol carries "
+                              "only tasks, -D overrides and --timeout. Declare "
+                              "the dependency in `needs:` instead.",
+                              file=sys.stderr)
+                        return 1
                     elif not args[i].startswith("-"):
                         tasks.append(args[i])
                         i += 1

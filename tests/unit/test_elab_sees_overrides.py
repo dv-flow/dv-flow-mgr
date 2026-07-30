@@ -162,7 +162,7 @@ def test_selection_of_everything_is_the_same_graph(env):
 
 # ------------------------------------------------------- end to end (CLI)
 # The builder-level tests above drive the override maps directly. These prove
-# the rungs that only exist at the CLI -- `-P` and a `cli:` `--flag` -- travel
+# the rungs that only exist at the CLI -- `-P` and a task `--flag` -- travel
 # the same path and reach the elaborator.
 
 CLI_FLOW = """\
@@ -175,11 +175,8 @@ package:
     - name: tests
       scope: root
       elaborate: elabsel:select
-      cli:
-        args:
-        - name: only
       with:
-        only: { type: list, value: [] }
+        only: { type: list, value: [], cli: true }
       needs: [a, b, c]
 """
 

@@ -361,7 +361,10 @@ class CmdValidate:
         
         from ..dataflow_matcher import DataflowMatcher
         
-        matcher = DataflowMatcher()
+        # With the loader's type registry the matcher can honor is-a, so a
+        # consumer asking for `std.FileSet` accepts a `std.PubSet`.
+        matcher = DataflowMatcher(
+            resolve_type=(loader.findType if loader is not None else None))
         
         # Find all root tasks to validate
         root_tasks = []
@@ -399,15 +402,44 @@ class CmdValidate:
                 return
             visited.add(id(current_node))
             
+            # A COMPOUND aggregates its needs' outputs into its own output
+            # rather than consuming them (`task_node_compound.py`) -- and for a
+            # compound, "needs" includes its own terminal interior tasks. Its
+            # `consumes:` patterns describe what its BODY reads, so checking
+            # them against the interior's produces asks the wrong question and
+            # reports every compound in the project.
+            from ..task_node_compound import TaskNodeCompound
+            _is_conduit = isinstance(current_node, TaskNodeCompound)
+
             # Check this node's dependencies
             for need, is_blocking in current_node.needs:
-                if not is_blocking:  # Only check dataflow dependencies
+                if not is_blocking and not _is_conduit:  # Only check dataflow dependencies
                     compatible, error_msg = matcher.check_compatibility(
                         produces=need.produces,
                         consumes=current_node.consumes,
                         producer_name=need.name,
-                        consumer_name=current_node.name
+                        consumer_name=current_node.name,
+                        passthrough=getattr(current_node, 'passthrough', None)
                     )
+
+                    # The producer said what it emits and the consumer never
+                    # said what it takes, so there was information here and
+                    # nothing to check it against. Reported only in that case:
+                    # nagging about an undeclared consumer with nothing
+                    # upstream to check would be noise, not a finding.
+                    if (compatible
+                            and need.produces
+                            and not getattr(current_node, 'consumes_declared', False)):
+                        warnings.append({
+                            'type': 'UndeclaredConsumes',
+                            'task': current_node.name,
+                            'producer': need.name,
+                            'message': (
+                                "Task '%s' does not declare `consumes:`, so the "
+                                "output of '%s' (%s) cannot be checked against "
+                                "it" % (current_node.name, need.name,
+                                        need.produces)),
+                        })
                     
                     if not compatible:
                         warnings.append({

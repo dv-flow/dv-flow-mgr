@@ -49,13 +49,13 @@ def collect_param_value_sets(task):
     Separate from `collect_task_params` because a value set **inherits
     independently of the value**: a derived task that re-declares a param to
     change its default, and says nothing about `values:`, keeps the base's set
-    and is checked against it. That is precisely the case that goes unchecked
-    when the set lives on a `cli:` block instead of the parameter.
+    and is checked against it. That is precisely the case that would go
+    unchecked if the set lived on a separate CLI declaration instead of the
+    parameter.
 
     A task that does re-declare `values:` replaces the inherited set outright
-    (narrowing or widening it) -- the same whole-block rule `cli:` follows, and
-    for the same reason: per-value merging has no answer for "how do I remove an
-    inherited value?".
+    (narrowing or widening it); per-value merging has no answer for "how do I
+    remove an inherited value?".
     """
     sets = {}
     for t in reversed(list(iter_uses_chain(task))):
@@ -69,6 +69,32 @@ def collect_param_value_sets(task):
     return sets
 
 
+def collect_param_cli(task):
+    """{param: CliOpt} for the params `task` exposes as command-line options.
+
+    Inherits along `uses:` **per parameter**, exactly as `collect_param_value_sets`
+    does and for the same reason: a derived task that re-declares a param to
+    change its default, saying nothing about `cli:`, keeps the base's flag. A
+    derived task removes an inherited flag by re-declaring the param with
+    `cli: false` -- which is the whole reason absence and `false` are stored
+    distinguishably (see ParamDef._normalize_cli).
+    """
+    opts = {}
+    for t in reversed(list(iter_uses_chain(task))):
+        param_defs = getattr(t, 'param_defs', None)
+        if param_defs is None:
+            continue
+        for name, pdef in param_defs.definitions.items():
+            cli = getattr(pdef, 'cli', None)
+            if cli is None:
+                continue
+            if cli is False:
+                opts.pop(name, None)
+            else:
+                opts[name] = cli
+    return opts
+
+
 @dc.dataclass
 class Need(object):
     task : 'Task'
@@ -80,9 +106,28 @@ class StrategyGenerate(object):
     run : str = None
 
 @dc.dataclass
+class SelectSpec(object):
+    """A resolved `select:` family: the axes with their members expanded, how a
+    cell is named, and what the bare family name means.
+
+    Resolved at load (unlike a matrix, whose axes are expanded at graph build)
+    because the cells are declared tasks -- they have to exist before anything
+    can reference one by name."""
+    axes : Dict[str, List[Any]] = dc.field(default_factory=dict)
+    key : str = None
+    # 'alias' (the family is one cell), 'all' (a gate over every cell), or
+    # 'none' (only cells are addressable).
+    mode : str = "alias"
+    # For mode == 'alias': {axis: value-or-expression} chosen at graph build.
+    default : Dict[str, Any] = dc.field(default_factory=dict)
+    # Cell key -> {axis: value}, in cartesian order. The catalog itself.
+    cells : Dict[str, Dict[str, Any]] = dc.field(default_factory=dict)
+
+@dc.dataclass
 class Strategy(object):
     generate : StrategyGenerate = None
     matrix : Dict[str, List[Any]] = dc.field(default_factory=dict)
+    select : SelectSpec = None
 
 @dc.dataclass
 class Task(object):
@@ -103,6 +148,10 @@ class Task(object):
     iff : str = None
     needs : List[str] = dc.field(default_factory=list)
     consumes : Union[ConsumesE, List[Dict[str, Any]]] = dc.field(default=None)
+    # Whether `consumes:` was actually declared. `consumes` itself is defaulted
+    # to ConsumesE.All for the engine, so it cannot answer this -- and reading
+    # the default as an authored claim is what made the dataflow check vacuous.
+    consumes_declared : bool = False
     produces : Union[List[Dict[str, Any]], None] = dc.field(default=None)
     passthrough : Union[PassthroughE, List[Dict[str, Any]]] = dc.field(default=None)
     rundir : RundirE = None
@@ -127,6 +176,18 @@ class Task(object):
     # expressions are stashed here and resolved per cell in _applyStrategyMatrix.
     needs_expr : List[str] = dc.field(default_factory=list)
     needs_expr_fragment : str = None
+    # A cell of a `select:` family: the family task it belongs to and the axis
+    # values that identify it. Set on the per-cell tasks registered in the
+    # package namespace at load; the builder uses them to bind `this`/`matrix`
+    # while the cell's node is constructed. None on every other task.
+    select_family : 'Task' = None
+    select_bindings : Dict[str, Any] = None
+    # A COMMAND-LINE partial cell key (`dfm run sim-img.prof`): the axes it
+    # named, with the rest left to the family's default. Set on a throwaway copy
+    # of the family task by CLITaskResolver; never on a declared task, because a
+    # flow file must name a cell in full (a partial key would change meaning
+    # when a default moved).
+    select_partial : Dict[str, Any] = None
     run : str = None
     # Directory of the file that *declared* `run`, which is not necessarily
     # this task's own srcdir: an inherited body carries its author's
@@ -149,10 +210,12 @@ class Task(object):
     # 'module:function' string or a SummaryDef (populated from TaskDef.summary).
     # Resolved along the `uses` chain by resolve_task_summary.
     summary : Any = None
-    # Command-line arguments this task accepts under `dfm run` (populated from
-    # TaskDef.cli). Resolved along the `uses` chain by cli_args.resolve_task_cli.
-    cli : Any = None
     tags : List['Type'] = dc.field(default_factory=list)
+    # Check instances this task must satisfy (from TaskDef.requires). Same shape
+    # as `tags` -- parameterized type instances -- but consulted by the builder
+    # rather than by whoever reads tags. Accumulated along `uses` by
+    # TaskGraphBuilder._resolve_requires.
+    requires : List['Type'] = dc.field(default_factory=list)
     max_failures : int = -1
     on_error : str = None
     srcinfo : SrcInfo = None

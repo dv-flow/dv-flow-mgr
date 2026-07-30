@@ -23,7 +23,8 @@ from .param_types import (KEYWORD_TYPE, TypeKind, check_value_set,
                           coerce_cli_value, keyword_default, normalize_type)
 from .srcinfo import SrcInfo
 from .symbol_scope import SymbolScope
-from .task import Task, Strategy, StrategyGenerate, collect_task_params
+from .task import (Task, Strategy, StrategyGenerate, SelectSpec,
+                   collect_task_params)
 from .task_def import TaskDef, ConsumesE, RundirE, PassthroughE, StrategyDef, CacheDef
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE
 from .type import Type
@@ -31,12 +32,17 @@ from .type_def import TypeDef
 from .yaml_srcinfo_loader import YamlSrcInfoLoader
 
 def _taskdef_has_matrix(taskdef) -> bool:
-    """True if `taskdef` declares a matrix strategy. A matrix body's `uses`/
-    `needs` may reference a matrix variable whose binding only exists once the
-    strategy fans out at graph-build; such expressions are deferred rather than
-    resolved at load. Single predicate for both defer sites."""
-    return (taskdef.strategy is not None and
-            bool(getattr(taskdef.strategy, 'matrix', None)))
+    """True if `taskdef` declares a per-cell strategy -- `matrix:` or `select:`.
+
+    A cell body's `uses`/`needs` may reference an axis variable whose binding
+    only exists once the cell is built; such expressions are deferred rather
+    than resolved at load. Single predicate for both defer sites, and it covers
+    both strategies because a select cell's body is evaluated through the same
+    per-cell path (TaskGraphBuilder._mkCellNode)."""
+    if taskdef.strategy is None:
+        return False
+    return bool(getattr(taskdef.strategy, 'matrix', None)) or \
+        getattr(taskdef.strategy, 'select', None) is not None
 
 
 def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
@@ -71,7 +77,7 @@ def _suggest_similar_field(invalid_field: str, model_class: type) -> str:
 _PARAMDEF_KEYS = frozenset({
     'type', 'value', 'append', 'prepend',
     'path-append', 'path-prepend',
-    'doc', 'desc', 'srcinfo', 'values',
+    'doc', 'desc', 'srcinfo', 'values', 'cli',
 })
 
 def _is_paramdef_dict(d: dict) -> bool:
@@ -933,11 +939,50 @@ class PackageProviderYaml(PackageProvider):
         when one is available). Callers MUST NOT proceed to dereference the missing
         task -- `error()` only records a marker, so continuing would append/deref a
         None and crash with an opaque 'NoneType' error downstream."""
+        partial = self._partialCellHint(need_name)
+        if partial is not None:
+            loader.error(partial, srcinfo)
+            return
         suggestions = self._suggestTaskNames(need_name)
         hint = ""
         if suggestions:
             hint = " (did you mean %s?)" % " or ".join("'%s'" % s for s in suggestions)
         loader.error("failed to find task '%s'%s" % (need_name, hint), srcinfo)
+
+    def _partialCellHint(self, name):
+        """A message for a `needs:` naming a select cell by a PARTIAL key.
+
+        A partial key is command-line sugar: the axes it leaves out come from
+        the family's default, which `-D` and a `--flag` can move. A flow file
+        must not change meaning because a default moved, so `needs:` requires
+        the full key -- and says which ones it could have meant, since the
+        generic "did you mean" would suggest nothing useful here.
+        """
+        if not len(self._pkg_s):
+            return None
+        scope = self._pkg_s[-1]
+        pkg = getattr(scope, "pkg", scope)
+        leaf = name.split('.')[-1]
+        for task in list(pkg.task_m.values()):
+            select = getattr(getattr(task, 'strategy', None), 'select', None)
+            if select is None:
+                continue
+            prefix = name[:-(len(leaf) + 1)] if len(name) > len(leaf) else ""
+            if not prefix or not (task.name == prefix
+                                  or task.name.endswith("." + prefix)):
+                continue
+            matches = ["%s.%s" % (task.name, key)
+                       for key, cell in select.cells.items()
+                       if leaf in [str(v) for v in cell.values()]]
+            if matches:
+                return (
+                    "'%s' names a cell of the select family '%s' by a partial "
+                    "key. A `needs:` must name a cell in full, because the axes "
+                    "a partial key leaves out come from the family's default -- "
+                    "which -D and a --flag can move. Did you mean %s?" % (
+                        name, task.name,
+                        " or ".join("'%s'" % m for m in sorted(matches))))
+        return None
 
     def _findTaskOrType(self, name, loader):
         self._log.debug("--> _findTaskOrType %s" % name)
@@ -1257,10 +1302,172 @@ class PackageProviderYaml(PackageProvider):
             loader._eval.set("srcdir", prev_srcdir)
             loader.popPath()
 
-    def _loadTasks(self, 
-                   pkg : Package, 
+    def _resolveSelectAxes(self, loader, taskdef, select):
+        """{axis: [members]} for a `select:` family, resolved at load.
+
+        An axis is a literal list or a `${{ }}` expression over package
+        variables. It may NOT depend on a `set:`/`let` rebind: those exist only
+        inside a subtree at graph build, and a family whose *shape* changed by
+        instantiation site could not have stable cell names. A reference that
+        cannot be resolved here is a marker naming the axis, not a late failure.
+        """
+        axes = {}
+        for name, values in select.axes.items():
+            if isinstance(values, str):
+                try:
+                    resolved = loader.evalExpr(values) if "${{" in values else values
+                except Exception as e:
+                    loader.error(
+                        "select axis '%s' on task '%s': %s. A select axis is "
+                        "resolved at load, so it may only reference package "
+                        "variables." % (name, taskdef.name, e),
+                        taskdef.srcinfo)
+                    return None
+                values = resolved
+            if not isinstance(values, list) or not len(values):
+                loader.error(
+                    "select axis '%s' on task '%s' must be a non-empty list "
+                    "(or an expression over package variables resolving to "
+                    "one), got %r" % (name, taskdef.name, values),
+                    taskdef.srcinfo)
+                return None
+            axes[name] = list(values)
+        return axes
+
+    def _selectCells(self, loader, taskdef, select, axes):
+        """{cell key: {axis: value}} in cartesian order.
+
+        The default key is the axis values joined with '.', in declaration
+        order; `key:` overrides it with a template evaluated against the cell's
+        own bindings.
+        """
+        import itertools
+        names = list(axes.keys())
+        cells = {}
+        for combo in itertools.product(*[axes[n] for n in names]):
+            bindings = dict(zip(names, combo))
+            if select.key is not None:
+                key = self._evalSelectKey(loader, taskdef, select.key, bindings)
+                if key is None:
+                    return None
+            else:
+                key = ".".join(str(v) for v in combo)
+            if key in cells:
+                loader.error(
+                    "select on task '%s': cells %s and %s both resolve to the "
+                    "key '%s'" % (taskdef.name, cells[key], bindings, key),
+                    taskdef.srcinfo)
+                return None
+            cells[key] = bindings
+        return cells
+
+    def _evalSelectKey(self, loader, taskdef, template, bindings):
+        """Evaluate a `key:` template against one cell's bindings.
+
+        `this`/`matrix` are bound to the cell, matching what a body task sees,
+        so one spelling works in both places.
+        """
+        saved_this = loader._eval.expr_eval.variables.get('this')
+        saved_matrix = loader._eval.expr_eval.variables.get('matrix')
+        saved_nr = loader._eval.expr_eval.name_resolution
+        loader._eval.expr_eval.variables['this'] = dict(bindings)
+        loader._eval.expr_eval.variables['matrix'] = dict(bindings)
+        # Dropped for the same reason _eval_in_cell drops it: an enclosing
+        # `this` scope would otherwise shadow the cell's own bindings.
+        loader._eval.expr_eval.name_resolution = None
+        try:
+            return str(loader.evalExpr(template))
+        except Exception as e:
+            loader.error(
+                "select 'key' on task '%s': %s" % (taskdef.name, e),
+                taskdef.srcinfo)
+            return None
+        finally:
+            loader._eval.expr_eval.name_resolution = saved_nr
+            for k, v in (('this', saved_this), ('matrix', saved_matrix)):
+                if v is None:
+                    loader._eval.expr_eval.variables.pop(k, None)
+                else:
+                    loader._eval.expr_eval.variables[k] = v
+
+    def _declareSelectCells(self, pkg, loader, taskdef, task, scope_name):
+        """Register one Task per cell of a `select:` family.
+
+        A cell is a real task in the package namespace -- that is the whole
+        point: it can be `needs:`-ed, resolved from the CLI, shown, and (because
+        the builder memoizes by name) shared by two consumers rather than built
+        twice. The cell's interior comes from the family's single body task,
+        linked in when the family elaborates; here we only establish identity.
+        """
+        select = taskdef.strategy.select
+        loader._eval.set_name_resolution(self.package_scope())
+
+        axes = self._resolveSelectAxes(loader, taskdef, select)
+        if axes is None:
+            return
+        cells = self._selectCells(loader, taskdef, select, axes)
+        if cells is None:
+            return
+
+        mode, default = self._selectDefault(loader, taskdef, select, axes)
+        task.strategy = Strategy(select=SelectSpec(
+            axes=axes, key=select.key, mode=mode, default=default, cells=cells))
+
+        for key, bindings in cells.items():
+            cell_name = "%s.%s" % (task.name, key)
+            if cell_name in pkg.task_m:
+                loader.error(
+                    "select cell '%s' collides with an existing task" % cell_name,
+                    taskdef.srcinfo)
+                continue
+            cell = Task(
+                name=cell_name,
+                desc=task.desc,
+                doc=task.doc,
+                package=pkg,
+                srcinfo=taskdef.srcinfo,
+                # Cells are as reachable as the family that declares them: a
+                # `root:` family yields runnable cells, which is what makes
+                # `dfm run sim-img.prof` work.
+                is_root=task.is_root,
+                is_export=task.is_export,
+                is_local=task.is_local,
+                select_family=task,
+                select_bindings=dict(bindings))
+            pkg.task_m[cell_name] = cell
+            self._pkg_s[-1].add(cell, "%s.%s" % (scope_name, key))
+
+    def _selectDefault(self, loader, taskdef, select, axes):
+        """(mode, binding-map) for what the bare family name means."""
+        default = select.default
+        if default is None:
+            # First value of each axis -- a family always names something.
+            return "alias", {name: values[0] for name, values in axes.items()}
+        if isinstance(default, str):
+            if default in ("all", "none"):
+                return default, {}
+            loader.error(
+                "select 'default' on task '%s' must be a binding map, 'all', or "
+                "'none', got '%s'" % (taskdef.name, default), taskdef.srcinfo)
+            return "alias", {name: values[0] for name, values in axes.items()}
+        # A binding map. Values may be `${{ }}` expressions over the task's own
+        # parameters, so they are NOT resolved here -- that is what wires a
+        # task-level variable (and its `--flag`) to the cell selection.
+        for name in default.keys():
+            if name not in axes:
+                loader.error(
+                    "select 'default' on task '%s' binds '%s', which is not an "
+                    "axis. Axes: %s" % (
+                        taskdef.name, name, ", ".join(axes.keys())),
+                    taskdef.srcinfo)
+        binding = {name: values[0] for name, values in axes.items()}
+        binding.update({k: v for k, v in default.items() if k in axes})
+        return "alias", binding
+
+    def _loadTasks(self,
+                   pkg : Package,
                    loader : PackageLoaderP,
-                   taskdefs : List[TaskDef], 
+                   taskdefs : List[TaskDef],
                    basedir : str):
         self._log.debug("--> _loadTasks %s" % pkg.name)
 
@@ -1297,7 +1504,6 @@ class PackageProviderYaml(PackageProvider):
                 set_defs=list(getattr(taskdef, "set_defs", []) or []),
                 elaborate=getattr(taskdef, "elaborate", None),
                 summary=getattr(taskdef, "summary", None),
-                cli=getattr(taskdef, "cli", None),
                 abstract=getattr(taskdef, "abstract", False))
 
             if taskdef.iff is not None:
@@ -1313,13 +1519,25 @@ class PackageProviderYaml(PackageProvider):
 
             tasks.append((taskdef, task))
             pkg.task_m[task.name] = task
-            
+
             # Add task to symbol scope with appropriate name
             if hasattr(taskdef, '_fragment_name') and taskdef._fragment_name is not None:
                 # Add to fragment scope
                 self._pkg_s[-1].add(task, f"{taskdef._fragment_name}.{taskdef.name}")
+                _scope_name = f"{taskdef._fragment_name}.{taskdef.name}"
             else:
                 self._pkg_s[-1].add(task, taskdef.name)
+                _scope_name = taskdef.name
+
+            # A `select:` family declares its cells as tasks in this same pass,
+            # NOT during elaboration. `needs:` resolution runs inside each task's
+            # own `_elabTask` and does not force the target to elaborate first,
+            # so a cell that came into existence only when its family elaborated
+            # would be missing for every task declared ahead of the family --
+            # making a legal reference depend on file order.
+            select = getattr(getattr(taskdef, 'strategy', None), 'select', None)
+            if select is not None:
+                self._declareSelectCells(pkg, loader, taskdef, task, _scope_name)
 
         # Collect feeds: for each taskdef with feeds, record feeding tasks in _feeds_map
         for taskdef, task in tasks:
@@ -1342,6 +1560,10 @@ class PackageProviderYaml(PackageProvider):
             self._elabTask(task, loader)
             # Resolve tags for this task after elaboration
             self._resolveTags(task, taskdef.tags, loader)
+            # `requires:` instances have the same shape as tags -- parameterized
+            # type instances -- so they are built the same way and land in a
+            # separate list, read by the builder rather than by tag consumers.
+            self._resolveRequires(task, taskdef.requires, loader)
             # Allow error markers to be reported without raising here
 
         self._log.debug("<-- _loadTasks %s" % pkg.name)
@@ -1593,7 +1815,12 @@ class PackageProviderYaml(PackageProvider):
                 # These fields have a None *default*: the default bypasses
                 # validation but passing None explicitly does not, so only pass
                 # what was actually authored.
-                docs = {k: getattr(param, k) for k in ("doc", "desc", "values")
+                # `cli:` rides along with the documentation fields: it is a
+                # property of the declaration, and dropping it here would leave
+                # the parameter exposed on the CLI in the source and invisible
+                # in the collection every consumer actually reads.
+                docs = {k: getattr(param, k)
+                        for k in ("doc", "desc", "values", "cli")
                         if getattr(param, k, None) is not None}
                 if isinstance(param, ParamDef) and param.has_list_op():
                     # Declaration with append/prepend (e.g. from extension merge).
@@ -1850,7 +2077,10 @@ class PackageProviderYaml(PackageProvider):
 
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
         
-        passthrough, consumes, produces, rundir, uptodate = self._getPTConsumesProducesRundirUptodate(taskdef, task.uses)
+        (passthrough, consumes, produces, rundir, uptodate,
+         consumes_declared) = self._getPTConsumesProducesRundirUptodate(
+            taskdef, task.uses)
+        task.consumes_declared = consumes_declared
 
         task.passthrough = passthrough
         task.consumes = consumes
@@ -1878,14 +2108,14 @@ class PackageProviderYaml(PackageProvider):
             taskdef,
             task.uses if task.uses is not None else None)
 
-        # A `cli:` block references params and dfm option names, so it can only
-        # be checked once param_defs and `uses` are in place -- which is here.
-        # Problems surface as markers, like every other load diagnostic.
-        if getattr(task, 'cli', None):
-            from .cli_args import validate_task_cli
-            validate_task_cli(
-                task,
-                lambda msg: loader.error(msg, taskdef.srcinfo))
+        # The flags a task exposes are decided by its params (`cli:` on a
+        # ParamDef) and checked against dfm's own option names, so this can only
+        # run once param_defs and `uses` are in place -- which is here. Problems
+        # surface as markers, like every other load diagnostic.
+        from .cli_args import validate_task_cli
+        validate_task_cli(
+            task,
+            lambda msg: loader.error(msg, taskdef.srcinfo))
 
         self._validate_refs(task, loader, taskdef, run_text=taskdef.run)
 
@@ -1931,6 +2161,14 @@ class PackageProviderYaml(PackageProvider):
                     nt = self._findTask(f"{fragment_name}.{need_name}", loader)
                 if nt is None:
                     nt = self._findTask(need_name, loader)
+                if nt is None and fragment_name and '.' in need_name:
+                    # A DOTTED name in a fragment. Historically a dot meant
+                    # "already qualified", so the fragment prefix was never
+                    # tried -- fine when every dotted name was a package path,
+                    # but a select cell key (`sim-img.rtl.opt`) is dotted and
+                    # local. Tried only after the plain lookup fails, so no
+                    # name that resolves today changes meaning.
+                    nt = self._findTask(f"{fragment_name}.{need_name}", loader)
             
                 if nt is None:
                     self._taskNotFound(loader, need_name, taskdef.srcinfo)
@@ -1946,7 +2184,12 @@ class PackageProviderYaml(PackageProvider):
 
         if taskdef.strategy is not None:
             self._log.debug("Task %s strategy: %s" % (task.name, str(taskdef.strategy)))
-            task.strategy = Strategy()
+            # A `select:` family already resolved its axes and declared its cells
+            # in the declaration pass (see _declareSelectCells); carry that
+            # forward rather than rebuilding it from a fresh Strategy.
+            _select = getattr(task.strategy, 'select', None) \
+                if task.strategy is not None else None
+            task.strategy = Strategy(select=_select)
             if taskdef.strategy.generate is not None:
                 shell = taskdef.strategy.generate.shell
                 if shell is None:
@@ -1963,6 +2206,19 @@ class PackageProviderYaml(PackageProvider):
                 temp_taskdef = taskdef.model_copy()
                 temp_taskdef.body = taskdef.strategy.body
                 self._mkTaskBody(task, loader, temp_taskdef)
+
+            # Link each already-declared cell to the recipe it is built from.
+            # Cells exist from the declaration pass but are empty until now:
+            # `uses` is what gives a cell the body's params, tags, produces and
+            # `uses`-chain, so `show task <cell>` and contract checks see the
+            # same thing the built node will.
+            if _select is not None and task.subtasks:
+                body = task.subtasks[0]
+                for key in _select.cells.keys():
+                    cell = task.package.task_m.get("%s.%s" % (task.name, key))
+                    if cell is not None and cell.uses is None:
+                        cell.uses = body
+                        cell.srcinfo = body.srcinfo or cell.srcinfo
 
         # Determine how to implement this task
         if taskdef.body is not None and len(taskdef.body) > 0:
@@ -1994,6 +2250,7 @@ class PackageProviderYaml(PackageProvider):
         td = tt.typedef
 
         tt.typedef = None
+        tt.check = getattr(td, 'check', None)
         if td.uses is not None:
             tt.uses = self._findType(loader, td.uses)
             if tt.uses is None:
@@ -2054,7 +2311,6 @@ class PackageProviderYaml(PackageProvider):
                 set_defs=list(getattr(td, "set_defs", []) or []),
                 elaborate=getattr(td, "elaborate", None),
                 summary=getattr(td, "summary", None),
-                cli=getattr(td, "cli", None),
                 abstract=getattr(td, "abstract", False))
 
             if td.iff is not None:
@@ -2105,7 +2361,10 @@ class PackageProviderYaml(PackageProvider):
                         loader.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % uses_name)
 
-            passthrough, consumes, produces, rundir, uptodate = self._getPTConsumesProducesRundirUptodate(td, st.uses)
+            (passthrough, consumes, produces, rundir, uptodate,
+             consumes_declared) = self._getPTConsumesProducesRundirUptodate(
+                td, st.uses)
+            st.consumes_declared = consumes_declared
 
             st.passthrough = passthrough
             st.consumes = consumes
@@ -2141,7 +2400,10 @@ class PackageProviderYaml(PackageProvider):
                                 td.srcinfo)
                             continue
                     nn = self._findTask(need_name, loader)
-                    if nn is None and fragment_name and '.' not in need_name:
+                    if nn is None and fragment_name:
+                        # Fragment-qualified retry, for dotted names too: a
+                        # select cell key is dotted and local (see the same
+                        # retry on the top-level `needs:` path).
                         nn = self._findTask(f"{fragment_name}.{need_name}", loader)
                 elif isinstance(need, TaskDef):
                     nn = self._findTask(need.name, loader)
@@ -2281,25 +2543,36 @@ class PackageProviderYaml(PackageProvider):
                 passthrough = base_t.passthrough
             if consumes is None:
                 consumes = base_t.consumes
-            # Inherit produces - extend base produces with new produces
-            if base_t.produces is not None:
-                if produces is None:
-                    produces = base_t.produces.copy() if isinstance(base_t.produces, list) else base_t.produces
-                elif isinstance(produces, list) and isinstance(base_t.produces, list):
-                    # Extend: new produces patterns extend inherited ones
-                    produces = base_t.produces.copy() + produces
+            # Inherit produces: NEAREST DECLARATION WINS. A derived task that
+            # says nothing keeps the base's declaration -- which is what lets a
+            # capability declare its outputs once and every backend variant
+            # inherit them. A derived task that does declare replaces it
+            # outright, because extension has no answer for "how do I stop
+            # claiming something my base claims?", and a task that narrows what
+            # it emits must be able to say so. Same rule as `values:`.
+            if base_t.produces is not None and produces is None:
+                produces = base_t.produces.copy() \
+                    if isinstance(base_t.produces, list) else base_t.produces
             if rundir is None:
                 rundir = base_t.rundir
             if uptodate is None:
                 uptodate = base_t.uptodate
+
+        # Whether `consumes:` was DECLARED, recorded before the default is
+        # applied. The default below is what the ENGINE needs (an undeclared
+        # task reads its inputs); it is not a statement the author made, and
+        # treating it as one is how the dataflow check came to silently pass
+        # for every task that never declared anything. Static checking reads
+        # this flag; the runtime reads `consumes`.
+        consumes_declared = consumes is not None
 
         if passthrough is None:
             passthrough = PassthroughE.Unused
         if consumes is None:
             consumes = ConsumesE.All
 
-
-        return (passthrough, consumes, produces, rundir, uptodate)
+        return (passthrough, consumes, produces, rundir, uptodate,
+                consumes_declared)
 
     def _resolveTags(self, target, tag_defs, loader):
         """Resolve tag type references and instantiate Type objects."""
@@ -2348,6 +2621,65 @@ class PackageProviderYaml(PackageProvider):
             target.name if hasattr(target, 'name') else str(target), 
             len(target.tags)))
     
+    def _resolveRequires(self, target, req_defs, loader):
+        """Instantiate a task's `requires:` check instances.
+
+        Identical handling to `_resolveTags` -- a requirement *is* a
+        parameterized type instance -- with one extra rule: the referenced type
+        must actually be a check, or the requirement would be silently inert.
+        """
+        if not req_defs:
+            return
+        for req_def in req_defs:
+            if isinstance(req_def, str):
+                type_name, overrides = req_def, {}
+            elif isinstance(req_def, dict):
+                if len(req_def) != 1:
+                    loader.error(
+                        "A `requires:` entry must be a single check-type "
+                        "reference, got %d keys" % len(req_def),
+                        getattr(target, 'srcinfo', None))
+                    continue
+                type_name = list(req_def.keys())[0]
+                overrides = req_def[type_name] or {}
+                if not isinstance(overrides, dict):
+                    loader.error(
+                        "`requires:` parameter overrides must be a map, got %s"
+                        % type(overrides).__name__,
+                        getattr(target, 'srcinfo', None))
+                    continue
+            else:
+                loader.error(
+                    "Invalid `requires:` entry: %s" % type(req_def).__name__,
+                    getattr(target, 'srcinfo', None))
+                continue
+
+            req_type = self._findType(loader, type_name)
+            if req_type is None:
+                loader.error(
+                    "`requires:` names check type '%s', which does not exist%s"
+                    % (type_name, loader.getSimilarNamesError(type_name) or ""),
+                    getattr(target, 'srcinfo', None))
+                continue
+            if not self._isCheckType(req_type):
+                loader.error(
+                    "`requires:` names type '%s', which is not a check (it does "
+                    "not derive from std.Check). A requirement that is not a "
+                    "check would never be evaluated." % type_name,
+                    getattr(target, 'srcinfo', None))
+                continue
+
+            target.requires.append(
+                self._instantiateTag(req_type, overrides, loader))
+
+    def _isCheckType(self, typ):
+        """True when `typ` derives from std.Check."""
+        while typ is not None:
+            if getattr(typ, 'name', None) == "std.Check":
+                return True
+            typ = getattr(typ, 'uses', None)
+        return False
+
     def _isTagType(self, typ):
         """Check if a type is derived from std.Tag"""
         if typ.name == "std.Tag":
@@ -2368,6 +2700,13 @@ class PackageProviderYaml(PackageProvider):
             doc=tag_type.doc,
             srcinfo=tag_type.srcinfo
         )
+        # An instance keeps no `uses` link back to its declared type, so a
+        # check's implementation would be unreachable from it. Resolve it here,
+        # along the type's own chain, and carry it onto the instance.
+        _typ = tag_type
+        while _typ is not None and tag_instance.check is None:
+            tag_instance.check = getattr(_typ, 'check', None)
+            _typ = getattr(_typ, 'uses', None)
         
         param_defs = ParamDefCollection(srcinfo=tag_type.srcinfo)
         

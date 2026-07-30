@@ -52,6 +52,66 @@ class TaskRunCtxt(object):
         return self.ctxt.root_rundir
 
     @property
+    def cores(self):
+        """How many CPU cores this task may use.
+
+        A task that shells out to something with a parallelism flag should pass
+        this down (`make -j ${{ ctxt.cores }}`) rather than asking the machine
+        how many CPUs it has -- under a scheduler the machine's answer is the
+        node's core count, not this job's allocation, and using it oversubscribes
+        the node.
+
+        Resolution order, most authoritative first:
+
+        1. ``DFM_CORES`` -- an explicit override, and the channel a runner
+           backend uses to state an allocation it knows about.
+        2. The **actual** batch-system allocation (``LSB_DJOB_NUMPROC``,
+           ``SLURM_CPUS_PER_TASK``, ...). Deliberately the allocation and not the
+           request: they can differ, and only one of them is true.
+        3. The runner's ``-j`` budget.
+        4. The machine's CPU count.
+
+        Note what this does NOT yet do: locally, the budget is not divided among
+        concurrently running tasks, so several heavy builds can still
+        oversubscribe. Weighted admission (a task consuming `cores` of the `-j`
+        budget) is the fix and is not implemented; until then `DFM_CORES` or a
+        smaller `-j` is the lever.
+        """
+        for var in ("DFM_CORES",
+                    "LSB_DJOB_NUMPROC",       # LSF: cores actually allocated
+                    "SLURM_CPUS_PER_TASK",    # SLURM: per-task allocation
+                    "SLURM_CPUS_ON_NODE",
+                    "NSLOTS"):                # SGE/UGE
+            value = self.env.get(var) if self.env else None
+            if value is None:
+                value = os.environ.get(var)
+            if value:
+                try:
+                    n = int(str(value).strip())
+                    if n > 0:
+                        return n
+                except ValueError:
+                    pass
+
+        # LSF also publishes the allocation as "host slots host slots ...".
+        mcpu = (self.env.get("LSB_MCPU_HOSTS") if self.env else None) \
+            or os.environ.get("LSB_MCPU_HOSTS")
+        if mcpu:
+            try:
+                parts = str(mcpu).split()
+                total = sum(int(parts[i]) for i in range(1, len(parts), 2))
+                if total > 0:
+                    return total
+            except (ValueError, IndexError):
+                pass
+
+        nproc = getattr(self.runner, 'nproc', None)
+        if isinstance(nproc, int) and nproc > 0:
+            return nproc
+
+        return os.cpu_count() or 1
+
+    @property
     def run_id(self):
         """The output-data run-id shared by all std.Publish tasks in this run."""
         return self.ctxt.run_id if self.ctxt is not None else ""
@@ -182,6 +242,17 @@ class TaskRunCtxt(object):
             task_name = getattr(getattr(self.runner, '_current_task', None), 'name', None)
             prefix = f"[{task_name}] " if task_name else ""
             self._log.info(prefix + f"exec: cmd={' '.join(cmd)}" + (f" env_diff: {diff_str}" if diff_items else ""))
+        except Exception:
+            pass
+
+        # Publish the core budget to the child, so a `run:` body can use
+        # `$DFM_CORES` without reaching into the context. Copy first: `env`
+        # defaults to the shared context environment, and mutating that would
+        # leak this value into every later task.
+        try:
+            if env is not None and "DFM_CORES" not in env:
+                env = dict(env)
+                env["DFM_CORES"] = str(self.cores)
         except Exception:
             pass
 

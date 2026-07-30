@@ -17,6 +17,7 @@ User Guide
 
    parameters
    configurations
+   variants
    expressions
    scoped_variables
    control_flow

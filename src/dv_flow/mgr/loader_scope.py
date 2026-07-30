@@ -66,16 +66,20 @@ class LoaderScope(SymbolScope):
     def findType(self, name) -> Type:
         self._log.debug("--> findType: %s" % name)
         ret = None
-        pkg = None
-        last_dot = name.rfind('.')
-        if last_dot != -1:
-            pkg_name = name[:last_dot]
-            assert self.loader is not None
-
-            pkg = self.loader.findPackage(pkg_name)
-
+        # Try every split point, longest package prefix first. Splitting only on
+        # the LAST dot assumed a type name is `<package>.<type>`, which a type
+        # declared in a FRAGMENT is not: `std.check.Implemented` lives in package
+        # `std` under the `check` namespace, so the last-dot split looked for a
+        # package named `std.check` and found nothing. Such a type was therefore
+        # unreachable from any other package.
+        assert self.loader is not None or name.find('.') == -1
+        idx = name.rfind('.')
+        while idx > 0 and ret is None:
+            pkg_name = name[:idx]
+            pkg = self.loader.findPackage(pkg_name) if self.loader else None
             if pkg is not None and name in pkg.type_m.keys():
                 ret = pkg.type_m[name]
+            idx = name.rfind('.', 0, idx)
 
         self._log.debug("<-- findType: %s (%s)" % (name, str(ret)))
 

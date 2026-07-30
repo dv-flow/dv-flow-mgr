@@ -23,6 +23,8 @@ class Type(object):
     param_defs : 'ParamDefCollection' = None
     uses : 'Type' = None
     tags : List[Any] = dc.field(default_factory=list)
+    # For a check type: the 'module:function' implementing it (from TypeDef.check).
+    check : str = None
     srcinfo : SrcInfo = None
     typedef : 'TypeDef' = None
 

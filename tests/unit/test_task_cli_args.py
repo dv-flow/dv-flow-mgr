@@ -1,6 +1,10 @@
 """
-Task-declared command-line arguments: the `cli:` block, its load-time
+Task command-line arguments: `cli:` on a parameter declaration, its load-time
 validation, the two-phase `run` parse, and how parsed values bind to params.
+
+The contract being pinned: a parameter that should be settable from the command
+line says so *in its own declaration*. There is no separate block to keep in
+sync, so type, default, help and accepted values can only come from one place.
 """
 import json
 import textwrap
@@ -23,17 +27,11 @@ package:
   - name: run-tests
     scope: root
     desc: Run the UVM regression suite
-    cli:
-      args:
-      - name: seed
-        short: s
-      - name: count
-      - name: sim
-        choices: [vlt, vcs, xsim]
     with:
-      seed: { type: int, value: 0, doc: Base random seed }
-      count: { type: int, value: 10, doc: Number of iterations }
-      sim: { type: str, value: vlt, doc: Simulator backend }
+      seed:  { type: int, value: 0,   cli: {short: s}, doc: Base random seed }
+      count: { type: int, value: 10,  cli: true, doc: Number of iterations }
+      sim:   { type: str, value: vlt, cli: true, doc: Simulator backend,
+               values: [vlt, vcs, xsim] }
     run: echo hello
   - name: plain
     scope: root
@@ -73,6 +71,12 @@ def _pkg(proj):
     return loadProjPkgDef(str(proj))
 
 
+def _flow(tmp_path, monkeypatch, text):
+    (tmp_path / 'flow.yaml').write_text(textwrap.dedent(text))
+    monkeypatch.chdir(tmp_path)
+    return _pkg(tmp_path)
+
+
 def _params(proj, task_args, defines=None):
     """Run through CmdRun's phase-2 parse and return the resulting node params."""
     loader, pkg = _pkg(proj)
@@ -90,70 +94,137 @@ def _params(proj, task_args, defines=None):
 
 
 # ---------------------------------------------------------------------------
-# Schema and resolution
+# Declaration and resolution
 # ---------------------------------------------------------------------------
 
-def test_cli_block_parses(proj):
+def test_declared_flags_are_collected(proj):
     _, pkg = _pkg(proj)
-    cli = resolve_task_cli(pkg.task_m['t.run-tests'])
-    assert [a.name for a in cli.args] == ['seed', 'count', 'sim']
-    assert cli.args[0].short == 's'
-    assert cli.args[2].choices == ['vlt', 'vcs', 'xsim']
-    # param defaults to name
-    assert cli.args[0].param is None
+    args = resolve_task_cli(pkg.task_m['t.run-tests'])
+    # Declaration order, not alphabetical.
+    assert [a.name for a in args] == ['seed', 'count', 'sim']
+    assert [a.param for a in args] == ['seed', 'count', 'sim']
+    assert args[0].short == 's'
+    # `cli: true` is the whole declaration for the common case.
+    assert args[1].short is None and args[1].hidden is False
 
 
-def test_task_without_cli_resolves_to_none(proj):
+def test_task_exposing_nothing_resolves_to_empty(proj):
     _, pkg = _pkg(proj)
-    assert resolve_task_cli(pkg.task_m['t.plain']) is None
+    assert resolve_task_cli(pkg.task_m['t.plain']) == []
 
 
-def test_cli_is_inherited_and_a_derived_block_replaces_entirely(tmp_path, monkeypatch):
-    (tmp_path / 'flow.yaml').write_text(textwrap.dedent('''\
+def test_help_type_and_default_come_from_the_parameter(proj):
+    _, pkg = _pkg(proj)
+    seed = resolve_task_cli(pkg.task_m['t.run-tests'])[0]
+    assert seed.help == 'Base random seed'
+    assert seed.default == 0
+
+
+def test_flag_may_be_renamed(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        with:
+          build_variant: { type: str, value: opt, cli: {name: build} }
+    ''')
+    arg = resolve_task_cli(pkg.task_m['t.e'])[0]
+    assert arg.name == 'build' and arg.param == 'build_variant'
+
+
+def test_flag_name_is_the_param_name_verbatim(tmp_path, monkeypatch):
+    """No underscore-to-dash rewriting: the flag and the `-D` form of the same
+    parameter must not disagree."""
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        with:
+          test_key: { type: str, value: name, cli: true }
+    ''')
+    assert resolve_task_cli(pkg.task_m['t.e'])[0].name == 'test_key'
+
+
+def test_hidden_flag_parses_but_is_absent_from_help(tmp_path, monkeypatch, capsys):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        scope: root
+        with:
+          secret: { type: str, value: "", cli: {hidden: true}, doc: Internal }
+    ''')
+    task = pkg.task_m['t.e']
+    args = resolve_task_cli(task)
+    assert args[0].hidden is True
+    assert parse_task_args(task, args, ["--secret", "x"], "p") == {'secret': 'x'}
+    parser, _ = build_arg_parser(task, args, "dfm run t.e")
+    parser.print_help()
+    assert "--secret" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Inheritance -- per parameter, not per block
+# ---------------------------------------------------------------------------
+
+def test_flags_inherit_along_uses(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: base
-        cli:
-          args:
-          - name: seed
-          - name: count
         with:
-          seed: { type: int, value: 0 }
-          count: { type: int, value: 1 }
+          seed:  { type: int, value: 0, cli: true }
+          count: { type: int, value: 1, cli: true }
       - name: mid
         uses: base
       - name: derived
         uses: base
-        cli:
-          args:
-          - name: seed
-    '''))
-    monkeypatch.chdir(tmp_path)
-    _, pkg = _pkg(tmp_path)
-    assert [a.name for a in resolve_task_cli(pkg.task_m['t.mid']).args] == ['seed', 'count']
-    # Whole-block replacement, not a per-arg merge: `count` is gone.
-    assert [a.name for a in resolve_task_cli(pkg.task_m['t.derived']).args] == ['seed']
+        with:
+          seed: { type: int, value: 5 }
+    ''')
+    assert [a.name for a in resolve_task_cli(pkg.task_m['t.mid'])] == ['seed', 'count']
+    # Re-declaring a param to change its default says nothing about `cli:`, so
+    # the inherited flag survives -- the same rule `values:` follows.
+    derived = resolve_task_cli(pkg.task_m['t.derived'])
+    assert [a.name for a in derived] == ['seed', 'count']
+    assert derived[0].default == 5
 
 
-def test_cli_arg_may_target_an_inherited_param(tmp_path, monkeypatch):
-    (tmp_path / 'flow.yaml').write_text(textwrap.dedent('''\
+def test_cli_false_removes_an_inherited_flag(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: base
         with:
-          seed: { type: int, value: 0 }
+          seed:  { type: int, value: 0, cli: true }
+          count: { type: int, value: 1, cli: true }
       - name: derived
         uses: base
-        scope: root
-        cli:
-          args:
-          - name: seed
-    '''))
-    monkeypatch.chdir(tmp_path)
-    _, pkg = _pkg(tmp_path)
-    assert resolve_task_cli(pkg.task_m['t.derived']) is not None
+        with:
+          count: { type: int, value: 1, cli: false }
+    ''')
+    assert [a.name for a in resolve_task_cli(pkg.task_m['t.derived'])] == ['seed']
+
+
+def test_a_derived_task_may_add_a_flag(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: base
+        with:
+          seed: { type: int, value: 0, cli: true }
+      - name: derived
+        uses: base
+        with:
+          extra: { type: str, value: "", cli: true }
+    ''')
+    assert {a.name for a in resolve_task_cli(pkg.task_m['t.derived'])} == {'seed', 'extra'}
 
 
 # ---------------------------------------------------------------------------
@@ -161,92 +232,98 @@ def test_cli_arg_may_target_an_inherited_param(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def _errors(tmp_path, monkeypatch, flow):
-    (tmp_path / 'flow.yaml').write_text(flow)
+    (tmp_path / 'flow.yaml').write_text(textwrap.dedent(flow))
     monkeypatch.chdir(tmp_path)
     msgs = []
     loadProjPkgDef(str(tmp_path), listener=lambda m: msgs.append(m.msg))
     return msgs
 
 
-def test_cli_arg_naming_a_missing_param_is_a_marker(tmp_path, monkeypatch):
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
+def test_flag_colliding_with_a_dfm_option_is_a_marker(tmp_path, monkeypatch):
+    msgs = _errors(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
-        cli:
-          args:
-          - name: nosuch
-    '''))
-    assert any("names parameter 'nosuch'" in m for m in msgs)
-
-
-def test_cli_arg_colliding_with_a_dfm_option_is_a_marker(tmp_path, monkeypatch):
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
-    package:
-      name: t
-      tasks:
-      - name: e
-        cli:
-          args:
-          - name: clean
         with:
-          clean: { type: str, value: "" }
-    '''))
-    assert any("collides with the dfm option '--clean'" in m for m in msgs)
+          clean: { type: str, value: "", cli: true }
+    ''')
+    assert any("collides with the dfm option" in m for m in msgs)
 
 
 def test_short_option_colliding_with_a_dfm_option_is_a_marker(tmp_path, monkeypatch):
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
+    msgs = _errors(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
-        cli:
-          args:
-          - name: jobs
-            short: j
         with:
-          jobs: { type: int, value: 1 }
-    '''))
+          jobs: { type: int, value: 1, cli: {short: j} }
+    ''')
     assert any("collides with a dfm option" in m for m in msgs)
 
 
-def test_duplicate_arg_names_are_markers(tmp_path, monkeypatch):
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
+def test_two_params_claiming_one_flag_is_a_marker(tmp_path, monkeypatch):
+    msgs = _errors(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
-        cli:
-          args:
-          - name: seed
-          - name: seed
         with:
-          seed: { type: int, value: 0 }
-    '''))
-    assert any("declared twice" in m for m in msgs)
+          seed:  { type: int, value: 0, cli: true }
+          other: { type: int, value: 0, cli: {name: seed} }
+    ''')
+    assert any("exposes '--seed' twice" in m for m in msgs)
+
+
+def test_inherited_collision_is_reported_on_the_task_that_has_it(tmp_path, monkeypatch):
+    """A collision can be created by inheritance alone, so validation looks at
+    the effective flag set rather than only the task's own declarations."""
+    msgs = _errors(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: base
+        with:
+          seed: { type: int, value: 0, cli: true }
+      - name: derived
+        uses: base
+        with:
+          other: { type: int, value: 0, cli: {name: seed} }
+    ''')
+    assert any("exposes '--seed' twice" in m for m in msgs)
 
 
 def test_multi_character_short_is_a_marker(tmp_path, monkeypatch):
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
+    msgs = _errors(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
-        cli:
-          args:
-          - name: seed
-            short: sd
         with:
-          seed: { type: int, value: 0 }
-    '''))
+          seed: { type: int, value: 0, cli: {short: sd} }
+    ''')
     assert any("single character" in m for m in msgs)
 
 
 def test_unknown_cli_key_is_rejected_by_the_schema(tmp_path, monkeypatch):
-    """`extra='forbid'`, so a typo'd key fails to load rather than being ignored."""
-    msgs = _errors(tmp_path, monkeypatch, textwrap.dedent('''\
+    """`extra='forbid'` on CliOpt, so a typo fails to load rather than being
+    silently ignored -- which would leave the flag quietly unexposed."""
+    msgs = _errors(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        with:
+          seed: { type: int, value: 0, cli: {shorrt: s} }
+    ''')
+    assert msgs
+
+
+def test_the_cli_block_is_gone(tmp_path, monkeypatch):
+    """`TaskDef` is `extra='forbid'`, so the retired block is a load error and
+    not a silently ignored key."""
+    msgs = _errors(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
@@ -254,10 +331,9 @@ def test_unknown_cli_key_is_rejected_by_the_schema(tmp_path, monkeypatch):
         cli:
           args:
           - name: seed
-            shorrt: s
         with:
           seed: { type: int, value: 0 }
-    '''))
+    ''')
     assert msgs
 
 
@@ -294,9 +370,9 @@ def test_only_supplied_args_are_returned(proj):
     """An unmentioned flag must leave the param's own default (or a -D) alone."""
     _, pkg = _pkg(proj)
     task = pkg.task_m['t.run-tests']
-    cli = resolve_task_cli(task)
-    assert parse_task_args(task, cli, [], "p") == {}
-    assert parse_task_args(task, cli, ["--seed", "42"], "p") == {'seed': 42}
+    args = resolve_task_cli(task)
+    assert parse_task_args(task, args, [], "p") == {}
+    assert parse_task_args(task, args, ["--seed", "42"], "p") == {'seed': 42}
 
 
 def test_int_type_comes_from_the_param(proj):
@@ -306,7 +382,7 @@ def test_int_type_comes_from_the_param(proj):
     assert got == {'count': 7} and isinstance(got['count'], int)
 
 
-def test_bad_choice_exits_with_a_task_scoped_usage(proj, capsys):
+def test_choices_come_from_the_declared_value_set(proj, capsys):
     _, pkg = _pkg(proj)
     task = pkg.task_m['t.run-tests']
     with pytest.raises(SystemExit):
@@ -317,42 +393,53 @@ def test_bad_choice_exits_with_a_task_scoped_usage(proj, capsys):
     assert "invalid choice" in err
 
 
-def test_bool_param_becomes_a_store_true_flag(tmp_path, monkeypatch):
-    (tmp_path / 'flow.yaml').write_text(textwrap.dedent('''\
+def test_an_open_value_set_does_not_restrict_the_flag(tmp_path, monkeypatch):
+    """An open set enumerates the *known* values. Blocking an unlisted one at
+    the parser would defeat the point -- the value-set check downstream warns."""
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
         scope: root
-        cli:
-          args:
-          - name: fast
         with:
-          fast: { type: bool, value: false }
-    '''))
-    monkeypatch.chdir(tmp_path)
-    _, pkg = _pkg(tmp_path)
+          sim:
+            type: str
+            value: vlt
+            cli: true
+            values: {of: [vlt, vcs], open: true}
+    ''')
     task = pkg.task_m['t.e']
-    cli = resolve_task_cli(task)
-    assert parse_task_args(task, cli, ["--fast"], "p") == {'fast': True}
-    assert parse_task_args(task, cli, [], "p") == {}
+    got = parse_task_args(task, resolve_task_cli(task), ["--sim", "questa"], "p")
+    assert got == {'sim': 'questa'}
+
+
+def test_bool_param_becomes_a_store_true_flag(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        scope: root
+        with:
+          fast: { type: bool, value: false, cli: true }
+    ''')
+    task = pkg.task_m['t.e']
+    args = resolve_task_cli(task)
+    assert parse_task_args(task, args, ["--fast"], "p") == {'fast': True}
+    assert parse_task_args(task, args, [], "p") == {}
 
 
 def test_list_param_becomes_an_append_flag(tmp_path, monkeypatch):
-    (tmp_path / 'flow.yaml').write_text(textwrap.dedent('''\
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
     package:
       name: t
       tasks:
       - name: e
         scope: root
-        cli:
-          args:
-          - name: top
         with:
-          top: { type: list, value: [] }
-    '''))
-    monkeypatch.chdir(tmp_path)
-    _, pkg = _pkg(tmp_path)
+          top: { type: list, value: [], cli: true }
+    ''')
     task = pkg.task_m['t.e']
     got = parse_task_args(task, resolve_task_cli(task),
                           ["--top", "a", "--top", "b"], "p")
@@ -420,11 +507,27 @@ def test_binding_is_keyed_on_the_full_name_not_the_leaf(proj):
     assert list(task_ov.keys()) == ['t.run-tests']
 
 
+def test_a_renamed_flag_binds_the_parameter_not_the_flag_name(tmp_path, monkeypatch):
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        scope: root
+        with:
+          build_variant: { type: str, value: opt, cli: {name: build} }
+        run: echo hi
+    ''')
+    task = pkg.task_m['t.e']
+    got = parse_task_args(task, resolve_task_cli(task), ["--build", "prof"], "p")
+    assert got == {'build_variant': 'prof'}
+
+
 # ---------------------------------------------------------------------------
 # CmdRun-level behavior
 # ---------------------------------------------------------------------------
 
-def test_args_to_a_task_with_no_cli_block_are_an_error(proj, capsys):
+def test_args_to_a_task_exposing_nothing_are_an_error(proj, capsys):
     from dv_flow.mgr.cli_task_resolver import CLITaskResolver
     _, pkg = _pkg(proj)
     args = Args(str(proj), task='plain', task_args=["--seed", "1"])
@@ -433,6 +536,8 @@ def test_args_to_a_task_with_no_cli_block_are_an_error(proj, capsys):
     err = capsys.readouterr().err
     assert "accepts no arguments" in err
     assert "-D name=value" in err
+    # The message must say how to fix it in the new spelling.
+    assert "cli: true" in err
 
 
 def test_unknown_task_is_reported(proj, capsys):
@@ -455,15 +560,16 @@ def test_task_help_renders_the_usage_view(proj, capsys):
     assert "--sim" in out
 
 
-def test_cli_on_a_nested_task_is_inert_for_run(proj, capsys):
-    """`run` never enters phase 2, so a flow with `cli:` blocks runs unchanged."""
+def test_exposed_params_on_a_nested_task_are_inert_for_run(proj, capsys):
+    """`run` never enters phase 2 for a nested task, so a flow whose tasks
+    expose flags runs unchanged."""
     args = Args(str(proj))
     args.tasks = ['run-tests']
     assert CmdRun()(args) == 0
 
 
 # ---------------------------------------------------------------------------
-# show task --usage reflects the cli block
+# show task --usage reflects the declarations
 # ---------------------------------------------------------------------------
 
 def test_usage_view_marks_first_class_flags(proj):
@@ -483,6 +589,21 @@ def test_usage_view_leaves_undeclared_params_as_define_only(proj):
     info = build_usage_info(pkg.task_m['t.plain'])
     assert info['args'][0]['name'] is None
     assert info['args'][0]['define'] == '-D plain.seed=VALUE'
+
+
+def test_usage_view_omits_a_hidden_flag(tmp_path, monkeypatch):
+    from dv_flow.mgr.cmds.show.usage import build_usage_info
+    _, pkg = _flow(tmp_path, monkeypatch, '''\
+    package:
+      name: t
+      tasks:
+      - name: e
+        with:
+          secret: { type: str, value: "", cli: {hidden: true} }
+    ''')
+    info = build_usage_info(pkg.task_m['t.e'])
+    secret = next(a for a in info['args'] if a['param'] == 'secret')
+    assert secret['name'] is None
 
 
 # ---------------------------------------------------------------------------
@@ -542,10 +663,11 @@ def test_only_run_is_marked_for_two_phase_parsing():
 # ---------------------------------------------------------------------------
 
 class CompleteArgs:
-    def __init__(self, root, prefix='', task=None):
+    def __init__(self, root, prefix='', task=None, flag=None):
         self.root = root
         self.prefix = prefix
         self.task = task
+        self.flag = flag
         self.config = None
         self.package_map = []
 
@@ -563,13 +685,19 @@ def test_complete_filters_flags_by_prefix(proj, capsys):
     assert capsys.readouterr().out.split() == ['--seed', '--sim']
 
 
+def test_complete_offers_values_from_the_declared_set(proj, capsys):
+    from dv_flow.mgr.cmds.cmd_complete import CmdComplete
+    CmdComplete()(CompleteArgs(str(proj), task='run-tests', flag='--sim'))
+    assert capsys.readouterr().out.split() == ['vlt', 'vcs', 'xsim']
+
+
 def test_complete_without_task_still_lists_task_names(proj, capsys):
     from dv_flow.mgr.cmds.cmd_complete import CmdComplete
     CmdComplete()(CompleteArgs(str(proj)))
     assert 'run-tests' in capsys.readouterr().out
 
 
-def test_complete_is_quiet_for_a_task_with_no_cli_or_no_such_task(proj, capsys):
+def test_complete_is_quiet_for_a_task_with_no_flags_or_no_such_task(proj, capsys):
     """Completion must never be the thing that fails."""
     from dv_flow.mgr.cmds.cmd_complete import CmdComplete
     CmdComplete()(CompleteArgs(str(proj), task='plain'))

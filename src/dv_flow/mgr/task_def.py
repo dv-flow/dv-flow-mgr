@@ -24,7 +24,6 @@ import pydantic.dataclasses as dc
 import enum
 from pydantic import BaseModel, ConfigDict, Field, AliasChoices, field_validator, model_validator
 from typing import Any, Dict, List, Union, Tuple
-from .cli_def import CliDef
 from .param_def import ParamDef
 from .srcinfo import SrcInfo
 from .task_output import TaskOutput
@@ -60,6 +59,37 @@ class GenerateSpec(BaseModel):
     run: str = dc.Field(
         description="Shell command to execute. Must output valid YAML task definitions to stdout")
 
+class SelectDef(BaseModel):
+    """A family of independently-addressable variants of one artifact.
+
+    Where `matrix:` fans a task out -- running it runs every cell -- `select:`
+    declares a *catalog*: each cell is a first-class task named
+    `<family>.<key>`, built only when something asks for it, and shared when two
+    consumers ask for the same one.
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    axes : Dict[str, Union[str, List[Any]]] = dc.Field(
+        description="The dimensions of the family. An axis value is a list, or "
+                    "a `${{ }}` expression over PACKAGE variables that resolves "
+                    "to one. Unlike a matrix axis this is resolved at load "
+                    "(cells are declared tasks), so it may not depend on a "
+                    "`set:`/`let` rebind -- a family's shape must not vary by "
+                    "instantiation site.")
+    key : Union[str, None] = dc.Field(
+        default=None,
+        description="Template naming a cell, evaluated against that cell's axis "
+                    "bindings (e.g. \"${{ this.view }}-${{ this.build }}\"). "
+                    "Defaults to the axis values joined with '.', in declaration "
+                    "order.")
+    default : Union[Dict[str, Any], str, None] = dc.Field(
+        default=None,
+        description="What the bare family name means: a binding map (the family "
+                    "is an alias for one cell -- values may be `${{ }}` "
+                    "expressions over the task's own parameters), 'all' (a gate "
+                    "over every cell), or 'none' (only cells are addressable). "
+                    "Omitted means the first value of each axis.")
+
 class StrategyDef(BaseModel):
     chain: Union[bool, None] = dc.Field(
         default=None,
@@ -70,6 +100,13 @@ class StrategyDef(BaseModel):
     matrix : Union[Dict[str,Union[str,List[Any]]],None] = dc.Field(
         default=None,
         description="Matrix of parameter values to explore. Creates one task instance per combination of values. An axis value may be a `${{ }}` expression that resolves to a list (e.g. `image: \"${{ images }}\"`), evaluated at graph-build.")
+    select : Union[SelectDef, None] = dc.Field(
+        default=None,
+        description="Enable select strategy: declare a family of independently-"
+                    "addressable variants (`<family>.<key>`) instead of a "
+                    "fan-out. Use `matrix:` when running the task should run "
+                    "every cell; use `select:` when the cells are separate "
+                    "artifacts and asking for one must not build the others.")
     body: List['TaskDef'] = dc.Field(
         default_factory=list,
         description="Body tasks for strategy execution. Used with chain and matrix strategies")
@@ -307,11 +344,6 @@ class TaskDef(BaseModel):
                     "task type at graph-build time, replacing the default node "
                     "interior. Signature: elaborate(ctxt, task, name) -> TaskNode. "
                     "Bound along the 'uses' chain (nearest declaration wins).")
-    cli : Union[CliDef, None] = dc.Field(
-        default=None,
-        description="Command-line arguments this task accepts when run with "
-                    "'dfm run'. Bound along the 'uses' chain (nearest "
-                    "declaration wins, whole-block replacement).")
     summary : Union[str, SummaryDef, None] = dc.Field(
         default=None,
         description="End-of-run summary for this task when it is the task being "
@@ -367,7 +399,16 @@ class TaskDef(BaseModel):
         description="Specifies matching patterns for parameter sets that this task consumes")
     produces : Union[List[Dict[str, Any]], None] = dc.Field(
         default=None,
-        description="Specifies matching patterns for datasets that this task produces")
+        description="Patterns describing the data items this task MAY produce. "
+                    "'May', not 'always': a conditional output is still worth "
+                    "declaring, and every consumer treats the declaration as "
+                    "what could be produced rather than a guarantee. Declare "
+                    "what this task ADDS -- items it merely passes through are "
+                    "already declared by whatever produced them. `type:` is the "
+                    "item type; other keys are attributes a consumer can match "
+                    "on, and may reference this task's parameters "
+                    "(`filetype: \"${{ type }}\"`). Inherited along 'uses' with "
+                    "the nearest declaration winning.")
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")
@@ -377,6 +418,15 @@ class TaskDef(BaseModel):
     tags : List[Union[str, Dict[str, Any]]] = dc.Field(
         default_factory=list,
         description="Tags as type references with optional parameter overrides")
+    requires : List[Union[str, Dict[str, Any]]] = dc.Field(
+        default_factory=list,
+        description="Contract this task must satisfy: a list of check-type "
+                    "references with optional parameter overrides (the same "
+                    "shape as 'tags'). Evaluated at graph build against every "
+                    "node built from this task, AFTER override resolution -- so "
+                    "a requirement declared by a base task is what a project "
+                    "overriding it must satisfy. Accumulated along the 'uses' "
+                    "chain, nearest declaration of a given check winning.")
     max_failures : int = dc.Field(
         default=-1,
         description="Max direct-subtask failures before independent subtasks are skipped. "
@@ -445,6 +495,28 @@ class TaskDef(BaseModel):
         """Ensure control and strategy are mutually exclusive"""
         if self.control is not None and self.strategy is not None:
             raise ValueError("Task cannot have both 'control' and 'strategy' fields. They are mutually exclusive.")
+        if self.strategy is not None and self.strategy.select is not None:
+            # `matrix:` fans out, `select:` enumerates a catalog. A task that
+            # declared both would have no answer for what running it means.
+            if self.strategy.matrix:
+                raise ValueError(
+                    "Task cannot have both 'strategy.select' and "
+                    "'strategy.matrix'. Use 'matrix:' when running the task "
+                    "should run every cell, 'select:' when the cells are "
+                    "independent artifacts.")
+            if self.strategy.generate is not None:
+                raise ValueError(
+                    "Task cannot have both 'strategy.select' and "
+                    "'strategy.generate'.")
+            if not self.strategy.select.axes:
+                raise ValueError("'strategy.select' requires at least one axis")
+            if len(self.strategy.body) != 1:
+                # A cell IS an artifact: with two body tasks there is no answer
+                # to what `<family>.<key>` names.
+                raise ValueError(
+                    "'strategy.select' requires exactly one body task (the "
+                    "recipe each cell is built from), got %d" % len(
+                        self.strategy.body))
         if self.abstract and self.override is not None:
             raise ValueError("Task cannot have both 'abstract' and 'override' fields.")
         return self

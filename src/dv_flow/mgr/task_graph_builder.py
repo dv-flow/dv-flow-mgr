@@ -73,6 +73,51 @@ class CompoundTaskCtxt(object):
 
 
 @dc.dataclass
+class CheckCtxt(object):
+    """What a `std.Check` implementation is handed.
+
+    Deliberately narrower than `ElabCtxt`: a check may inspect and report, and
+    must not construct nodes. A check that built something would change the
+    graph it is validating, and its diagnostics would stop being trustworthy.
+    """
+    task : Any                  # the (override-resolved) task being checked
+    node : Any                  # the constructed node
+    needs : List[Any]           # its needs, after elaborator selection
+    params : Any                # the check instance's own parameters
+    check_name : str = ""
+    severity : str = "error"
+    hint : str = ""
+    builder : Any = None
+
+    def error(self, msg, detail=None, fix=None):
+        self._report(msg, detail, fix, self.severity)
+
+    def warning(self, msg, detail=None, fix=None):
+        self._report(msg, detail, fix, "warning")
+
+    def _report(self, msg, detail, fix, severity):
+        """One shape for every check diagnostic: what is wrong, where the
+        requirement came from, and what to type. The third part is what makes
+        the difference between a report and a fix."""
+        lines = ["%s -- %s" % (self.task.name, msg)]
+        if detail:
+            lines.append("   " + str(detail).replace("\n", "\n   "))
+        lines.append("   required by  %s" % self.check_name)
+        for extra in (fix, self.hint):
+            if extra:
+                lines.append("")
+                for line in str(extra).rstrip().split("\n"):
+                    lines.append("   " + line)
+        text = "\n".join(lines)
+        if self.builder is None:
+            raise Exception(text)
+        if severity == "warning":
+            self.builder.marker(TaskMarker(msg=text, severity=SeverityE.Warning))
+        else:
+            self.builder.error(text)
+
+
+@dc.dataclass
 class _ParamsHolder(object):
     """Adapts a bare params instance to the `.params` shape that
     `_apply_task_param_overrides` expects, so the override pass can run against
@@ -227,6 +272,52 @@ class BuilderElabCtxt(object):
 
 
 @dc.dataclass
+class _ParamsHolder(object):
+    """Minimal stand-in for a TaskNode where only `.params` is needed.
+
+    `_apply_task_param_overrides` writes through `task_node.params`; a select
+    family has to apply overrides before it has a node (the node it builds
+    depends on the parameter values), so it passes this instead."""
+    params : Any
+
+
+def _resolve_uses_attr(task, attr : str):
+    """Resolve an inheritable Task attribute along the `uses` chain.
+
+    The package loader normally materializes inherited attributes onto each Task
+    when the package is read (see
+    `PackageProviderYaml._getPTConsumesProducesRundirUptodate`). That is correct
+    right up until an ELABORATOR rewrites `uses` -- which happens after loading,
+    so the inherited values were computed against the OLD chain and are stale.
+
+    The concrete case this exists for: `hdlsim`'s abstract simulator tasks carry
+    `elaborate: backend_select`, which rebinds `uses` from the abstract family
+    task to the selected backend (`hdlsim.SimImage` -> `hdlsim.vlt.SimImage`).
+    The backend is where `uptodate:` is declared, so before this the specialized
+    node was built with `uptodate=None` and silently fell back to comparing
+    parameters and the input signature -- neither of which changes when a source
+    file's CONTENTS change. Simulation images built through the abstract task
+    were therefore never rebuilt, which is the worst possible failure mode: a
+    regression that passes against a stale binary.
+
+    Only attributes that can legitimately still be None after loading are
+    resolved this way (`uptodate`, `rundir`). `passthrough` and `consumes` are
+    defaulted by the loader, so an unset value is indistinguishable from a
+    declared one and walking the chain would override real declarations.
+    """
+    v = getattr(task, attr, None)
+    seen = set()
+    t = task
+    while v is None and t is not None and getattr(t, "uses", None) is not None:
+        t = t.uses
+        if id(t) in seen:      # defensive: a malformed cyclic `uses` chain
+            break
+        seen.add(id(t))
+        v = getattr(t, attr, None)
+    return v
+
+
+@dc.dataclass
 class TaskGraphBuilder(object):
     """The Task-Graph Builder knows how to discover packages and construct task graphs"""
     root_pkg : Package
@@ -251,6 +342,12 @@ class TaskGraphBuilder(object):
     _shell_m : Dict[str,Callable] = dc.field(default_factory=dict)
     _task_m : Dict[str,Task] = dc.field(default_factory=dict)
     _type_m : Dict[str,Type] = dc.field(default_factory=dict)
+    # Node names whose `requires:` checks are held until `flushDeferredChecks`
+    # (the invoked root, whose needs `--needs` can still extend).
+    # >0 while a node is being built only to source a `uses:` implementation.
+    _uses_impl_depth : int = 0
+    _deferred_check_names : set = dc.field(default_factory=set)
+    _deferred_checks : List[Any] = dc.field(default_factory=list)
     _task_node_m : Dict['TaskSpec',TaskNode] = dc.field(default_factory=dict)
     _type_node_m : Dict[str,Any] = dc.field(default_factory=dict)
     _override_m : Dict[str,str] = dc.field(default_factory=dict)
@@ -868,6 +965,16 @@ class TaskGraphBuilder(object):
         # Apply override substitution before anything else
         task = self._findOverride(task)
 
+        # A cell of a `select:` family is built from the family's single body
+        # task with this cell's axis values bound -- the same construction a
+        # matrix cell gets, differing only in that the node carries the cell's
+        # registered name. Doing it here (rather than inside the family) is what
+        # makes a cell an ordinary node: it lands in the node memo under that
+        # name, so two consumers of `sim-img.prof` share one build, and a cell
+        # nobody asks for is never constructed at all.
+        if getattr(task, 'select_bindings', None) is not None:
+            return self._mkSelectCellNode(task, name)
+
         # Compute the `uses`-chain task type-names once (reused for the build
         # context below and the node stamp at exit).
         _chain = self._uses_chain_task_names(task)
@@ -969,6 +1076,7 @@ class TaskGraphBuilder(object):
                 params=params,
                 passthrough=task.passthrough,
                 consumes=task.consumes,
+                consumes_declared=getattr(task, 'consumes_declared', False),
                 task=NullCallable(task.run),
                 ctxt=None,
                 iff=False)
@@ -992,6 +1100,12 @@ class TaskGraphBuilder(object):
         # select this node (overrides `with:`, yields to CLI; Phase 4).
         if ret is not None and hasattr(ret, "params") and self._set_scopes:
             self._apply_set_force_rules(ret, task, name)
+
+        # Evaluate this task's contract against the node just built. Last,
+        # deliberately: everything a check should see -- the override-resolved
+        # task, the elaborated interior, the filtered needs -- is in place.
+        if ret is not None and iff:
+            self._run_checks(task, ret)
 
         return ret
 
@@ -1025,6 +1139,11 @@ class TaskGraphBuilder(object):
             # nothing here that has to see the final values first; they keep
             # the post-hoc application.
             self._apply_node_params(node, task, node_params)
+            return node
+        elif task.strategy is not None and getattr(task.strategy, 'select', None) is not None:
+            node = self._applySelect(
+                task, name, srcdir, params, hierarchical, eval,
+                select_needs=select_needs, node_params=node_params)
             return node
         elif task.strategy is not None:
             node = self._applyStrategy(
@@ -1139,6 +1258,135 @@ class TaskGraphBuilder(object):
                 if obj is not None:
                     return name, obj.elaborate
         return None, None
+
+    def _resolve_requires(self, task):
+        """The check instances in effect for `task`, accumulated along `uses:`.
+
+        Unlike `_resolve_elaborator`, this **accumulates**: a leaf that uses a
+        capability that uses an archetype is subject to all three levels. That
+        union is what makes a base project's contract enforceable at all.
+
+        Nearest-wins per `(check type, id)`, so a nearer level restating the
+        same check replaces the farther one -- the override channel, and the
+        reason `id:` exists (a task may legitimately carry two `std.check.Needs`
+        requirements with different parameters).
+        """
+        out, seen = [], set()
+        for current in iter_uses_chain(task):
+            for req in getattr(current, 'requires', ()) or ():
+                ident = ""
+                values = getattr(req, 'paramT', None)
+                if values is not None:
+                    ident = getattr(values, 'id', "") or ""
+                key = (getattr(req, 'name', ''), ident)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(req)
+        return out
+
+    def _run_checks(self, task, node):
+        """Evaluate `task`'s contract against the node just built.
+
+        Called after override resolution, after `iff:`, and after elaboration,
+        which is what makes it useful rather than pedantic:
+
+          * after OVERRIDE -- the check sees the effective task, so a leaf's
+            `override: src-rtl` is what satisfies a requirement the base
+            declared on `src-rtl`. This is the whole mechanism;
+          * after `iff:` -- a node that does not exist is not checked;
+          * after ELABORATION -- needs are wired and filtered, so a check sees
+            the graph rather than the declaration.
+
+        Memoization gives "once per node" for free, so a shared upstream task
+        is checked once and diagnostics are not duplicated.
+        """
+        # A `uses:` chain link is built as its own node under the SAME name, so
+        # without this a base's requirements would fire against the base task --
+        # outside the context of the task that derives from it, and before its
+        # override had a chance to satisfy them. The derived task's
+        # `_resolve_requires` already accumulates the whole chain, so checking
+        # only the outermost build loses nothing and is what "once per node,
+        # on the effective task" means.
+        if self.in_uses() or self._uses_impl_depth:
+            return
+
+        reqs = self._resolve_requires(task)
+        if not reqs:
+            return
+
+        # The invoked root's needs are not final until `--needs` has been wired,
+        # which necessarily happens after the node exists. Checking it here would
+        # report against an empty need-set and reject a correct command line, so
+        # the root's checks are deferred and flushed once the CLI has had its
+        # say (see flushDeferredChecks).
+        if getattr(node, 'name', None) in self._deferred_check_names:
+            self._deferred_checks.append((task, node))
+            return
+
+        needs = []
+        for entry in getattr(node, 'needs', ()) or ():
+            n = entry[0] if isinstance(entry, tuple) else entry
+            if n is not None:
+                needs.append(n)
+
+        for req in reqs:
+            values = getattr(req, 'paramT', None)
+            severity = (getattr(values, 'severity', 'error') or 'error')
+            if severity == 'off':
+                continue
+            fn = self._resolve_check_fn(req)
+            if fn is None:
+                self.error(
+                    "check type '%s' has no `check:` implementation" % (
+                        getattr(req, 'name', '?'),))
+                continue
+            ctxt = CheckCtxt(
+                task=task, node=node, needs=needs, params=values,
+                check_name=getattr(req, 'name', '?'),
+                severity=severity,
+                hint=(getattr(values, 'hint', '') or ''),
+                builder=self)
+            try:
+                fn(ctxt)
+            except Exception as e:
+                self.error("check '%s' on task '%s' raised: %s" % (
+                    getattr(req, 'name', '?'), task.name, e))
+
+    def deferCheckFor(self, name):
+        """Hold back checks for the node called `name` until flushed."""
+        self._deferred_check_names.add(name)
+
+    def flushDeferredChecks(self):
+        """Run the checks held back by `deferCheckFor`, now that the node is
+        final. Idempotent: the pending list is drained."""
+        pending, self._deferred_checks = self._deferred_checks, []
+        self._deferred_check_names = set()
+        for task, node in pending:
+            self._run_checks(task, node)
+
+    def _resolve_check_fn(self, req):
+        """The callable bound to a check instance, walking its type chain."""
+        current = req
+        seen = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            ref = getattr(current, 'check', None)
+            if ref:
+                return self._load_elaborate_fn(ref)
+            current = getattr(current, 'uses', None)
+        # A check instance is a fresh Type without a `uses` link back to its
+        # declared type (_instantiateTag builds it that way), so fall back to
+        # looking the type up by name.
+        name = getattr(req, 'name', None)
+        if name and self.loader is not None:
+            typ = self.loader.findType(name)
+            while typ is not None:
+                ref = getattr(typ, 'check', None)
+                if ref:
+                    return self._load_elaborate_fn(ref)
+                typ = getattr(typ, 'uses', None)
+        return None
 
     def _load_elaborate_fn(self, ref):
         """Import and cache the ``module:function`` (or ``module.function``)
@@ -1566,143 +1814,494 @@ class TaskGraphBuilder(object):
         for combo_values in itertools.product(*value_lists):
             # Build matrix dict for this combination
             matrix_dict = dict(zip(keys, combo_values))
-            
+
             # Calculate indices for this combination
             indices = []
             for value, value_list in zip(combo_values, value_lists):
                 indices.append(value_list.index(value))
-            
-            # Create task nodes for all subtasks with this matrix combination
+
             for subtask in subtasks:
-                # Create fresh eval context for each task node
-                eval_ctx = ParamRefEval()
-                
-                # Copy variables from current context
-                if hasattr(self, '_eval') and self._eval:
-                    # Deep copy to avoid mutation
-                    import copy
-                    eval_ctx.expr_eval.variables = copy.deepcopy(self._eval.expr_eval.variables)
-                    if self._eval.expr_eval.name_resolution:
-                        eval_ctx.set_name_resolution(self._eval.expr_eval.name_resolution)
-                
-                # Add matrix variables to 'this' scope
-                this_vars = eval_ctx.expr_eval.variables.get('this', {})
-                if not isinstance(this_vars, dict):
-                    this_vars = {}
-                # Create a fresh copy and update
-                this_vars = dict(this_vars)
-                this_vars.update(matrix_dict)
-                eval_ctx.expr_eval.variables['this'] = this_vars
-                
-                # Also expose under 'matrix' so ${{ matrix.key }} works
-                eval_ctx.expr_eval.variables['matrix'] = dict(matrix_dict)
-
-                # Layer the parent's `let` bindings into this cell's scope so
-                # resolve() in the subtree picks up per-cell values
-                # (e.g. let: sim: "${{ matrix.sim }}").
-                self._apply_let(eval_ctx, parent_let, parent_name)
-
-                # Push the parent's `set:` overrides for this cell so ordinary
-                # ${{ pkg.var }} references (in this subtask's params and its
-                # whole subtree) resolve to per-cell rebinds
-                # (e.g. set: [{ hdlsim.sim: "${{ matrix.sim }}" }]). Popped after
-                # the cell's node is fully built.
-                _set_scope = self._apply_set(eval_ctx, parent_set, parent_name)
-                try:
-                    # Resolve a deferred (matrix-driven) `uses` for this cell: the
-                    # body task's `uses` expression (e.g. uvm-${{ this.test }}) is
-                    # evaluated against this cell's matrix bindings, the referenced
-                    # task type is looked up, and the node is built from a per-cell
-                    # copy so the shared subtask template is not mutated.
-                    eff_subtask = subtask
-                    if getattr(subtask, 'uses_expr', None) and subtask.uses is None:
-                        # Evaluate the `uses` expression against this cell's
-                        # matrix bindings (see _eval_in_cell for the dropped
-                        # name-resolution rationale).
-                        uses_name = self._eval_in_cell(eval_ctx, subtask.uses_expr)
-                        uses_task = self._resolveDeferredUses(uses_name, subtask)
-                        if uses_task is None:
-                            raise Exception(
-                                "matrix 'uses' expression '%s' resolved to '%s', "
-                                "which is not a known task" % (
-                                    subtask.uses_expr, uses_name))
-                        import copy as _copy
-                        eff_subtask = _copy.copy(subtask)
-                        eff_subtask.uses = uses_task
-
-                    # Build params with matrix-specific eval context
-                    param_builder = ParamBuilder(eval_ctx)
-                    paramT = param_builder.build_param_type(eff_subtask)
-                    params = paramT()
-
-                    # Generate unique name using indices
-                    matrix_bindings = tuple(zip(keys, combo_values))
-                    matrix_indices = tuple(zip(keys, indices))
-                    pkg_name = subtask.package.name if hasattr(subtask, 'package') and subtask.package else ""
-                    root_pkg_name = self.root_pkg.name if self.root_pkg else ""
-                    parent_leaf = None
-                    parent_fq = parent_name
-                    if parent_name:
-                        parent_leaf = parent_name.rsplit(".", 1)[-1] if "." in parent_name else parent_name
-                    # A body task's name may itself be an expression over the
-                    # matrix variables (e.g. `name: "${{ this.test }}"`). Evaluate
-                    # it against this cell's bindings so the node name and its
-                    # rundir segment read `...uvm-test.wb-smoke` rather than the
-                    # raw `...uvm-test.${{ this.test }}` template (see
-                    # _eval_in_cell for the dropped name-resolution rationale).
-                    fq_name = subtask.name
-                    leaf_name = subtask.leafname
-                    if isinstance(fq_name, str) and "${{" in fq_name:
-                        try:
-                            fq_name = self._eval_in_cell(eval_ctx, fq_name)
-                            leaf_name = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
-                        except Exception:
-                            fq_name = subtask.name
-                            leaf_name = subtask.leafname
-                    matrix_ctx = MatrixNamingContext(
-                        fq_name=fq_name,
-                        leaf_name=leaf_name,
-                        package_name=pkg_name,
-                        root_package_name=root_pkg_name,
-                        parent_leaf=parent_leaf,
-                        parent_fq=parent_fq,
-                        matrix_bindings=matrix_bindings,
-                        matrix_indices=matrix_indices,
-                    )
-                    name = self._naming_scheme.matrix_task_node_name(matrix_ctx)
-
-                    # Build the task node with matrix-specific params
-                    node = self._mkTaskNode(
-                        eff_subtask,
-                        name=name,
-                        params=params,
-                        hierarchical=True,
-                        eval=eval_ctx
-                    )
-
-                    # Resolve any matrix-driven `needs` for this cell: evaluate
-                    # each deferred need expression against this cell's bindings
-                    # (see _eval_in_cell), look up the referenced task, and wire
-                    # its node in.
-                    for need_expr in getattr(eff_subtask, 'needs_expr', None) or []:
-                        need_name = self._eval_in_cell(eval_ctx, need_expr)
-                        need_task = self._resolveDeferredUses(
-                            need_name, eff_subtask,
-                            fragment=getattr(eff_subtask, 'needs_expr_fragment', None))
-                        if need_task is None:
-                            raise Exception(
-                                "matrix 'needs' expression '%s' resolved to '%s', "
-                                "which is not a known task" % (need_expr, need_name))
-                        need_node = self._getTaskNode(need_task.name)
-                        node.needs.append((need_node, False))
-
-                    result.append(node)
-                finally:
-                    self._pop_set_scope(_set_scope)
+                result.append(self._mkCellNode(
+                    subtask, matrix_dict, dict(zip(keys, indices)),
+                    parent_name=parent_name,
+                    parent_let=parent_let, parent_set=parent_set))
 
         return result
 
-    
+    def resolveTaskParams(self, task):
+        """`{param: value}` for `task` with its `${{ }}` defaults evaluated.
+
+        For the CLI-facing views (`dfm run <task> --help`, `dfm show task`),
+        which otherwise print the raw expression -- `[default: ${{ build }}]`
+        rather than `[default: opt]` -- because a lazily-evaluated default is
+        stored as its source text.
+
+        Deliberately stops short of `mkTaskNode`: only the parameter type is
+        built, so nothing upstream is constructed and a display command cannot
+        fail (or do work) because of a task's dependencies. `-D`/`-P` are
+        applied, so what is shown is what this invocation would use.
+        """
+        if task is None:
+            return {}
+        srcdir = os.path.dirname(task.srcinfo.file) if task.srcinfo else None
+        prev_srcdir = self._eval.expr_eval.variables.get("srcdir")
+        if srcdir is not None:
+            self._eval.set("srcdir", srcdir)
+
+        # A select cell's parameters are written against its axis bindings
+        # (`${{ this.view }}`), so without them the cell reports the template
+        # rather than what it will actually run with.
+        bindings = getattr(task, 'select_bindings', None)
+        prev_this = self._eval.expr_eval.variables.get('this')
+        prev_matrix = self._eval.expr_eval.variables.get('matrix')
+        if bindings:
+            self._eval.expr_eval.variables['this'] = dict(bindings)
+            self._eval.expr_eval.variables['matrix'] = dict(bindings)
+
+        self.push_name_resolution_context(task.package)
+        try:
+            paramT = ParamBuilder(self._eval).build_param_type(task)
+            if paramT is None:
+                return {}
+            params = paramT()
+            self._expandParams(params, self._eval)
+            self._apply_task_param_overrides(_ParamsHolder(params), task)
+            return {f: getattr(params, f, None)
+                    for f in getattr(type(params), 'model_fields', {})}
+        finally:
+            self.pop_name_resolution_context()
+            self._eval.set("srcdir", prev_srcdir)
+            for _k, _v in (('this', prev_this), ('matrix', prev_matrix)):
+                if _v is None:
+                    self._eval.expr_eval.variables.pop(_k, None)
+                else:
+                    self._eval.expr_eval.variables[_k] = _v
+
+    def resolveSelectDefault(self, task):
+        """`{axis: value}` a select family's `default:` currently resolves to,
+        or None if `task` is not a family with a binding default.
+
+        Same purpose as `resolveTaskParams`: `show task` would otherwise report
+        the family's default as the expression that computes it.
+        """
+        select = getattr(getattr(task, 'strategy', None), 'select', None)
+        if select is None or select.mode != "alias":
+            return None
+        values = self.resolveTaskParams(task)
+        eval_ctx = self._selectDefaultEval_values(values)
+        ret = {}
+        for axis, value in select.default.items():
+            if isinstance(value, str) and "${{" in value:
+                value = eval_ctx.eval(value)
+            ret[axis] = value
+        return ret
+
+    def mkSelectPartialNode(self, task):
+        """Build a family from a command-line partial cell key.
+
+        The resolver hands back a copy of the family task carrying
+        `select_partial`; that binding cannot survive a round-trip through a
+        name, so this is the entry point the CLI uses instead of
+        `mkTaskNode(name)`. Everything else -- the package name-resolution
+        context, the `node_params` "this is the top node" signal that makes
+        -D/--flag apply -- has to match `mkTaskNode`, or the family would
+        resolve its default from declared values only.
+        """
+        self.push_name_resolution_context(task.package)
+        try:
+            return self._mkTaskNode(
+                task, name=task.name, eval=self._eval, node_params={})
+        finally:
+            self.pop_name_resolution_context()
+
+    def _applySelect(self, task, name, srcdir, params, hierarchical, eval,
+                     select_needs=None, node_params=None):
+        """Build the node the bare family name denotes.
+
+        A select family is never a unit of work -- the cells are. What the
+        family name means is declared, not guessed:
+
+          * `default: {axis: value}` (or omitted) -- the family is an **alias**
+            for one cell, and the node returned *is* that cell's node. It is
+            registered under the family name too, so `needs: [sim-img]` and
+            `needs: [sim-img.tlm.opt]` reach the same build.
+          * `default: all`, or a binding naming several values -- the family is
+            a **gate** over that sub-family.
+          * `default: none` -- only cells are addressable; naming the family is
+            an error rather than a build of nothing.
+        """
+        select = task.strategy.select
+        if name is None:
+            name = task.name
+
+        if params is None:
+            # Built here, not left to the compound path below: the `default:`
+            # binding is an expression over these very parameters, so they have
+            # to exist before the family knows which cell it denotes.
+            if task.paramT is None:
+                if task.param_defs is not None or (
+                        task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    task.paramT = ParamBuilder(
+                        eval or self._eval).build_param_type(task)
+            params = task.paramT() if task.paramT else None
+            if params is not None:
+                self._expandParams(params, eval)
+                # `-D` / `--flag` must reach the family's parameters *before*
+                # the default binding is evaluated, or a select would resolve
+                # from its declared default no matter what the user asked for --
+                # the same mistake elaborators used to make (ChangeLog 1.19.0).
+                self._apply_task_param_overrides(_ParamsHolder(params), task)
+
+        if select.mode == "none":
+            raise Exception(
+                "task '%s' is a select family declared `default: none`, so it "
+                "cannot be built or depended on directly. Name one of its "
+                "cells: %s" % (
+                    task.name,
+                    ", ".join("%s.%s" % (task.name, k) for k in select.cells)))
+
+        cells = self._selectedCells(task, select, params, eval,
+                                    partial=getattr(task, 'select_partial', None))
+
+        if select.mode == "alias" and len(cells) == 1:
+            cell = self._selectCellTask(task, cells[0])
+            node = self._mkSelectCellNode(cell)
+            # The family name is an alias for the cell, so both names must find
+            # the same node -- otherwise a second consumer using the other
+            # spelling would build the artifact twice.
+            self._task_node_m[name] = node
+            return node
+
+        # A gate over several cells. The compound owns no work of its own; the
+        # cells are its needs, and each is still shared by name.
+        ret = TaskNodeCompound(
+            name=name,
+            srcdir=srcdir if srcdir is not None else os.path.dirname(task.srcinfo.file),
+            params=params,
+            ctxt=self._ctxt,
+            max_failures=getattr(task, 'max_failures', -1),
+            run=self._resolve_on_error(task, srcdir))
+        self._gatherNeeds(task, ret, select_needs)
+        ret.input.needs.extend(ret.needs)
+
+        for key in cells:
+            cell_node = self._mkSelectCellNode(self._selectCellTask(task, key))
+            cell_node.needs.append((ret.input, False))
+            ret.tasks.append(cell_node)
+        self._task_node_m[name] = ret
+        self._apply_node_params(ret, task, node_params)
+        return ret
+
+    def _selectDefaultEval_values(self, values):
+        """`_selectDefaultEval` over an already-extracted {name: value} map."""
+        from .param_ref_eval import ParamRefEval
+        import copy
+        ctx = ParamRefEval()
+        base = self._eval
+        if base is not None:
+            ctx.expr_eval.variables = copy.deepcopy(base.expr_eval.variables)
+            if base.expr_eval.name_resolution:
+                ctx.set_name_resolution(base.expr_eval.name_resolution)
+        ctx.expr_eval.variables.update(values)
+        ctx.expr_eval.variables['this'] = dict(values)
+        return ctx
+
+    def _selectDefaultEval(self, params, eval):
+        """An eval context in which a `default:` expression sees the family's
+        own parameters by bare name (and under `this`).
+
+        The family's parameter is the knob the user turns -- through its
+        declared default, the package variable that default came from, `-D`, or
+        its `--flag`. Binding it as a plain name is what makes
+        `default: {build: "${{ build }}"}` mean the obvious thing, and it
+        deliberately shadows a same-named package variable: the parameter
+        already defaults from it, so the parameter is the more specific answer.
+        """
+        from .param_ref_eval import ParamRefEval
+        import copy
+
+        base = eval if eval is not None else self._eval
+        ctx = ParamRefEval()
+        if base is not None:
+            ctx.expr_eval.variables = copy.deepcopy(base.expr_eval.variables)
+            if base.expr_eval.name_resolution:
+                ctx.set_name_resolution(base.expr_eval.name_resolution)
+        if params is not None:
+            values = {f: getattr(params, f, None)
+                      for f in getattr(type(params), 'model_fields', {})}
+            ctx.expr_eval.variables.update(values)
+            ctx.expr_eval.variables['this'] = values
+        return ctx
+
+    def _selectCellTask(self, family, key):
+        """The registered Task for cell `key` of `family`."""
+        cell = family.package.task_m.get("%s.%s" % (family.name, key))
+        if cell is None:
+            raise Exception(
+                "select family '%s' has no cell '%s'" % (family.name, key))
+        return cell
+
+    def _selectedCells(self, task, select, params, eval, partial=None):
+        """The cell keys the family currently denotes.
+
+        `default:` values may be `${{ }}` expressions over the family's own
+        parameters -- that is the wire from a task-level variable (and its
+        `--flag`, and the package variable it defaults from) to which cell gets
+        built. They are resolved here, at graph build, because that is the first
+        moment the parameter's final value is known.
+
+        `partial` is a command-line partial cell key (`sim-img.prof`): it pins
+        the axes it names and leaves the rest to the default, which is why it
+        can only come from the CLI.
+        """
+        if select.mode == "all" and not partial:
+            return list(select.cells.keys())
+
+        cell_eval = self._selectDefaultEval(params, eval)
+        binding = {}
+        base = select.default if select.mode != "all" else {}
+        for axis, value in base.items():
+            if isinstance(value, str) and "${{" in value:
+                value = cell_eval.eval(value)
+            binding[axis] = value
+        if partial:
+            # A partial key names some axes outright; every other axis keeps
+            # whatever the default (and therefore -D/--flag) says.
+            binding.update(partial)
+
+        wanted = {}
+        for axis, value in binding.items():
+            values = value if isinstance(value, list) else [value]
+            values = [v for v in values if v is not None and v != ""]
+            unknown = [v for v in values if v not in select.axes[axis]]
+            if unknown:
+                raise Exception(
+                    "task '%s': %s is not a value of select axis '%s'. "
+                    "Accepted: %s" % (
+                        task.name, ", ".join("'%s'" % u for u in unknown), axis,
+                        ", ".join(str(v) for v in select.axes[axis])))
+            wanted[axis] = values
+
+        keys = [k for k, cell in select.cells.items()
+                if all(cell[a] in vs for a, vs in wanted.items())]
+        if not keys:
+            raise Exception(
+                "task '%s': the select default %s matches no cell" % (
+                    task.name, binding))
+        return keys
+
+    def _mkSelectCellNode(self, cell, name=None):
+        """Build one cell of a `select:` family.
+
+        `cell` is the task registered at load under `<family>.<key>`; its
+        interior is the family's body task, evaluated with this cell's axis
+        values bound to `this`/`matrix`.
+        """
+        family = cell.select_family
+        if not family.subtasks:
+            raise Exception(
+                "select family '%s' has no body task to build cell '%s' from"
+                % (family.name, cell.name))
+        if name is None:
+            name = cell.name
+
+        existing = self._task_node_m.get(name)
+        if existing is not None:
+            return existing
+
+        # `${{ srcdir }}` must be the FAMILY's directory, not whatever the
+        # builder was last looking at. A matrix cell gets this for free -- its
+        # parent compound node sets srcdir before the cell's eval context is
+        # copied -- but a select cell has no parent node in the graph, so
+        # without this a `basedir: "${{ srcdir }}"` default resolves to the root
+        # package and the body looks for its sources in the wrong tree.
+        family_srcdir = os.path.dirname(family.srcinfo.file)
+        prev_srcdir = self._eval.expr_eval.variables.get("srcdir")
+        self._eval.set("srcdir", family_srcdir)
+
+        # Build at the TOP of the rundir stack, not nested under whoever asked
+        # for the cell. A matrix cell belongs to its parent compound and is
+        # rightly nested; a select cell is a shared, independently-addressable
+        # artifact, so its rundir must not depend on which consumer happened to
+        # trigger construction -- that would move the artifact (and its cache
+        # identity) depending on the order consumers appear in the graph.
+        self._task_rundir_s.append([self.rundir])
+        try:
+            return self._mkCellNode(
+                family.subtasks[0],
+                dict(cell.select_bindings),
+                {},
+                name=name,
+                parent_name=family.name,
+                parent_let=self._get_let(family),
+                parent_set=self._get_set(family),
+                hierarchical=False,
+                srcdir=family_srcdir)
+        finally:
+            self._task_rundir_s.pop()
+            self._eval.set("srcdir", prev_srcdir)
+
+    def _mkCellNode(self, subtask, matrix_dict, indices_m, name=None,
+                    parent_name=None, parent_let=None, parent_set=None,
+                    hierarchical=True, srcdir=None):
+        """Build the node for ONE cell of a matrix or select body.
+
+        Shared by both so they cannot drift on what a cell's scope contains:
+        the `this`/`matrix` bindings, the parent's `let:`/`set:` layers, and the
+        per-cell resolution of a deferred `uses`/`needs`/`name`. A `select` cell
+        passes `name` (its registered cell name); a matrix cell leaves it None
+        and gets the naming scheme's generated name.
+        """
+        from .param_builder import ParamBuilder
+        from .param_ref_eval import ParamRefEval
+
+        keys = list(matrix_dict.keys())
+        combo_values = [matrix_dict[k] for k in keys]
+        indices = [indices_m.get(k, 0) for k in keys]
+
+        # Create fresh eval context for each task node
+        eval_ctx = ParamRefEval()
+        
+        # Copy variables from current context
+        if hasattr(self, '_eval') and self._eval:
+            # Deep copy to avoid mutation
+            import copy
+            eval_ctx.expr_eval.variables = copy.deepcopy(self._eval.expr_eval.variables)
+            if self._eval.expr_eval.name_resolution:
+                eval_ctx.set_name_resolution(self._eval.expr_eval.name_resolution)
+        
+        # Add matrix variables to 'this' scope
+        this_vars = eval_ctx.expr_eval.variables.get('this', {})
+        if not isinstance(this_vars, dict):
+            this_vars = {}
+        # Create a fresh copy and update
+        this_vars = dict(this_vars)
+        this_vars.update(matrix_dict)
+        eval_ctx.expr_eval.variables['this'] = this_vars
+        
+        # Also expose under 'matrix' so ${{ matrix.key }} works
+        eval_ctx.expr_eval.variables['matrix'] = dict(matrix_dict)
+
+        # Layer the parent's `let` bindings into this cell's scope so
+        # resolve() in the subtree picks up per-cell values
+        # (e.g. let: sim: "${{ matrix.sim }}").
+        self._apply_let(eval_ctx, parent_let, parent_name)
+
+        # Push the parent's `set:` overrides for this cell so ordinary
+        # ${{ pkg.var }} references (in this subtask's params and its
+        # whole subtree) resolve to per-cell rebinds
+        # (e.g. set: [{ hdlsim.sim: "${{ matrix.sim }}" }]). Popped after
+        # the cell's node is fully built.
+        _set_scope = self._apply_set(eval_ctx, parent_set, parent_name)
+        try:
+            # Resolve a deferred (matrix-driven) `uses` for this cell: the
+            # body task's `uses` expression (e.g. uvm-${{ this.test }}) is
+            # evaluated against this cell's matrix bindings, the referenced
+            # task type is looked up, and the node is built from a per-cell
+            # copy so the shared subtask template is not mutated.
+            eff_subtask = subtask
+            if getattr(subtask, 'uses_expr', None) and subtask.uses is None:
+                # Evaluate the `uses` expression against this cell's
+                # matrix bindings (see _eval_in_cell for the dropped
+                # name-resolution rationale).
+                uses_name = self._eval_in_cell(eval_ctx, subtask.uses_expr)
+                uses_task = self._resolveDeferredUses(uses_name, subtask)
+                if uses_task is None:
+                    raise Exception(
+                        "matrix 'uses' expression '%s' resolved to '%s', "
+                        "which is not a known task" % (
+                            subtask.uses_expr, uses_name))
+                import copy as _copy
+                eff_subtask = _copy.copy(subtask)
+                eff_subtask.uses = uses_task
+
+            # Build params with matrix-specific eval context
+            param_builder = ParamBuilder(eval_ctx)
+            paramT = param_builder.build_param_type(eff_subtask)
+            params = paramT()
+
+            # Generate unique name using indices
+            matrix_bindings = tuple(zip(keys, combo_values))
+            matrix_indices = tuple(zip(keys, indices))
+            pkg_name = subtask.package.name if hasattr(subtask, 'package') and subtask.package else ""
+            root_pkg_name = self.root_pkg.name if self.root_pkg else ""
+            parent_leaf = None
+            parent_fq = parent_name
+            if parent_name:
+                parent_leaf = parent_name.rsplit(".", 1)[-1] if "." in parent_name else parent_name
+            # A body task's name may itself be an expression over the
+            # matrix variables (e.g. `name: "${{ this.test }}"`). Evaluate
+            # it against this cell's bindings so the node name and its
+            # rundir segment read `...uvm-test.wb-smoke` rather than the
+            # raw `...uvm-test.${{ this.test }}` template (see
+            # _eval_in_cell for the dropped name-resolution rationale).
+            fq_name = subtask.name
+            leaf_name = subtask.leafname
+            if isinstance(fq_name, str) and "${{" in fq_name:
+                try:
+                    fq_name = self._eval_in_cell(eval_ctx, fq_name)
+                    leaf_name = fq_name.rsplit(".", 1)[-1] if "." in fq_name else fq_name
+                except Exception:
+                    fq_name = subtask.name
+                    leaf_name = subtask.leafname
+            if name is None:
+                # A matrix cell has no identity of its own, so the naming scheme
+                # derives one from the parent and the cell's bindings. A select
+                # cell arrives with its registered name -- which is the point:
+                # that name is what `needs:` and the CLI address, and what the
+                # node memo keys on so two consumers share one build.
+                matrix_ctx = MatrixNamingContext(
+                    fq_name=fq_name,
+                    leaf_name=leaf_name,
+                    package_name=pkg_name,
+                    root_package_name=root_pkg_name,
+                    parent_leaf=parent_leaf,
+                    parent_fq=parent_fq,
+                    matrix_bindings=matrix_bindings,
+                    matrix_indices=matrix_indices,
+                )
+                name = self._naming_scheme.matrix_task_node_name(matrix_ctx)
+
+            # Build the task node with matrix-specific params
+            node = self._mkTaskNode(
+                eff_subtask,
+                name=name,
+                srcdir=srcdir,
+                params=params,
+                hierarchical=hierarchical,
+                eval=eval_ctx
+            )
+
+            # Resolve any matrix-driven `needs` for this cell: evaluate
+            # each deferred need expression against this cell's bindings
+            # (see _eval_in_cell), look up the referenced task, and wire
+            # its node in.
+            for need_expr in getattr(eff_subtask, 'needs_expr', None) or []:
+                need_name = self._eval_in_cell(eval_ctx, need_expr)
+                need_task = self._resolveDeferredUses(
+                    need_name, eff_subtask,
+                    fragment=getattr(eff_subtask, 'needs_expr_fragment', None))
+                if need_task is None:
+                    raise Exception(
+                        "matrix 'needs' expression '%s' resolved to '%s', "
+                        "which is not a known task" % (need_expr, need_name))
+                need_node = self._getTaskNode(need_task.name)
+                node.needs.append((need_node, False))
+                # A COMPOUND consumes its dependencies through `input`, not
+                # through `needs` -- `_gatherNeeds` gathers into `needs` and
+                # then extends `input.needs` from it. A deferred need is wired
+                # after that has already happened, so without this it reaches
+                # the node and never the interior, and the body compiles
+                # without the very thing the cell asked for. Only ever bit
+                # matrix bodies that were leaves (SimUVMCase); a select body is
+                # naturally a compound, which is what exposed it.
+                if getattr(node, 'input', None) is not None:
+                    node.input.needs.append((need_node, False))
+
+            return node
+        finally:
+            self._pop_set_scope(_set_scope)
+
     def _eval_in_cell(self, eval_ctx, expr):
         """Evaluate `expr` against a matrix cell's bindings with the
         name-resolution context dropped, so `this`/`matrix` resolve to the cell
@@ -1836,11 +2435,12 @@ class TaskGraphBuilder(object):
             ctxt=self._ctxt,
             passthrough=task.passthrough,
             consumes=task.consumes,
+            consumes_declared=getattr(task, 'consumes_declared', False),
             produces=task.produces,
-            uptodate=task.uptodate,
+            uptodate=_resolve_uses_attr(task, "uptodate"),
             taskdef=task,
             task=None,
-            inherits_rundir=(task.rundir == RundirE.Inherit))
+            inherits_rundir=(_resolve_uses_attr(task, "rundir") == RundirE.Inherit))
             
         self.push_task_scope(node)
 
@@ -1857,10 +2457,15 @@ class TaskGraphBuilder(object):
         # declared default while `node.params.seed` carried the override.
         self._apply_node_params(node, task, node_params)
 
-        # Evaluate produces patterns after params are set
+        # Evaluate produces patterns after params are set, in THIS node's eval
+        # context. The shared builder context has no `this`, so a produce
+        # pattern written against a strategy cell's axis values -- which is how
+        # an artifact advertises which variant it is,
+        # `{type: SimImg, build: "${{ this.build }}"}` -- would otherwise be
+        # stored as its own source text and match nothing.
         if task.produces is not None:
             from .produces_eval import ProducesEvaluator
-            evaluator = ProducesEvaluator(self._eval)
+            evaluator = ProducesEvaluator(eval if eval is not None else self._eval)
             node.produces = evaluator.evaluate(task.produces, params)
 
         # Expand the body, once per node, from this node's evaluated params.
@@ -1921,7 +2526,16 @@ class TaskGraphBuilder(object):
             if isinstance(task.uses, Type):
                 callable = DataCallable(task.uses.paramT)
             else:
-                uses = self._getTaskNode(task.uses.name)
+                # The base's node is built purely to borrow its callable. It is
+                # an implementation detail, not something anyone asked for, so
+                # its `requires:` contract must not fire here -- that contract
+                # is for whoever DERIVES from it, and is evaluated on the
+                # derived node (which accumulates it along the `uses` chain).
+                self._uses_impl_depth += 1
+                try:
+                    uses = self._getTaskNode(task.uses.name)
+                finally:
+                    self._uses_impl_depth -= 1
                 callable = uses.task
         
         if callable is None:

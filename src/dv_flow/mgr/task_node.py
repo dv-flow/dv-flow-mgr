@@ -54,6 +54,9 @@ class TaskNode(object):
     changed : bool = False # TODO: seems unused
     passthrough : bool = False
     consumes : List[Any] = dc.field(default_factory=list)
+    # See Task.consumes_declared: distinguishes "reads everything" from
+    # "never said". Static checks use it; the runtime does not.
+    consumes_declared : bool = False
     produces : Union[List[Dict[str, Any]], None] = dc.field(default=None)
     needs : List[Tuple['TaskNode',bool]] = dc.field(default_factory=list)
     rundir : List[str] = dc.field(default=None)

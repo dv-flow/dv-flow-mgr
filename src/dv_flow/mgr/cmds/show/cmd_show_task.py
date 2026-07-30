@@ -60,12 +60,14 @@ class CmdShowTask:
                 return 1
             task, _ = resolved
             from .usage import build_usage_info, render_usage
+            values = self._resolved_values(task, pkg, loader)
             if getattr(args, 'json', False):
                 # `--json` is a format switch here, exactly as it is for every
                 # other show subcommand -- not an alternative to --usage.
-                print(json.dumps(build_usage_info(task), indent=2, default=str))
+                print(json.dumps(build_usage_info(task, values=values),
+                                 indent=2, default=str))
             else:
-                render_usage(task)
+                render_usage(task, values=values)
             return 0
 
         # Find the task
@@ -90,8 +92,42 @@ class CmdShowTask:
         
         return 0
     
+    def _builder(self, pkg, loader):
+        """A throwaway builder used only to RESOLVE values for display.
+
+        It constructs no nodes (see `TaskGraphBuilder.resolveTaskParams`), so
+        describing a task never builds, or fails on, that task's dependencies.
+        """
+        if pkg is None or loader is None:
+            return None
+        try:
+            from ...task_graph_builder import TaskGraphBuilder
+            return TaskGraphBuilder(
+                root_pkg=pkg,
+                rundir=os.path.join(os.getcwd(), "rundir"),
+                loader=loader)
+        except Exception as e:
+            self._log.debug(f"No builder for value resolution: {e}")
+            return None
+
+    def _resolved_values(self, task, pkg, loader):
+        """`{param: value}` with `${{ }}` defaults evaluated, or None.
+
+        Display-only: any failure degrades to showing the declared text rather
+        than breaking the command.
+        """
+        b = self._builder(pkg, loader)
+        if b is None:
+            return None
+        try:
+            return b.resolveTaskParams(task)
+        except Exception as e:
+            self._log.debug(f"Could not resolve params for {task.name}: {e}")
+            return None
+
     def _find_task(self, task_name: str, pkg, loader) -> Optional[Dict[str, Any]]:
         """Find a task by name and describe it."""
+        self._resolve_builder = self._builder(pkg, loader)
         resolved = self._resolve_task(task_name, pkg, loader)
         if resolved is None:
             return None
@@ -167,15 +203,59 @@ class CmdShowTask:
             'scope': scope,
             'tags': self._tags_to_list(getattr(task, 'tags', [])),
             'params': self._get_params(task),
+            # A lazily-evaluated default is stored as its source text, so the
+            # detail view showed `${{ build }}` where the user wants `opt`.
+            'param_values': self._param_values(task),
             'needs': [n.name if hasattr(n, 'name') else str(n) for n in getattr(task, 'needs', [])],
             'rundir': str(task.rundir.value) if hasattr(task, 'rundir') and task.rundir else 'unique',
             'passthrough': str(task.passthrough) if hasattr(task, 'passthrough') and task.passthrough else None,
             'consumes': str(task.consumes) if hasattr(task, 'consumes') and task.consumes else None,
             'produces': task.produces if hasattr(task, 'produces') and task.produces else None,
         }
-        
+
+        select = getattr(getattr(task, 'strategy', None), 'select', None)
+        if select is not None:
+            # A family's cells are the thing a user actually addresses, so they
+            # belong in its detail view -- otherwise the only way to learn a
+            # cell's name is to derive it from the axes by hand.
+            # The default is an expression over the family's parameters, so
+            # report what it RESOLVES to -- `view=tlm`, not `view=${{ view }}`.
+            default = None
+            b = getattr(self, '_resolve_builder', None)
+            if b is not None:
+                try:
+                    default = b.resolveSelectDefault(task)
+                except Exception as e:
+                    self._log.debug(f"Could not resolve select default: {e}")
+            if default is None:
+                default = select.default
+            info['select'] = {
+                'axes': {a: [str(v) for v in vals]
+                         for a, vals in select.axes.items()},
+                'mode': select.mode,
+                'default': {a: str(v) for a, v in default.items()},
+                'cells': ["%s.%s" % (task.name, k) for k in select.cells],
+            }
+        bindings = getattr(task, 'select_bindings', None)
+        if bindings is not None:
+            family = getattr(task, 'select_family', None)
+            info['select_cell'] = {
+                'family': family.name if family is not None else None,
+                'bindings': {a: str(v) for a, v in bindings.items()},
+            }
+
         return info
     
+    def _param_values(self, task):
+        b = getattr(self, '_resolve_builder', None)
+        if b is None:
+            return None
+        try:
+            return {k: str(v) for k, v in b.resolveTaskParams(task).items()}
+        except Exception as e:
+            self._log.debug(f"Could not resolve params for {task.name}: {e}")
+            return None
+
     def _get_params(self, task) -> Dict[str, Dict[str, Any]]:
         """Extract parameters from a task, including those inherited via `uses:`.
 
@@ -303,7 +383,35 @@ class CmdShowTask:
         if info.get('doc'):
             formatter.add_section("Documentation", info['doc'])
         
-        formatter.add_params("Parameters", info.get('params', {}))
+        # Show resolved values where they are available: `${{ build }}` is the
+        # expression that computes the default, not the default.
+        _params = dict(info.get('params', {}))
+        _values = info.get('param_values') or {}
+        for _name, _entry in _params.items():
+            if _name in _values and isinstance(_entry, dict):
+                _entry = dict(_entry)
+                _entry['value'] = _values[_name]
+                _params[_name] = _entry
+        formatter.add_params("Parameters", _params)
+
+        select = info.get('select')
+        if select is not None:
+            axes = ["%s: %s" % (a, ", ".join(v)) for a, v in select['axes'].items()]
+            formatter.add_list("Variant axes", axes)
+            if select['mode'] == 'all':
+                note = "(a gate over every cell)"
+            elif select['mode'] == 'none':
+                note = "(only cells are addressable)"
+            else:
+                note = "(default: %s)" % ", ".join(
+                    "%s=%s" % (a, v) for a, v in select['default'].items())
+            formatter.add_list("Cells %s" % note, select['cells'])
+
+        cell = info.get('select_cell')
+        if cell is not None:
+            formatter.add_list(
+                "Variant of %s" % cell['family'],
+                ["%s = %s" % (a, v) for a, v in cell['bindings'].items()])
         
         if info.get('tags'):
             tag_strs = []

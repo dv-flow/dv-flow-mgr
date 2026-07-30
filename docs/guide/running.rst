@@ -53,6 +53,41 @@ For example, to run with four parallel jobs in the debug configuration:
 
     dfm run build -c debug -j 4
 
+Supplying an Input From the Command Line
+========================================
+
+``--needs TASK`` gives the task you are running an additional input, exactly as
+if it appeared in that task's ``needs:``. It is the same edge, so it resolves
+by the same (possibly partial) name, and its data reaches the task the same way.
+
+This is what lets a task in one package consume an artifact from another without
+either project listing the other. An analysis task that ships with a tool
+package, and is deliberately not part of your project's run surface, is joined
+to your artifact at invocation time:
+
+.. code-block:: bash
+
+    dfm run hdlsim.prof.Analyze --needs my-proj.sim-img.prof
+
+The supplied name may be a variant cell (see :doc:`variants`), which is what
+makes "analyze *the profiling build*" expressible.
+
+Two properties worth relying on:
+
+* **Additive.** It adds to what the task declares; it never replaces a declared
+  dependency.
+* **Root only.** It applies to the task named on the command line and to nothing
+  nested inside it, so it cannot quietly rewire the middle of a flow.
+
+``--needs`` may be repeated. An unresolvable name stops the run before anything
+executes.
+
+.. note::
+
+   A command-line need is not type-checked against what the task expects. If
+   the task declares what it requires, that check happens where every other
+   dependency is checked -- not in the flag.
+
 Re-running and forcing work
 ===========================
 

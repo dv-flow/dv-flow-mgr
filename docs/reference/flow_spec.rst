@@ -115,6 +115,14 @@ Strategy Definition
 
 .. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/StrategyDef
 
+Select Definition
+-----------------
+
+A family of independently-addressable artifact variants. See
+:doc:`/guide/variants`.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/SelectDef
+
 Generate Specification
 ----------------------
 

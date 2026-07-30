@@ -259,14 +259,19 @@ An import can itself select a configuration of the imported package via the
 What Configurations Enable
 ==========================
 
-* **Build variants** -- debug, release, profiling builds.
 * **Tool selection** -- switch between simulator/tool vendors.
 * **Target platforms** -- customize for different deployment targets.
 * **Test modes** -- normal vs. regression vs. continuous integration.
 
+A configuration is a **global** switch: it applies to the whole run. That makes
+it the wrong tool for a *per-artifact* build variant (debug vs. optimized vs.
+coverage images), because two artifacts in one run cannot then differ. Declare
+those as an axis of a variant family instead -- see :doc:`variants`.
+
 See Also
 ========
 
+* :doc:`variants` -- per-artifact build variants, which a configuration cannot express.
 * :doc:`parameters` -- parameter declarations, overrides, and resolution order.
 * :doc:`packages` -- the package namespace that hosts configurations.
 * :doc:`running` -- selecting a configuration with ``-c`` at run time.

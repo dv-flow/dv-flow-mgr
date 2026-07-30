@@ -59,124 +59,6 @@
       "type": "object",
       "$$target": "#/defs/CacheDef"
     },
-    "CliArgDef": {
-      "additionalProperties": false,
-      "description": "One command-line argument of a task.",
-      "properties": {
-        "name": {
-          "description": "Long-option name, without the leading '--' (e.g. 'seed' -> --seed)",
-          "title": "Name",
-          "type": "string"
-        },
-        "param": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Task parameter this argument sets. Defaults to 'name'.",
-          "title": "Param"
-        },
-        "short": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Single-character short option, without the leading '-'",
-          "title": "Short"
-        },
-        "help": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Help text. Defaults to the parameter's desc/doc.",
-          "title": "Help"
-        },
-        "type": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Argument type ('str', 'int', 'bool', 'list'). Defaults to the parameter's declared type.",
-          "title": "Type"
-        },
-        "default": {
-          "default": null,
-          "description": "Default value. Defaults to the parameter's value.",
-          "title": "Default"
-        },
-        "choices": {
-          "anyOf": [
-            {
-              "items": {},
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Restrict the argument to these values",
-          "title": "Choices"
-        },
-        "action": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "argparse action ('store_true', 'append', 'count'). Defaults from the parameter's type.",
-          "title": "Action"
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "title": "CliArgDef",
-      "type": "object",
-      "$$target": "#/defs/CliArgDef"
-    },
-    "CliDef": {
-      "additionalProperties": false,
-      "description": "The `cli:` block: a task's command-line interface.",
-      "properties": {
-        "args": {
-          "description": "Command-line arguments this task accepts under 'dfm run'",
-          "items": {
-            "$ref": "#/defs/CliArgDef"
-          },
-          "title": "Args",
-          "type": "array"
-        }
-      },
-      "title": "CliDef",
-      "type": "object",
-      "$$target": "#/defs/CliDef"
-    },
     "ComplexType": {
       "properties": {
         "list": {
@@ -1211,6 +1093,35 @@
           ],
           "default": null,
           "description": "The set of values this parameter accepts. Either a plain list ([a, b, c] -- closed) or {of: [...], open: true}. List elements may be bare values or {value: v, desc: ...}."
+        },
+        "cli": {
+          "anyOf": [
+            {
+              "description": "true exposes the parameter as --<name>; false removes a flag inherited via `uses:`",
+              "type": "boolean"
+            },
+            {
+              "description": "{name, short, hidden} -- rename the flag, add a short option, or keep it out of help",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "short": {
+                  "type": "string"
+                },
+                "hidden": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expose this parameter as a command-line option under 'dfm run'. `true` uses the parameter's own name ('build' -> --build); the map form adds a short option, renames the flag, or hides it. `false` removes a flag inherited from a base task. Type, default, help and accepted values all come from this declaration, so there is nothing to restate.",
+          "title": "Cli"
         }
       },
       "title": "ParamDef",
@@ -1235,6 +1146,64 @@
       "title": "RundirE",
       "type": "string",
       "$$target": "#/defs/RundirE"
+    },
+    "SelectDef": {
+      "additionalProperties": false,
+      "description": "A family of independently-addressable variants of one artifact.\n\nWhere `matrix:` fans a task out -- running it runs every cell -- `select:`\ndeclares a *catalog*: each cell is a first-class task named\n`<family>.<key>`, built only when something asks for it, and shared when two\nconsumers ask for the same one.",
+      "properties": {
+        "axes": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {},
+                "type": "array"
+              }
+            ]
+          },
+          "description": "The dimensions of the family. An axis value is a list, or a `${{ }}` expression over PACKAGE variables that resolves to one. Unlike a matrix axis this is resolved at load (cells are declared tasks), so it may not depend on a `set:`/`let` rebind -- a family's shape must not vary by instantiation site.",
+          "title": "Axes",
+          "type": "object"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Template naming a cell, evaluated against that cell's axis bindings (e.g. \"${{ this.view }}-${{ this.build }}\"). Defaults to the axis values joined with '.', in declaration order.",
+          "title": "Key"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What the bare family name means: a binding map (the family is an alias for one cell -- values may be `${{ }}` expressions over the task's own parameters), 'all' (a gate over every cell), or 'none' (only cells are addressable). Omitted means the first value of each axis.",
+          "title": "Default"
+        }
+      },
+      "required": [
+        "axes"
+      ],
+      "title": "SelectDef",
+      "type": "object",
+      "$$target": "#/defs/SelectDef"
     },
     "StrategyDef": {
       "properties": {
@@ -1286,6 +1255,18 @@
           "default": null,
           "description": "Matrix of parameter values to explore. Creates one task instance per combination of values. An axis value may be a `${{ }}` expression that resolves to a list (e.g. `image: \"${{ images }}\"`), evaluated at graph-build.",
           "title": "Matrix"
+        },
+        "select": {
+          "anyOf": [
+            {
+              "$ref": "#/defs/SelectDef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable select strategy: declare a family of independently-addressable variants (`<family>.<key>`) instead of a fan-out. Use `matrix:` when running the task should run every cell; use `select:` when the cells are separate artifacts and asking for one must not build the others."
         },
         "body": {
           "description": "Body tasks for strategy execution. Used with chain and matrix strategies",
@@ -1470,18 +1451,6 @@
           "description": "Python callable ('module:function') that elaborates this task type at graph-build time, replacing the default node interior. Signature: elaborate(ctxt, task, name) -> TaskNode. Bound along the 'uses' chain (nearest declaration wins).",
           "title": "Elaborate"
         },
-        "cli": {
-          "anyOf": [
-            {
-              "$ref": "#/defs/CliDef"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Command-line arguments this task accepts when run with 'dfm run'. Bound along the 'uses' chain (nearest declaration wins, whole-block replacement)."
-        },
         "summary": {
           "anyOf": [
             {
@@ -1656,7 +1625,7 @@
             }
           ],
           "default": null,
-          "description": "Specifies matching patterns for datasets that this task produces",
+          "description": "Patterns describing the data items this task MAY produce. 'May', not 'always': a conditional output is still worth declaring, and every consumer treats the declaration as what could be produced rather than a guarantee. Declare what this task ADDS -- items it merely passes through are already declared by whatever produced them. `type:` is the item type; other keys are attributes a consumer can match on, and may reference this task's parameters (`filetype: \"${{ type }}\"`). Inherited along 'uses' with the nearest declaration winning.",
           "title": "Produces"
         },
         "uptodate": {
@@ -1705,6 +1674,22 @@
             ]
           },
           "title": "Tags",
+          "type": "array"
+        },
+        "requires": {
+          "description": "Contract this task must satisfy: a list of check-type references with optional parameter overrides (the same shape as 'tags'). Evaluated at graph build against every node built from this task, AFTER override resolution -- so a requirement declared by a base task is what a project overriding it must satisfy. Accumulated along the 'uses' chain, nearest declaration of a given check winning.",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ]
+          },
+          "title": "Requires",
           "type": "array"
         },
         "max_failures": {
@@ -1780,6 +1765,19 @@
           },
           "title": "Tags",
           "type": "array"
+        },
+        "check": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Python callable ('module:function') implementing this type as a graph-build CHECK, invoked for every node built from a task that `requires:` it. Signature: check(ctxt) -> None; report with ctxt.error()/ctxt.warning(). Inherited along the type's `uses:` chain.",
+          "title": "Check"
         }
       },
       "required": [

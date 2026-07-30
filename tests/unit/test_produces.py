@@ -111,8 +111,19 @@ package:
     assert task.produces[0]["filetype"] == "verilog"
 
 
-def test_produces_inheritance_extends(tmpdir):
-    """Test produces inheritance - derived task extends base produces."""
+def test_produces_inheritance_nearest_wins(tmpdir):
+    """A derived task's `produces:` REPLACES the base's.
+
+    This reverses the earlier extend-the-base behavior. Extension has no answer
+    for "how do I stop claiming something my base claims?" -- a task that
+    narrows what it emits could not say so, and every derived task inherited
+    claims it might not honor. Nearest-wins is also the rule `values:` already
+    follows, so there is one inheritance story rather than two.
+
+    A derived task that says nothing still inherits (see
+    test_produces_inheritance_base_only), which is what lets a capability
+    declare its outputs once for every backend variant.
+    """
     flow_yaml = """
 package:
   name: test_inheritance
@@ -143,10 +154,10 @@ package:
     assert len(base_task.produces) == 1
     assert base_task.produces[0]["filetype"] == "verilog"
     
-    # Derived extends - should have both verilog (inherited) and vhdl (added)
-    assert len(derived_task.produces) == 2
-    assert derived_task.produces[0]["filetype"] == "verilog"  # Inherited
-    assert derived_task.produces[1]["filetype"] == "vhdl"     # Added
+    # Derived declares its own, so that is what it produces -- the base's
+    # `verilog` claim is not carried along.
+    assert len(derived_task.produces) == 1
+    assert derived_task.produces[0]["filetype"] == "vhdl"
 
 
 def test_produces_inheritance_base_only(tmpdir):
@@ -182,3 +193,45 @@ package:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_undeclared_consumes_is_distinguishable_from_declared_all(tmpdir):
+    """"Never said" and "said all" must stay distinct.
+
+    The engine defaults an undeclared `consumes:` to *all* -- it has to, or an
+    undeclared task would receive nothing. But that default is the ENGINE's
+    decision, not a claim the author made, and reading it as one is what made
+    the dataflow check silently pass for every task in the tree.
+    """
+    flow_yaml = """
+package:
+  name: test_decl
+  tasks:
+    - name: Undeclared
+      run: echo "u"
+
+    - name: DeclaredAll
+      consumes: all
+      run: echo "a"
+
+    - name: DeclaredNone
+      consumes: none
+      run: echo "n"
+"""
+    flow_file = tmpdir.join("flow.yaml")
+    flow_file.write(flow_yaml)
+
+    loader = PackageLoader()
+    pkg = loader.load(str(flow_file))
+
+    undeclared = pkg.task_m["test_decl.Undeclared"]
+    declared_all = pkg.task_m["test_decl.DeclaredAll"]
+    declared_none = pkg.task_m["test_decl.DeclaredNone"]
+
+    # The runtime value is the same for the first two -- that part is unchanged.
+    assert undeclared.consumes == declared_all.consumes
+
+    # ...but only one of them actually said so.
+    assert undeclared.consumes_declared is False
+    assert declared_all.consumes_declared is True
+    assert declared_none.consumes_declared is True

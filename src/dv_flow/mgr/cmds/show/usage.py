@@ -73,8 +73,16 @@ def _first_line(text : Optional[str]) -> str:
     return text.strip().split('\n')[0]
 
 
-def build_usage_info(task, prog : str = "dfm run") -> Dict[str, Any]:
+def build_usage_info(task, prog : str = "dfm run",
+                     values : Dict[str, Any] = None) -> Dict[str, Any]:
     """Structured usage description of `task`.
+
+    `values`, when supplied, holds each parameter's RESOLVED value (see
+    `TaskGraphBuilder.resolveTaskParams`). Without it the declared `value:` is
+    shown, which for a lazily-evaluated default is its source text -- so a
+    parameter declared `value: "${{ build }}"` reads `[default: ${{ build }}]`
+    instead of `[default: opt]`. Optional so the document can still be built
+    without a loaded project.
 
     This is also the `--usage --json` document, so it is the contract a shell
     completion script, the vscode extension, or `dfm mcp` would consume. Keep it
@@ -85,38 +93,33 @@ def build_usage_info(task, prog : str = "dfm run") -> Dict[str, Any]:
 
     `choices` comes from the **parameter's** declared value set when it has one,
     because that is the set actually enforced -- on `-D` and on a `with:`
-    override, not only on the flag. A `cli:` block's own `choices:` still wins,
-    since it can only narrow what the flag accepts.
+    override, not only on the flag.
     """
     definitions, types = collect_task_params(task)
     value_sets = collect_param_value_sets(task)
 
     leaf = task.name.split('.')[-1] if '.' in task.name else task.name
 
-    # Params promoted to first-class flags by a `cli:` block, keyed by param.
+    # Params exposed as first-class flags by their own declaration, keyed by param.
     from ...cli_args import resolve_task_cli
-    cli = resolve_task_cli(task)
-    flags = {}
-    if cli is not None:
-        for a in cli.args:
-            flags[a.param or a.name] = a
+    flags = {a.param: a for a in resolve_task_cli(task) if not a.hidden}
 
     args : List[Dict[str, Any]] = []
     for pname in sorted(definitions.keys()):
         pdef = definitions[pname]
         default = getattr(pdef, 'value', None)
+        if values is not None and pname in values:
+            default = values[pname]
         flag = flags.get(pname)
         vs = value_sets.get(pname)
-        choices = (flag.choices if (flag is not None and flag.choices is not None)
-                   else (vs.values() if vs is not None else None))
+        choices = vs.values() if vs is not None else None
         args.append({
             'name': ("--%s" % flag.name) if flag is not None else None,
             'short': ("-%s" % flag.short) if (flag is not None and flag.short) else None,
             'param': pname,
             'type': _type_name(types.get(pname)),
             'default': default,
-            'help': _first_line((flag.help if flag is not None else None)
-                                or getattr(pdef, 'doc', None)
+            'help': _first_line(getattr(pdef, 'doc', None)
                                 or getattr(pdef, 'desc', None)),
             'choices': choices,
             # Per-value documentation, when the declaration supplies it. Kept
@@ -192,13 +195,13 @@ def render_usage_text(info : Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def render_usage(task, prog : str = "dfm run"):
+def render_usage(task, prog : str = "dfm run", values : Dict[str, Any] = None):
     """Render the usage view for `task` to stdout.
 
     Uses rich when stdout is a terminal and plain text otherwise, matching how
     every other `show` renderer behaves (`formatters.is_terminal`).
     """
-    info = build_usage_info(task, prog)
+    info = build_usage_info(task, prog, values=values)
 
     if not is_terminal():
         print(render_usage_text(info))

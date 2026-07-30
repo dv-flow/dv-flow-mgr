@@ -65,6 +65,21 @@ class AmbiguousTaskError(TaskResolutionError):
         )
 
 
+class AmbiguousCellError(TaskResolutionError):
+    """A partial cell key that could mean more than one thing."""
+
+    def __init__(self, spec: str, value: str, axes: List[str], detail=None):
+        self.spec = spec
+        self.value = value
+        self.axes = axes
+        reason = detail or (
+            "'%s' is a value of more than one axis (%s)" % (
+                value, ", ".join(axes)))
+        super().__init__(
+            "'%s' is ambiguous: %s. Name the cell in full, or select the axes "
+            "with their flags." % (spec, reason))
+
+
 @dc.dataclass
 class CLITaskResolver:
     """Resolves partial / flexible task names from the CLI against the task graph.
@@ -165,10 +180,60 @@ class CLITaskResolver:
                 return root_pkg_candidates[0]
             raise AmbiguousTaskError(spec, candidates)
 
-        # 3. Fuzzy fallback
+        # 3. A partial cell key -- `sim-img.prof` for a family whose full cell
+        #    names are `sim-img.<view>.<build>`.
+        partial = self._resolve_partial_cell(spec)
+        if partial is not None:
+            return partial
+
+        # 4. Fuzzy fallback
         suggestions = difflib.get_close_matches(
             spec, self._all_suffixes, n=5, cutoff=0.6)
         raise TaskNotFoundError(spec, suggestions)
+
+    def _resolve_partial_cell(self, spec: str):
+        """`<family>.<value>...` naming only some of a select family's axes.
+
+        **Command line only.** The unnamed axes fall back to the family's own
+        default, which `-D`/`--flag` can move -- so the same partial key can
+        denote different cells from one invocation to the next. That is fine for
+        something a user types and wrong for something a flow file declares, so
+        `needs:` requires the full key (enforced at load, not here).
+
+        Returns the family Task with `select_partial` carrying the bindings, or
+        None if `spec` is not a partial key. Ambiguity is an error rather than a
+        guess.
+        """
+        for fq_name, task in self._task_m.items():
+            select = getattr(getattr(task, 'strategy', None), 'select', None)
+            if select is None:
+                continue
+            parts = fq_name.split('.')
+            suffixes = ['.'.join(parts[i:]) for i in range(len(parts))]
+            for suffix in suffixes:
+                if not spec.startswith(suffix + "."):
+                    continue
+                values = spec[len(suffix) + 1:].split('.')
+                bindings = {}
+                for value in values:
+                    axes = [a for a, members in select.axes.items()
+                            if value in [str(m) for m in members]]
+                    if not axes:
+                        return None       # not a partial key at all
+                    if len(axes) > 1:
+                        raise AmbiguousCellError(spec, value, axes)
+                    if axes[0] in bindings:
+                        raise AmbiguousCellError(
+                            spec, value, [axes[0]],
+                            "two values were given for axis '%s'" % axes[0])
+                    bindings[axes[0]] = value
+                if not bindings:
+                    return None
+                import copy as _copy
+                ret = _copy.copy(task)
+                ret.select_partial = bindings
+                return ret
+        return None
 
     def completions(self, prefix: str = "") -> List[str]:
         """Return suffix-index entries that start with *prefix*.

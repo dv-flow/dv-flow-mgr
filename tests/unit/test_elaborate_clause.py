@@ -26,6 +26,10 @@ def passthrough(ctxt, task, name):
     INVOKED.append(name)
     return ctxt.buildDefault(task, name)
 
+async def always_uptodate(ctxt):
+    """A custom uptodate callable; its identity is what the test asserts on."""
+    return True
+
 def rebind_to_banner(ctxt, task, name):
     """Rewrite `uses` to the flow's foo.Banner task (like the hdlsim backend
     selector rebinds to a concrete backend), so the node prints ELABORATED."""
@@ -124,3 +128,59 @@ package:
     # Derived's rebind (nearest) is selected -> banner prints.
     assert invoked == ["foo.R"]
     assert "ELABORATED" in out
+
+
+def test_elaborate_rewriting_uses_reinherits_uptodate(tmpdir, capsys):
+    """REGRESSION: an elaborator that rebinds `uses` must pick up the inheritable
+    attributes of the NEW base.
+
+    The loader materializes inherited attributes (`uptodate`, `rundir`, ...) onto
+    each Task when the package is read. An `elaborate:` clause runs later and can
+    rewrite `uses` -- so those values were computed against the OLD chain.
+
+    This is exactly how hdlsim binds a simulator: `hdlsim.SimImage` is abstract
+    and carries `elaborate: backend_select`, which rebinds `uses` to
+    `hdlsim.vlt.SimImage` -- and the BACKEND is where `uptodate:` lives. Before
+    the fix the specialized node was built with `uptodate=None` and fell back to
+    comparing parameters and the input signature, neither of which changes when a
+    source file's CONTENTS change. Simulation images built through the abstract
+    task were never rebuilt: a regression passing against a stale binary, which
+    is the worst way for this to fail.
+    """
+    flow = '''
+package:
+  name: foo
+  tasks:
+  - name: Banner
+    uses: std.Message
+    uptodate: elabmod:always_uptodate
+    with:
+      msg: "ELABORATED"
+  - name: Abstract
+    elaborate: elabmod:rebind_to_banner
+  - name: R
+    uses: Abstract
+'''
+    node, out, invoked = _run(tmpdir, flow, "foo.R", capsys)
+    assert node.uptodate == "elabmod:always_uptodate", (
+        "node built through an elaborator that rebound `uses` did not inherit "
+        "`uptodate` from the new base (got %r)" % (node.uptodate,))
+
+
+def test_uptodate_inherited_along_plain_uses_chain(tmpdir, capsys):
+    """The ordinary (non-elaborated) path must keep working: `uptodate` declared
+    on a base is inherited by a task that uses it."""
+    flow = '''
+package:
+  name: foo
+  tasks:
+  - name: Base
+    uses: std.Message
+    uptodate: elabmod:always_uptodate
+    with:
+      msg: "hi"
+  - name: R
+    uses: Base
+'''
+    node, out, invoked = _run(tmpdir, flow, "foo.R", capsys)
+    assert node.uptodate == "elabmod:always_uptodate"

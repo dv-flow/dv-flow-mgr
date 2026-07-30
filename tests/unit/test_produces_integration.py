@@ -139,7 +139,7 @@ package:
 
 
 def test_produces_inheritance_with_evaluation(tmpdir):
-    """Test produces inheritance works with parameter evaluation."""
+    """Nearest-wins inheritance, with the surviving pattern still evaluated."""
     flow_yaml = """
 package:
   name: test_inherit_eval
@@ -185,10 +185,11 @@ package:
     root_node = builder.mkTaskNode("test_inherit_eval.Main")
     prod_node = root_node.tasks[1]
     
-    # Should have both inherited produces and new produces (with evaluation)
-    assert len(prod_node.produces) == 2
-    assert prod_node.produces[0]["filetype"] == "verilog"  # Inherited
-    assert prod_node.produces[1]["filetype"] == "release"  # Evaluated from override
+    # The derived task declares its own, so that is what it produces -- the
+    # base's `verilog` claim is replaced, not extended (nearest declaration
+    # wins). Parameter evaluation still applies to what remains.
+    assert len(prod_node.produces) == 1
+    assert prod_node.produces[0]["filetype"] == "release"  # Evaluated from override
 
 
 def test_produces_no_parameters(tmpdir):

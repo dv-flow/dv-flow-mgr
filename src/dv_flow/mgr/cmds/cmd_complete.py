@@ -52,10 +52,10 @@ class CmdComplete:
         return 0
 
     def _flag_completions(self, resolver, task_name, prefix):
-        """The `--flags` a task declares via `cli:`.
+        """The `--flags` a task exposes (params declared `cli:`).
 
         Completion must never be the thing that fails: an unresolvable task or a
-        task with no `cli:` block yields no candidates rather than an error.
+        task that exposes nothing yields no candidates rather than an error.
         """
         from ..cli_args import resolve_task_cli
         from ..cli_task_resolver import TaskResolutionError
@@ -65,12 +65,10 @@ class CmdComplete:
         except TaskResolutionError:
             return []
 
-        cli = resolve_task_cli(task)
-        if cli is None:
-            return []
-
         candidates = []
-        for arg in cli.args:
+        for arg in resolve_task_cli(task):
+            if arg.hidden:
+                continue
             candidates.append("--%s" % arg.name)
             if arg.short:
                 candidates.append("-%s" % arg.short)
@@ -79,9 +77,9 @@ class CmdComplete:
     def _value_completions(self, resolver, task_name, flag, prefix):
         """The values a task flag accepts -- `--detail <TAB>` -> quiet normal full.
 
-        Sourced from the parameter's declared value set (a `cli:` `choices:`
-        narrowing wins), which is what makes declaring the set pay for itself at
-        the prompt. Silent on anything unresolvable, like flag completion.
+        Sourced from the parameter's declared value set, which is what makes
+        declaring the set pay for itself at the prompt. Silent on anything
+        unresolvable, like flag completion.
         """
         from ..cli_args import resolve_task_cli
         from ..cli_task_resolver import TaskResolutionError
@@ -93,21 +91,16 @@ class CmdComplete:
             return []
 
         name = flag.lstrip('-')
-        cli = resolve_task_cli(task)
-        arg = None
-        if cli is not None:
-            for a in cli.args:
-                if a.name == name or a.short == name:
-                    arg = a
-                    break
+        # The flag may be named differently from the parameter it sets
+        # (`cli: {name: ...}`), so map back through the exposed args first.
+        param = name
+        for a in resolve_task_cli(task):
+            if a.name == name or a.short == name:
+                param = a.param
+                break
 
-        param = (arg.param or arg.name) if arg is not None else name
-        if arg is not None and arg.choices is not None:
-            values = arg.choices
-        else:
-            vs = collect_param_value_sets(task).get(param)
-            if vs is None:
-                return []
-            values = vs.values()
+        vs = collect_param_value_sets(task).get(param)
+        if vs is None:
+            return []
 
-        return [str(v) for v in values if str(v).startswith(prefix)]
+        return [str(v) for v in vs.values() if str(v).startswith(prefix)]

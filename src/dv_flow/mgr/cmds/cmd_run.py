@@ -126,13 +126,40 @@ class CmdRun(object):
 
         resolver = CLITaskResolver.from_package(pkg)
 
-        # Phase 2 of the two-phase parse. The flow has now loaded,
-        # so the invoked task's `cli:` block is knowable and its own arguments --
+        # Phase 2a: project-level flags (package variables declared `cli:`).
+        # These are consumed BEFORE the task's own, and a package variable that
+        # was actually supplied forces a reload -- a package variable is read
+        # during the load (a select family's axes, an `iff:`), so binding it
+        # afterwards would make `--build cov` and `-D build=cov` mean different
+        # things. See _parse_package_args.
+        if getattr(args, "task", None) is not None:
+            rc, pkg_values = self._parse_package_args(args, resolver, pkg, loader)
+            if rc is not None:
+                return rc
+            if pkg_values:
+                merged_overrides.setdefault('package', {}).update(
+                    {k: str(v) for k, v in pkg_values.items()})
+                loader, pkg = loadProjPkgDef(
+                    get_rootdir(args),
+                    listener=listener.marker,
+                    parameter_overrides=merged_overrides,
+                    config=getattr(args, "config", None),
+                    package_maps=getattr(args, "package_map", []),
+                    override_tracker=override_tracker)
+                if pkg is None or listener.has_severity[SeverityE.Error] > 0:
+                    print("Error(s) encountered while loading package definition")
+                    sys.exit(1)
+                resolver = CLITaskResolver.from_package(pkg)
+
+        # Phase 2b of the two-phase parse. The flow has now loaded,
+        # so the invoked task's flags are knowable and its own arguments --
         # everything phase 1 could not recognize -- can be parsed. Runs here
         # because the result is folded into task_overrides, which must be final
         # before TaskGraphBuilder is constructed below.
         if getattr(args, "task", None) is not None:
-            rc = self._parse_task_args(args, resolver, task_overrides)
+            rc = self._parse_task_args(args, resolver, task_overrides,
+                                       pkg=pkg, loader=loader,
+                                       overrides=merged_overrides)
             if rc is not None:
                 return rc
 
@@ -166,6 +193,18 @@ class CmdRun(object):
 
             # Filter for 'root' visibility tasks
             root_tasks = [t for t in tasks if getattr(t, 'is_root', False)]
+
+            # A select family's cells are runnable tasks, so they are all
+            # root-scoped -- but listing a 3x4 family as twelve lines drowns
+            # everything else. Show the FAMILY, with its axes standing in for
+            # the cells (`dfm show task <family>` lists them).
+            _cells = set()
+            for t in tasks:
+                select = getattr(getattr(t, 'strategy', None), 'select', None)
+                if select is not None:
+                    _cells.update("%s.%s" % (t.name, k) for k in select.cells)
+            if _cells:
+                root_tasks = [t for t in root_tasks if t.name not in _cells]
             
             if root_tasks:
                 # Show only root tasks
@@ -180,6 +219,13 @@ class CmdRun(object):
             print("No task specified. Available Tasks:")
             for t in tasks:
                 desc = t.desc if t.desc else "<no description>"
+                select = getattr(getattr(t, 'strategy', None), 'select', None)
+                if select is not None:
+                    # The axes ARE the description of what this name offers.
+                    axes = " x ".join(
+                        "%s: %s" % (a, ",".join(str(v) for v in vals))
+                        for a, vals in select.axes.items())
+                    desc = "%s [%s]" % (desc, axes)
                 print(f"{t.name.ljust(max_name_len)} - {desc}")
 
             pass
@@ -264,6 +310,17 @@ class CmdRun(object):
         bindir = install_run_bin(rundir)
         run_env["PATH"] = bindir + os.pathsep + run_env.get("PATH", "")
 
+        # Graph-build diagnostics (a task's `requires:` contract, above all) had
+        # nowhere to go: the builder's marker channel defaults to a no-op and
+        # was never wired, so a violation was recorded and discarded. Collect
+        # them here, show them, and gate the run on an error below -- a contract
+        # that reports and then runs anyway is worse than no contract.
+        build_markers = []
+
+        def _build_marker(marker):
+            build_markers.append(marker)
+            listener.marker(marker)
+
         builder = TaskGraphBuilder(
             root_pkg=pkg,
             rundir=rundir,
@@ -273,6 +330,7 @@ class CmdRun(object):
             task_param_overrides=task_overrides,
             leaf_param_overrides=leaf_overrides,
             override_tracker=override_tracker,
+            marker_l=_build_marker,
             naming_scheme=get_naming_scheme())
 
         # Apply CLI --override arguments (TARGET=REPLACEMENT)
@@ -329,7 +387,20 @@ class CmdRun(object):
         for spec in args.tasks:
             try:
                 resolved_task = resolver.resolve(spec)
-                task = builder.mkTaskNode(resolved_task.name)
+                # Hold this node's contract checks until `--needs` is wired --
+                # its need-set is not final until then.
+                builder.deferCheckFor(resolved_task.name)
+                if getattr(resolved_task, 'select_partial', None):
+                    # A partial cell key (`sim-img.prof`). The axis bindings live
+                    # on the resolved task and would be lost by re-resolving from
+                    # its name, so the builder takes the task itself.
+                    task = builder.mkSelectPartialNode(resolved_task)
+                else:
+                    task = builder.mkTaskNode(resolved_task.name)
+                rc = self._wire_cli_needs(args, builder, resolver, task)
+                if rc is not None:
+                    return rc
+                builder.flushDeferredChecks()
                 tasks.append(task)
                 resolved_tasks.append(resolved_task)
             except TaskResolutionError as e:
@@ -338,6 +409,11 @@ class CmdRun(object):
             except Exception as e:
                 print("Error: %s" % str(e), file=sys.stderr)
                 return 1
+
+        if any(m.severity == SeverityE.Error for m in build_markers):
+            print("Error(s) encountered while building the task graph",
+                  file=sys.stderr)
+            return 1
 
         # The graph is now built, so every -D key that was going to bind has
         # bound. Report the ones that did not, and the ones that bound in two
@@ -364,13 +440,131 @@ class CmdRun(object):
 
         return runner.status
 
-    def _parse_task_args(self, args, resolver, task_overrides):
+    def _wire_cli_needs(self, args, builder, resolver, node):
+        """Wire `--needs TASK` onto the invoked task's node.
+
+        A command-line need is the same edge as one written in `needs:`, so it
+        resolves through the same name resolver (partial names and select cell
+        keys included) and is ADDITIVE -- it never replaces what the task
+        declares.
+
+        Returns an exit status to return immediately, or None to carry on.
+        """
+        specs = getattr(args, "needs", None) or []
+        if not specs:
+            return None
+
+        for spec in specs:
+            try:
+                need_task = resolver.resolve(spec)
+            except TaskResolutionError as e:
+                print("Error: --needs %s: %s" % (spec, e), file=sys.stderr)
+                return 1
+            try:
+                if getattr(need_task, 'select_partial', None):
+                    need_node = builder.mkSelectPartialNode(need_task)
+                else:
+                    need_node = builder.mkTaskNode(need_task.name)
+            except Exception as e:
+                print("Error: --needs %s: %s" % (spec, e), file=sys.stderr)
+                return 1
+
+            node.needs.append((need_node, False))
+            # A compound consumes through `input`, not `needs` -- the same
+            # distinction that made deferred cell needs invisible to a compound
+            # body. Without this, `--needs` on a compound root would be accepted
+            # and silently do nothing.
+            if getattr(node, 'input', None) is not None:
+                node.input.needs.append((need_node, False))
+
+        return None
+
+    def _parse_package_args(self, args, resolver, pkg, loader):
+        """Phase 2a: consume the PROJECT's flags out of the leftover tokens.
+
+        Returns `(exit-status-or-None, {variable: value})`. Whatever is left
+        after this is the task's own arguments.
+
+        **A flag the invoked task also claims belongs to the task.** Both are
+        legitimate declarations and neither site can see the other, so the rule
+        has to be stated once and reported: the task's parameter is the more
+        specific answer, and the package variable stays reachable as
+        `-D <name>=<value>`.
+        """
+        from ..cli_args import (collect_package_cli, resolve_task_cli,
+                                parse_task_args, validate_package_cli)
+
+        leftover = list(getattr(args, "task_args", []) or [])
+        pkg_args = collect_package_cli(pkg, loader)
+        if not pkg_args:
+            return None, {}
+
+        # Load-time validation has no natural home for a package-level flag (it
+        # is not attached to a task), so it runs here -- still before anything
+        # is built, and reported the same way.
+        problems = []
+        validate_package_cli(pkg, loader, problems.append)
+        if problems:
+            for msg in problems:
+                print("Error: %s" % msg, file=sys.stderr)
+            return 1, {}
+
+        try:
+            task = resolver.resolve(args.task)
+        except TaskResolutionError:
+            # Reported by the task-args phase, with its suggestions.
+            return None, {}
+
+        task_flags = {a.name for a in resolve_task_cli(task)}
+        shadowed = [a for a in pkg_args if a.name in task_flags]
+        for a in shadowed:
+            print("Warning: --%s is declared by both task '%s' and a package "
+                  "variable; the task parameter wins. Set the package variable "
+                  "with -D %s=<value>." % (a.name, task.name, a.param),
+                  file=sys.stderr)
+        pkg_args = [a for a in pkg_args if a.name not in task_flags]
+        if not pkg_args:
+            return None, {}
+
+        # `parse_known_args` semantics: take what the project declares and hand
+        # the rest on. An unknown flag is the TASK parser's to reject, since it
+        # is the one that can say what the task accepts.
+        values, remaining = parse_task_args(
+            pkg, pkg_args, leftover, "dfm run", partial=True)
+        args.task_args = remaining
+        return None, values
+
+    def _resolved_defaults(self, task, pkg, loader, overrides):
+        """`{param: value}` for the help view, with `${{ }}` defaults evaluated.
+
+        A display-only convenience: a failure here must degrade to showing the
+        raw expression, never break `--help`. The throwaway builder constructs
+        no nodes (see `resolveTaskParams`), so this costs a parameter-type build.
+        """
+        if pkg is None or loader is None:
+            return None
+        try:
+            from ..task_graph_builder import TaskGraphBuilder
+            b = TaskGraphBuilder(
+                root_pkg=pkg,
+                rundir=os.path.join(os.getcwd(), "rundir"),
+                loader=loader,
+                task_param_overrides=(overrides or {}).get('task', {}),
+                leaf_param_overrides=(overrides or {}).get('leaf', {}))
+            return b.resolveTaskParams(task)
+        except Exception as e:
+            self._log.debug("could not resolve defaults for %s: %s", task.name, e)
+            return None
+
+    def _parse_task_args(self, args, resolver, task_overrides,
+                         pkg=None, loader=None, overrides=None):
         """Phase 2 of the `run` parse: bind the task's own `--flags`.
 
         Returns an exit status to return immediately (`--help`, a bad task
         name), or None to carry on with the run.
         """
-        from ..cli_args import resolve_task_cli, parse_task_args, build_arg_parser
+        from ..cli_args import (resolve_task_cli, parse_task_args,
+                                build_arg_parser, collect_package_cli)
 
         try:
             task = resolver.resolve(args.task)
@@ -378,30 +572,55 @@ class CmdRun(object):
             print("Error: %s" % str(e), file=sys.stderr)
             return 1
 
-        cli = resolve_task_cli(task)
+        cli_args = resolve_task_cli(task)
         prog = "dfm run %s" % task.name
         leftover = list(getattr(args, "task_args", []) or [])
+
+        # Project-level flags are consumed before this point, but they belong in
+        # the help: from the command line they are indistinguishable from the
+        # task's own, so listing only half of what `dfm run <task>` accepts
+        # would be actively misleading.
+        pkg_args = [a for a in collect_package_cli(pkg, loader)
+                    if not a.hidden and a.name not in {c.name for c in cli_args}]
 
         if getattr(args, "task_help", False):
             # `dfm run <task> --help` is the task's argument help, not dfm's.
             from .show.usage import render_usage
-            render_usage(task, prog="dfm run")
-            if cli is not None and cli.args:
+            values = self._resolved_defaults(task, pkg, loader, overrides)
+            render_usage(task, prog="dfm run", values=values)
+            if cli_args:
                 print()
-                arg_parser, _ = build_arg_parser(task, cli, prog)
+                arg_parser, _ = build_arg_parser(task, cli_args, prog, values=values)
                 arg_parser.print_help()
+            if pkg_args:
+                print()
+                print("Project options (apply to any task in %s):" % pkg.name)
+                for a in pkg_args:
+                    flags = "--%s" % a.name
+                    if a.short:
+                        flags = "-%s, %s" % (a.short, flags)
+                    line = "  %-20s %s" % (flags, a.help or "")
+                    default = getattr(a.pdef, 'value', None)
+                    if default not in (None, ''):
+                        line += " (default: %s)" % default
+                    print(line.rstrip())
             return 0
 
-        if cli is None or not cli.args:
+        if not cli_args:
             if leftover:
-                print("Error: task '%s' accepts no arguments, but got: %s\n"
-                      "Set parameters with -D name=value, or declare a 'cli:' "
-                      "block on the task." % (task.name, " ".join(leftover)),
-                      file=sys.stderr)
+                hint = ("Set parameters with -D name=value, or mark a parameter "
+                        "`cli: true` in its declaration.")
+                if pkg_args:
+                    hint = ("This project accepts: %s. Otherwise set parameters "
+                            "with -D name=value, or mark a parameter `cli: true` "
+                            "in its declaration." % ", ".join(
+                                "--%s" % a.name for a in pkg_args))
+                print("Error: task '%s' accepts no arguments, but got: %s\n%s" % (
+                    task.name, " ".join(leftover), hint), file=sys.stderr)
                 return 1
             return None
 
-        values = parse_task_args(task, cli, leftover, prog)
+        values = parse_task_args(task, cli_args, leftover, prog)
 
         # Bind through the override map (design §4.4 option (a)), NOT as
         # mkTaskNode kwargs: kwargs are applied *before* the override pass, so a

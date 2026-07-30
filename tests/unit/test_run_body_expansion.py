@@ -217,12 +217,8 @@ package:
     tasks:
     - name: t
       shell: bash
-      cli:
-        args:
-        - name: seed
-          short: s
       with:
-        seed: { type: int, value: 0 }
+        seed: { type: int, value: 0, cli: {short: s} }
       run: echo "seed=${{ seed }}"
 """
 
@@ -236,7 +232,7 @@ def test_cli_D_reaches_the_executed_body(tmpdir):
 
 
 def test_cli_flag_reaches_the_executed_body(tmpdir):
-    """A `cli:` `--flag` binds through the override map, so it lands on the
+    """A task `--flag` binds through the override map, so it lands on the
     same rung as -D and reaches the body the same way."""
     with open(os.path.join(str(tmpdir), "flow.dv"), "w") as f:
         f.write(CLI_FLOW)

@@ -19,11 +19,10 @@
 #*     Author: 
 #*
 #****************************************************************************
-import enum
 import logging as _logging
 from typing import Annotated, Any, Dict, List, Union
-from pydantic import (BaseModel, Field, WithJsonSchema, field_validator,
-                      model_validator)
+from pydantic import (BaseModel, ConfigDict, Field, WithJsonSchema,
+                      field_validator, model_validator)
 
 class ValueDef(BaseModel):
     """One member of a parameter's value set."""
@@ -67,9 +66,25 @@ class ComplexType(BaseModel):
     list : Union[ListType, None] = None
     map : Union[MapType, None] = None
 
-class VisibilityE(enum.Enum):
-    LOCAL = "local"
-    EXPORT = "export"
+class CliOpt(BaseModel):
+    """How a parameter appears on the command line.
+
+    Authored as `cli: true` (the common case -- the parameter's own name becomes
+    the long option) or as a map when the flag needs a short option, a different
+    name, or must stay out of help.
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    name : Union[str, None] = Field(
+        default=None,
+        description="Long-option name, without the leading '--'. Defaults to "
+                    "the parameter's own name ('build' -> --build).")
+    short : Union[str, None] = Field(
+        default=None,
+        description="Single-character short option, without the leading '-'")
+    hidden : bool = Field(
+        default=False,
+        description="Accept the option but omit it from help and completion")
 
 class ParamDef(BaseModel):
     doc : str = Field(
@@ -123,7 +138,45 @@ class ParamDef(BaseModel):
         description="The set of values this parameter accepts. Either a plain "
                     "list ([a, b, c] -- closed) or {of: [...], open: true}. "
                     "List elements may be bare values or {value: v, desc: ...}.")
+    # Stored as CliOpt (exposed) | False (explicitly not exposed) | None (no
+    # statement -- inherit). The published schema has to describe the authored
+    # forms, not the stored one, or an editor flags `cli: true`.
+    cli : Annotated[Union[CliOpt, bool, None], WithJsonSchema({
+        "anyOf": [
+            {"type": "boolean",
+             "description": "true exposes the parameter as --<name>; false "
+                            "removes a flag inherited via `uses:`"},
+            {"type": "object",
+             "properties": {
+                 "name": {"type": "string"},
+                 "short": {"type": "string"},
+                 "hidden": {"type": "boolean"},
+             },
+             "description": "{name, short, hidden} -- rename the flag, add a "
+                            "short option, or keep it out of help"},
+            {"type": "null"},
+        ],
+        "default": None,
+    })] = Field(
+        default=None,
+        description="Expose this parameter as a command-line option under "
+                    "'dfm run'. `true` uses the parameter's own name "
+                    "('build' -> --build); the map form adds a short option, "
+                    "renames the flag, or hides it. `false` removes a flag "
+                    "inherited from a base task. Type, default, help and "
+                    "accepted values all come from this declaration, so there "
+                    "is nothing to restate.")
     srcinfo : Union[str, None] = Field(alias="srcinfo", default=None)
+
+    @field_validator('cli', mode='before')
+    @classmethod
+    def _normalize_cli(cls, v):
+        """`cli: true` -> an empty CliOpt; `cli: false` and absence stay
+        distinguishable, because they mean opposite things under inheritance:
+        absence inherits a base's flag, `false` removes it."""
+        if v is True:
+            return CliOpt()
+        return v
 
     @field_validator('values', mode='before')
     @classmethod
