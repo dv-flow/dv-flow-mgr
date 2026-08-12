@@ -273,3 +273,110 @@ package:
     # Both tasks should have run
     # proc1.result.changed should be True on first run
     assert task.result is not None
+
+
+class _RunRecorder(object):
+    """Records whether each task ran or was declared up-to-date."""
+
+    def __init__(self):
+        self.reasons = {}
+
+    def __call__(self, task, reason):
+        if reason in ("run", "uptodate"):
+            self.reasons[task.name] = reason
+
+
+def _run(pkg_dir, flow_dv, target):
+    """Build a fresh graph and run one target -- i.e. one `dfm run` invocation."""
+    with open(os.path.join(pkg_dir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    loader = PackageLoader()
+    pkg_def = loader.load(os.path.join(pkg_dir, "flow.dv"))
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(pkg_dir, "rundir"),
+        loader=loader)
+    runner = TaskSetRunner(rundir=os.path.join(pkg_dir, "rundir"), builder=builder)
+    recorder = _RunRecorder()
+    runner.add_listener(recorder)
+
+    asyncio.run(runner.run(builder.mkTaskNode(target)))
+    return recorder.reasons
+
+
+_FLOW = """
+package:
+  name: p1
+
+  tasks:
+  - name: src1
+    uses: std.CreateFile
+    with: {{ filename: "src1.txt", content: "{content}" }}
+  - name: consumer_a
+    needs: [src1]
+    passthrough: all
+  - name: consumer_b
+    needs: [src1]
+    passthrough: all
+"""
+
+
+def test_uptodate_stale_consumer_across_invocations(tmpdir):
+    """A consumer left out of the invocation that rebuilt its input is NOT up-to-date.
+
+    `changed` only propagates within a single invocation. Two consumers share
+    one producer; the producer is rebuilt in an invocation that asks only for
+    consumer_a. consumer_b was not part of that invocation, so nothing told it
+    at the time -- and on its next invocation the producer reports itself
+    up-to-date and `changed=False`. It must still re-run, which it can only
+    decide by hashing its inputs rather than trusting that announcement.
+    """
+    rundir = str(tmpdir)
+
+    # Invocation 1: build both consumers against content "v1"
+    _run(rundir, _FLOW.format(content="v1"), "p1.consumer_a")
+    reasons = _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
+    assert reasons["p1.consumer_b"] == "run"
+
+    # Both are now up-to-date and stay that way while nothing changes
+    reasons = _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
+    assert reasons["p1.src1"] == "uptodate"
+    assert reasons["p1.consumer_b"] == "uptodate"
+
+    # Invocation 2: the producer changes, but only consumer_a is requested
+    reasons = _run(rundir, _FLOW.format(content="v2"), "p1.consumer_a")
+    assert reasons["p1.src1"] == "run"
+    assert reasons["p1.consumer_a"] == "run"
+
+    # Invocation 3: consumer_b must now re-run. While the inputs signature
+    # recorded only which task produced each input, it reported up-to-date
+    # here and kept serving its "v1" result forever.
+    reasons = _run(rundir, _FLOW.format(content="v2"), "p1.consumer_b")
+    assert reasons["p1.src1"] == "uptodate", "producer is genuinely up-to-date now"
+    assert reasons["p1.consumer_b"] == "run", "consumer must see the rebuilt input"
+
+    # ... and settles again rather than re-running forever
+    reasons = _run(rundir, _FLOW.format(content="v2"), "p1.consumer_b")
+    assert reasons["p1.consumer_b"] == "uptodate"
+
+
+def test_uptodate_unchanged_rerun_does_not_churn_consumers(tmpdir):
+    """A producer that re-runs to the SAME output does not invalidate consumers."""
+    rundir = str(tmpdir)
+
+    _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
+
+    # Force src1 to re-run by removing its exec_data, then confirm it does.
+    import glob, shutil
+    for p in glob.glob(os.path.join(rundir, "rundir", "*src1*")):
+        shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+
+    reasons = _run(rundir, _FLOW.format(content="v1"), "p1.consumer_a")
+    assert reasons["p1.src1"] == "run"
+
+    # consumer_b never saw that run. src1 reported changed, so consumer_b does
+    # re-run once -- but it must then settle rather than oscillate.
+    _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
+    reasons = _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
+    assert reasons["p1.consumer_b"] == "uptodate"

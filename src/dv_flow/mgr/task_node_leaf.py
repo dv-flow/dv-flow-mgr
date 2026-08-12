@@ -22,6 +22,10 @@ class TaskNodeLeaf(TaskNode):
     uptodate : Union[bool, str, None] = dc.field(default=None)
     taskdef : Any = dc.field(default=None)
 
+    # Content identity of the inputs this run consumed. Set once per run,
+    # before the up-to-date check, and reused when saving exec_data.
+    _inputs_signature : Any = dc.field(default=None)
+
     async def do_run(self, 
                   runner,
                   rundir,
@@ -121,6 +125,19 @@ class TaskNodeLeaf(TaskNode):
                 if getattr(in_p, "type", None) == "std.Env":
                     inputs.append(in_p)
 
+        # Identify what arrives from our needs by content, once: the up-to-date
+        # check compares against it and the run records it for the next
+        # invocation to compare against. Computed before the task runs, since a
+        # task's own execution must not change what its inputs were.
+        #
+        # Over `in_params`, not the `inputs` filtered by `consumes` above. A
+        # task's result depends on what it consumes, but its OUTPUT also
+        # depends on what it passes through -- a passthrough task consumes
+        # nothing at all, and would otherwise have an empty signature and never
+        # notice anything.
+        self._inputs_signature = await self._compute_inputs_signature(
+            in_params, rundir, runner)
+
         # Check cache first (before uptodate check)
         # Skip cache if uptodate is explicitly False
         force_run = getattr(runner, 'force_run', False)
@@ -185,16 +202,12 @@ class TaskNodeLeaf(TaskNode):
                             if 'basedir' in out_data and '${{ rundir }}' in out_data['basedir']:
                                 out_data['basedir'] = out_data['basedir'].replace('${{ rundir }}', rundir)
                             
-                            excluded_fields = ("type", "src", "seq", "name", "params")
                             try:
                                 # Get type, ensuring it's not empty
                                 item_type = out_data.get("type") or "std.FileSet"
                                 if not out_data.get("type"):
                                     self._log.warning(f"Cached output item has empty/missing type field, falling back to std.FileSet")
-                                item = runner.mkDataItem(item_type, **{
-                                    k: v for k, v in out_data.items()
-                                    if k not in excluded_fields
-                                })
+                                item = self._mk_restored_item(runner, item_type, out_data)
                                 item.src = self.name
                                 item.seq = out_data.get("seq", 0)
                                 output.append(item)
@@ -300,17 +313,12 @@ class TaskNodeLeaf(TaskNode):
                 for i, out_data in enumerate(saved_output):
                     if out_data.get("src") == self.name:
                         # This is a local output, need to reconstruct the data item
-                        # Exclude fields that are set separately or may not be in the type schema
-                        excluded_fields = ("type", "src", "seq", "name", "params")
                         try:
                             # Get type, ensuring it's not empty
                             item_type = out_data.get("type") or "std.FileSet"
                             if not out_data.get("type"):
                                 self._log.warning("Output item in exec_data has empty/missing type field, falling back to std.FileSet")
-                            item = runner.mkDataItem(item_type, **{
-                                k: v for k, v in out_data.items() 
-                                if k not in excluded_fields
-                            })
+                            item = self._mk_restored_item(runner, item_type, out_data)
                             item.src = self.name
                             item.seq = out_data.get("seq", i)
                             output.append(item)
@@ -523,7 +531,7 @@ class TaskNodeLeaf(TaskNode):
                 self._log.warning(f"Failed to store task in cache: {e}")
         
         if self.save_exec_data:
-            self._save_exec_data(rundir, ctxt, input)
+            self._save_exec_data(rundir, ctxt, input, self._inputs_signature)
 
         # TODO: 
         self._log.debug("<-- do_run: %s" % self.name)
@@ -587,13 +595,9 @@ class TaskNodeLeaf(TaskNode):
             self._log.debug("Task %s: parameters changed, not up-to-date" % self.name)
             return (False, None)
         
-        # Compare inputs signature
+        # Compare inputs signature -- which inputs, and what was in them.
         saved_signature = exec_data.get("inputs_signature", [])
-        current_signature = [
-            {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
-            for item in inputs
-        ]
-        if saved_signature != current_signature:
+        if saved_signature != self._inputs_signature:
             self._log.debug("Task %s: inputs signature changed, not up-to-date" % self.name)
             return (False, None)
         

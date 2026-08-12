@@ -90,20 +90,27 @@ class DefaultHashProvider:
                 # Directory passed as file
                 hasher.update(b'<DIRECTORY>')
         
-        # Also hash other fileset properties that affect behavior
-        for incdir in sorted(fileset.incdirs):
+        # Also hash other fileset properties that affect behavior.
+        #
+        # Read defensively: a fileset restored from exec_data or the cache is
+        # built by mkDataItem, whose generated type carries neither `name` nor
+        # `params`, so those attributes are simply absent on it. Treating an
+        # absent field as empty is what lets a restored fileset hash equal to
+        # the one the task originally produced.
+        for incdir in sorted(getattr(fileset, 'incdirs', None) or []):
             hasher.update(b'INCDIR:')
             hasher.update(incdir.encode('utf-8'))
-        
-        for define in sorted(fileset.defines):
+
+        for define in sorted(getattr(fileset, 'defines', None) or []):
             hasher.update(b'DEFINE:')
             hasher.update(define.encode('utf-8'))
-        
+
         # Hash params as sorted key-value pairs
-        for key in sorted(fileset.params.keys()):
+        params = getattr(fileset, 'params', None) or {}
+        for key in sorted(params.keys()):
             hasher.update(b'PARAM:')
             hasher.update(key.encode('utf-8'))
             hasher.update(b'=')
-            hasher.update(str(fileset.params[key]).encode('utf-8'))
+            hasher.update(str(params[key]).encode('utf-8'))
         
         return hasher.hexdigest()

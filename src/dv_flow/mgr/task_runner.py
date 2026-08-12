@@ -626,13 +626,9 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                 restoration_ok = True
                 for i, out_data in enumerate(saved_output):
                     if out_data.get("src") == t.name:
-                        excluded_fields = ("type", "src", "seq", "name", "params")
                         try:
                             item_type = out_data.get("type") or "std.FileSet"
-                            item = self.mkDataItem(item_type, **{
-                                k: v for k, v in out_data.items()
-                                if k not in excluded_fields
-                            })
+                            item = t._mk_restored_item(self, item_type, out_data)
                             item.src = t.name
                             item.seq = out_data.get("seq", i)
                             output.append(item)

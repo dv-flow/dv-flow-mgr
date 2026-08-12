@@ -161,7 +161,9 @@ class TaskNodeCompound(TaskNode):
                 inputs=output,
                 memento=memento,
             )
-            self._save_exec_data(rundir, ctxt, input_for_save)
+            self._save_exec_data(
+                rundir, ctxt, input_for_save,
+                await self._compute_inputs_signature(output, rundir, runner))
 
         return None
 

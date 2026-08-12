@@ -20,6 +20,7 @@
 #*
 #****************************************************************************
 import enum
+import hashlib
 import json
 import os
 import sys
@@ -220,13 +221,102 @@ class TaskNode(object):
         self._log.debug("<-- _matches: %s %s" % (self.name, consumed))
         return consumed
     
-    def _save_exec_data(self, rundir, ctxt : TaskRunCtxt, input : TaskDataInput):
+    # `type`/`src`/`seq` are set by the caller from the saved item.
+    #
+    # `name` and `params` are dropped because they CANNOT be restored: the
+    # types `mkDataItem` builds from a package definition do not carry them,
+    # even though the FileSet class does -- `mkDataItem("std.FileSet",
+    # params={})` raises "parameters do not include params", and the field
+    # cannot be set afterwards either. A restored fileset is therefore a
+    # slightly lossy copy of the produced one, which is why anything comparing
+    # the two (notably the hash providers) has to read these fields defensively
+    # rather than assume they are present.
+    _ITEM_RESTORE_EXCLUDED = ("type", "src", "seq", "name", "params")
+
+    def _mk_restored_item(self, runner, item_type, out_data):
+        """Rebuild an output data item saved in exec_data or the cache."""
+        return runner.mkDataItem(item_type, **{
+            k: v for k, v in out_data.items()
+            if k not in self._ITEM_RESTORE_EXCLUDED
+        })
+
+    def _hash_registry(self, runner):
+        registry = getattr(runner, 'hash_registry', None) if runner is not None else None
+        if registry is None:
+            from .ext_rgy import ExtRgy
+            registry = ExtRgy.inst()
+        return registry
+
+    @staticmethod
+    def _is_fileset(item) -> bool:
+        """Whether an item is a fileset, however it was constructed.
+
+        `isinstance(item, FileSet)` is NOT usable here: items restored from
+        exec_data or the cache are built by `mkDataItem`, which produces a
+        dynamically-generated pydantic type. A restored fileset is therefore
+        not an instance of the FileSet class, and an isinstance test silently
+        classifies it as "some other data item" -- which would mean hashing its
+        serialized form instead of its file contents.
+        """
+        return getattr(item, "type", None) == "std.FileSet"
+
+    async def _hash_input_item(self, item, rundir, registry) -> str:
+        """Content identity of a single input item.
+
+        Filesets go through the registered hash providers -- the same ones the
+        cache key uses -- so the hash covers file contents, names, incdirs,
+        defines and fileset params, and a specialized provider (e.g. SV) can
+        widen it to included files. Anything else is identified by its
+        serialized value.
+        """
+        if self._is_fileset(item):
+            provider = registry.get_hash_provider(getattr(item, "filetype", ""))
+            if provider is not None:
+                return await provider.compute_hash(item, rundir)
+            self._log.warning("No hash provider for filetype %s (task %s)" % (
+                getattr(item, "filetype", ""), self.name))
+
+        try:
+            if hasattr(item, 'model_dump'):
+                value = item.model_dump(mode='json', warnings=False)
+            else:
+                value = item
+            encoded = json.dumps(value, sort_keys=True, default=str)
+        except Exception as e:
+            self._log.debug("Task %s: failed to serialize input item: %s" % (self.name, e))
+            encoded = repr(item)
+        return hashlib.md5(encoded.encode('utf-8')).hexdigest()
+
+    async def _compute_inputs_signature(self, inputs, rundir, runner=None):
+        """Content identity of everything this task consumes.
+
+        This is what makes the up-to-date check self-contained: it answers "are
+        my inputs the same bytes I last ran against" by looking at the inputs
+        themselves, rather than by relying on an upstream task to announce that
+        it changed. That announcement (TaskDataOutput.changed) only reaches
+        tasks that are part of the SAME invocation as the rebuild, so a
+        consumer left out of that invocation would otherwise stay up-to-date
+        against a stale result forever.
+        """
+        registry = self._hash_registry(runner)
+        signature = []
+        for item in inputs:
+            signature.append({
+                "src": item.src,
+                "seq": item.seq,
+                "type": getattr(item, "type", None),
+                "hash": await self._hash_input_item(item, rundir, registry),
+            })
+        return signature
+
+    def _save_exec_data(self, rundir, ctxt : TaskRunCtxt, input : TaskDataInput,
+                        inputs_signature=None):
         """Saves execution data to the rundir"""
-        # Build inputs signature for up-to-date checking
-        inputs_signature = [
-            {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
-            for item in input.inputs
-        ]
+        if inputs_signature is None:
+            inputs_signature = [
+                {"src": item.src, "seq": item.seq, "type": getattr(item, "type", None)}
+                for item in input.inputs
+            ]
 
         # The memento may be a pydantic model (e.g. AgentMemento) or a plain
         # script-owned dict/blob (shell tasks via DFM_MEMENTO_OUT).
