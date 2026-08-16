@@ -551,6 +551,53 @@ class TaskNodeLeaf(TaskNode):
         if need not in in_task_s:
             in_params.extend(need.output.output)
         
+    def _missing_outputs(self, exec_data: dict) -> List[str]:
+        """Declared output files recorded by the previous run that are now gone.
+
+        Only files this task itself PRODUCED are checked, which the `src` field
+        identifies. `exec_data["output"]` also carries PASSTHROUGH entries --
+        a dependency's filesets, forwarded through this task -- and those are
+        emphatically not ours to police: a dependency that moved to a different
+        unique rundir leaves its old path dangling here, and treating that as
+        our missing output makes this task re-run on every invocation and never
+        settle. Whether a dependency's products still exist is that
+        dependency's own up-to-date check to make.
+
+        A file-bearing output carries `basedir` + `files` (std.FileSet and
+        anything shaped like it). Objects with no files -- std.Env, parameter
+        carriers -- contribute nothing and are skipped rather than guessed at,
+        so a new output type cannot make this raise.
+
+        EXISTENCE ONLY, deliberately. Detecting a *modified* output would need
+        content hashes the exec_data does not carry, and adding them would put a
+        full re-hash of every product on the up-to-date path -- a real cost on a
+        task that emits a large fileset. Existence is cheap (one stat per file),
+        has no false positives, and covers the failure that actually occurs:
+        products removed, not products edited in place.
+
+        A path is resolved against its fileset's `basedir` when relative, which
+        is how std.FileSet stores them.
+        """
+        out_data = exec_data.get("output", {})
+        if not isinstance(out_data, dict):
+            return []
+
+        missing: List[str] = []
+        for out in out_data.get("output", []) or []:
+            if not isinstance(out, dict):
+                continue
+            if out.get("src") != self.name:
+                continue    # passthrough from a dependency -- see docstring
+            files = out.get("files")
+            if not files:
+                continue
+            basedir = out.get("basedir") or ""
+            for f in files:
+                path = f if os.path.isabs(f) else os.path.join(basedir, f)
+                if not os.path.exists(path):
+                    missing.append(path)
+        return missing
+
     async def _check_uptodate(self, rundir: str, inputs: List[Any], changed: bool) -> Tuple[bool, Optional[dict]]:
         """
         Check if this task is up-to-date.
@@ -599,6 +646,19 @@ class TaskNodeLeaf(TaskNode):
         saved_signature = exec_data.get("inputs_signature", [])
         if saved_signature != self._inputs_signature:
             self._log.debug("Task %s: inputs signature changed, not up-to-date" % self.name)
+            return (False, None)
+
+        # Every check above asks whether the task would produce the SAME answer.
+        # None of them asks whether the answer is still THERE. Without this, a
+        # task whose products have been deleted -- by a partial clean, an
+        # interrupted run, a stray rm, an editor writing over the rundir -- is
+        # reported up-to-date, its outputs are never regenerated, and the
+        # failure surfaces in whatever consumes them, which is the wrong place
+        # and often much later.
+        missing = self._missing_outputs(exec_data)
+        if missing:
+            self._log.debug("Task %s: %d declared output(s) missing (%s), not up-to-date" % (
+                self.name, len(missing), ", ".join(missing[:3])))
             return (False, None)
         
         # If there's a custom uptodate method, call it
