@@ -1047,6 +1047,31 @@ class TaskGraphBuilder(object):
                 # method cannot reach into, so its node settles params after
                 # the fact -- unchanged from before Phase C.
                 self._apply_node_params(ret, task, node_params)
+
+                # ...and because the interior evaluated `produces:` against the
+                # params as they stood BEFORE the line above, a `with:`/kwarg or
+                # -D value never reached it: `mode: test` would advertise
+                # `mode: run`, and downstream matching on a produces attribute
+                # would miss the artifact. Re-evaluate from the raw patterns now
+                # that params are settled. `ret.taskdef` is the (possibly
+                # rebound) task the elaborator actually built, so a backend's
+                # own `produces:` override is preserved.
+                # The node's task scope is what makes a bare `${{ sim }}`
+                # resolve to *this* node's parameter, so re-push it for the
+                # re-evaluation; without it the reference does not resolve and
+                # ProducesEvaluator quietly keeps the raw source text.
+                if node_params:
+                    _td = getattr(ret, "taskdef", None)
+                    _pat = getattr(_td, "produces", None) if _td is not None else None
+                    if _pat is not None and getattr(ret, "params", None) is not None:
+                        from .produces_eval import ProducesEvaluator
+                        self.push_task_scope(ret)
+                        try:
+                            ret.produces = ProducesEvaluator(
+                                eval if eval is not None else self._eval
+                            ).evaluate(_pat, ret.params)
+                        finally:
+                            self.pop_task_scope()
             else:
                 ret = self._build_default_interior(
                     task, name, srcdir, params, hierarchical, eval,
