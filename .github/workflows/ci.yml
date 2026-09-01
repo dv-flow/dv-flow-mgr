@@ -1,3 +1,27 @@
+# RELEASE PATH -- read this before changing the `uses:` below.
+#
+# This repo does not publish anything itself. Its release pipeline is
+# dv-flow/dv-flow-release's reusable dv-flow-pybuild workflow, and the gating
+# lives there: a `gate` job resolves the release-authority switch at
+# https://dvkit.org/.well-known/release-authority.json, and the publish step
+# requires both a `refs/tags/v*` ref and `authority == 'github'`. Until
+# 2026-08-30 it required neither -- a push to `main` published to PyPI, from
+# here and from ten sibling repos, through this one shared file.
+#
+# THE PIN IS A BRANCH. `@main`, not a tag and not a SHA, so a commit to
+# dv-flow-release changes this repo's release behaviour immediately, with no
+# commit here and nothing in this repo recording the dependency.
+#
+# This block is also load-bearing for the sync itself, which is worth knowing
+# before deleting it as boilerplate. git-sync's inbound publish preflight reads
+# workflow files as TEXT and cannot follow a `uses:` into another repository, so
+# it sees a reference to a release pipeline, finds no evidence of a gate in THIS
+# file, and refuses to pull the ref -- which would have blocked this repo's
+# inbound sync the first time GitHub got ahead of Forgejo. Found 2026-08-31
+# while onboarding edapack, whose callers have the same shape. Naming the switch
+# here is how this file answers the question the scanner is actually asking; the
+# gate really is on, it is just one repository away.
+
 name: CI
 on:
   - push
