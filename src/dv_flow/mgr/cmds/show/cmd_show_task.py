@@ -186,12 +186,14 @@ class CmdShowTask:
         if getattr(task, 'is_local', False):
             scope.append('local')
         
-        # Get description from taskdef if available
-        desc = ''
-        doc = ''
-        if hasattr(task, 'taskdef') and task.taskdef:
-            desc = getattr(task.taskdef, 'desc', '') or ''
-            doc = getattr(task.taskdef, 'doc', '') or ''
+        # Prefer the resolved Task, which is where inheritance along `uses:`
+        # has already been applied; the taskdef is only the authored YAML, and
+        # is absent entirely for tasks that aren't declared directly.
+        desc = getattr(task, 'desc', '') or ''
+        doc = getattr(task, 'doc', '') or ''
+        if not (desc and doc) and getattr(task, 'taskdef', None):
+            desc = desc or (getattr(task.taskdef, 'desc', '') or '')
+            doc = doc or (getattr(task.taskdef, 'doc', '') or '')
         
         info = {
             'name': task.name,
@@ -199,6 +201,7 @@ class CmdShowTask:
             'package': pkg_name,
             'desc': desc,
             'doc': doc,
+            'examples': self._examples_to_list(getattr(task, 'examples', [])),
             'uses': task.uses.name if hasattr(task, 'uses') and task.uses else None,
             'scope': scope,
             'tags': self._tags_to_list(getattr(task, 'tags', [])),
@@ -275,18 +278,51 @@ class CmdShowTask:
             }
         return params
     
+    def _examples_to_list(self, examples):
+        """Convert declared examples to JSON-serializable dicts."""
+        if not examples:
+            return []
+        result = []
+        for ex in examples:
+            result.append({
+                'title': getattr(ex, 'title', None),
+                'code': getattr(ex, 'code', '') or '',
+                'caption': getattr(ex, 'caption', None),
+                'lang': getattr(ex, 'lang', 'yaml') or 'yaml',
+            })
+        return result
+
     def _tags_to_list(self, tags):
-        """Convert tags to list."""
+        """Convert tags to JSON-serializable entries.
+
+        A resolved tag is a Type, and str() on one is a Python repr of the
+        whole type object -- unusable to any consumer. What a caller wants is
+        the tag's name and the parameters it was applied with, which is what a
+        lifecycle tag (std.Deprecated and friends) exists to carry.
+        """
         if not tags:
             return []
         result = []
         for tag in tags:
-            if isinstance(tag, str):
+            if isinstance(tag, (str, dict)):
                 result.append(tag)
-            elif isinstance(tag, dict):
-                result.append(tag)
-            else:
+                continue
+            name = getattr(tag, 'name', None)
+            if name is None:
                 result.append(str(tag))
+                continue
+            entry = {'name': name}
+            paramT = getattr(tag, 'paramT', None)
+            if paramT is not None and hasattr(type(paramT), 'model_fields'):
+                params = {}
+                for k in type(paramT).model_fields.keys():
+                    v = getattr(paramT, k, None)
+                    if isinstance(v, (str, int, float, bool, list, dict)) or v is None:
+                        params[k] = v
+                    else:
+                        params[k] = str(v)
+                entry['params'] = params
+            result.append(entry)
         return result
     
     def _get_needs_chain(self, task_name: str, pkg, loader, max_depth: int) -> List[Dict[str, Any]]:
@@ -413,11 +449,33 @@ class CmdShowTask:
                 "Variant of %s" % cell['family'],
                 ["%s = %s" % (a, v) for a, v in cell['bindings'].items()])
         
+        if info.get('examples'):
+            for i, ex in enumerate(info['examples']):
+                heading = ex.get('title') or "Example %d" % (i + 1)
+                # A section, not a list: example code is meant to be copied,
+                # and bullets are not part of what the reader should type.
+                body = ""
+                if ex.get('caption'):
+                    body += "%s\n\n" % ex['caption']
+                body += ex.get('code', '').rstrip()
+                formatter.add_section(heading, body)
+
         if info.get('tags'):
             tag_strs = []
             for tag in info['tags']:
                 if isinstance(tag, str):
                     tag_strs.append(tag)
+                elif isinstance(tag, dict) and 'name' in tag:
+                    # Show only the parameters that were actually set: a tag's
+                    # empty defaults say nothing and crowd out the ones that do.
+                    set_params = ["%s=%s" % (k, v)
+                                  for k, v in (tag.get('params') or {}).items()
+                                  if v not in (None, "", [], {})]
+                    if set_params:
+                        tag_strs.append("%s (%s)" % (tag['name'],
+                                                     ", ".join(set_params)))
+                    else:
+                        tag_strs.append(tag['name'])
                 elif isinstance(tag, dict):
                     for k, v in tag.items():
                         tag_strs.append(f"{k}: {v}")

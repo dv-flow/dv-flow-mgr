@@ -52,6 +52,12 @@ class PackageDef(BaseModel):
     desc : str = Field(
         default=None,
         description="Short description of the package")
+    doc : str = Field(
+        default=None,
+        description="Full documentation of the package. Where 'desc' is the "
+                    "one-line summary shown in listings, this is the prose a "
+                    "reader arriving at the package needs: what it is for and "
+                    "where to start.")
     type : List[PackageSpec] = Field(
         default_factory=list,
         description="List of data types defined by this package")

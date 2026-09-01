@@ -1295,20 +1295,14 @@ class TaskGraphBuilder(object):
         same check replaces the farther one -- the override channel, and the
         reason `id:` exists (a task may legitimately carry two `std.check.Needs`
         requirements with different parameters).
+
+        Delegates to `task.collect_task_requires`, which is where the rule now
+        lives: "what contract does this task impose" is a question the
+        documentation extractor asks as well, and two implementations of it
+        would eventually disagree.
         """
-        out, seen = [], set()
-        for current in iter_uses_chain(task):
-            for req in getattr(current, 'requires', ()) or ():
-                ident = ""
-                values = getattr(req, 'paramT', None)
-                if values is not None:
-                    ident = getattr(values, 'id', "") or ""
-                key = (getattr(req, 'name', ''), ident)
-                if key in seen:
-                    continue
-                seen.add(key)
-                out.append(req)
-        return out
+        from .task import collect_task_requires
+        return collect_task_requires(task)
 
     def _run_checks(self, task, node):
         """Evaluate `task`'s contract against the node just built.

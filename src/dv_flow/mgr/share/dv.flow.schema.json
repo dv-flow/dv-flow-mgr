@@ -107,6 +107,18 @@
           "title": "Name",
           "type": "string"
         },
+        "desc": {
+          "default": null,
+          "description": "Short description of the configuration: what selecting it is for, in one line",
+          "title": "Desc",
+          "type": "string"
+        },
+        "doc": {
+          "default": null,
+          "description": "Full documentation of the configuration. A configuration name is chosen by whoever runs the flow, so what it changes and when to reach for it has to be written down somewhere the runner can find it",
+          "title": "Doc",
+          "type": "string"
+        },
         "with": {
           "description": "Configuration parameters map",
           "items": {
@@ -370,6 +382,55 @@
       "title": "ControlStateDef",
       "type": "object",
       "$$target": "#/defs/ControlStateDef"
+    },
+    "ExampleDef": {
+      "additionalProperties": false,
+      "description": "A worked example of using a task.\n\nExamples are documentation, not tests: nothing runs them, and nothing\nchecks that `code` still works. They are deliberately NOT inherited along\nthe `uses:` chain -- an example is written against a specific task name and\na specific set of parameters, so re-presenting a base task's example under\na derived task would show the reader something they cannot type.",
+      "properties": {
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Short heading for the example (e.g. \"Run a single test\")",
+          "title": "Title"
+        },
+        "code": {
+          "description": "The example itself: a shell command line, a YAML fragment, or whatever the reader would actually type",
+          "title": "Code",
+          "type": "string"
+        },
+        "caption": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Prose shown with the example, explaining what it does or when to reach for it",
+          "title": "Caption"
+        },
+        "lang": {
+          "default": "yaml",
+          "description": "Language of 'code', used for syntax highlighting. Use 'shell' for command lines, 'yaml' for flow-file fragments",
+          "title": "Lang",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "ExampleDef",
+      "type": "object",
+      "$$target": "#/defs/ExampleDef"
     },
     "ExtendDef": {
       "description": "Extension definition",
@@ -801,6 +862,12 @@
           "default": null,
           "description": "Short description of the package",
           "title": "Desc",
+          "type": "string"
+        },
+        "doc": {
+          "default": null,
+          "description": "Full documentation of the package. Where 'desc' is the one-line summary shown in listings, this is the prose a reader arriving at the package needs: what it is for and where to start.",
+          "title": "Doc",
           "type": "string"
         },
         "type": {
@@ -1495,6 +1562,14 @@
           "title": "Task documentation",
           "type": "string"
         },
+        "examples": {
+          "description": "Worked examples of using this task. Not inherited along 'uses': an example names a specific task and specific parameters, so a base task's example would not be something a reader of the derived task could type.",
+          "items": {
+            "$ref": "#/defs/ExampleDef"
+          },
+          "title": "Examples",
+          "type": "array"
+        },
         "needs": {
           "description": "List of tasks that this task depends on",
           "items": {
@@ -1625,7 +1700,7 @@
             }
           ],
           "default": null,
-          "description": "Patterns describing the data items this task MAY produce. 'May', not 'always': a conditional output is still worth declaring, and every consumer treats the declaration as what could be produced rather than a guarantee. Declare what this task ADDS -- items it merely passes through are already declared by whatever produced them. `type:` is the item type; other keys are attributes a consumer can match on, and may reference this task's parameters (`filetype: \"${{ type }}\"`). Inherited along 'uses' with the nearest declaration winning.",
+          "description": "Patterns describing the data items this task MAY produce. 'May', not 'always': a conditional output is still worth declaring, and every consumer treats the declaration as what could be produced rather than a guarantee. Declare what this task ADDS -- items it merely passes through are already declared by whatever produced them. `type:` is the item type; other keys are attributes a consumer can match on, and may reference this task's parameters (`filetype: \"${{ type }}\"`). Inherited along 'uses' with the nearest declaration winning.\n\n`doc:` is the exception: it is prose describing the specific artifact (`doc: \"${{ task_rundir }}/ral_pkg.sv\"`), not an attribute. It never participates in matching, and it is NOT evaluated -- the shape of the path is what documents the output, where one machine's resolution of it is not.",
           "title": "Produces"
         },
         "uptodate": {

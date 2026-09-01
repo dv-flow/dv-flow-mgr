@@ -31,3 +31,4 @@ command-line interface, and the Python/type-system APIs.
 
    runner_config
    resource_tags
+   lifecycle_tags

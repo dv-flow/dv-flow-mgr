@@ -37,6 +37,7 @@ class Override(object):
 class Package(object):
     name : str = "<unknown>"
     desc : str = None
+    doc : str = None
     basedir : str = None
     paramT : Any = None
     pkg_def : PackageDef = None  # Added to expose original PackageDef for tests
@@ -177,7 +178,7 @@ class LazyPackage(Package):
     # defaults on Package, so __getattr__ would not fire -- __getattribute__ is
     # required to intercept them.
     _LAZY_ATTRS = frozenset({
-        "desc", "basedir", "paramT", "pkg_def", "task_m", "type_m",
+        "desc", "doc", "basedir", "paramT", "pkg_def", "task_m", "type_m",
         "fragment_def_l", "pkg_m", "pkg_alias_m", "tags", "substitution_m",
         "pkg_override_m", "all_configs", "srcinfo",
     })

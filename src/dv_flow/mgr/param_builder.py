@@ -139,6 +139,11 @@ class ParamBuilder:
                         merged[name] = (ParamDef(value=resolved_value), new_type)
                         self._log.debug(f"  Append/prepend param {name}: type={new_type}, value={resolved_value}")
                     else:
+                        # Per-field, not wholesale: a re-declaration that only
+                        # says `cli: false` (or only sets a default) must not
+                        # erase the base's value, docs or value set. See
+                        # ParamDef.inherit_from.
+                        param_def = param_def.inherit_from(existing_def)
                         merged[name] = (param_def, new_type)
                         self._log.debug(f"  Overriding param {name}: type={new_type}, value={param_def.value}")
         

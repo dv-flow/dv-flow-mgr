@@ -58,6 +58,13 @@ Package Definition
 
 .. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/PackageDef
 
+.. note::
+
+   ``desc`` and ``doc`` serve different readers. ``desc`` is the one line that
+   appears next to the package in a listing, so it has to stand alone.
+   ``doc`` is the prose someone reads once they have arrived: what the package
+   is for, and which task to run first. Tasks take the same pair.
+
 Fragment Definition
 -------------------
 
@@ -109,6 +116,51 @@ Task Definition
    bound along the ``uses`` chain (nearest declaration wins), so declaring it on
    an abstract type covers every task that ``uses:`` it -- e.g. hdlsim's
    simulator-backend selector.
+
+.. note::
+
+   ``desc`` and ``doc`` are inherited along ``uses:``, independently of one
+   another: a task that leaves either empty takes it from the nearest ancestor
+   that sets it. A task that derives from a described base and only narrows it
+   is still the thing its base describes, so it should not appear blank in a
+   listing. Restate whichever field the derived task genuinely changes; leave
+   the other empty to keep the base's wording.
+
+   Note that ``examples`` behave the opposite way -- see below.
+
+Example Definition
+------------------
+
+A worked example of using a task: what a reader would actually type. Examples
+are documentation, not tests -- nothing runs them, and nothing checks that
+``code`` still works.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/ExampleDef
+
+.. code-block:: yaml
+
+    tasks:
+    - name: sim
+      desc: Run the simulation
+      examples:
+      - title: Run a single test
+        caption: Names the test by its `case` tag.
+        lang: shell
+        code: dfm run sim --tests arb
+      - title: Reuse from another package
+        code: |
+          - name: my-sim
+            uses: proj.sim
+            with:
+              seed: 42
+
+.. note::
+
+   Examples are **not** inherited along ``uses:``. An example is written
+   against a specific task name and a specific set of parameters, so
+   re-presenting a base task's example under a derived task would show the
+   reader something they cannot type. A derived task that deserves an example
+   needs its own.
 
 Strategy Definition
 -------------------
