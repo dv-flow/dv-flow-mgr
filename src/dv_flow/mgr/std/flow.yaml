@@ -33,6 +33,7 @@ package:
 
   tasks:
   - name: Message
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.message.Message
     produces: []
@@ -41,6 +42,7 @@ package:
         type: str
         value: ""
   - name: FileSet
+    scope: export
     doc: |
       Creates a fileset from a list of files or glob patterns
     shell: pytask
@@ -80,6 +82,7 @@ package:
         type: list
         value: []
   - name: CreateFile
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.create_file.CreateFile
     passthrough: all
@@ -104,6 +107,7 @@ package:
         type: bool
         value: false
   - name: SetEnv
+    scope: export
     desc: Sets environment variables for use by other tasks
     shell: pytask
     run: dv_flow.mgr.std.setenv.SetEnv
@@ -119,6 +123,7 @@ package:
         type: map
 
   - name: SetFileType
+    scope: export
     consumes:
     - type: std.FileSet 
     desc: Outputs all input filesets with the specified filetype
@@ -132,6 +137,7 @@ package:
         type: str
         value: ""
   - name: IncDirs
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs
     produces:
@@ -142,6 +148,7 @@ package:
       input files.
 
   - name: PubSet
+    scope: export
     consumes:
     - type: std.FileSet
     desc: Binds a placement policy (dest/strip/flatten) to input FileSets
@@ -173,6 +180,7 @@ package:
         value: false
 
   - name: Publish
+    scope: export
     consumes:
     - type: std.FileSet
     - type: std.PubSet
@@ -216,6 +224,7 @@ package:
         value: []
 
   - name: Agent
+    scope: export
     desc: |
       Executes an AI assistant with a specified prompt and collects 
       structured results. The assistant MUST create a valid JSON result
@@ -295,6 +304,7 @@ package:
           For codex: sandbox_mode and approval_mode can also be set here.
 
   - name: "Null"
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.task_null.TaskNull
     passthrough: all
@@ -304,6 +314,7 @@ package:
     desc: "No-op task that passes inputs through unchanged"
 
   - name: RunTasks
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.run_tasks.RunTasks
     produces: []
@@ -325,6 +336,7 @@ package:
         doc: Optional timeout in seconds for all dynamic tasks
 
   - name: TestRunner
+    scope: export
     passthrough: all
     consumes: none
     desc: "Base for a test-running root: selection, arguments, and a report"
@@ -384,6 +396,7 @@ package:
           its values.
 
   - name: TestInfo
+    scope: export
     passthrough: none
     consumes: none
     uptodate: false

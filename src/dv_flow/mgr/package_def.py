@@ -60,7 +60,9 @@ class PackageDef(BaseModel):
                     "where to start.")
     type : List[PackageSpec] = Field(
         default_factory=list,
-        description="List of data types defined by this package")
+        description="(Deprecated, and inert) Nothing reads this field: data "
+                    "types are declared with 'types:'. It is retained only so "
+                    "that flow files setting it continue to load")
     tasks : List[TaskDef] = Field(
         default_factory=list,
         description="List of tasks defined in the package")

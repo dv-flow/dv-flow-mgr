@@ -185,6 +185,49 @@ Cache Definition
 
 .. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/CacheDef
 
+Summary Definition
+------------------
+
+Selects a framework-provided summary renderer for a task's results.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/SummaryDef
+
+Control Definition
+------------------
+
+Runtime control flow -- ``if``, ``match``, ``while``, ``do-while`` and
+``repeat``. Mutually exclusive with ``strategy``. See :doc:`/guide/control_flow`.
+
+.. warning::
+
+   ``control:`` is parsed and validated but **not yet executed**: the definition
+   does not reach the resolved task, so a task declaring one runs its ``body:``
+   unconditionally. See ``tests/unit/test_control_flow_from_flow_file.py``.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/ControlDef
+
+Control Case Definition
+-----------------------
+
+One case of a ``match`` construct.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/ControlCaseDef
+
+Control State Definition
+------------------------
+
+Loop state carried between iterations.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/ControlStateDef
+
+Filter Definition
+-----------------
+
+A reusable transformation usable on the right of a pipe in an expression:
+``${{ inputs | name(args) }}``. See :doc:`/guide/filters`.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/FilterDef
+
 Parameters and Types
 ====================
 
@@ -235,3 +278,17 @@ Compression Type
 ----------------
 
 .. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/CompressionType
+
+Deprecated
+==========
+
+Package Specification
+---------------------
+
+.. deprecated:: unreleased
+
+   ``PackageDef.type`` is inert -- nothing reads it, and data types are declared
+   with ``types:`` (see `Type Definition`_). It is documented here only because
+   the field still exists, so the schema still references this definition.
+
+.. jsonschema:: ../../src/dv_flow/mgr/share/dv.flow.schema.json#/defs/PackageSpec

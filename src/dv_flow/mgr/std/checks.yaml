@@ -54,9 +54,11 @@ fragment:
       `consumes:` pattern: every attribute named here must appear on a produced
       item with the same value, and the producer may carry more.
 
-          requires:
-          - std.check.Needs:
-              produces: {type: hdlsim.SimRun}
+      ```yaml
+      requires:
+      - std.check.Needs:
+          produces: {type: hdlsim.SimRun}
+      ```
 
       **This is a COARSE, STATIC gate -- not a proof.** It checks what tasks
       *declare*, at graph build, before anything runs. That is deliberately

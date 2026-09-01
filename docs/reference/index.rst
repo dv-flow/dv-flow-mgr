@@ -10,6 +10,7 @@ command-line interface, and the Python/type-system APIs.
    :caption: Specification
 
    flow_spec
+   stdlib
 
 .. toctree::
    :maxdepth: 1

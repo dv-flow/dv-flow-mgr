@@ -871,7 +871,7 @@
           "type": "string"
         },
         "type": {
-          "description": "List of data types defined by this package",
+          "description": "(Deprecated, and inert) Nothing reads this field: data types are declared with 'types:'. It is retained only so that flow files setting it continue to load",
           "items": {
             "$ref": "#/defs/PackageSpec"
           },
@@ -1050,6 +1050,30 @@
       "title": "PackageImportSpec",
       "type": "object",
       "$$target": "#/defs/PackageImportSpec"
+    },
+    "PackageSpec": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": true,
+          "title": "Params",
+          "type": "object"
+        },
+        "_fullname": {
+          "default": null,
+          "title": "Fullname",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "PackageSpec",
+      "type": "object",
+      "$$target": "#/defs/PackageSpec"
     },
     "ParamDef": {
       "properties": {

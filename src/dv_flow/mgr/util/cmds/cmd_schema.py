@@ -35,18 +35,51 @@ class CmdSchema(object):
             del props['srcinfo']
         return props
     
+    def _referenced_defs(self, node, out=None):
+        """Every `#/defs/<Name>` reachable from `node`."""
+        if out is None:
+            out = set()
+        if isinstance(node, dict):
+            ref = node.get('$ref')
+            if isinstance(ref, str) and ref.startswith('#/defs/'):
+                out.add(ref[len('#/defs/'):])
+            for value in node.values():
+                self._referenced_defs(value, out)
+        elif isinstance(node, list):
+            for value in node:
+                self._referenced_defs(value, out)
+        return out
+
     def _filter_implementation_artifacts(self, defs):
-        """Remove implementation artifacts from schema definitions."""
-        # Remove excluded definition types
-        for exclude in self.EXCLUDE_DEFS:
-            if exclude in defs:
-                del defs[exclude]
-        
-        # Remove srcinfo fields from all remaining definitions
+        """Remove implementation artifacts from schema definitions.
+
+        A definition is only dropped when nothing still points at it. Dropping
+        a *referenced* one leaves a `$ref` resolving to nothing, which makes the
+        published schema invalid -- every strict validator fails on it, and the
+        editors that consume it via `# yaml-language-server: $schema=...` report
+        an error on the file rather than completing it.
+
+        `PackageDef.type` is the case that found this: it is annotated
+        `List[PackageSpec]`, `PackageSpec` is excluded here, and the resulting
+        schema shipped with a dangling reference. Keeping it is the conservative
+        repair -- it is also more honest, since an internal type appearing in
+        the public schema is a visible prompt to fix the annotation, where a
+        broken reference merely looks like a rendering glitch.
+        """
+        # Strip `srcinfo` properties FIRST. They are the only thing that
+        # references `SrcInfo`, so computing reachability before removing them
+        # would find it still referenced and keep it -- putting the internal
+        # type back into the schema that this filter exists to take it out of.
         for def_name, def_schema in defs.items():
             if 'properties' in def_schema:
                 self._filter_srcinfo_from_properties(def_schema['properties'])
-        
+
+        keep = self._referenced_defs(defs)
+
+        for exclude in self.EXCLUDE_DEFS:
+            if exclude in defs and exclude not in keep:
+                del defs[exclude]
+
         return defs
 
     def _generate_schema(self):
