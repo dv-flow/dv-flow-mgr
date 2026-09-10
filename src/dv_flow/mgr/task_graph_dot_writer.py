@@ -1,7 +1,7 @@
 import dataclasses as dc
 import logging
 import sys
-from typing import ClassVar, Dict, Set, TextIO
+from typing import Callable, ClassVar, Dict, Optional, Set, TextIO
 from .task_node import TaskNode
 from .task_node_compound import TaskNodeCompound
 
@@ -9,6 +9,11 @@ from .task_node_compound import TaskNodeCompound
 class TaskGraphDotWriter(object):
     fp : TextIO = dc.field(default=None)
     show_params : bool = False
+    # Optional hook mapping a node to a URL, making graph nodes clickable in
+    # SVG output. Called as node_url(node) -> str|None; returning None (or
+    # raising) leaves the node without a URL rather than failing the write --
+    # a graph is worth emitting even when some links can't be resolved.
+    node_url : Optional[Callable[[TaskNode], Optional[str]]] = None
     _ind : str = ""
     _node_id_m : Dict[TaskNode, str] = dc.field(default_factory=dict)
     _processed_needs : Set[TaskNode] = dc.field(default_factory=set)
@@ -70,16 +75,18 @@ class TaskGraphDotWriter(object):
             if self.show_params and type(node.params).model_fields:
                 label = self._genLeafLabel(node)
                 # Use record shape for parameter display
-                self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"];" % (
-                    node_name, 
+                self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"%s];" % (
+                    node_name,
                     label,
-                    self._genLeafTooltip(node)))
+                    self._genLeafTooltip(node),
+                    self._urlAttr(node)))
             else:
                 label = node.name
-                self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
-                    node_name, 
+                self.println("%s[label=\"%s\",tooltip=\"%s\"%s];" % (
+                    node_name,
                     label,
-                    self._genLeafTooltip(node)))
+                    self._genLeafTooltip(node),
+                    self._urlAttr(node)))
         self._log.debug("<-- build_node %s (%d)" % (node.name, len(node.needs),))
 
     def _genLeafLabel(self, node):
@@ -113,6 +120,28 @@ class TaskGraphDotWriter(object):
         # Replace newlines with space
         s = s.replace("\n", " ")
         return s
+
+    def _urlAttr(self, node):
+        """Render the URL attribute for a node, or "" when there is none.
+
+        A failing hook must not take the whole graph down with it: the point of
+        the graph is the topology, and the links are an enhancement.
+        """
+        if self.node_url is None:
+            return ""
+        try:
+            url = self.node_url(node)
+        except Exception as e:
+            self._log.warning("node_url hook failed for %s: %s" % (
+                getattr(node, 'name', '<unknown>'), e))
+            return ""
+        if not url:
+            return ""
+        return ",URL=\"%s\"" % self._escapeDotStr(url)
+
+    def _escapeDotStr(self, s):
+        """Escape a value for use inside a double-quoted dot attribute."""
+        return str(s).replace("\\", "\\\\").replace("\"", "\\\"")
 
     def _escapeHtml(self, s):
         """Escape special characters for HTML-like labels"""
@@ -225,6 +254,11 @@ class TaskGraphDotWriter(object):
         self.inc_ind()
         self.println("label=\"%s\";" % node.name)
         self.println("tooltip=\"%s\";" % self._genLeafTooltip(node))
+        # A compound's link belongs on the cluster box, not on its exit point:
+        # the box is what a reader points at when they mean the whole task.
+        url = self._urlAttr(node)
+        if url:
+            self.println("%s;" % url[1:])
         self.println("color=blue;")
         self.println("style=dashed;")
 
@@ -259,16 +293,18 @@ class TaskGraphDotWriter(object):
                 elif self.show_params and type(n.params).model_fields:
                     label = self._genLeafLabel(n)
                     # Use record shape for parameter display
-                    self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"];" % (
-                        node_name, 
+                    self.println("%s[shape=record,label=\"%s\",tooltip=\"%s\"%s];" % (
+                        node_name,
                         label,
-                        self._genLeafTooltip(n)))
+                        self._genLeafTooltip(n),
+                        self._urlAttr(n)))
                 else:
                     label = leaf_name
-                    self.println("%s[label=\"%s\",tooltip=\"%s\"];" % (
-                        node_name, 
+                    self.println("%s[label=\"%s\",tooltip=\"%s\"%s];" % (
+                        node_name,
                         label,
-                        self._genLeafTooltip(n)))
+                        self._genLeafTooltip(n),
+                        self._urlAttr(n)))
         self.dec_ind()
         self.println("}")
 

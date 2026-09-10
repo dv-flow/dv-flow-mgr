@@ -380,3 +380,119 @@ def test_uptodate_unchanged_rerun_does_not_churn_consumers(tmpdir):
     _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
     reasons = _run(rundir, _FLOW.format(content="v1"), "p1.consumer_b")
     assert reasons["p1.consumer_b"] == "uptodate"
+
+
+def _run_p1_file1(tmpdir, loader, pkg_def):
+    """One invocation of p1.file1, in a fresh builder/runner as a real
+    re-invocation of `dfm` would be."""
+    builder = TaskGraphBuilder(
+        root_pkg=pkg_def,
+        rundir=os.path.join(tmpdir, "rundir"),
+        loader=loader)
+    runner = TaskSetRunner(rundir=os.path.join(tmpdir, "rundir"), builder=builder)
+    task = builder.mkTaskNode("p1.file1")
+    asyncio.run(runner.run(task))
+    return task
+
+
+_FILE1_FLOW = """
+package:
+  name: p1
+
+  tasks:
+  - name: file1
+    uses: std.CreateFile
+    with: { filename: "file1.txt", content: "file1" }
+"""
+
+
+def _find_output_file(rundir, name="file1.txt"):
+    for root, _dirs, files in os.walk(rundir):
+        if name in files:
+            return os.path.join(root, name)
+    return None
+
+
+def test_uptodate_detects_a_deleted_output(tmpdir):
+    """A task whose product has been deleted is NOT up-to-date.
+
+    Every other check asks whether the task would produce the *same* answer --
+    inputs, parameters, the input signature. None of them asks whether the
+    answer is still *there*. Without this, a partial clean, an interrupted run
+    or an `rm` aimed at forcing a rebuild leaves the task reporting up-to-date
+    forever, and the failure surfaces in whatever consumes the missing file --
+    the wrong place to debug it from, and usually much later.
+    """
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as fp:
+        fp.write(_FILE1_FLOW)
+
+    loader = PackageLoader()
+    pkg_def = loader.load(os.path.join(tmpdir, "flow.dv"))
+    rundir = os.path.join(tmpdir, "rundir")
+
+    assert _run_p1_file1(tmpdir, loader, pkg_def).result.changed is True
+    # Control: with the output present, the second run is up-to-date. Without
+    # this the test below would pass even if nothing were ever cached.
+    assert _run_p1_file1(tmpdir, loader, pkg_def).result.changed is False
+
+    produced = _find_output_file(rundir)
+    assert produced is not None, "the task produced no file to delete"
+    os.remove(produced)
+
+    task = _run_p1_file1(tmpdir, loader, pkg_def)
+    assert task.result.changed is True, "a deleted output must force a re-run"
+    assert os.path.exists(produced), "the deleted output was not regenerated"
+
+
+def test_uptodate_survives_an_output_with_no_files(tmpdir):
+    """The check must not assume every output object carries files.
+
+    `std.Env` and parameter-carrying outputs have none. Guessing at their shape
+    would make a new output type raise inside the up-to-date path, which turns
+    a caching optimisation into a hard failure.
+    """
+    flow_dv = """
+package:
+  name: p1
+
+  tasks:
+  - name: file1
+    uses: std.Message
+    with: { msg: "no files here" }
+"""
+    with open(os.path.join(tmpdir, "flow.dv"), "w") as fp:
+        fp.write(flow_dv)
+
+    loader = PackageLoader()
+    pkg_def = loader.load(os.path.join(tmpdir, "flow.dv"))
+
+    assert _run_p1_file1(tmpdir, loader, pkg_def) is not None
+    # Second invocation exercises the up-to-date path against an output that
+    # has no `files` key at all.
+    assert _run_p1_file1(tmpdir, loader, pkg_def) is not None
+
+
+def test_missing_outputs_ignores_passthrough_entries():
+    """Directly, because the end-to-end symptom is indirect and slow to read.
+
+    `exec_data["output"]` holds this task's own filesets AND any it forwards
+    from a dependency. Only the former are ours. A dependency that moved to a
+    different unique rundir leaves a dangling path in the passthrough entry, and
+    counting that as *our* missing output makes the task re-run on every
+    invocation and never settle -- which is how this was first caught, by
+    `test_uptodate_unchanged_rerun_does_not_churn_consumers` going red.
+    """
+    from dv_flow.mgr.task_node_leaf import TaskNodeLeaf
+
+    class _Named:
+        name = "p1.me"
+
+    exec_data = {"output": {"output": [
+        {"src": "p1.dep", "basedir": "/nonexistent",
+         "files": ["gone.txt"]},                       # not ours
+        {"src": "p1.me", "basedir": "/nonexistent",
+         "files": ["mine.txt"]},                       # ours, and missing
+    ]}}
+
+    missing = TaskNodeLeaf._missing_outputs(_Named(), exec_data)
+    assert missing == [os.path.join("/nonexistent", "mine.txt")]

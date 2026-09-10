@@ -12,8 +12,14 @@ on:
         required: false
         default: "openai/gpt-4o-mini"
 
-# models: read allows the GITHUB_TOKEN to call the GitHub Models API
-# (https://models.inference.ai.azure.com) — free tier, no Copilot subscription needed.
+# models: read allows the GITHUB_TOKEN to call the GitHub Models API.
+#
+# HEADS UP: GitHub Models is being retired, so this job no longer proves the
+# agent can reach a live model — the test SKIPS on provider-unavailability
+# instead of failing. A green run here is therefore not evidence of working
+# agent/LLM integration; check the skip reason in the log. See the PROVIDER
+# STATUS block in tests/unit/test_native_agent_live.py for what restoring real
+# coverage requires.
 permissions:
   contents: read
   models: read

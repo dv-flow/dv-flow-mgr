@@ -4,6 +4,7 @@ from pydantic import BaseModel, model_validator
 from typing import List, Union, Any
 from .extend_def import ExtendDef
 from .param_def import ParamDef
+from .srcinfo import SrcInfo
 
 class OverrideDef(BaseModel):
     """Override definition for task or package substitution.
@@ -40,6 +41,16 @@ class OverrideDef(BaseModel):
 class ConfigDef(BaseModel):
     name : str = pdc.Field(
         description="Name of the configuration")
+    desc : str = pdc.Field(
+        default=None,
+        description="Short description of the configuration: what selecting "
+                    "it is for, in one line")
+    doc : str = pdc.Field(
+        default=None,
+        description="Full documentation of the configuration. A configuration "
+                    "name is chosen by whoever runs the flow, so what it "
+                    "changes and when to reach for it has to be written down "
+                    "somewhere the runner can find it")
     params : List[ParamDef] = pdc.Field(
         default_factory=list,
         description="Configuration parameters map",
@@ -65,3 +76,6 @@ class ConfigDef(BaseModel):
     types : List['TypeDef'] = pdc.Field(
         default_factory=list,
         description="List of types defined/overridden by this config")
+    srcinfo : SrcInfo = pdc.Field(
+        default=None,
+        description="Where the configuration was declared")

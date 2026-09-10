@@ -1,0 +1,116 @@
+# dv-flow/dv-flow-mgr -- Forgejo Actions.
+#
+# THIS FILE'S FIRST JOB IS TO EXIST. When .forgejo/workflows/ is absent the
+# Forgejo runner falls back to running .github/workflows/ -- measured on this
+# instance, not assumed. That file calls
+#   dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main
+# which is a GitHub reusable workflow: `uses:` here resolves against
+# code.forgejo.org, not github.com, so the fallback could only ever have failed
+# on its first step. Existing is what stops it trying.
+#
+# WHY THIS IS A CHECK AND NOT A MIRROR OF THE BUILD. The real build fetches
+# dependencies with `ivpm update -a`, which clones sibling repositories over the
+# network. Reproducing that here would make every push depend on github.com
+# being reachable, to test nothing this repo controls.
+#
+# What it checks instead is THE CONTRACT WITH THE SHARED WORKFLOW, which is
+# otherwise unchecked anywhere and fails silently when broken. That workflow
+# stamps the build version with:
+#
+#   sed -i -e 's%SUFFIX=".*"%SUFFIX="${suffix}"%g' \
+#          -e 's%VERSION=".*"%VERSION="${version}"%g' <version_dir>/__init__.py
+#   sed -i -e 's%version.*=.*".*"%version = "${version}${suffix}"%g' pyproject.toml
+#
+# `sed` does not fail when its pattern matches nothing. So a version_dir that
+# has moved, or an __init__.py that no longer carries VERSION/SUFFIX, produces a
+# green build that stamped nothing -- and the mismatch surfaces as a package
+# whose metadata version and runtime __version__ disagree.
+#
+# THERE IS DELIBERATELY NO PUBLISH JOB. Releases for this repo run on GitHub
+# through the shared workflow, sync-policy.toml records authority as `github`,
+# and PYPI_API_TOKEN is a GitHub org secret. All three agree, which is what
+# distinguishes this from the peakrdl-pss anti-pattern -- that one was wrong
+# because the policy claimed GitHub while only Forgejo could publish.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for internal identifiers in tracked files
+      # This repo is published to git.dvkit.org, so anything committed here is
+      # public. Internal host names, tailnet addresses and CGNAT-range IPs must
+      # not appear in tracked files -- if a build ever needs one, it belongs in
+      # a repository secret, which is masked in logs.
+      run: |
+        pattern='perch-char\.ts\.net|\.ts\.net|a9550|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
+        if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/ci.yml' ; then
+          echo "::error::internal identifier found in a tracked file (see matches above)"
+          exit 1
+        fi
+        echo "OK: no internal identifiers in tracked files"
+
+    - name: The shared workflow reference must still resolve
+      # The caller pins a BRANCH, not a SHA, so this is not a version check --
+      # it is a check that the path has not been edited to something that will
+      # 404 at run time. GitHub reports a missing reusable workflow per caller,
+      # at the moment of the run, and never in the repo that moved it.
+      run: |
+        want='dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main'
+        if ! grep -qF "$want" .github/workflows/ci.yml; then
+          echo "::error::.github/workflows/ci.yml no longer references $want"
+          echo "If that is deliberate, this check and the repo's release path both need updating."
+          exit 1
+        fi
+        echo "OK: calls $want"
+
+    - name: The version stamp the shared workflow applies must have something to bite on
+      run: |
+        vd='src/dv_flow/mgr'
+        rc=0
+
+        if [ ! -d "$vd" ]; then
+          echo "::error::version_dir '$vd' does not exist; the shared workflow stamps into it"
+          exit 1
+        fi
+        echo "OK: version_dir $vd exists"
+
+        # pyproject.toml, read with the SAME pipeline the shared workflow uses.
+        # Matching its extraction rather than writing a better one is the point:
+        # what matters is what that sed will see.
+        version=$(grep -w version pyproject.toml | sed -e 's%^.*=.*"\([^"][^"]*\)".*$%\1%' | head -1)
+        if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+'; then
+          echo "::error::cannot read a version from pyproject.toml (got '$version')"
+          rc=1
+        else
+          echo "OK: pyproject.toml declares $version"
+        fi
+
+        # __init__.py. A WARNING rather than an error, deliberately: four repos
+        # in this org are in this state today (dv-flow-libcc, dv-flow-libgh, dv-flow-librdl, pytest-dfm), it
+        # predates the co-existence work, and failing their CI on the day they
+        # enter sync would be this migration breaking something it did not
+        # break. The consequence is real but narrow -- pyproject.toml is what
+        # determines the published artifact's version, so releases are correct;
+        # it is __version__ at runtime that goes stale.
+        init="$vd/__init__.py"
+        if [ ! -f "$init" ]; then
+          echo "::warning::$init does not exist; the shared workflow's VERSION/SUFFIX stamp is a no-op"
+        elif ! grep -qE '^VERSION\s*=\s*"' "$init" || ! grep -qE '^SUFFIX\s*=\s*"' "$init"; then
+          echo "::warning::$init has no top-level VERSION=\"...\" and SUFFIX=\"...\" pair;"
+          echo "::warning::the shared workflow seds for exactly that shape and sed does not fail on no match,"
+          echo "::warning::so __version__ will not reflect the build while pyproject.toml will."
+        else
+          echo "OK: $init carries the VERSION/SUFFIX pair the stamp rewrites"
+        fi
+
+        exit $rc

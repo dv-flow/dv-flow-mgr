@@ -10,6 +10,7 @@ command-line interface, and the Python/type-system APIs.
    :caption: Specification
 
    flow_spec
+   stdlib
 
 .. toctree::
    :maxdepth: 1
@@ -31,3 +32,4 @@ command-line interface, and the Python/type-system APIs.
 
    runner_config
    resource_tags
+   lifecycle_tags

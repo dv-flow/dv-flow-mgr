@@ -2,6 +2,54 @@
 Standard Library
 ################
 
+The ``std`` package ships with DV Flow Manager and is imported by nearly every
+flow file. It provides the tasks that move files around, the data types that
+``produces:`` and ``consumes:`` speak in, and the filters expressions use.
+
+.. note::
+
+   **Every task, type and filter is documented in** :doc:`/reference/stdlib`,
+   which is generated from ``std/flow.yaml``. Parameters, defaults, dataflow
+   contracts and source locations all live there and cannot drift from the code.
+
+   This page covers what generation cannot: which task to reach for, how the
+   framework emits ``std.TaskFailure``, and how to write a filter of your own.
+
+Choosing a task
+===============
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - To do this
+     - Use
+   * - Collect source files by glob
+     - :dvf:task:`std.FileSet`
+   * - Write a file from inline content
+     - :dvf:task:`std.CreateFile`
+   * - Copy outputs into the run's output directory
+     - :dvf:task:`std.Publish`
+   * - Place different inputs differently under ``Publish``
+     - :dvf:task:`std.PubSet`
+   * - Set environment variables for downstream tasks
+     - :dvf:task:`std.SetEnv`
+   * - Re-tag an existing FileSet's filetype
+     - :dvf:task:`std.SetFileType`
+   * - Add include directories
+     - :dvf:task:`std.IncDirs`
+   * - Print a message
+     - :dvf:task:`std.Message`
+   * - Group other tasks without doing anything itself
+     - :dvf:task:`std.Null`
+   * - Run a suite of tests
+     - :dvf:task:`std.TestRunner`
+   * - Ask what a test runner offers
+     - :dvf:task:`std.TestInfo`
+
+To run a shell command you do not need a task at all -- see
+`Running Shell Commands`_ below.
+
 std.TaskFailure
 ===============
 
@@ -34,209 +82,6 @@ In an ``on_error`` handler, filter ``std.TaskFailure`` items from
                 if getattr(i, "type", None) != "std.TaskFailure"]
 
 See :doc:`error_handling` for full details on compound task error handling.
-
-
-std.CreateFile
-==============
-Example 
--------
-.. code-block::
-
-    package:
-        name: create
-    
-        tasks:
-        - name: TemplateFile
-            uses: std.CreateFile
-            with:
-              type: text
-              filename: template.txt
-              content: |
-                This is a template file
-                with multiple lines
-                of text.
-
-Consumes 
---------
-
-Produces 
---------
-Produces a `std.FileSet` parameter set containing a single file
-
-
-Parameters
-----------
-
-* **type** - [Required] Specifies the `filetype` of the produced fileset
-* **filename** - [Required] Name of the file to produce
-* **incdir** - [Optional] If 'true', adds the output directory as an include directory
-
-
-std.FileSet
-===========
-Creates a 'FileSet' parameter set from a specification. This task is
-primarily used to build up list of files for processing by HDL compilation
-tools.
-
-Example 
--------
-.. code-block::
-
-    package:
-        name: fileset.example
-    
-        tasks:
-        - name: rtlsrc
-            uses: std.FileSet
-            with:
-              include: '*.v'
-              base: 'src/rtl'
-              type: 'verilogSource'
-
-The example above finds all files with a `.v` extension in the `src/rtl` 
-subdirectory of the task's source directory. The task emits a FileSet
-parameter set having the filetype of `verilogSource`.
-
-Consumes 
---------
-None by default (``consumes: none``)
-
-Produces 
---------
-Produces a `std.FileSet` parameter set containing files matched by the parameter specification.
-
-
-Parameters
-----------
-
-* **type** - [Required] Specifies the `filetype` of the produced fileset
-* **base** - [Optional] Base directory for the fileset. Defaults to the task's source directory
-* **include** - [Required] Set of file patterns to include in the fileset. Glob patterns may be used
-* **exclude** - [Optional] Set of file patterns to exclude from the fileset. Glob patterns may be used
-* **incdirs** - [Optional] Set of include directories that consumers of the fileset must use
-* **defines** - [Optional] Set of pre-processor defines that consumers of the fileset must use
-* **attributes** - [Optional] Set of attributes to tag the fileset with (e.g., ['uvm', 'testbench'])
-
-
-std.Publish
-===========
-Copies the files of consumed ``std.FileSet`` / ``std.PubSet`` inputs into this
-run's **output-data directory** and records their provenance. Every run has a
-designated output directory ``<rundir>/out/<run-id>``, and ``<rundir>/out/latest``
-is a symlink to the most recent one. Because the directory is per-run, ``Publish``
-also detects when two sources write conflicting content to the same destination.
-
-Example
--------
-.. code-block:: yaml
-
-    package:
-        name: publish.example
-
-        tasks:
-        - name: rtl
-          uses: std.FileSet
-          with: { type: verilogSource, base: src/rtl, include: '*.v' }
-
-        - name: publish
-          uses: std.Publish
-          needs: [rtl]
-          with:
-            dest: pub/rtl      # files land under out/<run-id>/pub/rtl/...
-            strip: 0
-
-Path mapping
-------------
-Each source file has a basedir-relative path ``f``; its destination is
-``dst_rel = dest / rebase(f, strip)``:
-
-* **dest** - additive base sub-path (composed in front of a PubSet's own ``dest``)
-* **strip** - signed rebase of ``f``: ``>0`` drops N leading path components,
-  ``0`` keeps it, ``<0`` grafts the last ``|N|`` components of ``basedir`` on front
-* **flatten** - publish basename only (overrides ``strip``)
-
-.. code-block:: text
-
-    dest    strip   core/top.sv  maps to
-    ----    -----   ----------------------
-    ""      0       core/top.sv
-    rtl     0       rtl/core/top.sv
-    rtl     1       rtl/top.sv
-    ""      2       top.sv
-
-Consumes
---------
-``std.FileSet`` and ``std.PubSet`` (also passes them through unchanged).
-
-Produces
---------
-A ``std.FileSet`` rooted at the output-data directory, listing the published
-(copied) files. A provenance manifest ``.dfm-publish.json`` is written into the
-output directory recording, per file, the publishing task, the originating task
-(``src_task``), source path, content ``sha256``, and size.
-
-Parameters
-----------
-
-* **dest** - [Optional] Additive base prefix under ``out/<run-id>``, joined in
-  front of every input's placement. Default: root
-* **strip** - [Optional] Default signed rebase for bare ``std.FileSet`` inputs
-  (a ``std.PubSet`` carries its own). Default: 0
-* **flatten** - [Optional] Default for bare filesets; publish basename only
-* **on_conflict** - [Optional] ``error`` (default), ``warn``, ``replace``, or
-  ``skip`` when a destination already holds different content
-* **include** - [Optional] Glob(s) selecting a subset of each input's files
-
-.. note::
-
-   The run-id is a zero-padded counter allocated per ``dfm run`` (``0001``,
-   ``0002``, ...). Override it with ``dfm run --run-id <ID>`` to pin the output
-   directory to, e.g., a CI build number. Re-copies of identical content are
-   skipped when a run-id is reused.
-
-
-std.PubSet
-==========
-Binds a placement policy (``dest`` / ``strip`` / ``flatten``) to input FileSets,
-emitting ``std.PubSet`` items for consumption by ``std.Publish``. Use this when a
-single ``Publish`` step must place different groups of files differently: the
-task-level ``dest`` of ``Publish`` composes as a base prefix in front of each
-PubSet's own ``dest``.
-
-Example
--------
-.. code-block:: yaml
-
-    package:
-        name: pubset.example
-
-        tasks:
-        - name: hdr_pubset       # headers -> include/, strip the leading include/
-          uses: std.PubSet
-          needs: [headers]
-          with: { dest: include, strip: 1 }
-
-        - name: publish          # dest: pub is the base namespace for the step
-          uses: std.Publish
-          needs: [hdr_pubset, readme]   # readme is a bare FileSet
-          with: { dest: pub }
-          # -> pub/include/<hdr>   and   pub/<readme>
-
-Consumes
---------
-``std.FileSet``
-
-Produces
---------
-``std.PubSet`` items (a ``std.FileSet`` subtype carrying the placement policy).
-
-Parameters
-----------
-
-* **dest** - [Optional] Additive destination sub-path
-* **strip** - [Optional] Signed rebase of each file's basedir-relative path
-* **flatten** - [Optional] Publish basename only (overrides ``strip``)
-
 
 Running Shell Commands
 ======================
@@ -281,565 +126,19 @@ The ``run:`` field specifies the command or script to execute. For inline
 scripts, use YAML's multi-line syntax (``|`` or ``>``).
 
 
-std.SetEnv
-==========
-
-Sets environment variables for use by downstream tasks. Supports glob
-pattern expansion for paths, making it easy to configure tool paths
-and directories.
-
-Example
--------
-
-.. code-block:: yaml
-
-    package:
-        name: setenv.example
-    
-        tasks:
-        - name: tool_env
-          uses: std.SetEnv
-          with:
-            setenv:
-              TOOL_HOME: /opt/tools/my_tool
-              PYTHONPATH: "lib/python/site-packages"
-            append_path:
-              PATH: /opt/tools/my_tool/bin
-            prepend_path:
-              LD_LIBRARY_PATH: /opt/tools/my_tool/lib
-
-Glob Expansion
---------------
-
-Values containing glob patterns (``*``, ``?``, ``[...]``) are expanded
-relative to the task's source directory:
-
-.. code-block:: yaml
-
-    tasks:
-    - name: lib_paths
-      uses: std.SetEnv
-      with:
-        setenv:
-          MY_LIBS: "libs/*/lib"  # Expands to all lib dirs
-
-If multiple paths match, they are joined with the platform path separator
-(`:` on Unix, `;` on Windows).
-
-Consumes
---------
-All inputs by default (``consumes: all``)
-
-Produces
---------
-Produces a ``std.Env`` data item containing the environment variable mappings.
-
-Parameters
-----------
-
-* **setenv** - [Optional] Map of environment variable names to values
-* **append_path** - [Optional] Map of environment variables to values that should be appended
-* **prepend_path** - [Optional] Map of environment variables to values that should be prepended
-
-The ``append_path`` and ``prepend_path`` parameters automatically handle
-path separator logic for PATH-like environment variables.
-
-
-std.SetFileType
-===============
-
-Modifies the file type of input filesets. This is useful when you need
-to reinterpret files with a different type for different tools.
-
-Example
--------
-
-.. code-block:: yaml
-
-    package:
-        name: setfiletype.example
-    
-        tasks:
-        - name: verilog_files
-          uses: std.FileSet
-          with:
-            include: "*.v"
-            type: verilogSource
-        
-        - name: reinterpret
-          uses: std.SetFileType
-          needs: [verilog_files]
-          with:
-            filetype: systemVerilogSource
-
-Consumes
---------
-Only ``std.FileSet`` data items (``consumes: [{type: std.FileSet}]``)
-
-Produces
---------
-Produces new ``std.FileSet`` data items with the updated file type.
-
-Parameters
-----------
-
-* **filetype** - [Required] The new file type to assign to all consumed filesets
-
-
-std.IncDirs
-===========
-
-Extracts include directories from input filesets and produces them as
-a structured list. This is useful for passing include paths to compilation
-tools.
-
-Example
--------
-
-.. code-block:: yaml
-
-    package:
-        name: incdirs.example
-    
-        tasks:
-        - name: rtl_files
-          uses: std.FileSet
-          with:
-            include: "*.sv"
-            incdirs:
-              - include
-              - rtl/include
-        
-        - name: extract_dirs
-          uses: std.IncDirs
-          needs: [rtl_files]
-
-Consumes
---------
-``std.FileSet`` data items
-
-Produces
---------
-Produces a data item containing the collected include directories.
-
-Parameters
-----------
-
-None. The task operates entirely on input filesets.
-
-
-std.Message
-===========
-
-Displays a message during task execution. Useful for logging, debugging,
-and providing user feedback during flow execution.
-
-Example
--------
-
-.. code-block:: yaml
-
-    package:
-        name: message.example
-    
-        tasks:
-        - name: hello
-          uses: std.Message
-          with:
-            msg: "Hello, World!"
-        
-        - name: status
-          uses: std.Message
-          with:
-            msg: "Build completed successfully"
-          needs: [build]
-
-Consumes
---------
-All inputs by default (``consumes: all``)
-
-Produces
---------
-Passes through all inputs. Does not produce additional data items.
-
-Parameters
-----------
-
-* **msg** - [Optional] The message to display (default: empty string)
-
-Messages support expression syntax for dynamic content:
-
-.. code-block:: yaml
-
-    package:
-      name: example
-      with:
-        version:
-          type: str
-          value: "1.0"
-      
-      tasks:
-      - name: version_msg
-        uses: std.Message
-        with:
-          msg: "Building version ${{ version }}"
-
-
-std.Null
-========
-
-A no-op task that passes its inputs through unchanged. ``std.Null`` is
-the natural replacement when stubbing out tasks via config-level or CLI
-overrides.
-
-Example
--------
-
-.. code-block:: yaml
-
-    package:
-        name: stub.example
-
-        tasks:
-        - name: placeholder
-          uses: std.Null
-
-Using as an Override
---------------------
-
-The most common use of ``std.Null`` is as a replacement in config-level
-overrides to skip expensive tasks during fast-iteration builds:
-
-.. code-block:: yaml
-
-    package:
-        name: my_project
-
-        configs:
-        - name: fast
-          overrides:
-          - task: sim_pkg.Compile
-            with: std.Null
-          - task: sim_pkg.Simulate
-            with: std.Null
-
-Or from the command line:
-
-.. code-block:: bash
-
-    dfm run entry --override sim_pkg.Compile=std.Null
-
-Consumes
---------
-None (``consumes: none``)
-
-Produces
---------
-No output data items. With ``passthrough: all`` (the default), all input
-data items are passed through to downstream tasks.
-
-Parameters
-----------
-
-None.
-
-
-std.Agent
-=========
-
-Executes an AI assistant with a specified prompt and collects structured 
-results. The AI assistant must create a valid JSON result file or the task 
-will fail with an error.
-
-This task enables AI-assisted workflows for code generation, documentation, 
-test creation, and other automated tasks that benefit from large language 
-model capabilities.
-
-Example
--------
-
-Basic usage:
-
-.. code-block:: yaml
-
-    package:
-        name: agent.example
-    
-        tasks:
-        - name: generate_code
-          uses: std.Agent
-          with:
-            user_prompt: "Generate a Python function to parse CSV files"
-            assistant: copilot
-
-Custom system prompt:
-
-.. code-block:: yaml
-
-    package:
-        name: agent.custom
-    
-        tasks:
-        - name: generate_test
-          uses: std.Agent
-          with:
-            system_prompt: |
-              You are a test generation assistant.
-              Input data: ${{ inputs }}
-              
-              Generate unit tests for the code and write results to ${{ result_file }}
-              in JSON format with the following structure:
-              {
-                "status": 0,
-                "changed": true,
-                "output": [],
-                "markers": []
-              }
-            user_prompt: "Create comprehensive unit tests"
-            result_file: "tests.result.json"
-
-Consumes
---------
-All inputs by default (``consumes: all``). Input data is available in the 
-prompt via the ``${{ inputs }}`` variable.
-
-Produces
---------
-Outputs are determined by the AI assistant's result JSON file. Typically 
-produces ``std.FileSet`` items for generated files, but can produce any 
-data type specified in the result.
-
-Parameters
-----------
-
-* **system_prompt** - [Optional] System prompt template. Can include variable references:
-
-  * ``${{ inputs }}`` - JSON of input data from upstream tasks
-  * ``${{ name }}`` - Current task name
-  * ``${{ result_file }}`` - Expected result filename
-  
-  If empty, uses a default template that describes the expected JSON result format.
-
-* **user_prompt** - [Optional] User's prompt content. This is appended to the 
-  system prompt with a "User Request:" header.
-
-* **result_file** - [Optional] Name of the JSON result file the AI must create 
-  (default: ``{name}.result.json``). The task fails if this file is missing or 
-  contains invalid JSON.
-
-* **assistant** - [Optional] AI assistant to use. Options:
-
-  * ``copilot`` - GitHub Copilot CLI (default)
-  * ``openai`` - OpenAI API (not yet implemented)
-  * ``claude`` - Claude API (not yet implemented)
-
-* **assistant_config** - [Optional] Map of assistant-specific configuration 
-  (e.g., API keys, model settings)
-
-Required Result Format
-----------------------
-
-The AI assistant must create a JSON file with the following structure:
-
-.. code-block:: json
-
-    {
-      "status": 0,
-      "changed": true,
-      "output": [
-        {
-          "type": "std.FileSet",
-          "filetype": "pythonSource",
-          "basedir": ".",
-          "files": ["generated.py"]
-        }
-      ],
-      "markers": [
-        {
-          "msg": "Generated 1 file",
-          "severity": "info"
-        }
-      ]
-    }
-
-Fields:
-
-* **status** - Exit code (0 = success, non-zero = failure)
-* **changed** - Whether the task produced new/modified outputs
-* **output** - Array of output data items (e.g., FileSets)
-* **markers** - Array of diagnostic messages with severity levels
-
-Error Handling
---------------
-
-The Agent task uses strict validation:
-
-* **Missing result file** → Task fails with status=1
-* **Invalid JSON syntax** → Task fails with status=1
-* **Result is not a JSON object** → Task fails with status=1
-* **Assistant not available** → Task fails with status=1
-* **Assistant execution fails** → Task fails with assistant's exit code
-
-Debugging
----------
-
-When the Agent task runs, it creates several files in the task's run directory:
-
-* ``{name}.prompt.txt`` - The complete prompt sent to the AI assistant
-* ``{name}.result.json`` - The structured result from the AI (if created)
-* ``assistant.stdout.log`` - Standard output from the AI assistant
-* ``assistant.stderr.log`` - Standard error from the AI assistant
-
-These files are invaluable for debugging when the AI assistant doesn't produce 
-the expected result or when result parsing fails.
-
-Setup Requirements
-------------------
-
-**GitHub Copilot CLI**
-
-To use the default ``copilot`` assistant:
-
-1. Install GitHub CLI: https://cli.github.com/
-2. Install Copilot extension:
-
-   .. code-block:: bash
-
-       gh extension install github/gh-copilot
-
-3. Authenticate:
-
-   .. code-block:: bash
-
-       gh auth login
-
-**Other Assistants**
-
-OpenAI and Claude assistants are placeholders for future implementation. 
-Contributions are welcome!
-
-Standard Filters
-================
-
-The standard library provides filters for transforming and selecting data in
-expressions. Filters are used with the pipe operator ``|`` to process inputs
-or other data.
-
-by_filetype
------------
-
-Filter files by extension:
-
-.. code-block:: yaml
-
-    sv_files: "${{ inputs | by_filetype('.sv') }}"
-    verilog_files: "${{ inputs | by_filetype('.v') }}"
-
-**Parameters:**
-
-* ``ext`` - File extension to match (including the dot)
-
-**Returns:** Array of items where ``path`` ends with the specified extension
-
-by_type
--------
-
-Filter items by data type:
-
-.. code-block:: yaml
-
-    filesets: "${{ inputs | by_type('std.FileSet') }}"
-    build_outputs: "${{ inputs | by_type('std.BuildOutput') }}"
-
-**Parameters:**
-
-* ``typename`` - Type name to match (e.g., "std.FileSet")
-
-**Returns:** Array of items where ``type`` matches the specified typename
-
-basenames
----------
-
-Extract base filenames from paths:
-
-.. code-block:: yaml
-
-    names: "${{ inputs | paths | basenames }}"
-
-**Returns:** Array of filenames without directory paths
-
-extensions
-----------
-
-Extract file extensions:
-
-.. code-block:: yaml
-
-    exts: "${{ inputs | paths | extensions }}"
-
-**Returns:** Array of file extensions (including the dot)
-
-paths
------
-
-Extract all paths from FileSet items:
-
-.. code-block:: yaml
-
-    all_paths: "${{ inputs | paths }}"
-
-**Returns:** Flattened array of all file paths from FileSet inputs
-
-first_of_type
--------------
-
-Get the first item of a specific type:
-
-.. code-block:: yaml
-
-    first_fileset: "${{ inputs | first_of_type('std.FileSet') }}"
-
-**Parameters:**
-
-* ``typename`` - Type name to match
-
-**Returns:** First item matching the type, or null if none found
-
-pluck
------
-
-Extract a specific field from all items:
-
-.. code-block:: yaml
-
-    all_types: "${{ inputs | pluck('type') }}"
-    all_paths: "${{ inputs | pluck('path') }}"
-
-**Parameters:**
-
-* ``field`` - Field name to extract
-
-**Returns:** Array of field values from all items
-
-count_by_type
--------------
-
-Count items grouped by type:
-
-.. code-block:: yaml
-
-    type_counts: "${{ inputs | count_by_type }}"
-
-**Returns:** Object with type names as keys and counts as values
-
-Example:
-
-.. code-block:: json
-
-    {
-      "std.FileSet": 3,
-      "std.BuildOutput": 1
-    }
+Filters
+=======
+
+The standard filters are documented in :doc:`/reference/stdlib`, generated from
+``std/filters.yaml`` -- including each filter's signature, its arguments, and
+the positions those arguments bind to.
+
+.. warning::
+
+   Filters are declared but **not yet resolved by the engine**: a package's
+   filter registry is never handed to the expression evaluator, so using one in
+   an expression currently fails. The generated reference says so on every
+   filter entry.
 
 Defining Custom Filters
 ========================
@@ -873,4 +172,3 @@ You can define custom filters in your package using JQ-style expressions:
 * ``local`` - Hide filter from child packages (default: false)
 
 For detailed filter documentation, see :doc:`filters`.
-

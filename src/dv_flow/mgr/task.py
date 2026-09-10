@@ -38,7 +38,17 @@ def collect_task_params(task):
         param_defs = getattr(t, 'param_defs', None)
         if param_defs is None:
             continue
-        definitions.update(param_defs.definitions)
+        for name, pdef in param_defs.definitions.items():
+            # Nearest wins per FIELD, not wholesale: a derived task that
+            # re-declares a param to change its default says nothing about the
+            # base's documentation or value set, and must not be reported as
+            # having dropped them. Same rule `collect_param_value_sets` and
+            # `collect_param_cli` follow -- see ParamDef.inherit_from.
+            prev = definitions.get(name)
+            definitions[name] = (pdef.inherit_from(prev)
+                                 if (prev is not None
+                                     and hasattr(pdef, 'inherit_from'))
+                                 else pdef)
         types.update(param_defs.types)
     return definitions, types
 
@@ -95,6 +105,38 @@ def collect_param_cli(task):
     return opts
 
 
+def collect_task_requires(task):
+    """The check instances in effect for `task`, accumulated along `uses:`.
+
+    Unlike the elaborator, which is nearest-declaration-wins, this
+    **accumulates**: a leaf that uses a capability that uses an archetype is
+    subject to all three levels. That union is what makes a base project's
+    contract enforceable at all.
+
+    Nearest-wins per `(check type, id)`, so a nearer level restating the same
+    check replaces the farther one -- the override channel, and the reason `id:`
+    exists (a task may legitimately carry two `std.check.Needs` requirements
+    with different parameters).
+
+    Lives here rather than on the builder because it is not a build-time fact:
+    "what contract does this task impose" is a question documentation asks too,
+    and answering it in two places is how the two answers drift apart.
+    """
+    out, seen = [], set()
+    for current in iter_uses_chain(task):
+        for req in getattr(current, 'requires', ()) or ():
+            ident = ""
+            values = getattr(req, 'paramT', None)
+            if values is not None:
+                ident = getattr(values, 'id', "") or ""
+            key = (getattr(req, 'name', ''), ident)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(req)
+    return out
+
+
 @dc.dataclass
 class Need(object):
     task : 'Task'
@@ -141,6 +183,10 @@ class Task(object):
     name : str
     desc: str = ""
     doc : str = ""
+    # Worked examples, as declared. Deliberately not inherited along `uses`
+    # (see ExampleDef): an example names a specific task, so carrying a base
+    # task's examples down would show a reader something they cannot type.
+    examples : List[Any] = dc.field(default_factory=list)
     paramT : Any = None
     param_defs : 'ParamDefCollection' = None  # NEW: Unevaluated param definitions
     uses : 'Task' = None

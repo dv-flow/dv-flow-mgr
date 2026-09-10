@@ -34,6 +34,7 @@ package:
 
   tasks:
   - name: Message
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.message.Message
     produces: []
@@ -42,6 +43,7 @@ package:
         type: str
         value: ""
   - name: FileSet
+    scope: export
     doc: |
       Creates a fileset from a list of files or glob patterns
     shell: pytask
@@ -81,6 +83,7 @@ package:
         type: list
         value: []
   - name: CreateFile
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.create_file.CreateFile
     passthrough: all
@@ -105,6 +108,7 @@ package:
         type: bool
         value: false
   - name: SetEnv
+    scope: export
     desc: Sets environment variables for use by other tasks
     shell: pytask
     run: dv_flow.mgr.std.setenv.SetEnv
@@ -120,6 +124,7 @@ package:
         type: map
 
   - name: SetFileType
+    scope: export
     consumes:
     - type: std.FileSet 
     desc: Outputs all input filesets with the specified filetype
@@ -133,6 +138,7 @@ package:
         type: str
         value: ""
   - name: IncDirs
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.incdirs.IncDirs
     produces:
@@ -143,6 +149,7 @@ package:
       input files.
 
   - name: PubSet
+    scope: export
     consumes:
     - type: std.FileSet
     desc: Binds a placement policy (dest/strip/flatten) to input FileSets
@@ -174,6 +181,7 @@ package:
         value: false
 
   - name: Publish
+    scope: export
     consumes:
     - type: std.FileSet
     - type: std.PubSet
@@ -217,6 +225,7 @@ package:
         value: []
 
   - name: Agent
+    scope: export
     desc: |
       Executes an AI assistant with a specified prompt and collects 
       structured results. The assistant MUST create a valid JSON result
@@ -298,6 +307,7 @@ package:
           For claude: permission_mode (default: acceptEdits).
 
   - name: "Null"
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.task_null.TaskNull
     passthrough: all
@@ -307,6 +317,7 @@ package:
     desc: "No-op task that passes inputs through unchanged"
 
   - name: RunTasks
+    scope: export
     shell: pytask
     run: dv_flow.mgr.std.run_tasks.RunTasks
     produces: []
@@ -328,6 +339,7 @@ package:
         doc: Optional timeout in seconds for all dynamic tasks
 
   - name: TestRunner
+    scope: export
     passthrough: all
     consumes: none
     desc: "Base for a test-running root: selection, arguments, and a report"
@@ -387,6 +399,7 @@ package:
           its values.
 
   - name: TestInfo
+    scope: export
     passthrough: none
     consumes: none
     uptodate: false
@@ -485,6 +498,56 @@ package:
       value:
         type: str
         value: ""
+
+  - name: Stable
+    uses: std.Tag
+    doc: |
+      Declares that a task's name, parameters and outputs are settled: a
+      project may depend on them and expect a deprecation cycle before they
+      change. This is the assumed state of an untagged task, so tag with it
+      only where saying so out loud is worth the noise -- typically alongside
+      `std.Experimental` siblings, to mark which of a set is the safe one.
+    with:
+      since:
+        type: str
+        value: ""
+        doc: Version at which this task became stable (free-form, e.g. "1.4")
+
+  - name: Experimental
+    uses: std.Tag
+    doc: |
+      Declares that a task may change or disappear without a deprecation
+      cycle. Use it to ship something useful before its interface has settled;
+      it is a promise about churn, not a claim that the task is broken.
+    with:
+      reason:
+        type: str
+        value: ""
+        doc: >
+          What is still unsettled, so a reader can judge the risk of depending
+          on it (e.g. "parameter names likely to change").
+
+  - name: Deprecated
+    uses: std.Tag
+    doc: |
+      Declares that a task should no longer be used and names what to use
+      instead. The task still works -- deprecation is a message to whoever
+      reads or maintains the flow file, not a runtime failure.
+    with:
+      reason:
+        type: str
+        value: ""
+        doc: Why the task is deprecated, in the author's words
+      replacement:
+        type: str
+        value: ""
+        doc: >
+          Name of the task to use instead. Empty when there is no replacement,
+          which is itself worth saying.
+      since:
+        type: str
+        value: ""
+        doc: Version at which this task was deprecated (free-form, e.g. "1.4")
 
   - name: Test
     uses: std.Tag

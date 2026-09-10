@@ -252,6 +252,36 @@ class ParamDef(BaseModel):
             return self.value
         return result
 
+    def inherit_from(self, base : 'ParamDef') -> 'ParamDef':
+        """This declaration, with anything it does not mention taken from *base*.
+
+        A derived task re-declares a parameter to change ONE thing -- usually a
+        default, sometimes only `cli: false` to drop an inherited flag. Treating
+        that as a wholesale replacement silently erases the base's
+        documentation, its value set, and even its default, so a task that
+        changed a default alone would document itself as if it had redeclared
+        the world.
+
+        Per-field inheritance is not a new rule here: `values:` and `cli:`
+        already inherit this way (see `collect_param_value_sets` and
+        `collect_param_cli`, and the reasoning in each). This applies the same
+        rule to the rest of the declaration, in one place, so the three cannot
+        drift apart.
+
+        Absence is what inherits. `cli: false` is not absence -- it is an
+        explicit "no flag", and it wins, which is the whole reason `False` and
+        `None` are stored distinguishably (see `_normalize_cli`).
+        """
+        if base is None:
+            return self
+        updates = {}
+        for f in ("value", "doc", "desc", "values", "cli", "type"):
+            if getattr(self, f, None) is None:
+                inherited = getattr(base, f, None)
+                if inherited is not None:
+                    updates[f] = inherited
+        return self.model_copy(update=updates) if updates else self
+
     def has_list_op(self) -> bool:
         """True when this ParamDef carries a list op (append/prepend or their
         path-* variants)."""

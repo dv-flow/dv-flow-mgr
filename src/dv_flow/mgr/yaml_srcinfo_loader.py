@@ -2,12 +2,22 @@
 from yaml.loader import SafeLoader
 
 class YamlSrcInfoLoader(SafeLoader):
+    # Keys whose entries keep their `srcinfo`. Everything else has it pruned,
+    # because a `srcinfo` on every nested mapping would end up inside parameter
+    # values and other places where it is data rather than provenance.
+    #
+    # `filters` and `configs` are here so that a diagnostic -- or a
+    # documentation tool -- can point at the definition rather than at the file
+    # that happens to contain it. Both are declared at package or fragment
+    # level, so without this the only location available is the whole file.
     scopes = {
         "tasks",
         "types",
         "body",
         "package",
-        "fragment"
+        "fragment",
+        "filters",
+        "configs"
     }
 
     def __init__(self, filename):

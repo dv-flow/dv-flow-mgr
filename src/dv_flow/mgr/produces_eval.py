@@ -51,10 +51,23 @@ class ProducesEvaluator:
         if not produces_patterns:
             return []
         
+        from .type_match import NON_ATTRIBUTE_KEYS
+
         evaluated = []
         for pattern in produces_patterns:
             evaluated_pattern = {}
             for key, value in pattern.items():
+                if key in NON_ATTRIBUTE_KEYS:
+                    # Carried through verbatim, deliberately unevaluated.
+                    #
+                    # `doc:` is prose about the artifact, and the useful thing
+                    # to show a reader is its SHAPE --
+                    # "${{ task_rundir }}/ral_pkg.sv" -- not one resolution of
+                    # it. Evaluating it would bake whichever machine built the
+                    # docs into the page, and would fail outright wherever the
+                    # referenced variable has no value outside a run.
+                    evaluated_pattern[key] = value
+                    continue
                 if isinstance(value, str):
                     # Check if value contains parameter reference
                     if "${{" in value:

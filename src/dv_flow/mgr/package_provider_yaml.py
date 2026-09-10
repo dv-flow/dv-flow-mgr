@@ -320,6 +320,7 @@ class PackageProviderYaml(PackageProvider):
 
         pkg.name = pkg_def.name
         pkg.desc = pkg_def.desc
+        pkg.doc = pkg_def.doc
         pkg.pkg_def = pkg_def  # expose original PackageDef for tests
         # Register package with loader for global lookup
         try:
@@ -1497,6 +1498,7 @@ class PackageProviderYaml(PackageProvider):
                 name=task_name,
                 desc=desc,
                 doc=doc,
+                examples=list(getattr(taskdef, "examples", []) or []),
                 package=pkg,
                 srcinfo=taskdef.srcinfo,
                 taskdef=taskdef,
@@ -1876,15 +1878,34 @@ class PackageProviderYaml(PackageProvider):
             else:
                 # Parameter override/assignment
                 self._log.debug("  is being overridden")
-                
-                # Get the parameter value
-                if hasattr(param, "copy"):
-                    value = param.copy()
-                elif isinstance(param, ParamDef):
+
+                # A ParamDef here is a PARTIAL re-declaration of a parameter the
+                # base already typed -- `{value: x}`, or `{cli: false}` to drop
+                # an inherited flag. It has to be unwrapped FIRST: a pydantic
+                # model also answers to `copy()`, so the container branch below
+                # used to win and store the whole ParamDef as the parameter's
+                # *value*. That reached `show task` as a repr blob and, when the
+                # base declared a `values:` set, failed validation outright --
+                # the stored "value" was never one of the accepted values. (The
+                # `isinstance(param, ParamDef)` branch was unreachable, which is
+                # the clearest evidence of what was meant.)
+                #
+                # The declaration fields have to ride along for the same reason
+                # they do in the typed branch above: `cli: false` is the only
+                # spelling for "remove an inherited flag", and dropping it here
+                # left that documented feature with no effect at all whenever
+                # the re-declaration omitted `type:`.
+                docs = {}
+                if isinstance(param, ParamDef):
                     value = param.value
+                    docs = {k: getattr(param, k)
+                            for k in ("doc", "desc", "values", "cli")
+                            if getattr(param, k, None) is not None}
+                elif hasattr(param, "copy"):
+                    value = param.copy()
                 else:
                     value = param
-                
+
                 # Try to get type from base task inheritance chain
                 ptype = None
                 if collection.has_param(p):
@@ -1923,7 +1944,7 @@ class PackageProviderYaml(PackageProvider):
                     continue
                 
                 # Store raw value - DON'T evaluate template expressions
-                collection.add_param(p, ParamDef(value=value), ptype)
+                collection.add_param(p, ParamDef(value=value, **docs), ptype)
                 self._log.debug("  Overriding param %s: type=%s, raw_value=%s" % (p, ptype, value))
         
         self._log.debug("<-- _collectParamDefs %s: %d params" % (taskdef.name, len(collection.definitions)))
@@ -2040,6 +2061,39 @@ class PackageProviderYaml(PackageProvider):
         for f in validate_task_refs(task, run_text=run_text, enclosing=enclosing):
             loader.error(f.message, taskdef.srcinfo)
 
+    def _inheritProse(self, task):
+        """Fill an empty `desc`/`doc` from the `uses:` chain.
+
+        A task that derives from a described base and adds a parameter is still
+        the same thing its base is. Leaving it blank throws away prose that was
+        already written, and does so in exactly the places a reader looks: the
+        `dfm show tasks` listing and generated documentation.
+
+        The two fields are inherited independently -- restating the one-line
+        summary while relying on the base for the long form is a reasonable
+        thing to author, as is the reverse.
+
+        The chain is walked rather than read one level deep, because tasks
+        elaborate in declaration order: a base declared later in the same file
+        has its own authored `desc` by now, but may not yet have inherited one.
+        Walking makes the result independent of file order.
+
+        Types are legal `uses:` targets and carry `doc` but no `desc`, so each
+        field is asked for by name rather than assuming a Task.
+        """
+        for field in ("desc", "doc"):
+            if getattr(task, field, None):
+                continue
+            base = task.uses
+            seen = set()
+            while base is not None and id(base) not in seen:
+                seen.add(id(base))
+                value = getattr(base, field, None)
+                if value:
+                    setattr(task, field, value)
+                    break
+                base = getattr(base, "uses", None)
+
     def _elabTask(self,
                   task,
                   loader : PackageLoaderP):
@@ -2075,8 +2129,10 @@ class PackageProviderYaml(PackageProvider):
                 self._log.error("failed to resolve task-uses %s.%s" % (uses_name, similar))
                 return
 
+        self._inheritProse(task)
+
         loader.pushEvalScope(dict(srcdir=os.path.dirname(taskdef.srcinfo.file)))
-        
+
         (passthrough, consumes, produces, rundir, uptodate,
          consumes_declared) = self._getPTConsumesProducesRundirUptodate(
             taskdef, task.uses)
@@ -2304,6 +2360,7 @@ class PackageProviderYaml(PackageProvider):
                 name=self._getScopeFullname(td.name),
                 desc=desc,
                 doc=doc,
+                examples=list(getattr(td, "examples", []) or []),
                 package=pkg.pkg,
                 srcinfo=td.srcinfo,
                 taskdef=td,
@@ -2360,6 +2417,8 @@ class PackageProviderYaml(PackageProvider):
                     if st.uses is None:
                         loader.error("failed to find task %s" % td.uses, td.srcinfo)
 #                        raise Exception("Failed to find task %s" % uses_name)
+
+            self._inheritProse(st)
 
             (passthrough, consumes, produces, rundir, uptodate,
              consumes_declared) = self._getPTConsumesProducesRundirUptodate(
@@ -2538,11 +2597,24 @@ class PackageProviderYaml(PackageProvider):
         uptodate = taskdef.uptodate
 #        needs = [] if task.needs is None else task.needs.copy()
 
+        # Whether THIS taskdef declared `consumes:`, recorded before anything is
+        # inherited or defaulted. See the note below the inheritance block.
+        consumes_declared = consumes is not None
+
         if base_t is not None and isinstance(base_t, Task):
             if passthrough is None:
                 passthrough = base_t.passthrough
             if consumes is None:
                 consumes = base_t.consumes
+                # ...and inherit whether that value was DECLARED, rather than
+                # re-deriving it from `consumes is not None` afterwards. The
+                # base has already had the engine default applied, so it always
+                # hands down a non-None value; deriving from it would mark every
+                # derived task as having declared `consumes:` -- reintroducing,
+                # one `uses:` away, exactly the bug the note below describes.
+                # An inherited declaration IS a declaration: the reader is
+                # subject to that contract. An inherited default is not.
+                consumes_declared = getattr(base_t, 'consumes_declared', False)
             # Inherit produces: NEAREST DECLARATION WINS. A derived task that
             # says nothing keeps the base's declaration -- which is what lets a
             # capability declare its outputs once and every backend variant
@@ -2558,14 +2630,13 @@ class PackageProviderYaml(PackageProvider):
             if uptodate is None:
                 uptodate = base_t.uptodate
 
-        # Whether `consumes:` was DECLARED, recorded before the default is
-        # applied. The default below is what the ENGINE needs (an undeclared
-        # task reads its inputs); it is not a statement the author made, and
-        # treating it as one is how the dataflow check came to silently pass
-        # for every task that never declared anything. Static checking reads
-        # this flag; the runtime reads `consumes`.
-        consumes_declared = consumes is not None
-
+        # `consumes_declared` (set above) records whether `consumes:` was
+        # DECLARED, before the default is applied. The default below is what the
+        # ENGINE needs (an undeclared task reads its inputs); it is not a
+        # statement the author made, and treating it as one is how the dataflow
+        # check came to silently pass for every task that never declared
+        # anything. Static checking reads this flag; the runtime reads
+        # `consumes`.
         if passthrough is None:
             passthrough = PassthroughE.Unused
         if consumes is None:

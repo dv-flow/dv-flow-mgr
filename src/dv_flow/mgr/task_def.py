@@ -279,6 +279,33 @@ def _validate_set_list(items, ctx="set"):
     return items
 
 
+class ExampleDef(BaseModel):
+    """A worked example of using a task.
+
+    Examples are documentation, not tests: nothing runs them, and nothing
+    checks that `code` still works. They are deliberately NOT inherited along
+    the `uses:` chain -- an example is written against a specific task name and
+    a specific set of parameters, so re-presenting a base task's example under
+    a derived task would show the reader something they cannot type.
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    title : Union[str, None] = dc.Field(
+        default=None,
+        description="Short heading for the example (e.g. \"Run a single test\")")
+    code : str = dc.Field(
+        description="The example itself: a shell command line, a YAML "
+                    "fragment, or whatever the reader would actually type")
+    caption : Union[str, None] = dc.Field(
+        default=None,
+        description="Prose shown with the example, explaining what it does or "
+                    "when to reach for it")
+    lang : str = dc.Field(
+        default="yaml",
+        description="Language of 'code', used for syntax highlighting. Use "
+                    "'shell' for command lines, 'yaml' for flow-file fragments")
+
+
 class SummaryDef(BaseModel):
     """Selects a framework-provided summary renderer."""
     model_config = ConfigDict(extra='forbid')
@@ -364,6 +391,12 @@ class TaskDef(BaseModel):
         default="",
         title="Task documentation",
         description="Full documentation of the task")
+    examples : List[ExampleDef] = dc.Field(
+        default_factory=list,
+        description="Worked examples of using this task. Not inherited along "
+                    "'uses': an example names a specific task and specific "
+                    "parameters, so a base task's example would not be "
+                    "something a reader of the derived task could type.")
     needs : List[Union[str]] = dc.Field(
         default_factory=list, 
         description="List of tasks that this task depends on")
@@ -408,7 +441,13 @@ class TaskDef(BaseModel):
                     "item type; other keys are attributes a consumer can match "
                     "on, and may reference this task's parameters "
                     "(`filetype: \"${{ type }}\"`). Inherited along 'uses' with "
-                    "the nearest declaration winning.")
+                    "the nearest declaration winning.\n\n"
+                    "`doc:` is the exception: it is prose describing the "
+                    "specific artifact "
+                    "(`doc: \"${{ task_rundir }}/ral_pkg.sv\"`), not an "
+                    "attribute. It never participates in matching, and it is "
+                    "NOT evaluated -- the shape of the path is what documents "
+                    "the output, where one machine's resolution of it is not.")
     uptodate : Union[bool, str, None] = dc.Field(
         default=None,
         description="Up-to-date check: false=always run, string=Python method, None=use default check")

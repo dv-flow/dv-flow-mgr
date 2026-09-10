@@ -116,23 +116,25 @@ class PackageCollector:
         """Convert package provider to info dict."""
         basedir = ''
         desc = ''
-        
+        doc = ''
+
         if hasattr(provider, '_path'):
             basedir = provider._path
-        
+
         # Try to load the package to get the description
         try:
             if self._loader is not None:
                 pkg = provider.findPackage(name, self._loader)
                 if pkg:
                     desc = getattr(pkg, 'desc', '') or ''
+                    doc = getattr(pkg, 'doc', '') or ''
         except Exception as e:
             self._log.debug(f"Could not load package {name} for description: {e}")
-        
+
         return {
             'name': name,
             'desc': desc,
-            'doc': '',
+            'doc': doc,
             'tags': [],
             'basedir': basedir,
             'source': 'installed'

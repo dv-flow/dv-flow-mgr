@@ -86,9 +86,22 @@ def _as_bool(v) -> bool:
     return str(v).strip().lower() in ("true", "1", "yes", "on")
 
 
+# Keys in a `produces:`/`consumes:` entry that describe the entry rather than
+# the item. They are never attributes: they take no part in matching, and they
+# are not evaluated as expressions.
+#
+# `doc` is here because prose about an artifact ("${{ task_rundir }}/ral_pkg.sv")
+# is documentation, not a property a consumer could sensibly match on. Without
+# the exclusion it would become a matchable attribute, and a producer's wording
+# could change what wires up to what.
+NON_ATTRIBUTE_KEYS = frozenset({"doc"})
+
+
 def pattern_matches(wanted, item, resolve=None) -> bool:
     """True when the produced `item` pattern satisfies the `wanted` pattern."""
     for key, value in wanted.items():
+        if key in NON_ATTRIBUTE_KEYS:
+            continue
         if key == "type":
             if not is_a(item.get("type"), value, resolve):
                 return False

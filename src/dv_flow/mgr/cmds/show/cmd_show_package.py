@@ -109,6 +109,8 @@ class CmdShowPackage:
         
         info = {
             'name': pkg.name,
+            'desc': getattr(pkg, 'desc', '') or '',
+            'doc': getattr(pkg, 'doc', '') or '',
             'basedir': getattr(pkg, 'basedir', '') or '',
             'source': 'project' if is_project else 'installed',
             'uses': getattr(pkg, 'uses', None),
