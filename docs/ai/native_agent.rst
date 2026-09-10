@@ -508,13 +508,15 @@ These general-purpose tools let the agent read and modify files:
    * - ``grep_search``
      - Search file contents with a regex *(green)*
 
-Subprocess Agents (Legacy)
-===========================
+Subprocess Agents
+=================
 
-The original subprocess-based agents (GitHub Copilot CLI, OpenAI Codex CLI)
-are still supported via ``--assistant``:
+Subprocess-based CLI assistants are supported via ``--assistant``:
 
 .. code-block:: bash
+
+    # Claude Code CLI (must be installed separately) -- preferred by auto-detect
+    dfm agent -a claude
 
     # GitHub Copilot CLI (must be installed separately)
     dfm agent -a copilot
@@ -522,9 +524,18 @@ are still supported via ``--assistant``:
     # OpenAI Codex CLI (must be installed separately)
     dfm agent -a codex
 
-These agents communicate with DFM through a JSON result-file protocol and do
-not have the streaming TUI or direct tool access.  They remain available for
-environments where the native agent dependencies cannot be installed.
+When ``-a`` is omitted, dfm probes for an installed CLI in the order claude,
+copilot, codex, and uses the native agent only if none is present.
+
+Claude Code authenticates through your existing Claude subscription login.
+dfm never sets ``ANTHROPIC_API_KEY`` for it, and strips the variable from the
+environment it passes to the CLI, so a ``dfm agent`` session is never billed as
+metered API usage.  Leave ``-m`` off to use whatever model your Claude session
+is configured with.
+
+In ``std.Agent`` tasks these assistants communicate with DFM through a JSON
+result-file protocol and do not have the native agent's streaming TUI or
+direct tool access.
 
 Troubleshooting
 ===============

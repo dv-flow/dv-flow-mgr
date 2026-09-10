@@ -12,8 +12,10 @@ your DV Flow project to create context-aware AI agent sessions.
    and any OpenAI-compatible provider.  See :doc:`native_agent` for setup and
    provider configuration.
 
-   The original subprocess-based agents (GitHub Copilot CLI, Codex CLI) remain
-   available via ``-a copilot`` / ``-a codex``.
+   Subprocess-based CLI assistants are also supported via ``-a claude`` /
+   ``-a copilot`` / ``-a codex``.  When no assistant is requested, dfm probes
+   for an installed CLI in the order claude, copilot, codex, and falls back to
+   the native agent if none is found.
 
 Overview
 ========

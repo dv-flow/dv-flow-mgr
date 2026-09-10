@@ -42,7 +42,7 @@ def _get_assistant_priority():
     return ASSISTANT_PRIORITY
 
 
-@pytest.fixture(params=["copilot", "codex"])
+@pytest.fixture(params=["claude", "copilot", "codex"])
 def assistant_name(request):
     """Parameterized fixture that yields each assistant name in priority order.
     
@@ -51,7 +51,7 @@ def assistant_name(request):
     
     Example:
         def test_something(assistant_name):
-            assert assistant_name in ['copilot', 'codex']
+            assert assistant_name in ['claude', 'copilot', 'codex']
     """
     return request.param
 

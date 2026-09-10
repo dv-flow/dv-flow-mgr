@@ -51,6 +51,13 @@ def _agent_filenames(ctxt, input):
 
 _log = logging.getLogger("Agent")
 
+# Log file each subprocess assistant writes its output to
+_OUTPUT_LOG = {
+    "claude": "claude_output.log",
+    "copilot": "copilot_output.log",
+    "codex": "codex_output.log",
+}
+
 # Default system prompt template
 # Notes on variable expansion:
 # - ${{ inputs }} is expanded at runtime by this task with JSON of input data
@@ -290,7 +297,7 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
             _log.info(f"Auto-detected AI assistant: {assistant_name}")
         else:
             markers.append(TaskMarker(
-                msg="No AI assistant available. Install copilot or codex CLI.",
+                msg="No AI assistant available. Install the claude, copilot, or codex CLI.",
                 severity=SeverityE.Error
             ))
             return TaskDataResult(status=1, markers=markers, changed=False)
@@ -404,8 +411,9 @@ async def _run_subprocess_agent(runner, input, assistant_name) -> TaskDataResult
                 result_file = input.params.result_file or result_fname
                 result_path = os.path.join(input.rundir, result_file)
                 
-                # Check copilot_output.log for emptiness
-                output_log_path = os.path.join(input.rundir, 'copilot_output.log')
+                # Check the assistant's output log for emptiness
+                output_log_path = os.path.join(
+                    input.rundir, _OUTPUT_LOG.get(assistant_name, 'copilot_output.log'))
                 output_log_empty = True
                 if os.path.exists(output_log_path):
                     with open(output_log_path, 'r') as f:

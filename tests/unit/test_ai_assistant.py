@@ -1,8 +1,11 @@
+import os
 import pytest
 import asyncio
 import inspect
+from dv_flow.mgr.cmds.agent.assistant_launcher import AssistantLauncher
 from dv_flow.mgr.std.ai_assistant import (
     get_assistant,
+    claude_env,
     CopilotAssistant,
     CodexAssistant,
     OpenAIAssistant,
@@ -24,9 +27,11 @@ def test_assistant_registry():
 
 def test_assistant_priority():
     """Test that priority order is defined correctly"""
+    assert "claude" in ASSISTANT_PRIORITY
     assert "copilot" in ASSISTANT_PRIORITY
     assert "codex" in ASSISTANT_PRIORITY
-    # copilot should be first priority
+    # claude should be first priority, then copilot, then codex
+    assert ASSISTANT_PRIORITY.index("claude") < ASSISTANT_PRIORITY.index("copilot")
     assert ASSISTANT_PRIORITY.index("copilot") < ASSISTANT_PRIORITY.index("codex")
 
 
@@ -111,14 +116,41 @@ def test_openai_not_implemented():
             await assistant.execute("test prompt", "/tmp", "", {})
     asyncio.run(_impl())
 
-def test_claude_not_implemented():
-    async def _impl():
-        """Test that Claude execute raises NotImplementedError"""
-        assistant = ClaudeAssistant()
-        
-        with pytest.raises(NotImplementedError):
-            await assistant.execute("test prompt", "/tmp", "", {})
-    asyncio.run(_impl())
+def test_claude_env_never_sets_api_key(monkeypatch):
+    """claude_env must strip ANTHROPIC_API_KEY and never introduce it.
+
+    Setting it switches the Claude Code CLI from subscription auth to
+    metered API billing.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-should-not-leak")
+    env = claude_env()
+    assert "ANTHROPIC_API_KEY" not in env
+    # Rest of the environment is preserved
+    assert env.get("PATH") == os.environ.get("PATH")
+
+    # An explicit base env is honored, minus the key
+    env = claude_env({"FOO": "bar", "ANTHROPIC_API_KEY": "sk-ant-x"})
+    assert env == {"FOO": "bar"}
+
+
+def test_claude_command_omits_model_when_unspecified():
+    """With no model requested, no --model flag is passed (CLI default wins)."""
+    launcher = AssistantLauncher(assistant_name="claude")
+    cmd = launcher._build_claude_command("SYSTEM PROMPT", "/tmp/wd", None)
+
+    assert cmd[0] == "claude"
+    assert "--model" not in cmd
+    assert "--append-system-prompt" in cmd
+    assert cmd[cmd.index("--append-system-prompt") + 1] == "SYSTEM PROMPT"
+    assert cmd[cmd.index("--add-dir") + 1] == "/tmp/wd"
+
+
+def test_claude_command_passes_explicit_model():
+    launcher = AssistantLauncher(assistant_name="claude", model="opus")
+    cmd = launcher._build_claude_command("SYSTEM PROMPT", "/tmp/wd", None)
+
+    assert cmd[cmd.index("--model") + 1] == "opus"
+
 
 def test_probe_available_assistant():
     """Test auto-probe for available assistant"""
@@ -145,7 +177,7 @@ def test_get_available_assistant_name():
 # Parameterized tests across all supported assistants
 # ============================================================================
 
-@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+@pytest.mark.parametrize("assistant_name", ["claude", "copilot", "codex"])
 def test_assistant_check_available_returns_tuple(assistant_name):
     """Test that check_available returns proper tuple for priority assistants."""
     assistant = get_assistant(assistant_name)
@@ -157,7 +189,7 @@ def test_assistant_check_available_returns_tuple(assistant_name):
     assert isinstance(result[1], str), f"{assistant_name}: second element should be str"
 
 
-@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+@pytest.mark.parametrize("assistant_name", ["claude", "copilot", "codex"])
 def test_assistant_has_execute_method(assistant_name):
     """Test that priority assistants have async execute method."""
     assistant = get_assistant(assistant_name)
@@ -166,7 +198,7 @@ def test_assistant_has_execute_method(assistant_name):
     assert inspect.iscoroutinefunction(assistant.execute), f"{assistant_name}: execute should be async"
 
 
-@pytest.mark.parametrize("assistant_name", ["copilot", "codex"])
+@pytest.mark.parametrize("assistant_name", ["claude", "copilot", "codex"])
 def test_assistant_has_name_classmethod(assistant_name):
     """Test that priority assistants have name classmethod."""
     assistant_cls = ASSISTANT_REGISTRY[assistant_name]

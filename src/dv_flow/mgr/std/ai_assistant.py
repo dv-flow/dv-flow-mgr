@@ -32,7 +32,20 @@ if TYPE_CHECKING:
 _log = logging.getLogger("AIAssistant")
 
 # Priority order for auto-detection of AI assistants
-ASSISTANT_PRIORITY = ["copilot", "codex"]
+ASSISTANT_PRIORITY = ["claude", "copilot", "codex"]
+
+
+def claude_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """Build the environment used to invoke the Claude Code CLI.
+
+    The CLI authenticates via the user's existing Claude subscription login.
+    If ``ANTHROPIC_API_KEY`` is present it switches to pay-per-token API
+    billing instead, so we never set it and actively strip it from the
+    environment we hand to the CLI.
+    """
+    env = dict(base_env if base_env is not None else os.environ)
+    env.pop("ANTHROPIC_API_KEY", None)
+    return env
 
 class AIAssistantBase(ABC):
     """Base class for AI assistant implementations"""
@@ -416,29 +429,116 @@ class OpenAIAssistant(AIAssistantBase):
 
 
 class ClaudeAssistant(AIAssistantBase):
-    """Claude API implementation (placeholder for future)"""
-    
-    async def execute(self, prompt: str, runner: 'TaskRunCtxt', 
+    """Claude Code CLI implementation"""
+
+    @classmethod
+    def name(cls) -> str:
+        return "claude"
+
+    async def execute(self, prompt: str, runner: 'TaskRunCtxt',
                      model: str, config: dict) -> Tuple[int, str, str]:
-        """Execute Claude assistant (not yet implemented)"""
-        raise NotImplementedError("Claude assistant not yet implemented")
-    
-    def check_available(self) -> Tuple[bool, str]:
-        """Check if Anthropic library is available"""
+        """
+        Execute the Claude Code CLI with prompt in non-interactive mode
+
+        Config options:
+            permission_mode: acceptEdits | bypassPermissions | plan | ...
+                             (default: acceptEdits)
+
+        Note: Uses 'claude -p' (print mode) for non-interactive execution.
+        The CLI authenticates through the user's Claude subscription login;
+        ANTHROPIC_API_KEY is deliberately removed from the environment so the
+        run is never billed as pay-per-token API usage.
+        """
+        _log.debug("Executing Claude Code CLI")
+
         try:
-            import anthropic
+            # Write prompt to a file for reference
+            prompt_input_file = os.path.join(runner.rundir, "claude_input.txt")
+            with open(prompt_input_file, 'w') as f:
+                f.write(prompt)
+
+            # Build command - use -p for non-interactive print mode
+            cmd = ['claude', '-p', prompt]
+
+            # Permission handling for unattended execution
+            permission_mode = config.get('permission_mode', 'acceptEdits') if config else 'acceptEdits'
+            cmd.extend(['--permission-mode', permission_mode])
+
+            # Add model parameter only if specified; otherwise the CLI's
+            # configured default model is used.
+            if model:
+                cmd.extend(['--model', model])
+
+            # Add allowed path for root rundir
+            cmd.extend(['--add-dir', runner.root_rundir])
+
+            # Execute claude in non-interactive mode
+            status = await runner.exec(
+                cmd,
+                logfile='claude_output.log',
+                env=claude_env(getattr(runner, 'env', None))
+            )
+
+            # Read stdout from log file
+            stdout_path = os.path.join(runner.rundir, 'claude_output.log')
+            stdout = ""
+            stderr = ""
+
+            if os.path.exists(stdout_path):
+                with open(stdout_path, 'r') as f:
+                    stdout = f.read()
+
+            _log.debug(f"Claude execution complete: status={status}")
+
+            return status, stdout, stderr
+
+        except Exception as e:
+            _log.error(f"Failed to execute claude: {e}")
+            raise
+
+    def check_available(self) -> Tuple[bool, str]:
+        """Check if the Claude Code CLI is available"""
+        try:
+            # Check if 'claude' command exists
+            result = subprocess.run(
+                ['which', 'claude'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0:
+                return False, "Claude Code CLI (claude) not found in PATH"
+
+            # Verify claude responds to --version
+            result = subprocess.run(
+                ['claude', '--version'],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=claude_env()
+            )
+
+            if result.returncode != 0:
+                return False, "Claude Code CLI found but not responding correctly"
+
             return True, ""
-        except ImportError:
-            return False, "anthropic package not installed. Run: pip install anthropic"
+
+        except subprocess.TimeoutExpired:
+            return False, "Command timed out while checking Claude Code CLI"
+        except FileNotFoundError:
+            return False, "Claude Code CLI (claude) not found in PATH"
+        except Exception as e:
+            return False, f"Error checking Claude Code CLI: {str(e)}"
 
 
 # Registry of available assistants
 ASSISTANT_REGISTRY = {
     "mock": MockAssistant,
+    "claude": ClaudeAssistant,
     "copilot": CopilotAssistant,
     "codex": CodexAssistant,
     "openai": OpenAIAssistant,
-    "claude": ClaudeAssistant,
 }
 
 
@@ -447,7 +547,7 @@ def get_assistant(name: str) -> AIAssistantBase:
     Get assistant instance by name
     
     Args:
-        name: Name of the assistant (copilot, openai, claude)
+        name: Name of the assistant (claude, copilot, codex, openai)
         
     Returns:
         Instance of the requested assistant
@@ -465,8 +565,8 @@ def get_assistant(name: str) -> AIAssistantBase:
 def probe_available_assistant() -> Optional[AIAssistantBase]:
     """
     Probe for available AI assistants in priority order.
-    
-    Priority order: copilot, codex
+
+    Priority order: claude, copilot, codex
     
     Returns:
         Instance of the first available assistant, or None if none available
@@ -488,8 +588,8 @@ def probe_available_assistant() -> Optional[AIAssistantBase]:
 def get_available_assistant_name() -> Optional[str]:
     """
     Get the name of the first available AI assistant.
-    
-    Priority order: copilot, codex
+
+    Priority order: claude, copilot, codex
     
     Returns:
         Name of available assistant, or None if none available

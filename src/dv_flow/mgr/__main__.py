@@ -581,10 +581,11 @@ def get_parser():
         nargs='*',
         help='Task references to use as context (skills, personas, tools, references)')
     agent_parser.add_argument('-a', '--assistant',
-        choices=['copilot', 'codex', 'mock', 'native'],
-        help='Specify which assistant to use (default: native if no subprocess CLI detected)')
+        choices=['claude', 'copilot', 'codex', 'mock', 'native'],
+        help='Specify which assistant to use (default: auto-detect, preferring claude; '
+             'native if no subprocess CLI is detected)')
     agent_parser.add_argument('-m', '--model',
-        help='Specify the AI model to use')
+        help="Specify the AI model to use (default: the assistant's own default model)")
     agent_parser.add_argument('--root',
         help='Specifies the root directory for the flow')
     agent_parser.add_argument('-c', '--config',

@@ -30,6 +30,7 @@ package:
   fragments:
     - filters.yaml
     - checks.yaml
+    - evals.yaml
 
   tasks:
   - name: Message
@@ -221,10 +222,11 @@ package:
       structured results. The assistant MUST create a valid JSON result
       file or the task will fail.
       
-      Supported assistants: GitHub Copilot (copilot), OpenAI Codex (codex)
-      
+      Supported assistants: Claude Code (claude), GitHub Copilot (copilot),
+      OpenAI Codex (codex)
+
       If no assistant is specified, auto-probes for available assistants
-      in priority order: copilot, codex.
+      in priority order: claude, copilot, codex.
     shell: pytask
     run: dv_flow.mgr.std.agent.Agent
     # The agent's result is written to a file, not emitted as a data item.
@@ -255,13 +257,13 @@ package:
         type: str
         value: ""
         doc: |
-          Override default AI assistant. Options: copilot, codex, openai, claude
-          If empty, auto-probes for available assistants (copilot > codex).
+          Override default AI assistant. Options: claude, copilot, codex, openai
+          If empty, auto-probes for available assistants (claude > copilot > codex).
       model:
         type: str
         value: ""
         doc: |
-          Specify the model to use (e.g., gpt-4, o4-mini, claude-3-opus). 
+          Specify the model to use (e.g., opus, sonnet, gpt-4, o4-mini).
           If empty, uses the assistant's default model.
       sandbox_mode:
         type: str
@@ -293,6 +295,7 @@ package:
         doc: |
           Additional assistant-specific configuration.
           For codex: sandbox_mode and approval_mode can also be set here.
+          For claude: permission_mode (default: acceptEdits).
 
   - name: "Null"
     shell: pytask

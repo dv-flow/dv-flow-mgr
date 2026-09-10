@@ -616,23 +616,26 @@ a comprehensive system prompt for the AI assistant.
 Agent Options
 -------------
 
-``-a, --assistant {copilot,codex,mock}``
+``-a, --assistant {claude,copilot,codex,mock,native}``
     Specify which AI assistant to use. If not specified, dfm auto-detects the available
-    assistant by checking for installed tools in this order: copilot, codex.
-    
+    assistant by checking for installed tools in this order: claude, copilot, codex.
+
     .. code-block:: bash
-    
-        dfm agent PiratePersona --assistant copilot
+
+        dfm agent PiratePersona --assistant claude
 
 ``-m, --model MODEL``
-    Specify the AI model to use. The format depends on the assistant:
-    
+    Specify the AI model to use. If omitted, the assistant's own default model is
+    used -- dfm does not substitute a model of its own. The format depends on the
+    assistant:
+
+    * **Claude**: Aliases like ``opus``, ``sonnet``, or a full model name
     * **Copilot**: Model names like ``gpt-4``, ``gpt-3.5-turbo``
     * **Codex**: OpenAI model identifiers
-    
+
     .. code-block:: bash
-    
-        dfm agent PiratePersona --model gpt-4
+
+        dfm agent PiratePersona --model opus
 
 ``--clean``
     Clean the rundir before executing tasks. Useful when you want to ensure

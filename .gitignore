@@ -173,3 +173,9 @@ passthrough/
 foo.entry.*/
 foo.expand/
 tmp/
+
+.agents/
+.claude/
+.codex/
+.cursor/
+

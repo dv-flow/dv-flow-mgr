@@ -1,0 +1,262 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+
+#****************************************************************************
+#* evals.yaml
+#*
+#* Copyright 2023-2026 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#****************************************************************************
+fragment:
+  # Deliberately unnamed. A fragment `name:` prefixes everything it defines
+  # (`std.check.Needs` comes from checks.yaml that way), and here that would
+  # give `std.eval.EvalRunner` -- both a stutter and a break in the parallel
+  # with `std.TestRunner`, which is the whole point of these names.
+
+  tasks:
+  #------------------------------------------------------------------
+  # EvalRunner -- TestRunner, plus an Inspect eval-set log.
+  #
+  # Everything about selection, pruning, and pass/fail reporting is
+  # inherited unchanged. The delta is that each case is run `epochs`
+  # times and the per-trial results are assembled into Inspect
+  # `EvalLog` documents at the root.
+  #------------------------------------------------------------------
+  - name: EvalRunner
+    uses: std.TestRunner
+    desc: "Base for an eval-running root: trials, scoring, and an Inspect log"
+    doc: |
+      Base task for a project's benchmark-execution command. A root `uses:`
+      it, wires the available cases and suites as `needs:`, and gets
+      everything `std.TestRunner` provides -- `--tests`/`--views` selection,
+      the console report, the CTRF file -- plus:
+
+        * **trials**: each case runs `--epochs` times, and the per-trial
+          scores are combined by `--epochs-reducer`. `pass_at_k` is what
+          makes a nondeterministic agent measurable; `mean` is the default
+          because it is the only reducer that is meaningful for a
+          continuous score.
+        * **an Inspect eval-set log**: every trial contributes one
+          `std.EvalSample` item, and the root assembles those into
+          `EvalLog` documents under `log_dir`.
+
+      A case declares its identity with a `std.Eval` tag -- which is a
+      `std.Test`, so a case is selectable exactly the way a test is, and a
+      project can mix graded cases and ordinary tests under one root.
+
+      An `EvalLog` is scoped to one task and one model, so a run spanning
+      several views produces one log per view, all sharing an `eval_set_id`.
+      That is Inspect's own grouping mechanism; the "single output" is the
+      log *directory*, which is the unit `list_eval_logs()` and the Inspect
+      viewer consume.
+
+      ```yaml
+      - root: evals
+        uses: std.EvalRunner
+        with: { epochs: 4, epochs_reducer: pass_at_k }
+        needs: [swe-suite, refactor-suite]
+      ```
+    elaborate: dv_flow.mgr.std.eval_select:EvalSelect
+    summary: dv_flow.mgr.std.eval_log:eval_summary
+    with:
+      epochs:
+        type: int
+        value: 1
+        cli: true
+        doc: |
+          How many times to run each selected case. Trials are independent
+          task nodes, so they distribute across the configured backend and
+          cache individually.
+
+          A graded agent is nondeterministic; a single trial measures one
+          sample of its behavior, not its behavior. Anything reported as a
+          benchmark result should use more than one.
+      epochs_reducer:
+        type: str
+        value: mean
+        # Spelled with a dash to match Inspect's own `--epochs-reducer`; the
+        # default derivation would give `--epochs_reducer`.
+        cli: {name: epochs-reducer}
+        doc: |
+          How a case's per-trial scores are combined into its verdict. This
+          is also what CTRF `status` derives from, so the console report,
+          the CTRF file, and the `EvalLog` cannot disagree.
+        values:
+        - {value: mean,     desc: "the average score across trials"}
+        - {value: median,   desc: "the middle score across trials"}
+        - {value: max,      desc: "the best trial"}
+        - {value: min,      desc: "the worst trial -- a reliability floor"}
+        - {value: pass_at_k, desc: "1.0 if any trial passed (k = epochs)"}
+        - {value: all,      desc: "1.0 only if every trial passed"}
+      log_dir:
+        type: str
+        value: logs
+        doc: |
+          Directory, relative to the root rundir, holding the eval set. One
+          `EvalLog` per (suite x view) is written here, plus nothing else --
+          the directory is the eval set, so anything else in it would be
+          picked up by `list_eval_logs()`.
+      log_format:
+        type: str
+        value: json
+        doc: |
+          Encoding for the assembled logs. Both encodings are the same
+          logical object.
+        values:
+        - {value: json, desc: "portable text JSON; written directly"}
+        - {value: eval, desc: "Inspect's binary format; requires the `inspect` CLI on PATH"}
+      eval_set_id:
+        type: str
+        value: ""
+        doc: |
+          Identity shared by every log in this run's eval set. Empty (the
+          default) takes the run-id, which is what makes a DFM run and an
+          Inspect eval set the same thing. Set it explicitly only to join
+          logs produced by separate invocations into one set.
+
+  #------------------------------------------------------------------
+  # EvalInfo -- the inventory companion, unchanged in substance from
+  # TestInfo. It exists so `evals-info` reads as the sibling of
+  # `evals`, and so the epochs/reducer settings show up in the report.
+  #------------------------------------------------------------------
+  - name: EvalInfo
+    uses: std.TestInfo
+    desc: "Introspect an eval-running root: what cases, views, and trials?"
+    doc: |
+      The companion to `std.EvalRunner`, and the same thing `std.TestInfo`
+      is to `std.TestRunner`: it reports the inventory the runner selects
+      over and builds nothing.
+
+      ```yaml
+      - root: evals-info
+        uses: std.EvalInfo
+        with: { target: evals }
+      ```
+    with:
+      target:
+        type: str
+        value: evals
+
+  types:
+  #------------------------------------------------------------------
+  # The Eval tag -- a Test, so selection is inherited wholesale.
+  #------------------------------------------------------------------
+  - name: Eval
+    uses: std.Test
+    doc: |
+      Marks a task as a graded eval case. `case`, `view`, and `group` are
+      inherited from `std.Test` and mean the same things, so `--tests` and
+      `--views` select over eval cases and ordinary tests identically.
+
+      What the tag adds is the benchmark identity that an `EvalLog` needs
+      but a test does not: which benchmark the case belongs to, and which
+      sample within it.
+    with:
+      benchmark:
+        type: str
+        value: ""
+        doc: |
+          The benchmark this case is drawn from (`swe-bench`, `terminal-bench`).
+          Becomes `eval.task` in the assembled log, and is what groups cases
+          into logs alongside the view.
+      sample_id:
+        type: str
+        value: ""
+        doc: |
+          The case's id *within the benchmark* -- the upstream identifier,
+          not the DFM task name. Becomes `EvalSample.id`. Empty falls back
+          to `case`.
+
+  #------------------------------------------------------------------
+  # EvalSample -- one trial's result, in flight.
+  #
+  # Field-for-field an Inspect `EvalSample`, plus the two fields
+  # `test_summary` collects on structurally (`passed`, `status`). That
+  # overlap is deliberate: it is what lets a graded case flow into the
+  # inherited console report and the CTRF file with no special case.
+  #------------------------------------------------------------------
+  - name: EvalSample
+    doc: |
+      One trial of one case: what was asked, what the agent did, and how it
+      scored. Produced by a grader, consumed by the root.
+
+      A grader populates what it knows and leaves the rest; the runner fills
+      in identity (`id`, `epoch`) and timing, and copies `scores` through
+      without interpreting it. Nothing here requires a particular grader
+      type -- the contract is structural, for the same reason the test
+      report's is.
+    with:
+      # -- identity ------------------------------------------------------
+      id:
+        type: str
+        value: ""
+        doc: "Sample id within the benchmark (`std.Eval.sample_id`)."
+      epoch:
+        type: int
+        value: 1
+        doc: "Which trial this is, 1-based. Set by the runner."
+      # -- verdict (also what the inherited report reads) -----------------
+      passed:
+        type: bool
+        value: false
+        doc: |
+          The trial's boolean verdict. Read structurally by the inherited
+          test report and by the CTRF emitter; reduced across epochs to
+          produce the case's verdict.
+      status:
+        type: str
+        value: ""
+        doc: "`pass`, `fail`, `error`, or `timeout`."
+      # -- Inspect payload -----------------------------------------------
+      input:
+        type: str
+        value: ""
+        doc: "The prompt or task statement given to the agent."
+      target:
+        type: str
+        value: ""
+        doc: "The expected answer, where the benchmark defines one."
+      output:
+        type: str
+        value: ""
+        doc: "The agent's final answer."
+      scores:
+        type: map
+        doc: |
+          Scorer name -> {value, answer, explanation, metadata}. Copied
+          through verbatim; the runner does not interpret it beyond
+          reducing `value` across epochs.
+      error:
+        type: str
+        value: ""
+        doc: "Error text, when the trial did not complete."
+      # -- artifacts, by reference ---------------------------------------
+      events:
+        type: str
+        value: ""
+        doc: |
+          Path, relative to the trial's rundir, of the transcript. Written
+          in Trajectory v1, which is what normalizes a `claude`/`codex`
+          session into a portable record. Referenced rather than inlined:
+          the rundir is already the artifact store.
+      model_usage:
+        type: map
+        doc: |
+          Model -> {input_tokens, output_tokens, total_tokens}. Summed into
+          the log's `stats` block.
+      started_at:
+        type: str
+        value: ""
+      completed_at:
+        type: str
+        value: ""

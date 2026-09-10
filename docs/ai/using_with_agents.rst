@@ -453,7 +453,7 @@ Command Options
       tasks                 Task references to use as context (skills, personas, tools, references)
     
     Options:
-      -a, --assistant       Specify assistant (copilot, codex, mock)
+      -a, --assistant       Specify assistant (claude, copilot, codex, mock, native)
       -m, --model          Specify the AI model to use
       --config-file FILE   Output assistant config file for debugging
       --json               Output context as JSON instead of launching

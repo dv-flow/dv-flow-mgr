@@ -24,7 +24,7 @@ import subprocess
 import sys
 from typing import List, Optional
 from .context_builder import AgentContext
-from ...std.ai_assistant import ASSISTANT_REGISTRY, get_available_assistant_name
+from ...std.ai_assistant import ASSISTANT_REGISTRY, claude_env, get_available_assistant_name
 
 
 class AssistantLauncher:
@@ -97,24 +97,31 @@ class AssistantLauncher:
         
         try:
             # Build launch command based on assistant type
-            if assistant_name == 'copilot':
+            env = None
+            if assistant_name == 'claude':
+                cmd = self._build_claude_command(system_prompt, working_dir, context)
+                # Claude Code authenticates via the user's subscription login;
+                # ANTHROPIC_API_KEY would switch it to metered API billing.
+                env = claude_env()
+            elif assistant_name == 'copilot':
                 cmd = self._build_copilot_command(context_file, working_dir, context)
             elif assistant_name == 'codex':
                 cmd = self._build_codex_command(context_file, working_dir, context)
             else:
                 raise RuntimeError(f"Interactive mode not supported for assistant: {assistant_name}")
-            
+
             # Launch in interactive mode
             self._log.info(f"Launching {assistant_name} in interactive mode")
             self._log.debug(f"Command: {' '.join(cmd)}")
-            
+
             # Run interactively - pass through stdin/stdout/stderr
             result = subprocess.run(
                 cmd,
                 cwd=working_dir,
                 stdin=sys.stdin,
                 stdout=sys.stdout,
-                stderr=sys.stderr
+                stderr=sys.stderr,
+                env=env
             )
             
             return result.returncode
@@ -130,7 +137,38 @@ class AssistantLauncher:
                 self._log.debug(f"Removing {context_file}")
                 os.remove(context_file)
     
-    def _build_copilot_command(self, context_file: str, working_dir: str, 
+    def _build_claude_command(self, system_prompt: str, working_dir: str,
+                              context: AgentContext) -> List[str]:
+        """Build command for the Claude Code CLI in interactive mode.
+
+        Args:
+            system_prompt: Generated DV Flow system prompt
+            working_dir: Working directory
+            context: Agent context
+
+        Returns:
+            Command line as list of strings
+
+        Note: The DV Flow context is appended to Claude's own system prompt
+        rather than handed over as a first user turn, so the session opens
+        ready for the user's actual question.
+        """
+        cmd = ['claude']
+
+        # Layer the DV Flow context onto Claude's default system prompt
+        cmd.extend(['--append-system-prompt', system_prompt])
+
+        # Add accessible directory
+        cmd.extend(['--add-dir', working_dir])
+
+        # Add model only if explicitly requested; otherwise Claude uses the
+        # model configured for the user's session.
+        if self.model:
+            cmd.extend(['--model', self.model])
+
+        return cmd
+
+    def _build_copilot_command(self, context_file: str, working_dir: str,
                                context: AgentContext) -> List[str]:
         """Build command for GitHub Copilot CLI in interactive mode.
         
