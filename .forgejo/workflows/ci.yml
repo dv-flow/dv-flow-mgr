@@ -51,9 +51,14 @@ jobs:
       # public. Internal host names, tailnet addresses and CGNAT-range IPs must
       # not appear in tracked files -- if a build ever needs one, it belongs in
       # a repository secret, which is masked in logs.
+      #
+      # The pathspec excludes the WHOLE .forgejo/workflows directory, not just
+      # this file. Excluding only itself is what made four edapack repos red for
+      # a day: with two workflows present, each matched the OTHER's copy of this
+      # very pattern. docs.yml carries the same check, so this repo has two.
       run: |
         pattern='perch-char\.ts\.net|\.ts\.net|a9550|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
-        if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/ci.yml' ; then
+        if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/' ; then
           echo "::error::internal identifier found in a tracked file (see matches above)"
           exit 1
         fi

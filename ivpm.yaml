@@ -21,6 +21,9 @@ package:
       src: pypi
     - name: sphinx-jsonschema
       url: https://github.com/lnoor/sphinx-jsonschema.git
+    - name: sphinx-dv-flow
+      dep-set: use
+      url: https://github.com/dv-flow/sphinx-dv-flow.git
     - name: sphinxcontrib-mermaid
       src: pypi
     - name: furo

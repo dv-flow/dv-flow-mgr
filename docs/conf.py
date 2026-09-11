@@ -17,13 +17,25 @@ import os
 import sys
 
 # sphinx-dv-flow generates the standard-library reference from `std/flow.yaml`
-# (docs/reference/stdlib.rst). It is a documentation dependency, declared in the
-# `docs` extra -- but in the development checkout it lives beside this package
-# rather than being installed, so fall back to the sibling source tree.
-_DEV_SRC = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "src"))
-if os.path.isdir(os.path.join(_DEV_SRC, "sphinx_dv_flow")):
-    sys.path.insert(0, _DEV_SRC)
+# (docs/reference/stdlib.rst). ivpm brings it in as a `dep-set: use` import,
+# which CHECKS IT OUT but does not install it into packages/python -- so
+# `import sphinx_dv_flow` fails in the ivpm venv and the extension has to be put
+# on the path from here. Candidates, in order: the ivpm checkout, then a sibling
+# development checkout.
+#
+# The previous form of this fallback resolved to <projects>/dv-flow/src, which
+# has never existed; the build worked only when PYTHONPATH was set by hand. A
+# path that points at nothing fails silently -- os.path.isdir() is simply False
+# and Sphinx reports a missing extension one step later -- so keep these
+# relative to conf.py and keep them pointing at real directories.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _cand in (
+        os.path.join(_HERE, "..", "packages", "sphinx-dv-flow", "src"),
+        os.path.join(_HERE, "..", "..", "sphinx-dv-flow", "src")):
+    _cand = os.path.abspath(_cand)
+    if os.path.isdir(os.path.join(_cand, "sphinx_dv_flow")):
+        sys.path.insert(0, _cand)
+        break
 
 extensions = [
     'sphinxarg.ext',

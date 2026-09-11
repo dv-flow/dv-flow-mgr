@@ -1,0 +1,182 @@
+# Docs build for dv-flow/dv-flow-mgr on Forgejo Actions.
+#
+# THIS IS THE ONLY THING THAT PUBLISHES THESE DOCS. dvkit.org owns all
+# documentation for the estate: this repo's docs land at
+# dvkit.org/dv-flow/dv-flow-mgr/. dvkit.org is a single Cloudflare Pages
+# project and a deploy replaces the WHOLE site, so there is exactly one
+# publisher for it and it is host-side, not here.
+#
+# What happens after this job, all of it host-side:
+#
+#   docs-fetch dv-flow/dv-flow-mgr main   # artifact -> staging/
+#   docs-promote / docs-deploy            # -> dvkit.org/dv-flow/dv-flow-mgr/
+#
+# The built HTML leaves as an ARTIFACT and nothing else. This job holds no
+# Cloudflare token and mounts nothing: a workflow file is public and editable
+# by anyone who can push, and the deploy credential is account-scoped.
+#
+# NO RELEASE-AUTHORITY GATE, deliberately. That switch decides who publishes
+# PACKAGES, and this repo is a "github" repo under it -- its wheels ship from
+# .github/workflows/ci.yml through dv-flow-release. Docs are not a release:
+# they publish from Forgejo regardless of who holds release authority, and
+# adding the gate here would stop docs for this repo entirely.
+#
+# Constraints this file is shaped by, all measured on this instance:
+#
+#  1. No third-party actions. A bare `uses:` resolves against code.forgejo.org
+#     (Forgejo's DEFAULT_ACTIONS_URL), not github.com, so actions/setup-python
+#     does not exist here. `ubuntu-latest` maps to catthehacker/ubuntu:act-22.04.
+#  2. `python` unqualified DOES NOT EXIST in that image. Use python3.
+#  3. The artifact name is the `docs-<org>-<repo>` convention docs-fetch matches
+#     on, and `path: .../**` makes the build directory the ZIP ROOT --
+#     docs-fetch refuses an artifact with no index.html at the top level.
+#  4. The build goes THROUGH ivpm. docs/conf.py loads `sphinx_dv_flow`, which
+#     imports dv_flow.mgr and reads src/dv_flow/mgr/std/flow.yaml through the
+#     engine's own loader to generate the standard-library reference. A bare
+#     `pip install sphinx` produces an ImportError on the extension, and a
+#     dv_flow.mgr that is present but not the one in this checkout produces a
+#     reference documenting the wrong standard library.
+
+name: Docs
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for internal identifiers in tracked files
+        # This repo is published to git.dvkit.org and mirrored to GitHub, so
+        # anything committed here is public. Internal host names, tailnet
+        # addresses and CGNAT-range IPs must not appear in tracked files -- if
+        # a build ever needs one, it belongs in a repository secret, which is
+        # masked in logs.
+        #
+        # The pathspec excludes the whole .forgejo/workflows directory, not
+        # just this file. Excluding only itself is what made four edapack repos
+        # red for a day: with two workflows present, each matched the OTHER's
+        # copy of this very pattern. ci.yml carries the same check.
+        run: |
+          pattern='perch-char\.ts\.net|\.ts\.net|a9550|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
+          if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/' ; then
+            echo "::error::internal identifier found in a tracked file (see matches above)"
+            exit 1
+          fi
+          echo "OK: no internal identifiers in tracked files"
+
+      - name: Report the environment
+        # Cheap, and it turns "the job failed and I cannot see why" into a fact.
+        run: |
+          echo "python: $(python3 -V 2>&1)  at $(command -v python3)"
+          echo "pwd:    $(pwd)"
+          echo "runner: ${RUNNER_OS:-unknown} ${RUNNER_ARCH:-}"
+
+      - name: Install ivpm
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ivpm
+
+      - name: Configure ivpm dependency resolution
+        # ivpm.yaml names github.com for sphinx-dv-flow (dv-flow) and svdep
+        # (fvutils). Remap both so a docs build on this forge does not depend on
+        # github.com being reachable -- the whole point of the mirror is that it
+        # is the source of truth here.
+        #
+        # sphinx-jsonschema is NOT remapped: it is lnoor/sphinx-jsonschema, a
+        # third-party repo with no counterpart on git.dvkit.org. This build
+        # still needs outbound network for it and for PyPI.
+        run: |
+          mkdir -p ~/.config/ivpm
+          cat > ~/.config/ivpm/config.yaml <<'EOF'
+          git-url-map:
+            - from: "https://github.com/dv-flow/"
+              to:   "https://git.dvkit.org/dv-flow/"
+            - from: "https://github.com/fvutils/"
+              to:   "https://git.dvkit.org/fvutils/"
+          git-auth:
+            - host: "git.dvkit.org"
+              order: ["https"]
+          EOF
+
+      - name: Assemble the dev environment
+        # -a selects the dev dep-set, which is the one carrying Sphinx, furo and
+        # sphinx-dv-flow; `default` has neither. The explicit check on
+        # sphinx-build is because `ivpm update` can resolve nothing and still
+        # exit 0, and the next failure would then read as a Sphinx problem.
+        run: |
+          python3 -m ivpm update -j 1 -a
+          if [ ! -x packages/python/bin/sphinx-build ]; then
+            echo "::error::ivpm update produced no packages/python/bin/sphinx-build."
+            echo "Resolved packages:"
+            ls -1 packages/ || true
+            exit 1
+          fi
+          # sphinx-dv-flow is a `dep-set: use` import: ivpm CHECKS IT OUT and
+          # does not install it. docs/conf.py puts packages/sphinx-dv-flow/src
+          # on sys.path itself -- assert the directory that fallback looks for,
+          # because a missing extension is the one failure mode here that used
+          # to be masked by a hand-set PYTHONPATH.
+          test -d packages/sphinx-dv-flow/src/sphinx_dv_flow \
+            || { echo "::error::packages/sphinx-dv-flow/src/sphinx_dv_flow missing; docs/conf.py cannot load the extension"; exit 1; }
+
+      - name: Build HTML docs
+        # Via docs/Makefile, which is what a developer runs, so the two cannot
+        # drift. It puts src/ on PYTHONPATH; conf.py handles sphinx-dv-flow.
+        #
+        # NOT -W yet. This doc set builds clean today, but the generated
+        # standard-library reference still has undocumented parameters behind it
+        # (117/154 at last count) and turning warnings into errors belongs in
+        # the same change that closes them -- not in the one that first makes
+        # docs publish at all.
+        run: |
+          make -C docs html
+
+      - name: Sanity-check the build
+        # Sphinx exits 0 on a build that produced almost nothing, and an empty
+        # doc set is worse than a failed one BECAUSE IT DEPLOYS. Auto-promote
+        # means no human stands between this artifact and dvkit.org for a push
+        # to the default branch, so these checks are what stands in place of the
+        # review gate.
+        run: |
+          html=docs/_build/html
+
+          test -s "$html/index.html" \
+            || { echo "::error::no index.html in the build output"; exit 1; }
+
+          n=$(find "$html" -name '*.html' | wc -l)
+          echo "generated pages: $n"
+          # A clean local build produced 50 pages on 2026-09-11. The floor is 42:
+          # enough headroom that a normal edit does not trip it, low enough that
+          # a section dropping out takes the count below it. KEEP RAISING THIS as
+          # pages are added; a floor that never moves stops being a check and
+          # becomes decoration.
+          [ "$n" -ge 42 ] || { echo "::error::only $n pages built; a known-good build of this doc set produces 50. Refusing to call this a doc set."; exit 1; }
+
+          # The standard-library reference is generated by sphinx-dv-flow from
+          # src/dv_flow/mgr/std/flow.yaml, and it is exactly what fails
+          # silently: a directive that resolves nothing still renders a page,
+          # with headings and no content. Page count cannot see that, so check
+          # that the domain actually registered objects.
+          test -s "$html/reference/stdlib.html" \
+            || { echo "::error::reference/stdlib.html missing or empty"; exit 1; }
+          for idx in dvf-tasks dvf-types; do
+            test -s "$html/${idx}.html" \
+              || { echo "::error::${idx}.html missing; the dvf domain registered no objects"; exit 1; }
+          done
+          echo "OK: $n pages, stdlib reference and dvf indices present"
+
+      - name: Upload docs
+        # Consumed by the host-side poller:
+        #   docs-fetch dv-flow/dv-flow-mgr main
+        uses: forgejo/upload-artifact@v4
+        with:
+          name: docs-dv-flow-dv-flow-mgr
+          path: docs/_build/html/**
+          if-no-files-found: error
