@@ -107,9 +107,18 @@ jobs:
           PY
 
       - name: Install ivpm
+        # Into a BOOTSTRAP VENV, not the system interpreter. act-24.04 marks its
+        # python3 externally-managed (PEP 668), so `pip install ivpm` exits 1
+        # with `error: externally-managed-environment` -- a wall of text about
+        # virtual environments that reads as a docs problem. act-22.04 does not,
+        # which is why the sibling repos that still run there install directly.
+        #
+        # py/ is only the interpreter that RUNS ivpm. The environment ivpm then
+        # assembles is packages/python, and that is what builds the docs.
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install ivpm
+          python3 -m venv py
+          ./py/bin/python3 -m pip install -q --upgrade pip
+          ./py/bin/python3 -m pip install -q ivpm
 
       - name: Configure ivpm dependency resolution
         # ivpm.yaml names github.com for sphinx-dv-flow (dv-flow) and svdep
@@ -139,7 +148,7 @@ jobs:
         # sphinx-build is because `ivpm update` can resolve nothing and still
         # exit 0, and the next failure would then read as a Sphinx problem.
         run: |
-          python3 -m ivpm update -j 1 -a
+          ./py/bin/python3 -m ivpm update -j 1 -a
           if [ ! -x packages/python/bin/sphinx-build ]; then
             echo "::error::ivpm update produced no packages/python/bin/sphinx-build."
             echo "Resolved packages:"
