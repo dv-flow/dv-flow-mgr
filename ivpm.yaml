@@ -16,7 +16,7 @@ package:
       src: pypi
     - name: sphinx
       src: pypi
-      version: 8.2.3
+        #      version: 8.2.3
     - name: sphinx-argparse
       src: pypi
     - name: sphinx-jsonschema
