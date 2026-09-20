@@ -167,11 +167,15 @@ def render_renderable_to_text(value, width : int = 100) -> str:
     golden-file test.
     """
     import io
-    from rich.console import Console
+
+    from .tui_theme import make_console
 
     buf = io.StringIO()
-    Console(file=buf, force_terminal=False, no_color=True, width=width,
-            highlight=False).print(value)
+    # Themed for the same reason as the console path: a summary written with
+    # dfm's style tags must render here too. `no_color` strips the colour, so
+    # the bytes are unchanged by the theme.
+    make_console(file=buf, force_terminal=False, no_color=True, width=width,
+                 highlight=False).print(value)
     return buf.getvalue()
 
 

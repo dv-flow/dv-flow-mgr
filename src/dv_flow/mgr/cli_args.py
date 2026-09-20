@@ -53,7 +53,12 @@ class CliArg(object):
     def help(self):
         if self.pdef is None:
             return None
-        return getattr(self.pdef, 'doc', None) or getattr(self.pdef, 'desc', None)
+        # `desc` first: this is a ONE-LINE help slot, which is what `desc` is
+        # for, while `doc` is the prose a reader gets from `show`. Preferring
+        # `doc` meant that documenting a flag more thoroughly replaced its
+        # summary with the first line of an explanation written to be read in
+        # paragraphs.
+        return getattr(self.pdef, 'desc', None) or getattr(self.pdef, 'doc', None)
 
     @property
     def default(self):

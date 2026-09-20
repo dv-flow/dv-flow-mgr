@@ -235,7 +235,26 @@ def test_a_reserved_option_name_is_rejected(tmp_path):
     '''))
     proc = _dfm(tmp_path, "t")
     assert proc.returncode != 0
-    assert "collides with the dfm option" in proc.stderr
+    # Marker text is line-wrapped for the console, so match a short fragment.
+    assert "asks to be exposed as '--clean'" in proc.stdout
+
+
+def test_a_reserved_option_name_is_rejected_without_naming_a_task(tmp_path):
+    """The flag is a declaration, so it is wrong before anyone runs anything.
+    Reporting it only once a task was named let `dfm run` list a flag that every
+    invocation then refused."""
+    (tmp_path / "flow.dv").write_text(textwrap.dedent('''\
+    package:
+        name: q
+        with:
+          clean: {type: str, value: "", cli: true}
+        tasks:
+        - {root: t, uses: std.Message, with: {msg: hi}}
+    '''))
+    proc = _dfm(tmp_path)
+    assert proc.returncode != 0
+    # Marker text is line-wrapped for the console, so match a short fragment.
+    assert "asks to be exposed as '--clean'" in proc.stdout
 
 
 def test_help_lists_project_options(proj):
@@ -275,3 +294,51 @@ def test_a_project_with_no_flags_is_unaffected(tmp_path):
     assert proc.returncode != 0
     assert "accepts no arguments" in proc.stderr
     assert "This project accepts" not in proc.stderr
+
+
+def test_the_task_listing_shows_project_options(proj):
+    """`dfm run` with no task is where a reader first meets the project. A
+    project-wide flag is part of what that project accepts, so it belongs in
+    the same view as the tasks."""
+    proc = _dfm(proj)
+    assert "Available root tasks in q:" in proc.stdout
+    assert "Project options" in proc.stdout
+    assert "--build" in proc.stdout
+    assert "Project-wide build variant" in proc.stdout
+    assert "-Q, --quiet" in proc.stdout
+
+
+def test_the_task_listing_is_unchanged_without_project_options(tmp_path):
+    (tmp_path / "flow.dv").write_text(textwrap.dedent('''\
+    package:
+        name: q
+        tasks:
+        - {root: t, uses: std.Message, with: {msg: hi}}
+    '''))
+    proc = _dfm(tmp_path)
+    assert "Available root tasks in q:" in proc.stdout
+    assert "Project options" not in proc.stdout
+
+
+def test_documented_values_are_shown_in_the_listing(tmp_path):
+    """A value set's per-value docs are the only place the meaning of a value
+    is written down -- the same reason `show task --usage` prints them."""
+    (tmp_path / "flow.dv").write_text(textwrap.dedent('''\
+    package:
+        name: q
+        with:
+          build:
+            type: str
+            value: opt
+            cli: true
+            desc: Build variant
+            values:
+            - {value: opt, desc: "optimized"}
+            - {value: dbg, desc: "waveform tracing"}
+        tasks:
+        - {root: t, uses: std.Message, with: {msg: hi}}
+    '''))
+    proc = _dfm(tmp_path)
+    assert "(default: opt)" in proc.stdout
+    assert "optimized" in proc.stdout
+    assert "waveform tracing" in proc.stdout

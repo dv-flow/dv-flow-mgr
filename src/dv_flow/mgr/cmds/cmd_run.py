@@ -205,18 +205,50 @@ class CmdRun(object):
                     _cells.update("%s.%s" % (t.name, k) for k in select.cells)
             if _cells:
                 root_tasks = [t for t in root_tasks if t.name not in _cells]
-            
+
+            # A slot the project declared not-provided is not a verb this
+            # project offers, so listing it would invite someone to type
+            # something that cannot work. It stays visible to `dfm show task`,
+            # which is where a reader asking why a verb is missing looks.
+            from ..std.not_provided import is_not_provided
+            root_tasks = [t for t in root_tasks if not is_not_provided(t)]
+
             if root_tasks:
                 # Show only root tasks
                 tasks = root_tasks
+                # Name the package: a project built on an archetype inherits
+                # most of these, so which package the reader is looking at is
+                # not obvious from the task names alone. Say "root" too, since
+                # this is a filtered view -- the tasks not listed are not
+                # missing, they are not root-scoped.
+                heading = "No task specified. Available root tasks in %s:" % pkg.name
             else:
                 # Show warning and all tasks
                 print("Warning: No 'root' tasks found in the current package. Runnable tasks must be marked 'scope: root'.")
                 print()
+                # Not a root listing -- do not call it one.
+                heading = "No task specified. Available tasks in %s:" % pkg.name
 
             max_name_len = max((len(t.name) for t in tasks), default=0)
 
-            print("No task specified. Available Tasks:")
+            # A slot the project declares but never wires up is part of what
+            # this listing is answering: a reader is deciding which of these
+            # verbs to type, and "this one exists but fails" is exactly the
+            # thing they cannot see otherwise. The authoritative check runs at
+            # graph build; this is the same question asked statically, and is
+            # conservative about saying yes (see unimplemented_slot).
+            from ..std.checks import unimplemented_slot
+            unfilled = set()
+            for t in tasks:
+                try:
+                    if unimplemented_slot(t, pkg):
+                        unfilled.add(t.name)
+                except Exception as e:
+                    # A listing must not fail over an advisory annotation.
+                    self._log.debug("unimplemented-slot probe failed for %s: %s",
+                                    t.name, e)
+
+            print(heading)
             for t in tasks:
                 desc = t.desc if t.desc else "<no description>"
                 select = getattr(getattr(t, 'strategy', None), 'select', None)
@@ -226,9 +258,32 @@ class CmdRun(object):
                         "%s: %s" % (a, ",".join(str(v) for v in vals))
                         for a, vals in select.axes.items())
                     desc = "%s [%s]" % (desc, axes)
+                if t.name in unfilled:
+                    desc = "%s  [unimplemented]" % desc
                 print(f"{t.name.ljust(max_name_len)} - {desc}")
 
-            pass
+            if unfilled:
+                # A pointer, not an explanation. The task's own requirement
+                # carries a hint written by whoever declared the slot, and that
+                # is both more specific than anything general said here and
+                # already shown by running it -- so this only has to say where
+                # to look.
+                print()
+                print("[unimplemented] run `dfm run <task>` for details on "
+                      "how to implement it.")
+
+            # The project's own knobs belong in the same view as its tasks: a
+            # package variable declared `cli:` is part of what `dfm run`
+            # accepts, and this listing is the only place a reader who did not
+            # pick a task yet would see it.
+            from .show.usage import (build_package_options,
+                                     render_package_options_text)
+            opt_lines = render_package_options_text(
+                pkg.name, build_package_options(pkg, loader))
+            if opt_lines:
+                print()
+                for line in opt_lines:
+                    print(line)
 
         # TODO: allow user to specify run root -- maybe relative to some fixed directory?
         rundir = os.path.join(os.getcwd(), "rundir")
@@ -492,22 +547,16 @@ class CmdRun(object):
         `-D <name>=<value>`.
         """
         from ..cli_args import (collect_package_cli, resolve_task_cli,
-                                parse_task_args, validate_package_cli)
+                                parse_task_args)
 
         leftover = list(getattr(args, "task_args", []) or [])
         pkg_args = collect_package_cli(pkg, loader)
         if not pkg_args:
             return None, {}
 
-        # Load-time validation has no natural home for a package-level flag (it
-        # is not attached to a task), so it runs here -- still before anything
-        # is built, and reported the same way.
-        problems = []
-        validate_package_cli(pkg, loader, problems.append)
-        if problems:
-            for msg in problems:
-                print("Error: %s" % msg, file=sys.stderr)
-            return 1, {}
+        # These flags were validated at load (PackageLoader.load), so anything
+        # that reaches here has a usable flag set: a bad one aborted the load
+        # like any other declaration error.
 
         try:
             task = resolver.resolve(args.task)
@@ -593,17 +642,17 @@ class CmdRun(object):
                 arg_parser, _ = build_arg_parser(task, cli_args, prog, values=values)
                 arg_parser.print_help()
             if pkg_args:
+                # Shared with the no-task listing, so the two views of the same
+                # options say the same thing. `pkg_args` is already filtered for
+                # flags the task shadows, so render only those.
+                from .show.usage import (build_package_options,
+                                         render_package_options_text)
+                shown = {a.param for a in pkg_args}
+                options = [o for o in build_package_options(pkg, loader)
+                           if o['param'] in shown]
                 print()
-                print("Project options (apply to any task in %s):" % pkg.name)
-                for a in pkg_args:
-                    flags = "--%s" % a.name
-                    if a.short:
-                        flags = "-%s, %s" % (a.short, flags)
-                    line = "  %-20s %s" % (flags, a.help or "")
-                    default = getattr(a.pdef, 'value', None)
-                    if default not in (None, ''):
-                        line += " (default: %s)" % default
-                    print(line.rstrip())
+                for line in render_package_options_text(pkg.name, options):
+                    print(line)
             return 0
 
         if not cli_args:
@@ -699,6 +748,8 @@ class CmdRun(object):
         if isinstance(value, str):
             print(value)
             return
-        from rich.console import Console
-        # A non-tty Console emits no ANSI, so piped output stays clean.
-        Console().print(value)
+        from ..tui_theme import make_console
+        # A non-tty Console emits no ANSI, so piped output stays clean. The
+        # theme is registered so a task's own summary can use dfm's
+        # light-mode-safe tags ("[label]", "[secondary]") -- see tui_theme.
+        make_console().print(value)

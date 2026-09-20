@@ -308,9 +308,91 @@ class PackageProviderYaml(PackageProvider):
 
         return pkg
     
-    def _mkPackage(self, 
+    def _basePackage(self, pkg : Package, pkg_def : PackageDef):
+        """The package named by `uses:`, or None.
+
+        Resolved through `pkg.pkg_m`, which is populated by the imports -- so
+        this answers None until `_loadPackageImports` has run.
+        """
+        if pkg_def.uses is None:
+            return None
+        return pkg.pkg_m.get(pkg_def.uses)
+
+    def _findPkgParamDef(self, pkg : Package, pkg_def : PackageDef, pname : str):
+        """The declaration of package variable `pname`, searched along the
+        `uses:` chain.
+
+        A variable inherited from a base project is declared in the BASE's
+        pkg_def, so looking only at this one would silently skip the value-set
+        check for exactly the variables a base project exists to define.
+        """
+        seen = set()
+        while pkg_def is not None and id(pkg_def) not in seen:
+            seen.add(id(pkg_def))
+            if pname in pkg_def.params:
+                return pkg_def.params[pname]
+            base = self._basePackage(pkg, pkg_def)
+            if base is None:
+                return None
+            pkg, pkg_def = base, base.pkg_def
+        return None
+
+    def _applyPkgParamOverrides(self, pkg : Package, pkg_def : PackageDef, loader):
+        """Bake `-D`/`-P`/CLI overrides into the package's parameter defaults.
+
+        Called once per `paramT` build: a rebuild (a selected config, or the
+        `uses:` merge below) creates a fresh type whose defaults are the
+        declared ones again, and the CLI is the precedence ceiling (design
+        §R2.4) -- so it has to be re-applied, not applied once.
+        """
+        if not (hasattr(loader, 'param_overrides') and loader.param_overrides):
+            return
+        import yaml
+        for k, v in loader.param_overrides.items():
+            if '.' in k:
+                # Split on the LAST dot: the trailing segment is the param
+                # name; everything before it is the (possibly dotted, e.g.
+                # `hdlsim.vlt`) package name. Splitting on the first dot
+                # mis-parsed `-D hdlsim.vlt.trace_fmt=...` as pkg=`hdlsim`.
+                pkg_name, pname = k.rsplit('.',1)
+                if pkg_name != pkg.name:
+                    continue
+            else:
+                pname = k
+            if pname in pkg.paramT.model_fields:
+                ann_t = pkg.paramT.model_fields[pname].annotation
+                # Pre-parse YAML so `[a,b]` / `{k: v}` / `42` literals become
+                # real objects, then apply the single CLI coercion policy
+                # (comma-split for a bare list string, TRUTHY bool, int base-0;
+                # lenient int/float fallback -- CLI package vars, not strict).
+                # See param_types.coerce_cli_value.
+                try:
+                    parsed = yaml.safe_load(v) if isinstance(v, str) else v
+                except Exception:
+                    parsed = v
+                parsed = coerce_cli_value(parsed, ann_t)
+                # A package var may declare a value set too; check it here,
+                # the one place a `-D` reaches a package var.
+                vs = _param_value_set(self._findPkgParamDef(pkg, pkg_def, pname))
+                if vs is not None:
+                    warning = check_value_set(
+                        parsed, vs, ann_t,
+                        name="package '%s' variable '%s'" % (pkg.name, pname))
+                    if warning is not None:
+                        self._log.warning(warning)
+                pkg.paramT.model_fields[pname].default = parsed
+                # Record that this var was CLI/-D overridden so a subtree
+                # `set:` rebind yields to it (CLI is the ceiling, §R2.4).
+                pkg.cli_var_overrides.add(pname)
+                # Diagnostics: note that this `-D` key found a home, so the
+                # CLI can warn about the keys that found none.
+                tracker = getattr(loader, 'override_tracker', None)
+                if tracker is not None:
+                    tracker.note_package_bind(k, pkg.name)
+
+    def _mkPackage(self,
                    pkg : Package,
-                   pkg_def : PackageDef, 
+                   pkg_def : PackageDef,
                    root : str,
                    loader : PackageLoaderP) -> Package:
         self._log.debug("--> _mkPackage %s (%d types ; %d tasks)" % (
@@ -328,52 +410,19 @@ class PackageProviderYaml(PackageProvider):
         except Exception:
             pass
 
-        # TODO: handle 'uses' for packages
-        pkg.paramT = self._getParamT(loader, pkg_def, None)
+        # PROVISIONAL parameter type: this package's own variables only.
+        #
+        # It has to exist before the imports are loaded, because an import spec
+        # may reference one (`imports: [{name: "${{ vip }}"}]`). But a package
+        # that `uses:` a base inherits the base's variables too, and the base is
+        # reachable only THROUGH those imports -- so such a package is rebuilt
+        # below, once the base is in scope, and errors are held back until that
+        # authoritative build. A leaf that overrides an inherited variable
+        # without restating its type is an error here and correct there.
+        pkg.paramT = self._getParamT(loader, pkg_def, None,
+                                     report_errors=(pkg_def.uses is None))
         # Apply parameter overrides (qualified or unqualified) before elaboration of tasks/types
-        if hasattr(loader, 'param_overrides') and loader.param_overrides:
-            import yaml
-            for k, v in loader.param_overrides.items():
-                if '.' in k:
-                    # Split on the LAST dot: the trailing segment is the param
-                    # name; everything before it is the (possibly dotted, e.g.
-                    # `hdlsim.vlt`) package name. Splitting on the first dot
-                    # mis-parsed `-D hdlsim.vlt.trace_fmt=...` as pkg=`hdlsim`.
-                    pkg_name, pname = k.rsplit('.',1)
-                    if pkg_name != pkg.name:
-                        continue
-                else:
-                    pname = k
-                if pname in pkg.paramT.model_fields:
-                    ann_t = pkg.paramT.model_fields[pname].annotation
-                    # Pre-parse YAML so `[a,b]` / `{k: v}` / `42` literals become
-                    # real objects, then apply the single CLI coercion policy
-                    # (comma-split for a bare list string, TRUTHY bool, int base-0;
-                    # lenient int/float fallback -- CLI package vars, not strict).
-                    # See param_types.coerce_cli_value.
-                    try:
-                        parsed = yaml.safe_load(v) if isinstance(v, str) else v
-                    except Exception:
-                        parsed = v
-                    parsed = coerce_cli_value(parsed, ann_t)
-                    # A package var may declare a value set too; check it here,
-                    # the one place a `-D` reaches a package var.
-                    vs = _param_value_set(pkg_def.params.get(pname))
-                    if vs is not None:
-                        warning = check_value_set(
-                            parsed, vs, ann_t,
-                            name="package '%s' variable '%s'" % (pkg.name, pname))
-                        if warning is not None:
-                            self._log.warning(warning)
-                    pkg.paramT.model_fields[pname].default = parsed
-                    # Record that this var was CLI/-D overridden so a subtree
-                    # `set:` rebind yields to it (CLI is the ceiling, §R2.4).
-                    pkg.cli_var_overrides.add(pname)
-                    # Diagnostics: note that this `-D` key found a home, so the
-                    # CLI can warn about the keys that found none.
-                    tracker = getattr(loader, 'override_tracker', None)
-                    if tracker is not None:
-                        tracker.note_package_bind(k, pkg.name)
+        self._applyPkgParamOverrides(pkg, pkg_def, loader)
 
         # Apply any overrides from above
 
@@ -422,6 +471,27 @@ class PackageProviderYaml(PackageProvider):
 
             # Imports are loaded first
             self._loadPackageImports(loader, pkg, pkg_def.imports, pkg.basedir)
+
+            # Package `uses:` inheritance of VARIABLES. The base package is
+            # reached through the imports, so this is the first point it can be
+            # asked for its parameter type -- which is why the build above is
+            # provisional rather than final.
+            #
+            # Inheriting the variables is what makes a base project able to
+            # define knobs its leaves use: without it the flags were inherited
+            # (collect_package_cli walks the same chain) while the variables
+            # they set were not, so `${{ sim }}` in a leaf was an undefined
+            # reference and a base-declared `bool` lost its type.
+            #
+            # Unconditional when `uses:` is set, so the suppressed diagnostics
+            # of the provisional build are always reported by a later one --
+            # including when the base names a package that was never imported.
+            if pkg_def.uses is not None:
+                base_pkg = self._basePackage(pkg, pkg_def)
+                pkg.paramT = self._getParamT(
+                    loader, pkg_def,
+                    base_pkg.paramT if base_pkg is not None else None)
+                self._applyPkgParamOverrides(pkg, pkg_def, loader)
 
             taskdefs = pkg_def.tasks.copy()
             typedefs = pkg_def.types.copy()
@@ -520,8 +590,16 @@ class PackageProviderYaml(PackageProvider):
             if base_pkg is not None:
                 override_targets = {td.override for td in taskdefs if getattr(td, 'override', None)}
                 from .task import Task
+                # The name a task has WITHIN the base package: strip the base's
+                # own name, not the first dotted component. A package name may
+                # itself be dotted (`project.dv`), and splitting on the first
+                # dot re-read the rest of it as a task namespace -- inheriting
+                # `project.dv.src-rtl` into `leaf` produced `leaf.dv.src-rtl`,
+                # so `override: src-rtl` then found no such target.
+                base_prefix = base_pkg.name + "."
                 for task in base_pkg.task_m.values():
-                    leaf = task.name.split('.', 1)[1] if '.' in task.name else task.name
+                    leaf = (task.name[len(base_prefix):]
+                            if task.name.startswith(base_prefix) else task.name)
                     if leaf in override_targets:
                         continue  # overridden
                     alias_name = f"{pkg.name}.{leaf}"
@@ -687,9 +765,17 @@ class PackageProviderYaml(PackageProvider):
         if base_cfg is not None:
             merged_params = merge_params(merged_params, base_cfg.params)
         merged_params = merge_params(merged_params, cfg.params)
-        # Update pkg_def params then rebuild paramT
+        # Update pkg_def params then rebuild paramT. Runs after the imports, so
+        # the `uses:` base is in scope and its variables are inherited here too
+        # -- a selected config must not narrow what the package declares. The
+        # rebuild discards the baked-in CLI defaults, so they are re-applied:
+        # a config cannot outrank `-D` (design §R2.4).
         pkg_def.params = merged_params
-        pkg.paramT = self._getParamT(loader, pkg_def, None)
+        base_pkg = self._basePackage(pkg, pkg_def)
+        pkg.paramT = self._getParamT(
+            loader, pkg_def,
+            base_pkg.paramT if base_pkg is not None else None)
+        self._applyPkgParamOverrides(pkg, pkg_def, loader)
         # Apply imports/fragments from base then cfg (config-loaded fragments cannot define configs)
         if base_cfg is not None:
             self._loadPackageImports(loader, pkg, base_cfg.imports, pkg.basedir)
@@ -1606,13 +1692,23 @@ class PackageProviderYaml(PackageProvider):
         pass
 
     def _getParamT(
-            self, 
+            self,
             loader,
-            taskdef, 
-            base_t : pydantic.BaseModel, 
+            taskdef,
+            base_t : pydantic.BaseModel,
             typename=None,
-            is_type=False):
+            is_type=False,
+            report_errors=True):
         self._log.debug("--> _getParamT %s (%s)" % (taskdef.name, str(taskdef.params)))
+        # `report_errors=False` makes this build PROVISIONAL: its diagnostics are
+        # dropped because a later build of the same declarations is the one that
+        # sees the whole picture. Only _mkPackage uses it, and only when a
+        # rebuild is guaranteed to follow -- see the `uses:` merge there.
+        def _error(msg, srcinfo=None):
+            if report_errors:
+                loader.error(msg, srcinfo)
+            else:
+                self._log.debug("provisional build, error suppressed: %s", msg)
         # Get the base parameter type (if available)
         # We will build a new type with updated fields
 
@@ -1680,7 +1776,7 @@ class PackageProviderYaml(PackageProvider):
                         try:
                             val = loader.evalExpr(val)
                         except Exception as e:
-                            loader.error(
+                            _error(
                                 "failed to evaluate default for parameter '%s' (%s): %s" % (
                                     p, val, str(e)),
                                 getattr(taskdef, "srcinfo", None))
@@ -1708,7 +1804,7 @@ class PackageProviderYaml(PackageProvider):
                         field_m[p] = (field_m[p][0], resolved)
                         self._log.debug("Set param=%s (append/prepend) to %s" % (p, str(resolved)))
                     else:
-                        loader.error("append/prepend target '%s' not found in task %s (%s)" % (
+                        _error("append/prepend target '%s' not found in task %s (%s)" % (
                             p, taskdef.name, ",".join(field_m.keys())), taskdef.srcinfo)
                 elif p in field_m.keys():
                     if hasattr(param, "copy"):
@@ -1735,7 +1831,7 @@ class PackageProviderYaml(PackageProvider):
                     field_m[p] = (field_m[p][0], value)
                     self._log.debug("Set param=%s to %s" % (p, str(field_m[p][1])))
                 else:
-                    loader.error("Field %s not found in task %s (%s)" % (
+                    _error("Field %s not found in task %s (%s)" % (
                         p, 
                         taskdef.name,
                         ",".join(field_m.keys())), taskdef.srcinfo)

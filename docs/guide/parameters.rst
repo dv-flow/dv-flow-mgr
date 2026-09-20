@@ -71,6 +71,46 @@ The following parameter types are supported:
 * **map**
 * **str**
 
+Inheriting Package Variables
+----------------------------
+
+A package that ``uses:`` another inherits its **variables**, alongside the tasks
+and types it already inherited. This is what lets a base project own the knobs a
+family of projects shares:
+
+.. code-block:: YAML
+
+    # base-project.yaml
+    package:
+      name: base-project
+      with:
+        sim:   {type: str, value: vlt, values: [vlt, mti, vcs]}
+        build: {type: str, value: opt, values: [opt, dbg]}
+
+.. code-block:: YAML
+
+    # a leaf project
+    package:
+      name: my-proj
+      uses: base-project
+      imports:
+      - base-project.yaml
+      with:
+        build: dbg                 # override the inherited default; no re-declaration
+      tasks:
+      - {name: flags, uses: hdlsim.SimCompArgsOpt, with: {sim: "${{ sim }}"}}
+
+The leaf reads ``${{ sim }}`` by name, exactly as if it had declared it. A leaf
+can override the inherited **value** without restating the type, or re-declare
+the variable outright to change its type, ``values:`` or ``cli:``. Inheritance
+is transitive: a base built on another base contributes both.
+
+The base package is reached through the ``imports:``, so it must be imported as
+well as named in ``uses:``. That is also why a package variable's ``${{ }}``
+default cannot reference a variable of its own base -- defaults are evaluated
+before the imports are in scope. Override the inherited variable instead, which
+is what that would have been expressing.
+
 Value Sets
 ----------
 
@@ -290,9 +330,21 @@ being run:
 ``cli:`` on a package variable is collected along the package ``uses:`` chain,
 so a **base project can define a command-line interface its leaves inherit** --
 which is how a family of projects gets the same flags without restating them.
+The *variable* is inherited along the same chain (see `Inheriting Package
+Variables`_), so the leaf reads it by name like one of its own.
 
 ``dfm run <task> --help`` lists these under **Project options**, because from
-the command line they are indistinguishable from the task's own.
+the command line they are indistinguishable from the task's own. ``dfm run``
+with no task lists them too, below the available tasks: that listing is where a
+reader first meets the project, and a project-wide knob is part of what the
+project offers. Documented values (``values: [{value: dbg, desc: ...}]``) get a
+line each there, since the declaration is the only place their meaning is
+written down.
+
+A flag that cannot work -- one colliding with a ``dfm`` option, or declared
+twice -- is a load-time error, reported before any task is named. A declaration
+is wrong whether or not anyone runs anything, and a base project's mistake would
+otherwise surface once per leaf, at the point of use.
 
 If a task parameter and a package variable claim the same flag, the **task
 parameter wins** and a warning names both. Neither declaration can see the

@@ -42,6 +42,36 @@ package:
       msg:
         type: str
         value: ""
+  - name: NotProvided
+    scope: export
+    doc: |
+      Declares that a slot does not apply to this project.
+
+      An archetype declares a project interface -- `src-rtl`, `lint-rtl`,
+      `tests` -- and a project either fills a slot in or says it has no such
+      flow. This is how it says so:
+
+      ```yaml
+      - override: lint-rtl
+        uses: std.NotProvided
+      ```
+
+      The task then does not appear in `dfm run`, because the project does not
+      offer that verb; `dfm show task` still reports it, so a reader porting a
+      flow between projects can find out why the verb is missing. Naming it
+      anyway fails saying the project does not provide it -- not silently
+      succeeding, which is the failure `std.check.Implemented` exists to
+      prevent, and not complaining that it is unimplemented, which is the wrong
+      reason. It satisfies that check, because a slot declared not-provided is
+      answered rather than neglected.
+
+      This is deliberately a DECLARATION, not a deletion: it stays in the flow
+      file as a statement someone made on purpose, which is what distinguishes
+      "this project has no lint flow" from "nobody has got to lint yet".
+    shell: pytask
+    run: dv_flow.mgr.std.not_provided.NotProvided
+    produces: []
+
   - name: FileSet
     scope: export
     doc: |

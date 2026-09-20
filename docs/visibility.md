@@ -82,7 +82,7 @@ When the `run` command is invoked without specifying a task:
 
 ```bash
 $ dv-flow run
-No task specified. Available Tasks:
+No task specified. Available root tasks in my_project:
 build       - Build the project
 test        - Run tests
 deploy      - Deploy to production

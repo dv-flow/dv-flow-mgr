@@ -31,6 +31,25 @@ from ..type_match import normalize, pattern_matches
 _log = logging.getLogger("std.checks")
 
 
+#: The `check:` reference identifying the Implemented check. Matching on this
+#: rather than on the type name means a project that derives its own check type
+#: from `std.check.Implemented` is still recognized.
+IMPLEMENTED_CHECK = "dv_flow.mgr.std.checks:implemented"
+
+
+def _has_implementation(task, needs) -> bool:
+    """Whether `task` does anything: a `run:`, a body, a need, or a `select:`
+    family. Split out so that the check and the static `unimplemented_slot`
+    query below cannot answer the same question differently -- one of them runs
+    at graph build and the other in a listing, and a listing that disagreed
+    with the run would be worse than no listing."""
+    return bool(
+        getattr(task, 'run', None)
+        or getattr(task, 'subtasks', None)
+        or needs
+        or getattr(getattr(task, 'strategy', None), 'select', None) is not None)
+
+
 def implemented(ctxt) -> None:
     """The task must do something.
 
@@ -39,19 +58,55 @@ def implemented(ctxt) -> None:
     because it makes `dfm run <verb>` mean nothing in some projects while
     meaning something everywhere else.
     """
-    task = ctxt.task
-    if getattr(task, 'run', None):
-        return
-    if getattr(task, 'subtasks', None):
-        return
-    if ctxt.needs:
-        return
-    if getattr(getattr(task, 'strategy', None), 'select', None) is not None:
+    if _has_implementation(ctxt.task, ctxt.needs):
         return
 
     ctxt.error(
         "required project slot is not implemented",
-        detail="'%s' has no `run:`, no body, and no `needs:`." % _leaf(task))
+        detail="'%s' has no `run:`, no body, and no `needs:`." % _leaf(ctxt.task))
+
+
+def unimplemented_slot(task, pkg=None) -> bool:
+    """Whether `task`, **as loaded**, is a declared-but-unfilled project slot:
+    it is required to be implemented, and nothing implements it.
+
+    This is the same question `implemented` answers, asked early enough to be
+    useful in a LISTING. A project interface exists to be filled in, so "which
+    of these verbs does this project actually answer to" is what a reader
+    arriving at `dfm run` wants to know -- and finding out by running the task
+    and reading the failure is a poor way to learn it.
+
+    Necessarily a STATIC approximation: the authoritative check runs at graph
+    build, after elaboration, where it sees needs this cannot. So it is
+    deliberately conservative -- it answers True only for a task that declares
+    the requirement, satisfies none of the ways of being implemented, and is
+    not the target of a package `overrides:` substitution (which supplies an
+    implementation the loaded task does not show). Anything it is unsure of it
+    calls implemented, because a false alarm in a listing is worse than a
+    missing one: the run still reports the truth.
+    """
+    from ..task import collect_task_requires
+
+    reqs = [r for r in collect_task_requires(task)
+            if getattr(r, 'check', None) == IMPLEMENTED_CHECK
+            and (getattr(getattr(r, 'paramT', None), 'severity', 'error')
+                 or 'error') != 'off']
+    if not reqs:
+        return False
+
+    needs = [n for n in (getattr(task, 'needs', ()) or ()) if n is not None]
+    if _has_implementation(task, needs):
+        return False
+
+    # A substitution replaces the task wholesale at graph build; the loaded
+    # task is not what will run.
+    if pkg is not None:
+        subs = getattr(pkg, 'substitution_m', None) or {}
+        name = getattr(task, 'name', '')
+        if name in subs or _leaf(task) in subs:
+            return False
+
+    return True
 
 
 def needs(ctxt) -> None:

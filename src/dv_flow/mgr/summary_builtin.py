@@ -70,7 +70,9 @@ _STATUS_STYLE = {
     BASE_HIT: 'cyan',
     UPTODATE: 'blue',
     DONE: 'green',
-    UNKNOWN: 'dim',
+    # A status word is read, so it renders in the default foreground rather
+    # than `dim`, which a light-mode terminal blends away -- see tui_theme.
+    UNKNOWN: 'none',
 }
 
 # Statuses worth showing when not verbose. A run of 200 up-to-date tasks should
@@ -310,6 +312,8 @@ def build_task_summary(roots, verbose : bool = False, cache_enabled : bool = Fal
     from rich.panel import Panel
     from rich.table import Table
 
+    from .tui_theme import S_LABEL, S_SECONDARY
+
     facts = collect_task_facts(roots)
     counts = count_facts(facts)
 
@@ -319,13 +323,15 @@ def build_task_summary(roots, verbose : bool = False, cache_enabled : bool = Fal
     if not rows:
         # An all-up-to-date run has no interesting rows; an empty box reads as
         # a bug, so say so. The counts are in the title.
-        table.add_row("[dim]nothing to report[/dim]")
+        table.add_row("[%s]nothing to report[/%s]" % (S_LABEL, S_LABEL))
     for f in rows:
         style = _STATUS_STYLE[f.status]
         elapsed = format_elapsed(f.elapsed)
         line = "[%s]%s[/%s] %s" % (style, f.status, style, f.name.replace("[", "\\["))
         if elapsed:
-            line += " [dim]%s[/dim]" % elapsed
+            # An elapsed time is data; the status colour ahead of it already
+            # carries the emphasis.
+            line += " [%s]%s[/%s]" % (S_SECONDARY, elapsed, S_SECONDARY)
         table.add_row(line)
         for m in f.markers:
             table.add_row("  " + _marker_text(m).replace("[", "\\["))

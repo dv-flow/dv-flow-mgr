@@ -116,7 +116,7 @@ Running ``dfm run`` without arguments:
 .. code-block:: bash
 
     $ dfm run
-    No task specified. Available Tasks:
+    No task specified. Available root tasks in my_project:
     my_project.build  - Build the project
     my_project.test   - Run tests
 

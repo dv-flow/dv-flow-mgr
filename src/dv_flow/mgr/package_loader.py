@@ -105,6 +105,21 @@ class PackageLoader(PackageLoaderP):
         ret = provider.getPackage(
             provider.getPackageNames(self)[0],
             self)
+
+        # A `cli:` package variable is a declaration, so a flag that cannot work
+        # is a declaration error and belongs with the other load markers -- not
+        # reported only once a task is named, which left `dfm run` listing a
+        # flag that every invocation then refused.
+        #
+        # Here rather than in the provider because the flag set is collected
+        # along the package `uses:` chain: a base project's contribution is only
+        # visible once the whole load is done. Root package only -- a library's
+        # `cli:` vars are not on this project's command line.
+        if ret is not None:
+            from .cli_args import validate_package_cli
+            validate_package_cli(
+                ret, self, lambda msg: self.error(msg, ret.srcinfo))
+
         self._log.debug("<-- load %s" % root)
         return ret
     

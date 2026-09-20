@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 from .cache_provider import CacheEntry, CompressionType
 from .param_ref_eval import ParamRefEval
 from .fileset import FileSet
+from .hash_provider import collect_incdirs, compute_hash
 
 
 _log = logging.getLogger(__name__)
@@ -85,13 +86,18 @@ async def compute_cache_key(
     # Hash task name
     hasher.update(task_name.encode('utf-8'))
     
+    # Include search path the consuming task will compile against -- the union
+    # over all its input filesets, not each fileset's own incdirs (see
+    # hash_provider.collect_incdirs)
+    incdirs = collect_incdirs(inputs, rundir)
+
     # Hash input filesets
     for input_item in inputs:
         if isinstance(input_item, FileSet):
             # Get hash provider for this filetype
             provider = hash_registry.get_hash_provider(input_item.filetype)
             if provider:
-                fileset_hash = await provider.compute_hash(input_item, rundir)
+                fileset_hash = await compute_hash(provider, input_item, rundir, incdirs)
                 hasher.update(fileset_hash.encode('utf-8'))
             else:
                 _log.warning(f"No hash provider for filetype {input_item.filetype}, skipping")

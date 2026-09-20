@@ -203,6 +203,8 @@ def test_summary(ctxt):
     from rich.panel import Panel
     from rich.table import Table
 
+    from ..tui_theme import S_LABEL, S_SECONDARY
+
     cases, rollups = collect_cases(list(ctxt.output))
     if not cases and not rollups:
         return ctxt.task_summary()
@@ -235,22 +237,28 @@ def test_summary(ctxt):
         for _ in range(4 + len(cols)):
             table.add_column(justify="left")
         if cols:
-            # Unlabeled durations and sizes side by side are ambiguous; a dim
-            # header costs one line and removes the guessing.
+            # Unlabeled durations and sizes side by side are ambiguous; a
+            # header costs one line and removes the guessing. It is read, so it
+            # gets a named colour rather than `dim` -- see tui_theme.
             table.add_row("", "", "", "",
-                          *["[dim]%s[/dim]" % labels[i] for i in cols])
+                          *["[%s]%s[/%s]" % (S_LABEL, labels[i], S_LABEL)
+                            for i in cols])
         for case, r in rows:
             name, view, status, errors = r[0], r[1], r[2], r[3]
             style = "green" if getattr(case, "passed", False) else "red"
             table.add_row(
                 "[%s]%s[/%s]" % (style, status, style),
                 name.replace("[", "\\["), view, errors,
-                *["[dim]%s[/dim]" % r[i] if r[i] else "" for i in cols])
+                # Resource figures are data: the column and its header already
+                # place them below the verdict, so they need no dimming.
+                *["[%s]%s[/%s]" % (S_SECONDARY, r[i], S_SECONDARY) if r[i]
+                  else "" for i in cols])
         blocks.append(table)
 
     if not blocks:
-        blocks.append("[dim]%s[/dim]" % (
-            "all cases passed" if total else "no tests ran"))
+        # The panel's only content -- the verdict itself.
+        blocks.append("[%s]%s[/%s]" % (
+            S_LABEL, "all cases passed" if total else "no tests ran", S_LABEL))
 
     style = "green" if (total and not failed and not errored) else "red"
     panel = Panel(Group(*blocks), title="Tests (%s)" % headline,

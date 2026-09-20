@@ -78,7 +78,8 @@ class CmdGraph(object):
                 if len(t.name) > max_name_len:
                     max_name_len = len(t.name)
 
-            print("No task specified. Available Tasks:")
+            # Not "root tasks": unlike `dfm run`, this listing is unfiltered.
+            print("No task specified. Available tasks in %s:" % pkg.name)
             for t in tasks:
                 desc = t.desc
                 if desc is None or t.desc == "":

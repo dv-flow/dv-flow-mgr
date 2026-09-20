@@ -128,10 +128,13 @@ class AgentTUI:
         """Run the TUI loop until the user exits. Returns exit code."""
         from prompt_toolkit import PromptSession
         from prompt_toolkit.history import FileHistory
-        from rich.console import Console
+
+        from ...tui_theme import make_console
 
         os.makedirs(os.path.dirname(_HISTORY_FILE), exist_ok=True)
-        self._console = Console(highlight=False)
+        # Themed: the markup tags below ("label", "secondary") are dfm's
+        # light-mode-safe vocabulary -- see tui_theme.
+        self._console = make_console(highlight=False)
         self._session = PromptSession(history=FileHistory(_HISTORY_FILE))
 
         self._print_banner()
@@ -144,10 +147,10 @@ class AgentTUI:
             except KeyboardInterrupt:
                 now = time.monotonic()
                 if now - self._last_interrupt <= _CTRL_C_EXIT_WINDOW:
-                    self._console.print("\n[dim]Exiting.[/dim]")
+                    self._console.print("\n[label]Exiting.[/label]")
                     break
                 self._last_interrupt = now
-                self._console.print("\n[dim](Press Ctrl+C again to exit)[/dim]")
+                self._console.print("\n[label](Press Ctrl+C again to exit)[/label]")
                 continue
 
             user_input = user_input.strip()
@@ -165,7 +168,7 @@ class AgentTUI:
             self.history.append({"role": "user", "content": user_input})
             await self._stream_response(user_input)
 
-        self._console.print("[dim]Goodbye.[/dim]")
+        self._console.print("[label]Goodbye.[/label]")
         return 0
 
     # ------------------------------------------------------------------ #
@@ -212,7 +215,7 @@ class AgentTUI:
                         if approval_mode != APPROVAL_NEVER and ev.tool_name in _WRITE_TOOLS:
                             live.stop()
                             self._console.print(Panel(
-                                f"[dim]{args_display}[/dim]",
+                                f"[secondary]{args_display}[/secondary]",
                                 title=f"[bold {color}]⚙ {ev.tool_name}[/bold {color}]",
                                 border_style=color,
                                 expand=False,
@@ -231,7 +234,7 @@ class AgentTUI:
                             live.start()
                         else:
                             live.update(Panel(
-                                f"[dim]{args_display}[/dim]",
+                                f"[secondary]{args_display}[/secondary]",
                                 title=f"[bold {color}]⚙ {ev.tool_name}[/bold {color}]",
                                 border_style=color,
                                 expand=False,
@@ -241,7 +244,7 @@ class AgentTUI:
                         color = _tool_color(ev.tool_name)
                         result_display = ev.result[:500] + ("…" if len(ev.result) > 500 else "")
                         self._console.print(Panel(
-                            f"[dim]{result_display}[/dim]",
+                            f"[secondary]{result_display}[/secondary]",
                             title=f"[bold {color}]✓ {ev.tool_name}[/bold {color}]",
                             border_style=color,
                             expand=False,
@@ -258,7 +261,7 @@ class AgentTUI:
                             live.update(Markdown(accumulated))
 
         except KeyboardInterrupt:
-            self._console.print("\n[dim][cancelled][/dim]")
+            self._console.print("\n[label]\\[cancelled][/label]")
             return
         except Exception as e:
             self._console.print(f"[red]Error:[/red] {_friendly_error(e)}")
@@ -282,7 +285,7 @@ class AgentTUI:
             return True
         elif name == "/clear":
             self.history.clear()
-            self._console.print("[dim]Conversation cleared.[/dim]")
+            self._console.print("[label]Conversation cleared.[/label]")
         elif name == "/model":
             self._console.print(f"Model: [bold]{getattr(self.agent, 'model_name', 'unknown')}[/bold]")
         elif name == "/tools":
@@ -316,19 +319,19 @@ class AgentTUI:
         basedir = getattr(self.pkg, 'basedir', '') if self.pkg else ''
         header = Text.assemble(
             ("DFM Agent", "bold cyan"), "  |  ",
-            ("model: ", "dim"), (model, "bold"),
-            ("  |  project: ", "dim"), (pkg_name, "bold"),
+            ("model: ", "label"), (model, "bold"),
+            ("  |  project: ", "label"), (pkg_name, "bold"),
         )
         if basedir:
-            header.append(f"\n{basedir}", style="dim")
+            header.append(f"\n{basedir}", style="secondary")
         self._console.print(Panel(header, border_style="cyan", padding=(0, 1)))
-        self._console.print("[dim]Type /help for commands, Ctrl+D to exit.[/dim]\n")
+        self._console.print("[label]Type /help for commands, Ctrl+D to exit.[/label]\n")
 
     def _print_tools(self):
         from rich.table import Table
         tools = getattr(self.agent.agent, 'tools', [])
         if not tools:
-            self._console.print("[dim]No tools registered.[/dim]")
+            self._console.print("[label]No tools registered.[/label]")
             return
         t = Table(title="Registered Tools", show_lines=False, header_style="bold")
         t.add_column("Name", style="bold cyan")
@@ -342,7 +345,7 @@ class AgentTUI:
     def _print_skills(self):
         from rich.table import Table
         if self.pkg is None:
-            self._console.print("[dim]No project loaded.[/dim]")
+            self._console.print("[label]No project loaded.[/label]")
             return
         skills, personas = [], []
         for task in self.pkg.task_m.values():
@@ -365,7 +368,7 @@ class AgentTUI:
                 st.add_row(name, desc)
             self._console.print(st)
         else:
-            self._console.print("[dim]Skills: (none found)[/dim]")
+            self._console.print("[label]Skills: (none found)[/label]")
 
         if personas:
             pt = Table(title="Personas", show_lines=False, header_style="bold magenta")
@@ -375,7 +378,7 @@ class AgentTUI:
                 pt.add_row(name, desc)
             self._console.print(pt)
         else:
-            self._console.print("[dim]Personas: (none found)[/dim]")
+            self._console.print("[label]Personas: (none found)[/label]")
 
     def _print_cost(self):
         self._console.print(

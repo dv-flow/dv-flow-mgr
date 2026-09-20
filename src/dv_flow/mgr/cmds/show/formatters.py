@@ -84,21 +84,23 @@ class TableFormatter:
     
     def _print_rich(self):
         """Print using rich library for enhanced terminal output."""
-        from rich.console import Console
         from rich.table import Table
         from rich.style import Style
-        
-        console = Console()
-        
+
+        from ...tui_theme import make_console, S_BORDER, S_LABEL
+
+        console = make_console()
+
         if not self._rows:
-            console.print("[dim]No results found.[/dim]")
+            console.print("[%s]No results found.[/%s]" % (S_LABEL, S_LABEL))
             return
-        
+
         table = Table(
             show_header=True,
             header_style="bold cyan",
-            border_style="dim",
-            row_styles=["", "dim"],
+            border_style=S_BORDER,
+            # No zebra striping: `dim` on every other row blends half the data
+            # into a light background -- see tui_theme.
         )
         
         for col in self._columns:
@@ -217,14 +219,18 @@ class DetailFormatter:
     
     def _print_rich(self):
         """Print using rich library for enhanced terminal output."""
-        from rich.console import Console
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
         from rich.markdown import Markdown
-        
-        console = Console()
-        
+
+        from ...tui_theme import make_console, S_BORDER, S_SECONDARY
+
+        console = make_console()
+        # "(none)" is the section's answer, not decoration: it is read, so it
+        # takes the default foreground. So do descriptions.
+        none_s = "[%s]  (none)[/%s]" % (S_SECONDARY, S_SECONDARY)
+
         for section in self._sections:
             kind = section[0]
             
@@ -241,9 +247,9 @@ class DetailFormatter:
                     if '```' in content or content.strip().startswith('#'):
                         console.print(Markdown(content))
                     else:
-                        console.print(Panel(content.strip(), border_style="dim"))
+                        console.print(Panel(content.strip(), border_style=S_BORDER))
                 else:
-                    console.print("[dim]  (none)[/dim]")
+                    console.print(none_s)
             
             elif kind == 'list':
                 title, items = section[1], section[2]
@@ -252,7 +258,7 @@ class DetailFormatter:
                     for item in items:
                         console.print(f"  [green]•[/green] {item}")
                 else:
-                    console.print("[dim]  (none)[/dim]")
+                    console.print(none_s)
             
             elif kind == 'params':
                 title, params = section[1], section[2]
@@ -262,7 +268,7 @@ class DetailFormatter:
                     table.add_column("Name", style="cyan")
                     table.add_column("Type", style="green")
                     table.add_column("Default", style="yellow")
-                    table.add_column("Description", style="dim")
+                    table.add_column("Description", style=S_SECONDARY)
                     
                     for name, info in params.items():
                         ptype = info.get('type', 'any')
@@ -274,4 +280,4 @@ class DetailFormatter:
                     
                     console.print(table)
                 else:
-                    console.print("[dim]  (none)[/dim]")
+                    console.print(none_s)

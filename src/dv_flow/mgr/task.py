@@ -21,6 +21,22 @@ def iter_uses_chain(task):
         yield current
         current = getattr(current, 'uses', None)
 
+def chain_declares_params(task):
+    """Whether anything along `task`'s `uses:` chain declares a parameter --
+    the question to ask before deciding a task has no params at all.
+
+    Asking only of the rung immediately above gets it wrong for a task
+    inherited through package `uses:`: the alias carries neither `param_defs`
+    nor `paramT` of its own, so a two-rung chain (leaf -> mid -> base) puts an
+    EMPTY rung between the task and the declarations. The task then looked
+    parameterless, and got an empty params model -- which surfaces as a missing
+    attribute at run time, or, to an `elaborate:` clause reading a parameter, as
+    that parameter being unset.
+    """
+    return any(
+        c.param_defs is not None or (c is not task and c.paramT is not None)
+        for c in iter_uses_chain(task))
+
 def collect_task_params(task):
     """Return (definitions, types) for `task`, **including params inherited via
     `uses:`**, nearest declaration winning.

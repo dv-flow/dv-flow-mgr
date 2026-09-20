@@ -189,8 +189,8 @@ class CmdShowProject:
         # Root tasks (runnable) - show prominently with descriptions
         root_tasks = info.get('root_tasks', [])
         if is_terminal():
-            from rich.console import Console
-            console = Console()
+            from ...tui_theme import make_console, S_SECONDARY
+            console = make_console()
             
             if root_tasks:
                 console.print("[bold cyan]Runnable Tasks (root):[/bold cyan]")
@@ -201,7 +201,9 @@ class CmdShowProject:
                     else:
                         console.print(f"  [green]*[/green] {t['name']}")
             else:
-                console.print("[bold cyan]Runnable Tasks (root):[/bold cyan] [dim](none)[/dim]")
+                console.print(
+                    "[bold cyan]Runnable Tasks (root):[/bold cyan] "
+                    "[%s](none)[/%s]" % (S_SECONDARY, S_SECONDARY))
         else:
             if root_tasks:
                 print("Runnable Tasks (root):")

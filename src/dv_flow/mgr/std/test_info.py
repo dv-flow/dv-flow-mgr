@@ -248,7 +248,13 @@ def scope_rows(suites : List[Dict[str, Any]]):
 # ---------------------------------------------------------------------------
 
 def _fmt(values, open_ended=False) -> str:
-    text = ", ".join(values) if values else "(none)"
+    from ..tui_theme import S_SECONDARY
+    if not values:
+        # "(none)" is the ANSWER to "what views does this suite offer?" -- an
+        # empty cell would read as a rendering bug -- so it is read, and gets
+        # the default foreground rather than `dim`. See tui_theme.
+        return "[%s](none)[/%s]" % (S_SECONDARY, S_SECONDARY)
+    text = ", ".join(values)
     return (text + ", ...") if open_ended else text
 
 
@@ -257,6 +263,8 @@ def test_info_summary(ctxt):
     from rich.console import Group
     from rich.panel import Panel
     from rich.table import Table
+
+    from ..tui_theme import S_BORDER, S_LABEL
 
     params = getattr(getattr(ctxt, "root", None), "params", None)
     raw = getattr(params, "inventory", "") if params is not None else ""
@@ -284,12 +292,15 @@ def test_info_summary(ctxt):
         table.add_column(justify="left")
         table.add_column(justify="left")
         table.add_column(justify="left")
-        table.add_row("[dim]suite[/dim]", "[dim]views[/dim]", "[dim]cases[/dim]")
+        # The column key, and below it the scope labels: both are read, so
+        # neither may be `dim`. See tui_theme.
+        table.add_row(*["[bold]%s[/bold]" % c
+                        for c in ("suite", "views", "cases")])
         for depth, label, suite in scope_rows(suites):
             indent = "  " * depth
             if suite is None:
                 # A scope: structure, not a runnable thing -- no case columns.
-                table.add_row("%s[dim]%s[/dim]" % (indent, label))
+                table.add_row("%s[%s]%s[/%s]" % (indent, S_LABEL, label, S_LABEL))
                 continue
             table.add_row(
                 indent + label,
@@ -297,11 +308,12 @@ def test_info_summary(ctxt):
                 _fmt(suite.get("cases") or []))
         blocks.append(table)
 
+    # The copy-paste line -- the point of running this command at all.
     usage = (
-        "[dim]dfm run %s --tests <case>[,<case>]  --views <view>[,<view>][/dim]"
-        % (inv.get("target") or "tests"))
+        "[%s]dfm run %s --tests <case>[,<case>]  --views <view>[,<view>][/%s]"
+        % (S_LABEL, inv.get("target") or "tests", S_LABEL))
     blocks.append(usage)
 
     return Panel(Group(*blocks),
                  title="Test inventory (%s)" % (inv.get("target") or "?"),
-                 border_style="cyan")
+                 border_style=S_BORDER)

@@ -28,9 +28,10 @@ a hash that includes both root sources and all included files.
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from .fileset import FileSet
+from .hash_provider import resolve_incdirs
 
 
 _log = logging.getLogger(__name__)
@@ -62,43 +63,48 @@ class SVHashProvider:
         """Check if this provider handles the given filetype."""
         return filetype in self.SUPPORTED_TYPES
     
-    async def compute_hash(self, fileset: FileSet, rundir: str) -> str:
+    async def compute_hash(self, fileset: FileSet, rundir: str,
+                           incdirs: Optional[List[str]] = None) -> str:
         """Compute hash for SystemVerilog fileset including all includes.
-        
+
         Args:
             fileset: FileSet containing SV files
             rundir: Run directory (used for relative path resolution)
-            
+            incdirs: Absolute incdirs contributed by the consuming task's other
+                input filesets. Required to resolve a cross-fileset include --
+                `include "uvm_macros.svh" in an env package is satisfied by the
+                UVM library fileset's incdir, never by the env fileset's own.
+                Without them the include silently drops out of the hash and a
+                change to the included file does not trigger a rebuild.
+
         Returns:
             MD5 hash string (32 hex characters)
         """
         try:
             # Import svdep
             import svdep
-            
+
             # Get absolute paths to files
             basedir = Path(fileset.basedir)
             if not basedir.is_absolute():
                 basedir = Path(rundir) / basedir
-            
+
             files = []
             for f in fileset.files:
                 file_path = Path(f)
                 if not file_path.is_absolute():
                     file_path = basedir / file_path
                 files.append(str(file_path.resolve()))
-            
-            # Get include directories
-            incdirs = []
-            if hasattr(fileset, 'incdirs') and fileset.incdirs:
-                for incdir in fileset.incdirs:
-                    inc_path = Path(incdir)
-                    if not inc_path.is_absolute():
-                        inc_path = Path(rundir) / inc_path
-                    incdirs.append(str(inc_path.resolve()))
-            
+
+            # Search path: this fileset's own incdirs first, then those the rest
+            # of the task's inputs contribute.
+            search_path = resolve_incdirs(fileset, rundir)
+            for incdir in (incdirs or []):
+                if incdir not in search_path:
+                    search_path.append(incdir)
+
             # Compute hash using svdep (uses native if available, else pure-Python)
-            hash_value = svdep.compute_hash_for_files(files, incdirs)
+            hash_value = svdep.compute_hash_for_files(files, search_path)
             
             if hash_value is None:
                 _log.warning("svdep hash computation failed, falling back to default")

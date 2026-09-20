@@ -34,7 +34,8 @@ from .param_builder import ParamBuilder
 from .name_resolution import NameResolutionContext, TaskNameResolutionScope, SetScope, node_matches
 from .exec_gen_callable import ExecGenCallable
 from .ext_rgy import ExtRgy
-from .task import (Task, Need, iter_uses_chain, collect_task_params,
+from .task import (Task, Need, iter_uses_chain, chain_declares_params,
+                   collect_task_params,
                    collect_param_value_sets)
 from .task_def import RundirE
 from .task_data import TaskMarker, TaskMarkerLoc, SeverityE, TaskDataItem
@@ -1224,7 +1225,7 @@ class TaskGraphBuilder(object):
         """
         ev = eval if eval is not None else self._eval
         if task.paramT is None:
-            if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+            if chain_declares_params(task):
                 paramT = ParamBuilder(ev).build_param_type(task)
                 if ev is self._eval:
                     task.paramT = paramT
@@ -2422,14 +2423,11 @@ class TaskGraphBuilder(object):
             # of reusing stale defaults cached on the shared Task object.
             needs_rebuild = task.paramT is None or (eval is not None and eval is not self._eval)
             if needs_rebuild:
-                if task.param_defs is not None:
-                    self._log.debug(f"Building paramT for {task.name} from param_defs")
-                    param_builder = ParamBuilder(eval or self._eval)
-                    paramT = param_builder.build_param_type(task)
-                elif task.uses and (task.uses.paramT or task.uses.param_defs):
-                    # Task has no param_defs but uses another task with params
-                    # Build paramT from the uses chain
-                    self._log.debug(f"Building paramT for {task.name} from uses chain")
+                if chain_declares_params(task):
+                    # Own declarations, or any inherited through the `uses:`
+                    # chain -- which has to be walked whole, not one rung; see
+                    # chain_declares_params.
+                    self._log.debug(f"Building paramT for {task.name} from the uses chain")
                     param_builder = ParamBuilder(eval or self._eval)
                     paramT = param_builder.build_param_type(task)
                 else:

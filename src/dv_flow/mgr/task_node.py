@@ -34,6 +34,7 @@ from .task_data import TaskDataInput, TaskDataOutput, TaskDataResult
 from .task_node_ctxt import TaskNodeCtxt
 from .task_run_ctxt import TaskRunCtxt
 from .param import Param
+from .hash_provider import collect_incdirs, compute_hash
 
 from .naming_scheme import TaskNamingContext
 
@@ -260,7 +261,7 @@ class TaskNode(object):
         """
         return getattr(item, "type", None) == "std.FileSet"
 
-    async def _hash_input_item(self, item, rundir, registry) -> str:
+    async def _hash_input_item(self, item, rundir, registry, incdirs=None) -> str:
         """Content identity of a single input item.
 
         Filesets go through the registered hash providers -- the same ones the
@@ -268,11 +269,15 @@ class TaskNode(object):
         defines and fileset params, and a specialized provider (e.g. SV) can
         widen it to included files. Anything else is identified by its
         serialized value.
+
+        `incdirs` is the whole task's include search path, threaded in because a
+        fileset's includes are resolved against what the COMPILE will see, not
+        against the fileset alone.
         """
         if self._is_fileset(item):
             provider = registry.get_hash_provider(getattr(item, "filetype", ""))
             if provider is not None:
-                return await provider.compute_hash(item, rundir)
+                return await compute_hash(provider, item, rundir, incdirs)
             self._log.warning("No hash provider for filetype %s (task %s)" % (
                 getattr(item, "filetype", ""), self.name))
 
@@ -299,13 +304,14 @@ class TaskNode(object):
         against a stale result forever.
         """
         registry = self._hash_registry(runner)
+        incdirs = collect_incdirs(inputs, rundir)
         signature = []
         for item in inputs:
             signature.append({
                 "src": item.src,
                 "seq": item.seq,
                 "type": getattr(item, "type", None),
-                "hash": await self._hash_input_item(item, rundir, registry),
+                "hash": await self._hash_input_item(item, rundir, registry, incdirs),
             })
         return signature
 

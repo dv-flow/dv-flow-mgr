@@ -28,6 +28,7 @@ from ...util import loadProjPkgDef, parse_parameter_overrides
 from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
 from ...ext_rgy import ExtRgy
 from ...task import collect_task_params
+from ...std.not_provided import is_not_provided as _is_not_provided
 
 
 class CmdShowTask:
@@ -204,6 +205,10 @@ class CmdShowTask:
             'examples': self._examples_to_list(getattr(task, 'examples', [])),
             'uses': task.uses.name if hasattr(task, 'uses') and task.uses else None,
             'scope': scope,
+            # A slot the project declared not-provided is hidden from `dfm run`,
+            # so this view is where a reader asking why a verb is missing finds
+            # out that it exists and was declined on purpose.
+            'not_provided': _is_not_provided(task),
             'tags': self._tags_to_list(getattr(task, 'tags', [])),
             'params': self._get_params(task),
             # A lazily-evaluated default is stored as its source text, so the
@@ -412,6 +417,9 @@ class CmdShowTask:
         
         scope_str = ', '.join(info.get('scope', [])) if info.get('scope') else '-'
         formatter.add_field("Scope", scope_str)
+
+        if info.get('not_provided'):
+            formatter.add_field("Status", "not provided by this project")
         
         if info.get('desc'):
             formatter.add_section("Description", info['desc'])
@@ -523,15 +531,16 @@ class CmdShowTask:
         from .formatters import is_terminal
         
         if is_terminal():
-            from rich.console import Console
-            console = Console()
+            from ...tui_theme import make_console, S_LABEL
+            console = make_console()
             prefix = " " * indent
             for need in needs:
                 name = need['name']
                 circular = need.get('circular_ref', False)
                 
                 if circular:
-                    console.print(f"{prefix}[green]•[/green] [cyan]{name}[/cyan] [dim](circular ref)[/dim]")
+                    console.print(f"{prefix}[green]•[/green] [cyan]{name}[/cyan] "
+                                  f"[{S_LABEL}](circular ref)[/{S_LABEL}]")
                 else:
                     console.print(f"{prefix}[green]•[/green] [cyan]{name}[/cyan]")
                     if need.get('needs'):

@@ -81,7 +81,8 @@ class DaemonMonitor:
     """
 
     def __init__(self, console: Optional[Console] = None):
-        self._console = console or Console()
+        from .tui_theme import make_console
+        self._console = console or make_console()
         self._workers: List[Dict[str, Any]] = []
         self._active_tasks: List[Dict[str, Any]] = []
         self._completed_tasks: List[Dict[str, Any]] = []
@@ -192,6 +193,8 @@ class DaemonMonitor:
 
     def _render_main(self):
         """Dynamic area: running tasks table + recent completions."""
+        from .tui_theme import S_BORDER, S_SECONDARY
+
         run_table = Table(
             expand=True,
             show_lines=False,
@@ -199,10 +202,10 @@ class DaemonMonitor:
             show_header=True,
             header_style="bold",
             title=None,
-            border_style="dim",
+            border_style=S_BORDER,
         )
-        run_table.add_column("PID", style="dim", width=8)
-        run_table.add_column("WORKER", style="dim", width=10)
+        run_table.add_column("PID", style=S_SECONDARY, width=8)
+        run_table.add_column("WORKER", style=S_SECONDARY, width=10)
         run_table.add_column("TIME", justify="right", width=8)
         run_table.add_column("TASK", style="bold")
 
@@ -228,9 +231,9 @@ class DaemonMonitor:
             show_lines=False,
             pad_edge=False,
             show_header=True,
-            header_style="bold dim",
+            header_style="bold",
             title=None,
-            border_style="dim",
+            border_style=S_BORDER,
         )
         comp_table.add_column("COMPLETED", ratio=3)
         comp_table.add_column("STATUS", justify="center", width=10)
@@ -253,7 +256,7 @@ class DaemonMonitor:
         if self._active_tasks:
             parts.append(run_table)
         else:
-            parts.append(Text("  (idle)", style="dim"))
+            parts.append(Text("  (idle)", style=S_SECONDARY))
         parts.append(Text(""))
 
         # Completed section
@@ -268,6 +271,8 @@ class DaemonMonitor:
 
     def _render_status_bar(self):
         """Fixed status bar at the bottom -- 3 lines."""
+        from .tui_theme import S_BORDER, S_LABEL, S_SECONDARY
+
         total, idle, busy, pending_w = self._worker_counts()
         uptime_s = int(time.monotonic() - self._start_time)
         uptime_str = "%d:%02d:%02d" % (uptime_s // 3600, (uptime_s % 3600) // 60, uptime_s % 60)
@@ -275,31 +280,32 @@ class DaemonMonitor:
         summary = Text()
         summary.append("dfm daemon", style="bold cyan")
         summary.append("  up %s" % uptime_str)
-        summary.append("  |  workers: ", style="dim")
-        summary.append("%d" % busy, style="green bold" if busy else "dim")
-        summary.append(" busy", style="dim")
-        summary.append(", %d" % idle, style="dim")
-        summary.append(" idle", style="dim")
+        summary.append("  |  workers: ", style=S_LABEL)
+        summary.append("%d" % busy, style="green bold" if busy else S_SECONDARY)
+        summary.append(" busy", style=S_LABEL)
+        summary.append(", %d" % idle, style=S_SECONDARY)
+        summary.append(" idle", style=S_LABEL)
         if pending_w:
             summary.append(", %d" % pending_w, style="yellow")
-            summary.append(" pend", style="dim")
-        summary.append("  |  tasks: ", style="dim")
-        summary.append("%d" % len(self._active_tasks), style="green bold" if self._active_tasks else "dim")
-        summary.append(" run", style="dim")
-        summary.append(", %d" % self._total_completed, style="dim")
-        summary.append(" done", style="dim")
+            summary.append(" pend", style=S_LABEL)
+        summary.append("  |  tasks: ", style=S_LABEL)
+        summary.append("%d" % len(self._active_tasks), style="green bold" if self._active_tasks else S_SECONDARY)
+        summary.append(" run", style=S_LABEL)
+        summary.append(", %d" % self._total_completed, style=S_SECONDARY)
+        summary.append(" done", style=S_LABEL)
 
         active_line = Text()
         if self._active_tasks:
             names = [t.get("name", "?") for t in self._active_tasks[:5]]
-            active_line.append("  active: ", style="dim")
+            active_line.append("  active: ", style=S_LABEL)
             active_line.append(", ".join(names), style="bold")
             if len(self._active_tasks) > 5:
-                active_line.append(" (+%d)" % (len(self._active_tasks) - 5), style="dim")
+                active_line.append(" (+%d)" % (len(self._active_tasks) - 5),
+                               style=S_SECONDARY)
         else:
-            active_line.append("  (no active tasks)", style="dim")
+            active_line.append("  (no active tasks)", style=S_SECONDARY)
 
-        return Group(Rule(style="dim"), summary, active_line)
+        return Group(Rule(style=S_BORDER), summary, active_line)
 
     # -- full-screen redraw --
 

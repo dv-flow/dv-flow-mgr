@@ -196,7 +196,7 @@ for the cells:
 .. code-block:: text
 
     $ dfm run
-    No task specified. Available Tasks:
+    No task specified. Available root tasks in my-proj:
     my-proj.sim-img  - Simulation images [view: tlm,wb,rtl x build: opt,dbg,cov,prof]
     my-proj.tests    - Run the regression
 

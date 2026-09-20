@@ -22,6 +22,7 @@
 import hashlib
 import os
 from pathlib import Path
+from typing import List, Optional
 from .fileset import FileSet
 
 
@@ -37,13 +38,17 @@ class DefaultHashProvider:
         """Supports all file types (fallback provider)."""
         return True
     
-    async def compute_hash(self, fileset: FileSet, rundir: str) -> str:
+    async def compute_hash(self, fileset: FileSet, rundir: str,
+                           incdirs: Optional[List[str]] = None) -> str:
         """Compute MD5 hash of all files in the fileset.
-        
+
         Args:
             fileset: The fileset to hash
             rundir: The run directory (base path for resolving relative paths)
-            
+            incdirs: Sibling filesets' include directories. Accepted for
+                signature compatibility and ignored: this provider hashes the
+                listed files' bytes and does not follow `include directives.
+
         Returns:
             MD5 hash string (hex digest) of all file contents combined
         """

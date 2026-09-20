@@ -45,7 +45,7 @@ def test_run_list_shows_only_root_tasks(tmp_path, capsys):
     assert 'my_pkg.entry' in out
     assert 'my_pkg.build' in out
     assert 'my_pkg.helper' not in out
-    assert 'Available Tasks:' in out
+    assert 'Available root tasks in my_pkg:' in out
 
 
 def test_run_list_warns_when_no_root_tasks(tmp_path, capsys):
@@ -73,7 +73,9 @@ def test_run_list_warns_when_no_root_tasks(tmp_path, capsys):
     # Should still show all tasks
     assert 'my_pkg.task1' in out
     assert 'my_pkg.task2' in out
-    assert 'Available Tasks:' in out
+    assert 'Available tasks in my_pkg:' in out
+    # Not a root listing -- the heading must not claim to be one.
+    assert 'root tasks in' not in out
 
 
 def test_run_list_shows_only_root_with_mixed_scopes(tmp_path, capsys):

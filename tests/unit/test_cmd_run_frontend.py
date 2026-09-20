@@ -227,6 +227,6 @@ def test_run_with_no_task_lists_root_tasks(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     CmdRun()(Args(root=str(tmp_path), task=None))
     out = capsys.readouterr().out
-    assert 'Available Tasks:' in out
+    assert 'Available root tasks in my_pkg:' in out
     assert 'my_pkg.entry' in out
     assert 'my_pkg.helper' not in out

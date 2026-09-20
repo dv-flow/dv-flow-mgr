@@ -73,7 +73,7 @@ package:
 ### List available tasks (only root tasks shown)
 ```bash
 $ dv-flow run
-No task specified. Available Tasks:
+No task specified. Available root tasks in myapp:
 myapp.build  - Build the application
 myapp.test   - Run tests
 utils.format - Format source files

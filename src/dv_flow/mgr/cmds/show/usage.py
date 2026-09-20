@@ -119,8 +119,11 @@ def build_usage_info(task, prog : str = "dfm run",
             'param': pname,
             'type': _type_name(types.get(pname)),
             'default': default,
-            'help': _first_line(getattr(pdef, 'doc', None)
-                                or getattr(pdef, 'desc', None)),
+            # `desc` first -- a one-line help slot wants the one-line
+            # summary, not the opening line of prose written to be read in
+            # paragraphs. Same order as CliArg.help.
+            'help': _first_line(getattr(pdef, 'desc', None)
+                                or getattr(pdef, 'doc', None)),
             'choices': choices,
             # Per-value documentation, when the declaration supplies it. Kept
             # separate from `choices` so a consumer that only wants the values
@@ -207,10 +210,11 @@ def render_usage(task, prog : str = "dfm run", values : Dict[str, Any] = None):
         print(render_usage_text(info))
         return info
 
-    from rich.console import Console
     from rich.table import Table
 
-    console = Console()
+    from ...tui_theme import make_console, S_LABEL, S_SECONDARY
+
+    console = make_console()
 
     heading = "[bold cyan]%s[/bold cyan]" % info['task']
     if info['desc']:
@@ -230,7 +234,9 @@ def render_usage(task, prog : str = "dfm run", values : Dict[str, Any] = None):
         table.add_column("Argument", style="cyan")
         table.add_column("Type", style="green")
         table.add_column("Default", style="yellow")
-        table.add_column("Description", style="dim")
+        # The description is the column the reader came for; the column
+        # position already marks it as secondary -- see tui_theme.
+        table.add_column("Description", style=S_SECONDARY)
         for a in info['args']:
             default = a['default']
             help_s = a['help'] or ""
@@ -245,11 +251,79 @@ def render_usage(task, prog : str = "dfm run", values : Dict[str, Any] = None):
                           help_s)
         console.print(table)
     else:
-        console.print("[dim]  (none)[/dim]")
+        # The answer to "what arguments?" -- read, so not `dim`.
+        console.print("[%s]  (none)[/%s]" % (S_SECONDARY, S_SECONDARY))
 
     console.print()
-    console.print("[dim]Set any task parameter with -D <task>.<param>=<value>, "
-                  "or -D <param>=<value> to set it on every task that has it.[/dim]")
-    console.print("[dim]Run `%s --help` for run options.[/dim]" % info['prog'])
+    # Usage hints: the reader acts on these, so they take a named colour.
+    console.print(
+        "[%s]Set any task parameter with -D <task>.<param>=<value>, "
+        "or -D <param>=<value> to set it on every task that has it.[/%s]"
+        % (S_LABEL, S_LABEL))
+    console.print("[%s]Run `%s --help` for run options.[/%s]"
+                  % (S_LABEL, info['prog'], S_LABEL))
 
     return info
+
+
+def build_package_options(pkg, loader=None) -> List[Dict[str, Any]]:
+    """The project-level options `pkg` exposes -- package variables declared
+    `cli:` -- in the same shape `build_usage_info` uses for task arguments.
+
+    Structured rather than pre-rendered because two callers show these: the
+    no-task listing of `dfm run` and the `Project options` block of
+    `dfm run <task> --help`.
+    """
+    from ...cli_args import collect_package_cli
+
+    ret : List[Dict[str, Any]] = []
+    for a in collect_package_cli(pkg, loader):
+        if a.hidden:
+            continue
+        label = "--%s" % a.name
+        if a.short:
+            label = "-%s, %s" % (a.short, label)
+        # A package variable has no `uses:` chain of parameter definitions, so
+        # its declaration is the only source of the value set -- the same
+        # reasoning as the `choices` fallback in `build_arg_parser`.
+        vs = getattr(a.pdef, 'values', None)
+        ret.append({
+            'label': label,
+            'param': a.param,
+            'default': getattr(a.pdef, 'value', None),
+            'help': _first_line(getattr(a.pdef, 'desc', None)
+                                or getattr(a.pdef, 'doc', None)),
+            'choices': vs.values() if vs is not None else None,
+            'choices_doc': ([{'value': e.value, 'desc': e.desc} for e in vs.of]
+                            if (vs is not None and any(e.desc for e in vs.of))
+                            else None),
+            'choices_open': bool(vs.open) if vs is not None else False,
+        })
+    return ret
+
+
+def render_package_options_text(pkg_name : str,
+                                options : List[Dict[str, Any]]) -> List[str]:
+    """Plain-text lines for `build_package_options`, heading included.
+
+    Empty list when the project exposes nothing, so a caller can splice the
+    result in unconditionally.
+    """
+    if not options:
+        return []
+    lines = ["Project options (apply to any task in %s):" % pkg_name]
+    label_w = max(len(o['label']) for o in options)
+    for o in options:
+        line = "  %s  %s" % (o['label'].ljust(label_w), o['help'] or "")
+        if o['default'] not in (None, ''):
+            line += " (default: %s)" % o['default']
+        lines.append(line.rstrip())
+        if o['choices'] and not o['choices_doc']:
+            lines.append("  %s  %s" % (
+                " ".ljust(label_w), _choices_text(o)))
+        for entry in (o['choices_doc'] or []):
+            lines.append("  %s  %s%s" % (
+                str(entry['value']).rjust(label_w),
+                "- " if entry['desc'] else "",
+                entry['desc'] or ""))
+    return lines

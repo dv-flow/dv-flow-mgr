@@ -663,3 +663,216 @@ def test_a_compound_does_not_satisfy_an_unrelated_requirement(tmp_path):
     proc = _dfm(d, "t")
     assert proc.returncode != 0
     assert "kind: other" in proc.stdout + proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Showing an unfilled slot BEFORE it is run
+# ---------------------------------------------------------------------------
+#
+# A project interface exists to be filled in, so "which of these verbs does
+# this project actually answer to" is the question a reader arriving at
+# `dfm run` has. Learning it by running the task and reading the failure is a
+# poor way to find out. The annotation is a static approximation of the check
+# above, and is deliberately conservative: a false alarm in a listing is worse
+# than a missing one, because the run still reports the truth either way.
+
+SLOT_LISTING = '''\
+package:
+    name: p
+    tasks:
+    - root: lint-rtl
+      desc: Entrypoint for running lint on RTL sources
+      requires:
+      - std.check.Implemented
+    - root: other
+      uses: std.Message
+      desc: Something that works
+      with: {msg: hi}
+'''
+
+
+def test_the_listing_marks_a_slot_nothing_implements(tmp_path):
+    proc = _dfm(_write(tmp_path, SLOT_LISTING))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    lint = [ln for ln in proc.stdout.splitlines() if "p.lint-rtl" in ln]
+    assert lint and "[unimplemented]" in lint[0], proc.stdout
+
+
+def test_the_listing_points_at_where_the_detail_is(tmp_path):
+    """A marker nobody can act on is noise -- but the listing is not where the
+    explanation belongs. The requirement carries a hint written by whoever
+    declared the slot, which is more specific than anything a general footer
+    could say and is what running the task already prints. So the footer is a
+    pointer, and stays one line."""
+    proc = _dfm(_write(tmp_path, SLOT_LISTING))
+    assert "dfm run <task>" in proc.stdout
+    footer = [ln for ln in proc.stdout.splitlines()
+              if ln.startswith("[unimplemented]")]
+    assert len(footer) == 1, proc.stdout
+
+
+def test_the_listing_leaves_a_working_task_alone(tmp_path):
+    proc = _dfm(_write(tmp_path, SLOT_LISTING))
+    other = [ln for ln in proc.stdout.splitlines() if "p.other" in ln]
+    assert other and "[unimplemented]" not in other[0], proc.stdout
+
+
+def test_an_implemented_slot_is_not_marked(tmp_path):
+    d = _write(tmp_path, SLOT_LISTING + """\
+    - override: lint-rtl
+      needs: [lint-impl]
+    - name: lint-impl
+      uses: std.Message
+      with: {msg: linting}
+""")
+    proc = _dfm(d)
+    assert "[unimplemented]" not in proc.stdout, proc.stdout
+
+
+def test_a_declined_requirement_is_not_marked(tmp_path):
+    """`severity: off` is a project saying it has no lint flow. That is an
+    answer, not an omission, so the listing must not keep nagging about it."""
+    d = _write(tmp_path, SLOT_LISTING + """\
+    - override: lint-rtl
+      requires:
+      - {std.check.Implemented: {severity: "off"}}
+""")
+    proc = _dfm(d)
+    assert "[unimplemented]" not in proc.stdout, proc.stdout
+
+
+def test_a_project_with_nothing_unfilled_gets_no_footer(tmp_path):
+    """The common case stays exactly as it was."""
+    d = _write(tmp_path, '''\
+    package:
+        name: p
+        tasks:
+        - {root: t, uses: std.Message, with: {msg: hi}}
+    ''')
+    proc = _dfm(d)
+    assert "Available root tasks in p:" in proc.stdout
+    assert "not implemented" not in proc.stdout
+
+
+def test_the_mark_agrees_with_the_run(tmp_path):
+    """The listing and the check answer the same question, so they must not
+    disagree: what is marked must fail, and what is not marked must not fail
+    for this reason."""
+    d = _write(tmp_path, SLOT_LISTING)
+    listing = _dfm(d)
+    assert "[unimplemented]" in listing.stdout
+
+    run = _dfm(d, "lint-rtl")
+    assert run.returncode != 0
+    assert "not implemented" in run.stdout + run.stderr
+
+    ok = _dfm(d, "other")
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+
+
+# ---------------------------------------------------------------------------
+# std.NotProvided -- declaring a slot inapplicable
+# ---------------------------------------------------------------------------
+#
+# The third state, and the one the escape hatch got wrong. An archetype
+# declares a slot; a project either fills it in or says it has no such flow.
+# Saying so must be a real answer, not a way of silencing the complaint: a
+# declined slot that still reports success is the exact failure this check
+# exists to prevent.
+
+ARCHETYPE = '''\
+package:
+    name: arch
+    tasks:
+    - root: lint-rtl
+      desc: Entrypoint for running lint on RTL sources
+      requires:
+      - std.check.Implemented
+    - root: tests
+      uses: std.Message
+      desc: Run the regression
+      with: {msg: testing}
+'''
+
+DECLINED = '''\
+package:
+    name: p
+    uses: arch
+    imports:
+    - base.dv
+    tasks:
+    - override: lint-rtl
+      uses: std.NotProvided
+'''
+
+
+def _arch(tmp_path, leaf=DECLINED):
+    (tmp_path / "base.dv").write_text(textwrap.dedent(ARCHETYPE))
+    (tmp_path / "flow.dv").write_text(textwrap.dedent(leaf))
+    return tmp_path
+
+
+def test_a_not_provided_slot_is_absent_from_the_listing(tmp_path):
+    """The project does not offer that verb, so listing it would invite
+    someone to type something that cannot work."""
+    proc = _dfm(_arch(tmp_path))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "p.tests" in proc.stdout
+    assert "lint-rtl" not in proc.stdout, proc.stdout
+    # Not flagged either -- it is answered, not neglected.
+    assert "unimplemented" not in proc.stdout
+
+
+def test_naming_a_not_provided_slot_says_so(tmp_path):
+    """The property `severity: off` fails: declining must not produce a task
+    that runs and reports success."""
+    proc = _dfm(_arch(tmp_path), "lint-rtl")
+    assert proc.returncode != 0, proc.stdout
+    out = proc.stdout + proc.stderr
+    assert "does not provide 'lint-rtl'" in out, out
+    # ... and not the wrong reason.
+    assert "not implemented" not in out
+
+
+def test_a_not_provided_slot_satisfies_the_check(tmp_path):
+    """A slot declared not-provided is answered, so the requirement is met --
+    otherwise declaring it would trade one diagnostic for another."""
+    assert _build(_arch(tmp_path), "p.lint-rtl") == []
+
+
+def test_a_not_provided_slot_is_still_discoverable(tmp_path):
+    """Hidden from `dfm run`, not erased. Someone porting a flow between
+    projects needs to be able to find out why the verb is missing."""
+    d = _arch(tmp_path)
+    proc = subprocess.run(
+        [sys.executable, "-m", "dv_flow.mgr", "show", "task", "p.lint-rtl"],
+        cwd=str(d), capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "not provided by this project" in proc.stdout
+
+
+def test_a_sibling_slot_is_unaffected(tmp_path):
+    """Declining one slot says nothing about the others."""
+    proc = _dfm(_arch(tmp_path))
+    assert "p.tests" in proc.stdout
+
+
+def test_not_provided_is_recognized_through_the_uses_chain(tmp_path):
+    """A project may derive its own not-provided base -- a house-style message,
+    say -- and an intermediate archetype may decline a slot on behalf of the
+    projects that inherit it. Both are chain questions."""
+    d = _arch(tmp_path, leaf='''\
+    package:
+        name: p
+        uses: arch
+        imports:
+        - base.dv
+        tasks:
+        - name: house-style-declined
+          uses: std.NotProvided
+        - override: lint-rtl
+          uses: house-style-declined
+    ''')
+    proc = _dfm(d)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "lint-rtl" not in proc.stdout, proc.stdout
