@@ -358,7 +358,12 @@ def test_parser_uses_readable_metavars_and_help(proj, capsys):
     parser, dest_param = build_arg_parser(task, resolve_task_cli(task), "dfm run x")
     parser.print_help()
     out = capsys.readouterr().out
-    assert "-s SEED, --seed SEED" in out
+    # Check parser structure rather than help layout: Python 3.13+ prints
+    # '-s, --seed SEED' where older versions print '-s SEED, --seed SEED'.
+    action = next(a for a in parser._actions if "--seed" in a.option_strings)
+    assert action.option_strings == ["-s", "--seed"]
+    assert action.metavar == "SEED"
+    assert "--seed SEED" in out
     # Metavar comes from the arg name, not the mangled dest.
     assert "ARG_SEED" not in out
     # Help and default come from the parameter.
