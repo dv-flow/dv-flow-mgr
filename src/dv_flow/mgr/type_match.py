@@ -128,3 +128,38 @@ def normalize(value):
         cleaned = {k: v for k, v in value.items() if v is not None}
         return cleaned or None
     return None
+
+
+def parse_pattern(text):
+    """A pattern written on the command line, as a map.
+
+    `std.FileSet:filetype=simDir` is `{type: std.FileSet, filetype: simDir}`.
+    Either half may be left out: `filetype=simDir` names attributes only, and
+    `std.FileSet` is the bare-type shorthand `normalize` accepts. Attributes are
+    comma-separated. Values stay strings; `values_equal` already compares
+    `true` and a YAML `true` as equal.
+    """
+    text = (text or "").strip()
+    if not text:
+        return None
+    if ":" in text:
+        type_part, attrs = text.split(":", 1)
+    elif "=" in text:
+        type_part, attrs = "", text
+    else:
+        type_part, attrs = text, ""
+    ret = {}
+    if type_part.strip():
+        ret["type"] = type_part.strip()
+    for item in attrs.split(","):
+        if not item.strip():
+            continue
+        if "=" not in item:
+            raise ValueError(
+                "malformed pattern '%s': '%s' is not key=value" % (text, item))
+        key, value = item.split("=", 1)
+        if not key.strip():
+            raise ValueError(
+                "malformed pattern '%s': '%s' has no key" % (text, item))
+        ret[key.strip()] = value.strip()
+    return ret or None

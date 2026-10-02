@@ -44,9 +44,7 @@ from .ext_rgy import ExtRgy
 from .pytask import PyTask, pytask
 from .pypkg import PyPkg, pypkg
 
-VERSION = "1.5.0"
-SUFFIX = ""
-__version__ = "%s%s" % (VERSION, SUFFIX)
+from .__version__ import _pkg_version as __version__, get_version
 
 # ── Lazy-loaded symbols ─────────────────────────────────────────────
 # Maps public name → (module_path, attribute).

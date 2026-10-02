@@ -194,6 +194,21 @@ def _add_run_opts(p):
     return p
 
 
+class _VersionAction(argparse.Action):
+    """`--version`, computed only when asked for: the full version may run
+    `git describe`, which every other invocation should not pay for."""
+
+    def __init__(self, option_strings, dest=argparse.SUPPRESS,
+                 default=argparse.SUPPRESS, help=None):
+        super().__init__(option_strings=option_strings, dest=dest,
+                         default=default, nargs=0, help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        from .__version__ import get_version
+        print("dfm %s" % get_version())
+        parser.exit()
+
+
 def reserved_option_strings(*parsers):
     """Every option string claimed by the given parsers (e.g. {'-j', '--clean'}).
 
@@ -205,6 +220,10 @@ def reserved_option_strings(*parsers):
     ret = set()
     for parser in parsers:
         for action in parser._actions:
+            # Only meaningful before the subcommand, so it cannot collide with
+            # a task flag: a project keeps its `--version` knob.
+            if isinstance(action, _VersionAction):
+                continue
             ret.update(action.option_strings)
     return ret
 
@@ -218,6 +237,8 @@ def get_parser():
     # parser.add_argument("-d", "--debug", 
     #                     help="Enable debug",
     #                     action="store_true")
+    parser.add_argument("-V", "--version", action=_VersionAction,
+                        help="Show the dfm version and exit")
     parser.add_argument("--log-level", 
                         help="Configures debug level [INFO, DEBUG]",
                         choices=("NONE", "INFO", "DEBUG"))

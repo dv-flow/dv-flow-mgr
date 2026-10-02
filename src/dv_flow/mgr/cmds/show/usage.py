@@ -290,7 +290,7 @@ def build_package_options(pkg, loader=None) -> List[Dict[str, Any]]:
         ret.append({
             'label': label,
             'param': a.param,
-            'default': getattr(a.pdef, 'value', None),
+            'default': a.default,
             'help': _first_line(getattr(a.pdef, 'desc', None)
                                 or getattr(a.pdef, 'doc', None)),
             'choices': vs.values() if vs is not None else None,

@@ -37,6 +37,9 @@ from .task import (iter_uses_chain, collect_task_params,
                    collect_param_value_sets, collect_param_cli)
 
 
+_UNSET = object()
+
+
 @dc.dataclass
 class CliArg(object):
     """One command-line option of a task, resolved from the parameter that
@@ -48,6 +51,11 @@ class CliArg(object):
     hidden : bool = False
     pdef : Any = None           # the declaring ParamDef
     type : Any = None           # the parameter's declared type
+    # The default, when it is declared somewhere other than `pdef`. A package
+    # leaf that only rebinds an inherited variable (`with: {sim: vcs}`) says
+    # nothing about `cli:`, so `pdef` stays the base's declaration -- and its
+    # `value` is the base's default, not the one in effect.
+    value : Any = _UNSET
 
     @property
     def help(self):
@@ -62,6 +70,8 @@ class CliArg(object):
 
     @property
     def default(self):
+        if self.value is not _UNSET:
+            return self.value
         return getattr(self.pdef, 'value', None) if self.pdef is not None else None
 
 
@@ -150,11 +160,20 @@ def collect_package_cli(pkg, loader=None) -> List[CliArg]:
 
     # Base-first, so a leaf redeclaring a variable wins -- and `cli: false`
     # lets it withdraw a flag its base offered.
+    #
+    # The default is tracked separately from the flag: the nearest declaration
+    # of the variable supplies it whether or not that declaration carries
+    # `cli:`. Otherwise a leaf changing an inherited knob's default would see
+    # the base's default in `--help`.
     opts = {}
+    values = {}
     for p in reversed(chain):
         pkg_def = getattr(p, 'pkg_def', None)
         params = getattr(pkg_def, 'params', None) or {}
         for name, pdef in params.items():
+            # Value-only form (`sim: vcs`) or a full declaration.
+            values[name] = getattr(pdef, 'value', None) \
+                if hasattr(pdef, 'cli') else pdef
             cli = getattr(pdef, 'cli', None)
             if cli is None:
                 continue
@@ -175,7 +194,8 @@ def collect_package_cli(pkg, loader=None) -> List[CliArg]:
             short=getattr(opt, 'short', None),
             hidden=bool(getattr(opt, 'hidden', False)),
             pdef=pdef,
-            type=ptype))
+            type=ptype,
+            value=values.get(name, _UNSET)))
     return args
 
 

@@ -46,6 +46,8 @@ Choosing a task
      - :dvf:task:`std.TestRunner`
    * - Ask what a test runner offers
      - :dvf:task:`std.TestInfo`
+   * - Group tests into a named suite
+     - :dvf:task:`std.TestSuite`
 
 To run a shell command you do not need a task at all -- see
 `Running Shell Commands`_ below.

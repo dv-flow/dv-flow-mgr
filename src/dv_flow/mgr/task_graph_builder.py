@@ -2291,6 +2291,9 @@ class TaskGraphBuilder(object):
                 hierarchical=hierarchical,
                 eval=eval_ctx
             )
+            # The cell's axis values, so a consumer can find a cell by what it
+            # is (`image=rtl`) rather than by parsing its generated name.
+            node.matrix_bindings = dict(matrix_dict)
 
             # Resolve any matrix-driven `needs` for this cell: evaluate
             # each deferred need expression against this cell's bindings

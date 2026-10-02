@@ -8,7 +8,7 @@
 #*     drift from what `tests` would actually run;
 #*   * introspection BUILDS NOTHING -- no image, no case;
 #*   * what it reports and what `--tests`/`--views` accept are the same set
-#*     (both go through test_select.plan_need).
+#*     (both go through test_select.build_tree + resolve).
 #****************************************************************************
 import json
 import os
@@ -166,9 +166,12 @@ def test_declaration_order_is_preserved():
 
 
 def test_entries_carry_scope_and_short_name(loaded, proj):
+    """Rows are grouped by the SUITE path they sit under -- the structure
+    `--tests` selects over -- not by where the task was declared. A top-level
+    suite has an empty scope."""
     _, inv = _inventory(loaded, proj)
     suite = [s for s in inv["suites"] if s["name"] == "p.suite"][0]
-    assert (suite["scope"], suite["short"]) == ("p", "suite")
+    assert (suite["scope"], suite["short"]) == ("", "suite")
 
 
 def test_an_unknown_target_is_an_error(loaded, proj):

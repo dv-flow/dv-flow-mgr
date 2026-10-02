@@ -477,6 +477,19 @@ class CmdRun(object):
         for msg in override_tracker.warnings():
             print("Warning: %s" % msg, file=sys.stderr)
 
+        # A root whose summary is a machine-readable payload (`tests-info
+        # --json`) owns stdout: move the console listener to stderr so the
+        # payload can be piped. Decided after the graph is built, because only
+        # the root's elaborator knows which format was asked for.
+        if any(getattr(t, 'machine_output', False) for t in tasks):
+            from rich.console import Console
+            quiet = TaskListenerLog()
+            quiet.console = Console(highlight=False, stderr=True)
+            quiet.verbose = listener.verbose
+            runner.listeners = [
+                (quiet.event, rec) if l == listener.event else (l, rec)
+                for l, rec in runner.listeners]
+
         asyncio.run(runner.run(tasks))
 
         trace.close()

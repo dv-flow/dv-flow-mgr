@@ -34,9 +34,18 @@ Nothing upstream is built: the info node drops every declared need
 (`select_needs -> []`), so `dfm run tests-info` compiles no images and runs no
 simulations. The enumeration happens at graph-build time, in the elaborator,
 and rides to the run callable as a JSON blob on the node's `inventory` param.
+`--requires` elaborates the target's graph to find each run's producers, but
+wires none of it to this node, so it still executes nothing.
 
-Classification reuses `test_select.plan_need` with an empty selection, so what
-this reports and what `--tests`/`--views` select over cannot disagree.
+Classification and selection are `test_select.build_tree` + `resolve` -- the
+same calls the runner makes -- so `tests-info --tests sanity.` reports exactly
+what `tests --tests sanity.` would run, and rejects exactly what it would
+reject.
+
+Output is chosen by `format` (or the `json` shorthand). In a machine format the
+summary hook returns the payload as a plain string and the elaborator marks the
+node `machine_output`, which tells `dfm run` to keep its own progress output off
+stdout -- so `dfm run tests-info --json | jq` works.
 """
 
 import dataclasses as dc
@@ -44,7 +53,13 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from .test_select import Plan, Selection, plan_need
+from .test_select import (Selection, SelectionError, Tree, Resolution,
+                          Pattern, build_tree, resolve, format_path,
+                          parse_requires, run_requires, warn_unproduced)
+
+# Version of the machine-readable inventory. Bump on an incompatible change, so
+# a script consuming `--json` can refuse a shape it does not understand.
+SCHEMA_VERSION = 1
 
 _log = logging.getLogger("test_info")
 
@@ -89,54 +104,233 @@ def resolve_target(ctxt, task, target : str):
 # Inventory
 # ---------------------------------------------------------------------------
 
-def _entry(plan : Plan) -> Dict[str, Any]:
-    name = getattr(plan.task, "name", "") or ""
-    scope, _, short = name.rpartition(".")
-    return {
-        "name": name,
-        # A task name IS a path (`fw-wb-dma.uvm.uvm-universal`), so the scope it
-        # was declared in is data the report can group by rather than a string
-        # the reader has to parse out of every row.
-        "scope": scope,
-        "short": short or name,
-        "cases": list(plan.cases),
-        "views": list(plan.views),
-        "views_open": bool(plan.views_open),
-    }
+def build_inventory(tree : Tree, res : Resolution,
+                    target : str = "",
+                    instances : bool = False) -> Dict[str, Any]:
+    """The inventory of what `tree` offers, narrowed to the selection in `res`.
 
+    `suites` holds one row per *test container* -- a matrix suite or a single
+    test -- grouped by the suite path it sits under, which is what the console
+    report renders. `tests` is the flat list of selected tests by path: what
+    `--tests` accepts, and what `--format list` prints.
+    """
+    sel = res.selection
+    kept = res.kept_tests(tree)
 
-def build_inventory(ctxt, target_task, sel : Selection) -> Dict[str, Any]:
-    """Enumerate what `target_task` offers, without building any of it."""
-    expand = getattr(ctxt, "expand", None)
-    plans = [plan_need(need, sel, expand)
-             for need in ctxt.declaredNeeds(target_task)]
-
-    suites = [_entry(p) for p in plans if p.is_test]
-    other = [getattr(p.task, "name", "") or "" for p in plans if not p.is_test]
-
+    tests = []
     cases : List[str] = []
     views : List[str] = []
-    for p in plans:
-        for c in p.cases:
-            if c and c not in cases:
-                cases.append(c)
-        for v in p.views:
-            if v and v not in views:
+    for t in kept:
+        tviews = _test_views(tree, res, t)
+        tests.append({
+            "path": format_path(t.path),
+            "name": t.name,
+            "task": getattr(t.task, "name", "") or "",
+            "views": tviews,
+            "views_open": bool(t.views_open and tviews == []),
+            # The other paths the same test is reachable by, through a suite
+            # shared by two parents.
+            "aliases": [format_path(p) for p in t.paths[1:]],
+        })
+        if t.name not in cases:
+            cases.append(t.name)
+        for v in tviews:
+            if v not in views:
                 views.append(v)
 
-    return {
-        "target": getattr(target_task, "name", "") or "",
+    rows = []
+    seen = set()
+    for t in kept:
+        task_name = getattr(t.task, "name", "") or ""
+        if t.key[1] is not None:
+            # A matrix cell: one row for the whole suite.
+            if task_name in seen:
+                continue
+            seen.add(task_name)
+            suite = tree.suites[task_name]
+            suite_cases = [k[1] for k in suite.tests if res.kept.get(k)]
+            row_path = suite.path
+        else:
+            suite_cases = [t.name]
+            row_path = t.path
+        tviews = _test_views(tree, res, t)
+        rows.append({
+            "name": task_name,
+            "path": format_path(row_path),
+            # Grouping key for the report: the suite the row sits under.
+            "scope": format_path(row_path[:-1]),
+            "short": row_path[-1],
+            "cases": suite_cases,
+            "views": tviews,
+            "views_open": bool(t.views_open and tviews == []),
+        })
+
+    suites = []
+    for name, s in tree.suites.items():
+        if name in res.dropped:
+            continue
+        suites.append({
+            "path": format_path(s.path),
+            "task": name,
+            "kind": s.kind,
+            "aliases": [format_path(p) for p in s.paths[1:]],
+        })
+
+    for entry in tests:
+        entry["selector"] = selector_for(tree, entry["path"])
+
+    ret = {
+        "schema": SCHEMA_VERSION,
+        "target": target,
         "test_key": sel.test_key,
         "view_axis": sel.view_axis,
+        "selection": {
+            "tests": list(sel.tests),
+            "views": list(sel.views),
+            "exclude": list(sel.exclude),
+        },
         "cases": cases,
         "views": views,
         # A suite whose view axis is an unresolvable expression: its members are
         # not knowable here, and the report must say so rather than imply the
         # list is complete.
-        "views_open": any(p.views_open for p in plans),
-        "suites": suites,
-        "other": other,
+        "views_open": any(r["views_open"] for r in rows),
+        "tests": tests,
+        "suites": rows,
+        "suite_tree": suites,
+        "other": list(tree.other),
     }
+    if instances:
+        ret["instances"] = build_instances(tree, res, target, tests)
+    return ret
+
+
+def selector_for(tree : Tree, path : str) -> str:
+    """The `--tests` value that selects the test at `path` and nothing else.
+
+    Anchored with a leading `.`: patterns match from the right, so a bare
+    `x.reset` would also select `y.x.reset`. Checked rather than assumed --
+    a suite and a test can share a path, and then no pattern selects just the
+    one.
+    """
+    selector = "." + path
+    pat = Pattern.parse(selector)
+    hits = {k for k, t in tree.tests.items()
+            if any(pat.selects(p) for p in t.paths)}
+    if len(hits) != 1:
+        raise SelectionError(
+            "test path '%s' is not unique: '%s' selects %d tests. Rename the "
+            "suite or test that shares the path." % (path, selector, len(hits)))
+    return selector
+
+
+def build_instances(tree : Tree, res : Resolution, target : str,
+                    tests : List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """One entry per RUN -- a test on one view -- with the exact `dfm`
+    arguments that run it alone.
+
+    The unit a per-test runner schedules. `argv` is complete for the
+    selection, so the caller never assembles selection syntax itself; it does
+    NOT carry global options (`-c`, `-D`, project flags), which the caller
+    passes the same way it passed them to `tests-info`.
+    """
+    out = []
+    by_path = {format_path(t.path): t for t in res.kept_tests(tree)}
+    for entry in tests:
+        t = by_path[entry["path"]]
+        views = entry["views"]
+        if not views and t.views_open:
+            # The view axis is an expression that could not be resolved, so the
+            # runs cannot be enumerated. Listing one run that silently covers
+            # every view would defeat the point of per-run entries.
+            raise SelectionError(
+                "cannot list runs of '%s': its views are an expression that "
+                "could not be resolved here. Name them with --views."
+                % entry["path"])
+        for view in (views or [None]):
+            argv = ["run", target, "--tests", entry["selector"]]
+            if view is not None:
+                argv += ["--views", view]
+            out.append({
+                "id": entry["path"] + ("[view=%s]" % view if view else ""),
+                "test": entry["path"],
+                "view": view,
+                "argv": argv,
+            })
+    return out
+
+
+def add_requires(ctxt, inv : Dict[str, Any], tree : Tree, res : Resolution,
+                 sel : Selection, target : str, text : str) -> None:
+    """`--requires <pattern>`: add each run's producers of `pattern`, the
+    producers themselves, and the command that builds them.
+
+    Builds the target's graph under the same selection -- elaboration only,
+    nothing is wired to this node, so nothing executes. The graph is needed
+    because which producer a run uses is often decided while it is built
+    (`needs: [img-${{ this.view }}]`).
+    """
+    from .checks import _type_resolver
+    want = parse_requires(text)
+    root = ctxt.mkTaskNode(target, tests=list(sel.tests),
+                           views=list(sel.views), exclude=list(sel.exclude))
+    required = run_requires(tree, res, root, want, sel.test_key,
+                            _type_resolver(ctxt))
+    session_root = getattr(getattr(ctxt, "builder", None), "rundir", None)
+
+    by_path = {format_path(t.path): t for t in res.kept_tests(tree)}
+    producers : Dict[str, Dict[str, Any]] = {}
+    for inst in inv["instances"]:
+        nodes = required.get((by_path[inst["test"]].key, inst["view"]))
+        if nodes is None:
+            raise SelectionError(
+                "run '%s' was not found in the built graph of '%s'"
+                % (inst["id"], target))
+        inst["requires"] = [n.name for n in nodes]
+        for n in nodes:
+            entry = producers.get(n.name)
+            if entry is None:
+                entry = producers[n.name] = {
+                    "node": n.name,
+                    "rundir": relative_rundir(n, session_root),
+                    "needed_by": [],
+                }
+            entry["needed_by"].append(inst["id"])
+
+    warn_unproduced([i["id"] for i in inv["instances"] if not i["requires"]],
+                    len(inv["instances"]), text)
+
+    argv = ["run", target]
+    for flag, values in (("--tests", sel.tests), ("--views", sel.views),
+                         ("--exclude", sel.exclude)):
+        if values:
+            argv += [flag, ",".join(values)]
+    inv["requires"] = {"pattern": text, "produces": want}
+    inv["producers"] = list(producers.values())
+    inv["build"] = {"argv": argv + ["--build-only", text]}
+
+
+def relative_rundir(node, session_root) -> Optional[str]:
+    """Where `node` runs, relative to the session's rundir -- the path a
+    `--base-rundir` lookup resolves -- or None when it cannot be told."""
+    import re
+    from ..task_runner import TaskSetRunner
+    segs = getattr(node, "rundir", None)
+    if not isinstance(segs, list) or len(segs) < 2 or session_root is None \
+            or str(segs[0]) != str(session_root):
+        return None
+    return "/".join(re.sub(TaskSetRunner._INVALID_RUNDIR_CHARS, "_", str(s))
+                    for s in segs[1:])
+
+
+def _test_views(tree : Tree, res : Resolution, t) -> List[str]:
+    """The views `t` will run on under the selection."""
+    task_name = getattr(t.task, "name", "") or ""
+    if t.view is not None:
+        return [t.view] if t.view else []
+    if task_name in res.run_views:
+        return list(res.run_views[task_name] or [])
+    return list(t.views)
 
 
 # ---------------------------------------------------------------------------
@@ -146,9 +340,7 @@ def build_inventory(ctxt, target_task, sel : Selection) -> Dict[str, Any]:
 def TestInfo(ctxt, task, name):
     """`elaborate:` entry point for `std.TestInfo`."""
     params = ctxt.mkParams(task)
-    sel = Selection(
-        test_key=getattr(params, "test_key", None) or "name",
-        view_axis=getattr(params, "view_axis", None) or "view")
+    sel = Selection.from_params(params)
     target = str(getattr(params, "target", "") or "")
 
     target_task = resolve_target(ctxt, task, target)
@@ -158,15 +350,38 @@ def TestInfo(ctxt, task, name):
             "no task named '%s' to introspect. Set `target:` to the project's "
             "test-running root (the task that `uses: std.TestRunner`)." % target)
 
-    inventory = build_inventory(ctxt, target_task, sel)
+    tree = build_tree(
+        target_task, ctxt.declaredNeeds,
+        test_key=sel.test_key, view_axis=sel.view_axis,
+        expand=getattr(ctxt, "expand", None))
+    res = resolve(tree, sel)
+    for w in res.warnings:
+        _log.warning(w)
+    requires = str(getattr(params, "requires", "") or "").strip()
+    target_name = getattr(target_task, "name", "") or ""
+    inventory = build_inventory(
+        tree, res, target=target_name,
+        instances=bool(getattr(params, "instances", False)) or bool(requires))
+    if requires:
+        add_requires(ctxt, inventory, tree, res, sel, target_name, requires)
     _log.debug("test-info: target=%s cases=%s views=%s",
                inventory["target"], inventory["cases"], inventory["views"])
 
     # Build nothing upstream: an inventory must never trigger a compile.
     node = ctxt.buildDefault(task, name, select_needs=lambda needs: [])
+    if output_format(params) != "text":
+        # Read by `dfm run`: the summary is the payload, so nothing else may
+        # be written to stdout.
+        node.machine_output = True
     if getattr(node, "params", None) is not None:
         node.params.inventory = json.dumps(inventory)
     return node
+
+
+def output_format(params) -> str:
+    if getattr(params, "as_json", False):
+        return "json"
+    return str(getattr(params, "format", "") or "text")
 
 
 # ---------------------------------------------------------------------------
@@ -196,10 +411,10 @@ async def TestInfoRun(runner, input):
 # Hierarchy
 # ---------------------------------------------------------------------------
 #
-# A task name is a path, and the scopes it passes through are the project's own
-# structure (`fw-wb-dma.uvm` holds the UVM suites). Flattening that to one
-# fully-qualified name per row repeats the shared prefix on every line and
-# leaves the reader to spot what is a sibling of what.
+# A test path is a path, and the suites it passes through are the project's own
+# structure (`regress.uart` holds the UART suites). Flattening that to one
+# full path per row repeats the shared prefix on every line and leaves the
+# reader to spot what is a sibling of what.
 
 def scope_rows(suites : List[Dict[str, Any]]):
     """`suites` as `(depth, label, suite_or_None)` rows: a scope header, then
@@ -207,8 +422,8 @@ def scope_rows(suites : List[Dict[str, Any]]):
 
     Declaration order is preserved -- it is the order the flow file is written
     in, which is the order the author thinks about them in. A scope with one
-    child and no suites of its own is joined onto its child (`fw-wb-dma.uvm`,
-    not `fw-wb-dma` > `uvm`): the intermediate node carries no information a
+    child and no suites of its own is joined onto its child (`regress.uart`,
+    not `regress` > `uart`): the intermediate node carries no information a
     reader needs, and indenting for it wastes the width the case list wants.
     """
     root : Dict[str, Any] = {"children": {}, "suites": []}
@@ -276,11 +491,30 @@ def test_info_summary(ctxt):
     if not inv:
         return ctxt.task_summary()
 
+    # Machine formats: a plain string, printed verbatim.
+    fmt = output_format(params)
+    if fmt == "json":
+        return json.dumps(inv, indent=2)
+    if fmt == "yaml":
+        import yaml
+        return yaml.safe_dump(inv, sort_keys=False).rstrip("\n")
+    if fmt == "list":
+        # Each line is accepted back by `dfm run <target>`: an anchored
+        # selector per test, or the full selection arguments per run.
+        if "instances" in inv:
+            return "\n".join(" ".join(i["argv"][2:]) for i in inv["instances"])
+        return "\n".join(t["selector"] for t in inv.get("tests") or [])
+
     blocks = []
 
     header = Table.grid(padding=(0, 2))
     header.add_column(justify="left", style="bold")
     header.add_column(justify="left")
+    selection = inv.get("selection") or {}
+    sel_text = "  ".join(
+        "--%s %s" % (k, ",".join(v)) for k, v in selection.items() if v)
+    if sel_text:
+        header.add_row("selection", sel_text)
     header.add_row("cases", _fmt(inv.get("cases") or []))
     header.add_row("views", _fmt(inv.get("views") or [],
                                  inv.get("views_open", False)))
@@ -308,9 +542,24 @@ def test_info_summary(ctxt):
                 _fmt(suite.get("cases") or []))
         blocks.append(table)
 
+    producers = inv.get("producers")
+    if producers is not None:
+        table = Table.grid(padding=(0, 2))
+        table.add_column(justify="left")
+        table.add_column(justify="left")
+        table.add_row("[bold]producer[/bold]", "[bold]needed by[/bold]")
+        for p in producers:
+            n = len(p["needed_by"])
+            table.add_row(p["node"], "%d run%s" % (n, "" if n == 1 else "s"))
+        if not producers:
+            table.add_row(_fmt([]), "")
+        blocks.append(table)
+        blocks.append("[%s]dfm %s[/%s]" % (
+            S_LABEL, " ".join(inv["build"]["argv"]), S_LABEL))
+
     # The copy-paste line -- the point of running this command at all.
     usage = (
-        "[%s]dfm run %s --tests <case>[,<case>]  --views <view>[,<view>][/%s]"
+        "[%s]dfm run %s --tests <pattern>[,<pattern>]  --views <view>[,<view>][/%s]"
         % (S_LABEL, inv.get("target") or "tests", S_LABEL))
     blocks.append(usage)
 

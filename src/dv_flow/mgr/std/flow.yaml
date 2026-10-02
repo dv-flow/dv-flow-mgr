@@ -383,10 +383,13 @@ package:
         * an end-of-run **report** of per-case status, with `--detail`
           controlling how much is shown.
 
-      A case declares its identity with a `std.Test` tag; a suite is a matrix
-      task whose cells carry a `name` field (see `test_key`). Needs that are
-      neither -- an image, a flags item, a helper -- are always kept, so
-      selecting tests never breaks the build.
+      A case declares its identity with a `std.Test` tag. A suite is either a
+      matrix task whose cells carry a `name` field (see `test_key`), or a task
+      that `uses: std.TestSuite` and lists its members -- tests or further
+      suites -- as `needs:`. A test's path is its position in that tree,
+      relative to this task (`sanity.reset`); that is what `--tests` matches.
+      Needs that are none of these -- an image, a flags item, a helper -- are
+      always kept, so selecting tests never breaks the build.
 
       Selection is deliberately strict: naming a test that does not exist, or a
       selection that matches nothing, is an error rather than a quietly green
@@ -398,14 +401,42 @@ package:
         type: list
         value: []
         cli: {short: t}
+        desc: Tests to run, by path pattern (e.g. reset, sanity., uart.fifo_*)
         doc: |
-          Cases to run, by name. Empty (the default) runs all of them.
+          Tests to run, as path patterns. Empty (the default) runs all of them.
+          `reset` matches a test or suite named `reset` anywhere in the tree;
+          `sanity.reset` a trailing path; `sanity.` everything under the
+          `sanity` suite; a leading `.` anchors at this task; `*` globs within
+          one name and `**` across names. Each pattern must match something.
       views:
         type: list
         value: []
         cli: true
         doc: |
           Variants/configurations to run the cases on. Empty runs all of them.
+      exclude:
+        type: list
+        value: []
+        cli: {short: x}
+        desc: Tests to leave out, by path pattern; applied after --tests
+        doc: |
+          Path patterns (same syntax as `tests`) for tests to leave out.
+          Applied last, so an exclude always wins over a selection.
+      build_only:
+        type: str
+        value: ""
+        cli: {name: build-only}
+        desc: Build what the selected tests need (producers of PATTERN); run no tests
+        doc: |
+          Builds the nearest producers of PATTERN that the selected tests
+          depend on, and runs none of the tests. PATTERN is a produce pattern:
+          `std.FileSet:filetype=simDir`, or just `filetype=simDir`.
+
+          The first half of a split regression: build once here, then run each
+          test in its own rundir with `--base-rundir` pointing at this one.
+          Producers are built where a normal run would build them, so the
+          per-test runs find them instead of rebuilding. `tests-info
+          --requires PATTERN` lists the same producers, and the command.
       detail:
         type: str
         value: normal
@@ -450,8 +481,14 @@ package:
         with: { target: tests }
       ```
 
-      `tests-info.json` is written to the rundir for scripted use; the console
-      report is the same data.
+      It accepts the same selection as the runner (`--tests`, `--views`,
+      `--exclude`), resolved by the same code, so `tests-info --tests sanity.`
+      lists exactly what `tests --tests sanity.` would run. `--format` (or
+      `--json`) picks the output: `text` (the default panel), `json`, `yaml`,
+      or `list` -- one test path per line, each accepted back by `--tests`.
+      In a machine format the payload is the only thing written to stdout.
+
+      `tests-info.json` is written to the rundir for scripted use.
     shell: pytask
     run: dv_flow.mgr.std.test_info.TestInfoRun
     elaborate: dv_flow.mgr.std.test_info:TestInfo
@@ -464,6 +501,69 @@ package:
           The test-running root to introspect. A bare name resolves in this
           task's own package first, so a base project can write `target: tests`
           once and have it bind in every leaf.
+      tests:
+        type: list
+        value: []
+        cli: {short: t}
+        desc: Tests to list, by path pattern (same syntax as the runner's)
+      views:
+        type: list
+        value: []
+        cli: true
+        desc: Views to list (same as the runner's --views)
+      exclude:
+        type: list
+        value: []
+        cli: {short: x}
+        desc: Tests to leave out, by path pattern
+      format:
+        type: str
+        value: text
+        cli: true
+        desc: Output format
+        values:
+        - {value: text, desc: "the inventory panel"}
+        - {value: json, desc: "the inventory as JSON"}
+        - {value: yaml, desc: "the inventory as YAML"}
+        - {value: list, desc: "one --tests selector per line"}
+      instances:
+        type: bool
+        value: false
+        cli: true
+        desc: List runs (a test on one view) with the dfm arguments for each
+        doc: |
+          Lists RUNS instead of tests: one entry per test per view, each with
+          an `id` and the exact `argv` that runs it alone (`dfm run <target>
+          --tests .<path> --views <view>`). The unit a per-test runner
+          schedules. `argv` is `[run, <target>, <selection args>...]` and
+          carries only the selection: insert run options (`--clean`, `-c`)
+          after `run`, and pass `-D` and project flags the same way they were
+          passed here.
+          With `--format list`, each line is the selection arguments of one
+          run.
+      requires:
+        type: str
+        value: ""
+        cli: true
+        desc: Report the producers of PATTERN each run needs (implies --instances)
+        doc: |
+          The build fan-in of the selection. PATTERN is a produce pattern:
+          `std.FileSet:filetype=simDir`, or just `filetype=simDir`. Each run
+          gets `requires`, the nearest producers of PATTERN its data comes
+          from; `producers` lists each one once, with the runs that need it;
+          `build.argv` builds them all, and runs no test (the target's
+          `--build-only`).
+
+          This builds the target's graph (nothing executes), because which
+          producer a run uses is often decided at graph build. Producers are
+          found from `produces:` declarations, so a producer that does not
+          declare its output is missed; a run with no producer is warned about.
+      as_json:
+        # Not `json`: that name shadows an attribute of the params model.
+        type: bool
+        value: false
+        cli: {name: json}
+        desc: Shorthand for --format json
       test_key:
         type: str
         value: name
@@ -482,6 +582,28 @@ package:
         doc: |
           Set by the elaborator: the enumerated inventory, as JSON. Not a user
           parameter.
+
+  - name: TestSuite
+    scope: export
+    passthrough: all
+    consumes: none
+    desc: "A named collection of tests and suites"
+    doc: |
+      Groups tests -- and other suites -- under one name. The members are the
+      task's `needs:`; a suite that contains suites is a super-suite, and
+      nothing else distinguishes it.
+
+      ```yaml
+      - name: sanity
+        uses: std.TestSuite
+        needs: [reset, csr-rw, fifo-suite]
+      ```
+
+      The suite's name (the task's own name, or `name:` on a `std.TestSuite`
+      tag) becomes a segment of each member's test path, so
+      `dfm run tests --tests sanity.` selects everything in it. Run directly,
+      a suite simply runs all its members; selection happens in the
+      `std.TestRunner` that reaches it.
 
   types:
   - name: Check
@@ -583,9 +705,17 @@ package:
     uses: std.Tag
     doc: |
       Marks a task as a test case and gives it the identity `std.TestRunner`
-      selects on. `case` is the short name the user types (`--tests arb`);
-      `view` is the variant it runs on, when a project has more than one.
+      selects on. `name` is its segment in the test path (`sanity.reset`),
+      defaulting to the task's own name; `case` is the older spelling of the
+      same thing. `view` is the variant it runs on, when a project has more
+      than one.
     with:
+      name:
+        type: str
+        value: ""
+      desc:
+        type: str
+        value: ""
       case:
         type: str
         value: ""
@@ -593,6 +723,21 @@ package:
         type: str
         value: ""
       group:
+        type: str
+        value: ""
+
+  - name: TestSuite
+    uses: std.Tag
+    doc: |
+      Marks a task as a test suite. On a matrix task whose cells carry a
+      `name`, it names the suite (`name`, defaulting to the task's own name);
+      on any other task, the task's `needs:` are the suite's members.
+      `uses: std.TestSuite` is the usual way to declare a collector suite.
+    with:
+      name:
+        type: str
+        value: ""
+      desc:
         type: str
         value: ""
 

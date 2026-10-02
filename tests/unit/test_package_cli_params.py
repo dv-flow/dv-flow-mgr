@@ -110,6 +110,44 @@ def test_a_base_package_can_expose_a_project_interface(tmp_path):
     assert [a.name for a in collect_package_cli(pkg, loader)] == ["build"]
 
 
+
+@pytest.mark.parametrize("leaf_sim", [
+    "vcs",                          # value-only rebind
+    "{type: str, value: vcs}",      # full redeclaration, saying nothing of cli
+])
+def test_an_inherited_flag_shows_the_leafs_default(tmp_path, leaf_sim):
+    """A leaf that changes an inherited knob's default keeps the base's flag,
+    but `--help` must show the default actually in effect -- not the base's.
+    Showing the base's told users the project ran a different simulator."""
+    (tmp_path / "base.yaml").write_text(textwrap.dedent('''\
+    package:
+        name: base
+        with:
+          sim: {type: str, value: vlt, cli: true, values: [vlt, vcs],
+                desc: Simulator backend}
+    '''))
+    (tmp_path / "flow.dv").write_text(textwrap.dedent('''\
+    package:
+        name: leaf
+        uses: base
+        imports:
+        - base.yaml
+        with:
+          sim: %s
+        tasks:
+        - {root: t, uses: std.Message, with: {msg: "${{ sim }}"}}
+    ''' % leaf_sim))
+    loader, pkg = loadProjPkgDef(str(tmp_path))
+    args = {a.name: a for a in collect_package_cli(pkg, loader)}
+    assert args["sim"].default == "vcs"
+    assert args["sim"].help == "Simulator backend"
+
+    for argv in (["t", "--help"], []):
+        proc = _dfm(tmp_path, *argv)
+        assert "(default: vcs)" in proc.stdout, proc.stdout
+        assert "(default: vlt)" not in proc.stdout, proc.stdout
+
+
 # ---------------------------------------------------------------------------
 # Binding
 # ---------------------------------------------------------------------------

@@ -288,6 +288,55 @@ def _reachable_produces(nodes):
     return reachable, direct
 
 
+def producers(roots, want, resolve=None):
+    """The nearest producers of `want` that each of `roots` depends on, as
+    {root name: [producer nodes]}.
+
+    The same dataflow walk as `_reachable_produces`, read the other way:
+    instead of "what reaches this consumer?", "which nodes supply it with
+    `want`?". On each path the walk stops at the first node that declares a
+    matching output, so an image's own upstream is not reported, and it does
+    not continue past a node that consumes what it receives -- a producer
+    whose output is used up on the way is not one the root depends on.
+
+    A root's own declarations do not count: a root reads its inputs, so the
+    walk starts at its needs (and, for a compound, its input).
+    """
+    out = {}
+    for root in roots:
+        found = []
+        seen = set()
+
+        def walk(node):
+            if node is None or id(node) in seen:
+                return
+            seen.add(id(node))
+            if any(pattern_matches(want, have, resolve)
+                   for have in _node_produces(node)):
+                if node not in found:
+                    found.append(node)
+                return
+            if not _passes_through(node):
+                return
+            for nxt in _upstream(node):
+                walk(nxt)
+
+        for nxt in _upstream(root):
+            walk(nxt)
+        out[root.name] = found
+    return out
+
+
+def _upstream(node):
+    for entry in getattr(node, 'needs', ()) or ():
+        nxt = entry[0] if isinstance(entry, tuple) else entry
+        if nxt is not None:
+            yield nxt
+    inp = getattr(node, 'input', None)
+    if inp is not None and inp is not node:
+        yield inp
+
+
 def _fmt(pattern):
     """'{type: hdlsim.SimImg, profile: true}' -- readable in a diagnostic."""
     return "{%s}" % ", ".join(

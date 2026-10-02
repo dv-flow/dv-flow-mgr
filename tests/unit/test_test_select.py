@@ -20,7 +20,7 @@ import pytest
 
 from dv_flow.mgr import PackageLoader, TaskGraphBuilder
 from dv_flow.mgr.std.test_select import (
-    Selection, SelectionError, plan_need, check_selection)
+    Selection, SelectionError, build_tree, resolve)
 # Imported under an alias: pytest would otherwise collect `test_tag` itself as
 # a test case and fail it for requesting a `task` "fixture".
 from dv_flow.mgr.std.test_select import test_tag as read_test_tag
@@ -126,38 +126,59 @@ def _cases(names):
 
 # --------------------------------------------------------------- unit level
 
+def _root(pkg, *names):
+    """A stand-in runner whose needs are the named tasks."""
+    import types
+    return types.SimpleNamespace(
+        name="p.root", needs=[pkg.task_m["p.%s" % n] for n in names])
+
+
+def _tree(pkg, *names, expand=None):
+    return build_tree(_root(pkg, *names), lambda t: list(t.needs),
+                      expand=expand)
+
+
 def test_tag_is_read_off_a_task(pkg):
     assert read_test_tag(pkg.task_m["p.solo"]).case == "smoke"
     assert read_test_tag(pkg.task_m["p.helper"]) is None
 
 
 def test_an_untagged_non_matrix_need_is_not_a_test(pkg):
-    plan = plan_need(pkg.task_m["p.helper"], Selection(tests=["arb"]))
-    assert plan.is_test is False
-    assert plan.keep is True
+    tree = _tree(pkg, "suite", "helper")
+    assert tree.kinds["p.helper"] == "other"
+    res = resolve(tree, Selection(tests=["arb"]))
+    assert "p.helper" not in res.dropped
 
 
 def test_a_matrix_offers_its_cases_and_views(pkg):
-    plan = plan_need(pkg.task_m["p.suite"], Selection())
-    assert plan.is_test is True
-    assert plan.cases == ["arb", "arb_eq", "err"]
-    assert plan.views == ["tlm", "rtl"]
+    tree = _tree(pkg, "suite")
+    suite = tree.suites["p.suite"]
+    assert [k[1] for k in suite.tests] == ["arb", "arb_eq", "err"]
+    assert suite.views == ["tlm", "rtl"]
+
+
+def test_an_untagged_matrix_is_a_suite_named_after_its_task(pkg):
+    """Paths need a segment for the suite; the task's own name is the one the
+    author already chose."""
+    tree = _tree(pkg, "suite", "solo")
+    assert sorted(".".join(t.path) for t in tree.tests.values()) == [
+        "smoke", "suite.arb", "suite.arb_eq", "suite.err"]
 
 
 def test_a_fully_deselected_suite_is_dropped(pkg):
     """An empty matrix would build a suite that runs nothing, which reads as
     success; drop the whole need instead."""
-    plan = plan_need(pkg.task_m["p.suite"], Selection(tests=["smoke"]))
-    assert plan.keep is False
+    res = resolve(_tree(pkg, "suite", "solo"), Selection(tests=["smoke"]))
+    assert "p.suite" in res.dropped
 
 
 def test_no_selection_builds_no_variant(pkg):
     """Selecting everything must be the same graph as selecting nothing --
     otherwise the default path carries the cost of the feature."""
-    assert plan_need(pkg.task_m["p.suite"], Selection()).variant is None
-    assert plan_need(
-        pkg.task_m["p.suite"],
-        Selection(tests=["arb", "arb_eq", "err"])).variant is None
+    tree = _tree(pkg, "suite")
+    assert resolve(tree, Selection()).narrowed == {}
+    assert resolve(
+        tree, Selection(tests=["arb", "arb_eq", "err"])).narrowed == {}
 
 
 def test_an_expression_view_axis_is_resolved_when_it_can_be(pkg):
@@ -165,62 +186,50 @@ def test_an_expression_view_axis_is_resolved_when_it_can_be(pkg):
     (`image: "${{ images }}"`). Resolving it is what lets a mistyped `--views`
     be reported here, instead of being bound literally and failing much later
     with an error naming neither the view nor the flag that set it."""
-    suite = pkg.task_m["p.expr_suite"]
-    plan = plan_need(suite, Selection(), expand=lambda e: ["tlm", "rtl"])
-    assert plan.views == ["tlm", "rtl"]
-    assert plan.views_open is False
+    tree = _tree(pkg, "expr_suite", expand=lambda e: ["tlm", "rtl"])
+    assert tree.suites["p.expr_suite"].views == ["tlm", "rtl"]
+    assert not any(t.views_open for t in tree.tests.values())
 
 
 def test_an_unresolvable_view_axis_stays_open(pkg):
     """When the axis cannot be resolved its members are genuinely unknown, so
     validation must stay silent rather than reject a working flow."""
-    suite = pkg.task_m["p.expr_suite"]
-    plan = plan_need(suite, Selection(), expand=lambda e: e)
-    assert plan.views_open is True
+    tree = _tree(pkg, "expr_suite", expand=lambda e: e)
+    assert all(t.views_open for t in tree.tests.values())
 
 
 def test_an_open_view_axis_suppresses_view_validation(pkg):
     """The false-positive guard: with one suite's views unknowable, an
     unmatched view cannot be claimed."""
-    sel = Selection(views=["anything"])
-    open_plan = plan_need(pkg.task_m["p.expr_suite"], sel, expand=lambda e: e)
-    known_plan = plan_need(pkg.task_m["p.suite"], sel)
-    check_selection(sel, [open_plan, known_plan])   # must not raise
+    tree = _tree(pkg, "expr_suite", "suite", expand=lambda e: e)
+    resolve(tree, Selection(views=["anything"]))   # must not raise
 
 
 # ------------------------------------------------------------- diagnostics
 
 def test_unmatched_test_is_an_error(pkg):
-    plans = [plan_need(t, Selection(tests=["nosuch"]))
-             for t in (pkg.task_m["p.suite"], pkg.task_m["p.solo"])]
     with pytest.raises(SelectionError, match="no test matches 'nosuch'"):
-        check_selection(Selection(tests=["nosuch"]), plans)
+        resolve(_tree(pkg, "suite", "solo"), Selection(tests=["nosuch"]))
 
 
 def test_the_error_lists_what_is_available(pkg):
-    sel = Selection(tests=["nosuch"])
-    plans = [plan_need(t, sel)
-             for t in (pkg.task_m["p.suite"], pkg.task_m["p.solo"])]
-    with pytest.raises(SelectionError, match="arb, arb_eq, err, smoke"):
-        check_selection(sel, plans)
+    with pytest.raises(SelectionError,
+                       match="smoke, suite.arb, suite.arb_eq, suite.err"):
+        resolve(_tree(pkg, "suite", "solo"), Selection(tests=["nosuch"]))
 
 
 def test_unmatched_view_is_an_error(pkg):
-    sel = Selection(views=["nosuch"])
-    plans = [plan_need(pkg.task_m["p.suite"], sel)]
     with pytest.raises(SelectionError, match="no view matches"):
-        check_selection(sel, plans)
+        resolve(_tree(pkg, "suite"), Selection(views=["nosuch"]))
 
 
 def test_selecting_with_no_tests_present_is_an_error(pkg):
-    sel = Selection(tests=["arb"])
-    plans = [plan_need(pkg.task_m["p.helper"], sel)]
     with pytest.raises(SelectionError, match="none of this task's needs"):
-        check_selection(sel, plans)
+        resolve(_tree(pkg, "helper"), Selection(tests=["arb"]))
 
 
 def test_no_selection_never_raises(pkg):
-    check_selection(Selection(), [plan_need(pkg.task_m["p.helper"], Selection())])
+    resolve(_tree(pkg, "helper"), Selection())
 
 
 # ------------------------------------------------------------- graph level
@@ -299,8 +308,9 @@ def test_comma_and_repeated_flags_agree(proj):
     `action='append'`, which does not comma-split on its own."""
     _dfm(proj, "run", "tests", "--tests", "arb,err", "--views", "tlm")
     comma = _ran(proj)
-    _dfm(proj, "--clean", "run", "tests", "--tests", "arb", "--tests", "err",
-         "--views", "tlm")
+    proc = _dfm(proj, "run", "--clean", "tests", "--tests", "arb",
+                "--tests", "err", "--views", "tlm")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     repeated = _ran(proj)
     assert comma == repeated
     assert "RAN-tlm/arb" in comma and "RAN-tlm/err" in comma

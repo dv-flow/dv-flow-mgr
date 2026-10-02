@@ -5,7 +5,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dv-flow-mgr"
-version = "1.12.0"
+# The version lives in src/dv_flow/mgr/__version__.py, its one source.
+dynamic = ["version"]
 dependencies = [
 #    'jq',
     'pydantic',
@@ -26,6 +27,9 @@ agent = [
     "openai-agents[litellm]>=0.9.0",
     "prompt_toolkit>=3.0",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "dv_flow.mgr.__version__._pkg_version"}
 
 [project.scripts]
 dfm = "dv_flow.mgr.__main__:main"

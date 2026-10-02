@@ -14,17 +14,17 @@
 # being reachable, to test nothing this repo controls.
 #
 # What it checks instead is THE CONTRACT WITH THE SHARED WORKFLOW, which is
-# otherwise unchecked anywhere and fails silently when broken. That workflow
-# stamps the build version with:
+# otherwise unchecked anywhere and fails silently when broken. dfm keeps its
+# version in ONE place, src/dv_flow/mgr/__version__.py, and pyproject.toml
+# reads it (`dynamic = ["version"]`). When <version_dir>/__version__.py exists
+# the shared workflow reads BASE from it and stamps the suffix with:
 #
-#   sed -i -e 's%SUFFIX=".*"%SUFFIX="${suffix}"%g' \
-#          -e 's%VERSION=".*"%VERSION="${version}"%g' <version_dir>/__init__.py
-#   sed -i -e 's%version.*=.*".*"%version = "${version}${suffix}"%g' pyproject.toml
+#   sed -i -e 's%^SUFFIX *= *".*"%SUFFIX = "${suffix}"%' <version_dir>/__version__.py
 #
-# `sed` does not fail when its pattern matches nothing. So a version_dir that
-# has moved, or an __init__.py that no longer carries VERSION/SUFFIX, produces a
-# green build that stamped nothing -- and the mismatch surfaces as a package
-# whose metadata version and runtime __version__ disagree.
+# and leaves pyproject.toml alone. So the file must carry a literal BASE and
+# SUFFIX in that shape, and pyproject.toml must not declare a version of its own
+# -- a second copy is how `__version__` came to say 1.5.0 while the package was
+# at 1.12.0.
 #
 # THERE IS DELIBERATELY NO PUBLISH JOB. Releases for this repo run on GitHub
 # through the shared workflow, sync-policy.toml records authority as `github`,
@@ -81,41 +81,38 @@ jobs:
     - name: The version stamp the shared workflow applies must have something to bite on
       run: |
         vd='src/dv_flow/mgr'
+        vfile="$vd/__version__.py"
         rc=0
 
-        if [ ! -d "$vd" ]; then
-          echo "::error::version_dir '$vd' does not exist; the shared workflow stamps into it"
+        if [ ! -f "$vfile" ]; then
+          echo "::error::$vfile does not exist; it is dfm's one version source"
           exit 1
         fi
-        echo "OK: version_dir $vd exists"
 
-        # pyproject.toml, read with the SAME pipeline the shared workflow uses.
-        # Matching its extraction rather than writing a better one is the point:
-        # what matters is what that sed will see.
-        version=$(grep -w version pyproject.toml | sed -e 's%^.*=.*"\([^"][^"]*\)".*$%\1%' | head -1)
+        # Read with the SAME pipeline the shared workflow uses: what matters is
+        # what that sed will see.
+        version=$(sed -n -e 's%^BASE *= *"\([^"][^"]*\)".*$%\1%p' "$vfile")
         if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+'; then
-          echo "::error::cannot read a version from pyproject.toml (got '$version')"
+          echo "::error::cannot read BASE from $vfile (got '$version')"
           rc=1
         else
-          echo "OK: pyproject.toml declares $version"
+          echo "OK: $vfile declares BASE $version"
+        fi
+        if ! grep -qE '^SUFFIX *= *"' "$vfile"; then
+          echo "::error::$vfile has no SUFFIX = \"...\" line for the stamp to rewrite"
+          rc=1
+        else
+          echo "OK: $vfile carries the SUFFIX line the stamp rewrites"
         fi
 
-        # __init__.py. A WARNING rather than an error, deliberately: four repos
-        # in this org are in this state today (dv-flow-libcc, dv-flow-libgh, dv-flow-librdl, pytest-dfm), it
-        # predates the co-existence work, and failing their CI on the day they
-        # enter sync would be this migration breaking something it did not
-        # break. The consequence is real but narrow -- pyproject.toml is what
-        # determines the published artifact's version, so releases are correct;
-        # it is __version__ at runtime that goes stale.
-        init="$vd/__init__.py"
-        if [ ! -f "$init" ]; then
-          echo "::warning::$init does not exist; the shared workflow's VERSION/SUFFIX stamp is a no-op"
-        elif ! grep -qE '^VERSION\s*=\s*"' "$init" || ! grep -qE '^SUFFIX\s*=\s*"' "$init"; then
-          echo "::warning::$init has no top-level VERSION=\"...\" and SUFFIX=\"...\" pair;"
-          echo "::warning::the shared workflow seds for exactly that shape and sed does not fail on no match,"
-          echo "::warning::so __version__ will not reflect the build while pyproject.toml will."
+        if grep -qE '^version *= *"' pyproject.toml; then
+          echo "::error::pyproject.toml declares a version; it must read $vfile instead"
+          rc=1
+        elif ! grep -qF 'attr = "dv_flow.mgr.__version__._pkg_version"' pyproject.toml; then
+          echo "::error::pyproject.toml does not read its version from $vfile"
+          rc=1
         else
-          echo "OK: $init carries the VERSION/SUFFIX pair the stamp rewrites"
+          echo "OK: pyproject.toml reads the version from $vfile"
         fi
 
         exit $rc
