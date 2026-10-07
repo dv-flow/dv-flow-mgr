@@ -5,7 +5,7 @@ import os
 # `.dev<run>+gh` on a non-release build -- so the wheel's metadata and the
 # runtime version cannot disagree. Keep this file free of imports beyond the
 # standard library: setuptools loads it on its own, in an isolated build.
-BASE = "1.19.0"
+BASE = "1.20.0"
 SUFFIX = ""
 
 __version__ = (BASE, SUFFIX)
