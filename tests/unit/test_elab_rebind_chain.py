@@ -420,3 +420,53 @@ def test_rebind_uses_task_is_old_base(env):
     abstract, impl = b.lookupTask("foo.Abstract"), b.lookupTask("foo.ImplA")
     v = _ctxt(b).rebindUses(abstract, abstract, impl)
     assert v is not abstract and v.uses is impl and abstract.uses is None
+
+
+# --- Package `uses:` inheritance ----------------------------------------------
+
+def test_inherited_task_keeps_the_leafs_override_of_its_need(env):
+    """REGRESSION: a task a leaf inherits through package `uses:` is an alias
+    whose `needs` are already re-resolved in the leaf -- the leaf's override of
+    a slot replaces the base's. The alias is marked so needs gathering does not
+    walk into the base task as well. `rebindUses` copies with `dc.replace`,
+    which dropped that mark when it was an ad-hoc attribute, so the rebound
+    alias gathered BOTH the leaf's override and the base's own slot. In
+    project terms: `coverage` (inherited, `uses: hdlsim.SimCovMerge`,
+    `needs: [tests]`) ran the archetype's empty `tests` beside the leaf's."""
+    with open(os.path.join(env, "foo.dv"), "w") as f:
+        f.write(_HEADER)
+    with open(os.path.join(env, "base.dv"), "w") as f:
+        f.write('''
+package:
+  name: base
+  imports: [foo.dv]
+  tasks:
+  - export: slot
+    uses: std.Message
+    with: {msg: "base-slot"}
+  - root: R
+    uses: foo.Abstract
+    needs: [slot]
+    with: {target: A}
+''')
+    with open(os.path.join(env, "flow.dv"), "w") as f:
+        f.write('''
+package:
+  name: leaf
+  uses: base
+  imports: [base.dv]
+  tasks:
+  - override: slot
+    uses: std.Message
+    with: {msg: "leaf-slot"}
+''')
+    collector = MarkerCollector()
+    loader = PackageLoader(marker_listeners=[collector])
+    pkg = loader.load(os.path.join(env, "flow.dv"))
+    b = TaskGraphBuilder(root_pkg=pkg, rundir=os.path.join(env, "rundir"),
+                         marker_l=collector, loader=loader)
+    node = b.mkTaskNode("leaf.R")
+    assert _need_names(node) == ["leaf.slot"]
+    rb = _run(env, node)
+    assert rb.INVOKED == ["leaf.R"]
+    assert [r[0] for r in rb.RAN] == ["A"]

@@ -224,6 +224,13 @@ class Task(object):
     is_root : bool = False
     is_export : bool = False
     is_local : bool = False
+    # An alias a package `uses:` inheritance made of a base package's task. Its
+    # `needs` are already the base's, re-resolved in the inheriting package, so
+    # needs gathering does not walk into the aliased base as well. A field, not
+    # an ad-hoc attribute: `dc.replace` (as in ElabCtxt.rebindUses) copies only
+    # fields, and an alias that lost the mark gathered the base's needs too --
+    # the archetype's own slot next to the leaf's override of it.
+    inherited : bool = False
     strategy : Strategy = dc.field(default=None)
     # Deferred `uses` for matrix-strategy body subtasks: when a body task computes
     # its `uses` from a matrix variable (e.g. `uses: uvm-${{ this.test }}`), the
