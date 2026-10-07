@@ -110,6 +110,8 @@ class PackageProviderYaml(PackageProvider):
     _loading : bool = dc.field(default=False)
     _fragment_names : Dict[str, str] = dc.field(default_factory=dict)  # Track fragment names -> file
     _field_srcinfo_map : Dict[int, Dict] = dc.field(default_factory=dict)  # Store _field_srcinfo by object id
+    # The parameter overrides `pkg` was built under (see _ensurePackage).
+    _pkg_overrides_key : Optional[str] = dc.field(default=None)
     _log : ClassVar[logging.Logger] = logging.getLogger("PackageProviderYaml")
 
     # Shared parser hook that dispatches based on file extension
@@ -143,26 +145,46 @@ class PackageProviderYaml(PackageProvider):
                 return field_info[field_name]
         return None
 
-    def getPackageNames(self, loader : PackageLoaderP) -> List[str]: 
-        assert not self._loading
-        if self.pkg is None:
-            self._loading = True
-            self.pkg = Package(
-                basedir=os.path.dirname(self.path),
-                srcinfo=SrcInfo(file=self.path))
-            self._loadPackage(self.pkg, self.path, loader)
-            self._loading = False
-        return [self.pkg.name]
+    @staticmethod
+    def _overridesKey(loader : PackageLoaderP) -> str:
+        ov = getattr(loader, 'param_overrides', None) or {}
+        return repr(sorted((str(k), repr(v)) for k, v in ov.items()))
 
-    def getPackage(self, name : str, loader : PackageLoaderP) -> Package: 
+    def _ensurePackage(self, loader : PackageLoaderP) -> Package:
+        """Load the package, or reuse the one already loaded.
+
+        A provider registered with ExtRgy is a process-wide singleton, so the
+        package it caches outlives the loader that built it. That package has
+        the loader's parameter overrides baked in -- package-variable defaults,
+        and every `${{ var }}` resolved during the load, such as one in a
+        task's `needs:`. So it is reused only by a loader with the same
+        overrides, and rebuilt for any other. `dfm run` depends on this: it
+        loads once to learn the project's `cli:` flags, then reloads with
+        their values, and a base package reused from the first load would
+        ignore `--build dbg` where `-D build=dbg` worked.
+        """
         assert not self._loading
-        if self.pkg is None:
+        key = self._overridesKey(loader)
+        if self.pkg is None or self._pkg_overrides_key != key:
+            self._pkg_path_m.clear()
+            self._fragment_names.clear()
+            self._field_srcinfo_map.clear()
             self._loading = True
-            self.pkg = Package(
-                basedir=os.path.dirname(self.path),
-                srcinfo=SrcInfo(file=self.path))
-            self._loadPackage(self.pkg, self.path, loader)
-            self._loading = False
+            try:
+                self.pkg = Package(
+                    basedir=os.path.dirname(self.path),
+                    srcinfo=SrcInfo(file=self.path))
+                self._loadPackage(self.pkg, self.path, loader)
+            finally:
+                self._loading = False
+            self._pkg_overrides_key = key
+        return self.pkg
+
+    def getPackageNames(self, loader : PackageLoaderP) -> List[str]:
+        return [self._ensurePackage(loader).name]
+
+    def getPackage(self, name : str, loader : PackageLoaderP) -> Package:
+        self._ensurePackage(loader)
         if name != self.pkg.name:
             raise Exception("Internal error: this provider only handles %s:%s" % (
                 self.pkg.name, self.path))
@@ -173,12 +195,9 @@ class PackageProviderYaml(PackageProvider):
         self._log.debug("--> findPackage %s" % name)
 
         if not self._loading:
-            if self.pkg is None:
-                ret = self.getPackage(name, loader)
-                if name != ret.name:
-                    raise Exception("Package name doesn't match expected")
-            else:
-                ret = self.pkg
+            ret = self.getPackage(name, loader)
+            if name != ret.name:
+                raise Exception("Package name doesn't match expected")
 
         self._log.debug("<-- findPackage %s" % name)
         return ret
