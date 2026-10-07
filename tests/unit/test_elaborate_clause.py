@@ -34,8 +34,17 @@ def rebind_to_banner(ctxt, task, name):
     """Rewrite `uses` to the flow's foo.Banner task (like the hdlsim backend
     selector rebinds to a concrete backend), so the node prints ELABORATED."""
     INVOKED.append(name)
-    variant = dc.replace(task, uses=ctxt.getTask("foo.Banner"), paramT=None)
+    variant = ctxt.rebindUses(task, _abstract(task), ctxt.getTask("foo.Banner"))
     return ctxt.buildDefault(variant, name)
+
+def _abstract(task):
+    """The chain link that carries this elaborator, found by identity."""
+    cur = task
+    while cur is not None:
+        if getattr(cur, "elaborate", None) == "elabmod:rebind_to_banner":
+            return cur
+        cur = cur.uses
+    raise Exception("no rebind_to_banner link in chain of %s" % task.name)
 '''
 
 

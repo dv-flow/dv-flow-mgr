@@ -42,6 +42,11 @@ class ElabCtxt:
       mkParams(task)                  -- build and return this task's params model
       mkTaskNode(name_or_task, ...)   -- resolve/build another task's node
       resolveNeed(name)               -- memoized lazy need lookup (== _getTaskNode)
+      getTask(name)                   -- look up a task type without building it
+      rebindUses(task, old, new)      -- variant of `task` whose chain reaches
+                                         `new` where it reached `old`; keeps
+                                         intermediate links (use this, not
+                                         dc.replace(task, uses=...))
 
     Needs wiring primitives (used by custom compound/leaf elaborators):
       wireNeed(node, need, block=False)

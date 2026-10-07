@@ -37,6 +37,7 @@ along the ``uses`` chain, so binding an abstract type covers every task that
 
 .. code-block:: python
 
+    from dv_flow.mgr.task import iter_uses_chain
     from dv_flow.mgr.task_elaborator import TaskElaborator
 
     class BackendSelect(TaskElaborator):
@@ -45,10 +46,18 @@ along the ``uses`` chain, so binding an abstract type covers every task that
             if sim == "unset":
                 ctxt.error("No simulator selected for '%s'" % name)
                 raise Exception("no simulator selected")
-            # rebind `uses` to the concrete backend and build normally
-            import dataclasses as dc
+            # rebind the abstract type to the concrete backend, keeping any
+            # intermediate tasks between `task` and it, and build normally
+            family = next(t for t in iter_uses_chain(task)
+                          if t.name == "hdlsim.SimImage")
             concrete = ctxt.getTask("hdlsim.%s.SimImage" % sim)
-            return ctxt.buildDefault(dc.replace(task, uses=concrete, paramT=None), name)
+            return ctxt.buildDefault(ctxt.rebindUses(task, family, concrete), name)
+
+Rebind with ``ctxt.rebindUses``, not ``dc.replace(task, uses=concrete)``. The
+elaborator is bound along the ``uses`` chain, so ``task`` may reach the
+abstract type through the user's own tasks (``image uses base uses
+hdlsim.SimImage``). ``dc.replace`` swaps ``task``'s *first* link, which splices
+``base`` -- its ``with:`` values and its ``needs:`` -- out of the chain.
 
 The ``ctxt`` (an ``ElabCtxt``) is how an elaborator builds nodes:
 
@@ -66,6 +75,12 @@ The ``ctxt`` (an ``ElabCtxt``) is how an elaborator builds nodes:
     without building it. ``mkTaskNode`` accepts a name **or** a ``Task``; the
     latter is how you build a locally-derived variant
     (``dc.replace(need, strategy=…)``).
+``rebindUses(task, old_base, new_base)``
+    Return a variant of ``task`` whose ``uses`` chain reaches ``new_base``
+    where it used to reach ``old_base``. Every link between ``task`` and
+    ``old_base`` is kept, as a copy, so other tasks that share them are
+    unaffected. ``old_base`` is matched by identity: pass the chain object
+    found by walking the chain, not a name lookup.
 ``expand(expr)``
     Evaluate a ``${{ }}`` expression in this elaboration's context — useful to
     inspect a declaration that is still an expression, such as a matrix axis

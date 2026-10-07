@@ -213,6 +213,54 @@ class BuilderElabCtxt(object):
         """Resolve a task *type* by name without building it (for rebinding)."""
         return self.builder.lookupTask(name)
 
+    def rebindUses(self, task, old_base, new_base):
+        """Return a variant of `task` whose `uses` chain reaches `new_base`
+        where it used to reach `old_base`.
+
+        This is the way to specialize an abstract type from an elaborator:
+        `ctxt.rebindUses(task, abstract, concrete)`. `dc.replace(task,
+        uses=concrete)` is wrong as soon as the elaborator is inherited through
+        an intermediate task (`R uses Base uses Abstract`): it replaces R's
+        *first* link, splicing `Base` -- and with it Base's `with:` values and
+        `needs:` -- out of the chain.
+
+        Every link from `task` down to the one that pointed at `old_base` is
+        kept, as a copy (never mutated: other tasks share them) with `paramT`
+        reset so params rebuild against the new chain. `old_base` itself is
+        replaced, so its own declarations are in the new chain only if
+        `new_base` derives from it. If `task` is itself `old_base`, its own
+        `uses` is replaced (and its declarations kept).
+
+        `old_base` is matched by identity: pass the chain object found by
+        walking `task`'s chain, not a name lookup (under package aliasing the
+        chain may hold the type under another qualified name).
+
+        Materialized attributes (`uptodate`, `passthrough`, ...) are read off
+        the returned leaf; adjusting them stays the caller's job.
+        """
+        if task is old_base:
+            links = [task]
+        else:
+            links = []      # task, ..., L where L.uses is old_base
+            cur = task
+            seen = set()
+            while cur is not None and id(cur) not in seen:
+                seen.add(id(cur))
+                links.append(cur)
+                if cur.uses is old_base:
+                    break
+                cur = cur.uses
+            else:
+                raise Exception(
+                    "rebindUses: '%s' is not in the uses chain of '%s'" % (
+                        getattr(old_base, 'name', old_base), task.name))
+        new = new_base
+        for link in reversed(links):
+            new = dc.replace(link, uses=new, paramT=None)
+            if link is not task:
+                self.builder._rebound_links[id(new)] = new
+        return new
+
     def declaredNeeds(self, task):
         """The task's declared needs, as a list of **Task** objects (not `Need`
         -- `Task.needs` holds resolved Tasks, which `_gatherNeeds` reads
@@ -390,6 +438,11 @@ class TaskGraphBuilder(object):
     # forever. The node name is stable across those aliases, so gating on it too
     # makes the re-entrancy guard alias-proof (critical for package-uses-package).
     _elab_active_names : set = dc.field(default_factory=set)
+    # Intermediate `uses` links copied by ElabCtxt.rebindUses, keyed by id().
+    # They are not registered tasks, so they must never be resolved by name
+    # (see the implementation borrow in _mkTaskLeafNode). Holding the Task
+    # keeps it alive, so its id stays unique for the builder's lifetime.
+    _rebound_links : Dict[int,Any] = dc.field(default_factory=dict)
     _ctxt : TaskNodeCtxt = None
     _uses_count : int = 0
     _inherit_rundir_depth : int = 0
@@ -1084,7 +1137,7 @@ class TaskGraphBuilder(object):
             if params is None:
                 # Build paramT lazily
                 if task.paramT is None:
-                    if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                    if chain_declares_params(task):
                         param_builder = ParamBuilder(eval or self._eval)
                         task.paramT = param_builder.build_param_type(task)
                 params = task.paramT() if task.paramT else None
@@ -1453,7 +1506,7 @@ class TaskGraphBuilder(object):
         # Build parameters if needed
         if params is None:
             if task.paramT is None:
-                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                if chain_declares_params(task):
                     param_builder = ParamBuilder(eval or self._eval)
                     task.paramT = param_builder.build_param_type(task)
             params = task.paramT() if task.paramT else None
@@ -1523,7 +1576,7 @@ class TaskGraphBuilder(object):
         if params is None:
             # Build paramT lazily
             if task.paramT is None:
-                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                if chain_declares_params(task):
                     param_builder = ParamBuilder(self._eval)
                     task.paramT = param_builder.build_param_type(task)
             params = task.paramT() if task.paramT else None
@@ -1959,8 +2012,7 @@ class TaskGraphBuilder(object):
             # binding is an expression over these very parameters, so they have
             # to exist before the family knows which cell it denotes.
             if task.paramT is None:
-                if task.param_defs is not None or (
-                        task.uses and (task.uses.paramT or task.uses.param_defs)):
+                if chain_declares_params(task):
                     task.paramT = ParamBuilder(
                         eval or self._eval).build_param_type(task)
             params = task.paramT() if task.paramT else None
@@ -2551,9 +2603,21 @@ class TaskGraphBuilder(object):
                 # its `requires:` contract must not fire here -- that contract
                 # is for whoever DERIVES from it, and is evaluated on the
                 # derived node (which accumulates it along the `uses` chain).
+                #
+                # A link copied by ElabCtxt.rebindUses is not a registered task:
+                # looking it up by name would build the ORIGINAL link, whose
+                # chain still ends at the abstract type the elaborator just
+                # rebound away from (and, with the elaborator suppressed by the
+                # re-entrancy guard, borrows its empty body). Step past copies
+                # to the first registered link. A copy has no body of its own
+                # to offer: had it one, the loader would have materialized it
+                # onto `task.run` and we would not be here.
+                base = task.uses
+                while id(base) in self._rebound_links and isinstance(base.uses, Task):
+                    base = base.uses
                 self._uses_impl_depth += 1
                 try:
-                    uses = self._getTaskNode(task.uses.name)
+                    uses = self._getTaskNode(base.name)
                 finally:
                     self._uses_impl_depth -= 1
                 callable = uses.task
@@ -2610,7 +2674,7 @@ class TaskGraphBuilder(object):
             # a matrix-specific eval context is active.
             needs_rebuild = task.paramT is None or (eval is not None and eval is not self._eval)
             if needs_rebuild:
-                if task.param_defs is not None or (task.uses and (task.uses.paramT or task.uses.param_defs)):
+                if chain_declares_params(task):
                     param_builder = ParamBuilder(eval or self._eval)
                     paramT = param_builder.build_param_type(task)
                 else:
