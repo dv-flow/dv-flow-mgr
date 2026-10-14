@@ -58,9 +58,12 @@ class ExecCallable(object):
         self._log.debug("--> ExecCallable")
         self._log.debug("Body:\n%s" % self.body)
 
-        # Merge std.Env filesets into context environment for exec
-        env = _merge_env_filesets(ctxt, input)
-        ctxt.env.update(env)
+        # Merge std.Env filesets into THIS task's environment. Assigned, never
+        # written into ctxt.env in place: that dict is the run's shared env,
+        # and an update() there leaks one task's settings into every task
+        # running alongside it or after it (e.g. a Verilator-only cocotb
+        # setting reaching a concurrent Icarus run).
+        ctxt.env = _merge_env_filesets(ctxt, input)
 
         # If it is a single line, then we have a spec to load
         # Otherwise, we have an inline task

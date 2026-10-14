@@ -124,6 +124,23 @@ class TaskNode(object):
             inherits_rundir=self.inherits_rundir,
         )
 
+    def _impl_identity(self):
+        """What actually runs for this node: the pytask/shell body, or the
+        callable's qualified name. Recorded in exec_data and compared by the
+        up-to-date check, because the same task name can be bound to a
+        different implementation from one run to the next -- `uses:
+        hdlsim.${{ sim }}.SimImage` under `--sim vlt` and then `--sim ivl` has
+        the same name, rundir and params -- and a result produced by one
+        implementation must never stand in for the other's."""
+        task = getattr(self, "task", None)
+        if task is None:
+            return None
+        body = getattr(task, "body", None)
+        if isinstance(body, str):
+            return body
+        return "%s.%s" % (getattr(task, "__module__", ""),
+                          getattr(task, "__qualname__", type(task).__name__))
+
     def _get_exec_data_filename(self):
         """Get the exec_data filename using the naming scheme."""
         if self.ctxt and self.ctxt.naming_scheme:
@@ -344,6 +361,7 @@ class TaskNode(object):
             "logfile": self._get_log_filename(),
             "params": self.params.model_dump(mode='json') if hasattr(self.params, 'model_dump') else {},
             "inputs_signature": inputs_signature,
+            "impl": self._impl_identity(),
             "input": input.model_dump(mode='json', warnings=False),
             "needs": [need[0].name for need in self.needs],
             "commands": [cmd.model_dump(mode='json') for cmd in ctxt._exec_info],

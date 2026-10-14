@@ -642,6 +642,14 @@ class TaskNodeLeaf(TaskNode):
             self._log.debug("Task %s: parameters changed, not up-to-date" % self.name)
             return (False, None)
         
+        # Compare the implementation: the same task name, rundir and params can
+        # be bound to a different implementation (a `--sim` switch rebinding
+        # `uses: hdlsim.${{ sim }}.SimImage`). A record without one predates
+        # this check and cannot vouch for itself, so it re-runs once.
+        if exec_data.get("impl") != self._impl_identity():
+            self._log.debug("Task %s: implementation changed, not up-to-date" % self.name)
+            return (False, None)
+
         # Compare inputs signature -- which inputs, and what was in them.
         saved_signature = exec_data.get("inputs_signature", [])
         if saved_signature != self._inputs_signature:

@@ -746,6 +746,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                 "rundir": rundir,
                 "params": t.params.model_dump(mode='json') if hasattr(t.params, 'model_dump') else {},
                 "inputs_signature": inputs_signature,
+                "impl": t._impl_identity() if hasattr(t, "_impl_identity") else None,
                 "result": {
                     "status": t.result.status,
                     "changed": t.result.changed,

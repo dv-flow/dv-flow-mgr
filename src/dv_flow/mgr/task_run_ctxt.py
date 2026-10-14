@@ -42,6 +42,10 @@ class TaskRunCtxt(object):
     _log : logging.Logger = dc.field(default_factory=lambda: logging.getLogger("TaskRunCtxt"))
     _exec_start_callback : callable = dc.field(default=None)
     _exec_end_callback : callable = dc.field(default=None)
+    # This task's own environment, when it has one (its std.Env inputs merged
+    # over the graph's). Set through the `env` setter. The graph's env is
+    # shared by every task in the run, so a task must never write into it.
+    _env : dict = dc.field(default=None)
 
     @property
     def root_pkgdir(self):
@@ -123,7 +127,13 @@ class TaskRunCtxt(object):
 
     @property
     def env(self):
+        if self._env is not None:
+            return self._env
         return self.ctxt.env if self.ctxt is not None else os.environ
+
+    @env.setter
+    def env(self, env):
+        self._env = env
     
     def mkDataItem(self, type, **kwargs):
         """
