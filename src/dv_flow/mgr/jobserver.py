@@ -189,7 +189,7 @@ class JobServer:
         """
         return f"--jobserver-auth=fifo:{self.fifo_path}"
     
-    async def acquire(self, timeout: float = 60.0):
+    async def acquire(self, timeout: float = None):
         """
         Acquire a job token (async, blocks if none available).
         
@@ -197,7 +197,9 @@ class JobServer:
         A single background task reads tokens from the FIFO and distributes them.
         
         Args:
-            timeout: Maximum time to wait in seconds (default 60)
+            timeout: Maximum time to wait in seconds (default None: wait as
+                long as it takes; a token may be held by a job that runs for
+                many minutes, so a waiting job is queued work, not a hang)
             
         Raises:
             asyncio.TimeoutError: If timeout expires
@@ -227,7 +229,7 @@ class JobServer:
         self._activate_reader()
         
         try:
-            # Wait for token with timeout
+            # Wait for a token (bounded only if the caller asked)
             await asyncio.wait_for(future, timeout=timeout)
             self._acquired_count += 1
             _log.debug(f"Acquired token (count={self._acquired_count})")
