@@ -396,7 +396,16 @@ class CmdRun(object):
             target, replacement = override_spec.split('=', 1)
             builder.addOverride(target.strip(), replacement.strip())
 
-        runner = TaskSetRunner(rundir, builder=builder, backend=backend)
+        # -j on the command line wins; DFM_JOBS sets a default task-parallelism
+        # cap (eg per-project in .envrc) for runs that don't pass one. Passed to
+        # the constructor, not set afterwards: __post_init__ sizes the jobserver
+        # from nproc, so a later assignment would leave it at os.cpu_count().
+        nproc = -1
+        if args.j != -1:
+            nproc = int(args.j)
+        elif os.environ.get("DFM_JOBS", "").strip():
+            nproc = int(os.environ["DFM_JOBS"])
+        runner = TaskSetRunner(rundir, builder=builder, backend=backend, nproc=nproc)
         runner.base_rundir = base_rundir
 
         # Initialize cache providers from DV_FLOW_CACHE environment variable
@@ -406,8 +415,6 @@ class CmdRun(object):
         if runner.cache_providers:
             self._log.info(f"Cache enabled with {len(runner.cache_providers)} provider(s)")
 
-        if args.j != -1:
-            runner.nproc = int(args.j)
         
         # Wire up force_run from CLI
         if getattr(args, 'force', False):
