@@ -103,7 +103,6 @@ def test_base_matrix_expands(tmp_path):
     assert _cell_needs(n) == {"amd_0": ["img-amd"], "px_1": ["img-px"]}
 
 
-@pytest.mark.xfail(strict=True, reason="item 2: strategy not inherited via uses")
 def test_repro_b_loads_and_expands(tmp_path):
     """Plan §2 repro B: bypass_initial expands into its own amd/px cells."""
     b = _builder(tmp_path, _REPRO_B)
@@ -114,7 +113,6 @@ def test_repro_b_loads_and_expands(tmp_path):
     assert _cell_needs(n) == {"amd_0": ["img-amd"], "px_1": ["img-px"]}
 
 
-@pytest.mark.xfail(strict=True, reason="item 2: strategy not inherited via uses")
 def test_inherit_one_node_per_cell(tmp_path, capsys):
     """§5 case 1: no own strategy -> one node per inherited cell."""
     b = _builder(tmp_path, _PLAIN_BASE % "  - { name: t1, uses: case }")
@@ -125,7 +123,6 @@ def test_inherit_one_node_per_cell(tmp_path, capsys):
     assert "base-body on px" in out
 
 
-@pytest.mark.xfail(strict=True, reason="item 2: body can't see task params")
 def test_inherit_body_sees_task_params(tmp_path, capsys):
     """§5 case 2: two tests with different `testname` get different results."""
     b = _builder(tmp_path, _REPRO_B)
@@ -135,7 +132,6 @@ def test_inherit_body_sees_task_params(tmp_path, capsys):
             assert "%s on %s" % (t, img) in out
 
 
-@pytest.mark.xfail(strict=True, reason="item 2: multi-level inheritance")
 def test_inherit_multi_level(tmp_path, capsys):
     """§5 case 4: base -> mid (adds a default) -> test still gets the matrix."""
     b = _builder(tmp_path, _REPRO_B + """\
