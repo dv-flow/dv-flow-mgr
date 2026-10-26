@@ -182,3 +182,42 @@ def test_override_strategy_and_body(tmp_path, capsys):
     assert "own-body on px" in out
     assert "base-body" not in out
     assert "build" not in out
+
+
+def test_task_namespace_in_inherited_body(tmp_path, capsys):
+    """§5 case 3: `task.*` in an inherited body names the inheriting task."""
+    text = _PLAIN_BASE.replace(
+        'msg: "base-body on ${{ this.image }}"',
+        'msg: "R ${{ task.leafname }} ${{ task.name }} ${{ this.image }}"') % (
+        "  - { name: t1, uses: case }\n"
+        "  - { name: t2, uses: case }")
+    b = _builder(tmp_path, text)
+    out = _run(b, tmp_path, capsys, "pb.t1", "pb.t2")
+    for t in ("t1", "t2"):
+        for img in ("amd", "px"):
+            assert "R %s pb.%s %s" % (t, t, img) in out
+    assert "R case" not in out
+
+
+def test_task_namespace_in_own_params(tmp_path, capsys):
+    """`task.*` in an ordinary task's parameters names that task."""
+    text = _PLAIN_BASE % (
+        '  - { name: plain, uses: std.Message,'
+        ' with: { msg: "P ${{ task.leafname }} ${{ task.name }}" } }')
+    b = _builder(tmp_path, text)
+    out = _run(b, tmp_path, capsys, "pb.plain")
+    assert "P plain pb.plain" in out
+
+
+def test_task_namespace_outside_task(tmp_path):
+    """§4: `task` in a package variable is an error that says where it's bound."""
+    text = """\
+package:
+  name: pv
+  with:
+    v: { type: str, value: "x-${{ task.leafname }}" }
+  tasks:
+  - { name: m, uses: std.Message, with: { msg: "${{ v }}" } }
+"""
+    with pytest.raises(Exception, match="'task' is only defined in a task's"):
+        _builder(tmp_path, text).mkTaskNode("pv.m")

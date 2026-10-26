@@ -792,6 +792,12 @@ class TaskGraphBuilder(object):
         # Add task parameters as 'this' in the scope's variables
         if isinstance(task, TaskNodeCompound):
             scope.variables['this'] = task.params
+        # The reserved `task` namespace names the task being built. A matrix
+        # body is expanded inside its owner's scope, so an inherited body
+        # sees the inheriting task.
+        scope.variables['task'] = {
+            'name': task.name,
+            'leafname': task.name.rsplit('.', 1)[-1]}
         self._name_resolution_stack[-1].task_scopes.append(scope)
 
     def task_scope(self):

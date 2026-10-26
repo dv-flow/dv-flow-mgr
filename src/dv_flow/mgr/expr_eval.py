@@ -41,6 +41,14 @@ class ResolveError(Exception):
     pass
 
 
+def _not_found_msg(name):
+    """'Variable not found' text; the reserved `task` namespace says where it
+    is bound instead."""
+    if name == "task":
+        return "'task' is only defined in a task's parameters and body"
+    return "Variable '%s' not found" % name
+
+
 @dc.dataclass
 class ExprEval(ExprVisitor):
     methods: Dict[str, Callable] = dc.field(default_factory=dict)
@@ -230,7 +238,7 @@ class ExprEval(ExprVisitor):
             if default_value is not None:
                 self.value = default_value
                 return
-            raise Exception("Variable '%s' not found" % id_parts[0])
+            raise Exception(_not_found_msg(id_parts[0]))
 
         # If qualified lookup returned a terminal value, stop here
         # Otherwise, traverse remaining identifiers
@@ -279,7 +287,7 @@ class ExprEval(ExprVisitor):
             if default_value is not None:
                 self.value = default_value
             else:
-                raise Exception("Variable '%s' not found" % id_str)
+                raise Exception(_not_found_msg(id_str))
 
     def visitExprString(self, e: ExprString):
         self.value = e.value
