@@ -221,3 +221,31 @@ package:
 """
     with pytest.raises(Exception, match="'task' is only defined in a task's"):
         _builder(tmp_path, text).mkTaskNode("pv.m")
+
+
+def test_inherited_body_error_names_both_tasks(tmp_path):
+    """§4: an error expanding a base's body names the inheriting task and the base."""
+    b = _builder(tmp_path, _PLAIN_BASE % """\
+  - name: by_arch
+    uses: case
+    strategy:
+      matrix:
+        arch: [x86]
+""")
+    with pytest.raises(Exception, match=r"by_arch \(inherits strategy from case\): "
+                                        r"Sub-element 'image' not found"):
+        b.mkTaskNode("pb.by_arch")
+
+
+def test_inherited_body_undeclared_param_fails_at_load(tmp_path):
+    """§4: a base body using a parameter no task declares is caught at load, on the base."""
+    text = _REPRO_B.replace('    with:\n      testname: { type: str, value: "" }\n', '')
+    text = text.replace(", with: { testname: t_bypass }", "").replace(
+        ", with: { testname: t_encrypt }", "")
+    (tmp_path / "flow.dv").write_text(text)
+    from .marker_collector import MarkerCollector
+    collector = MarkerCollector()
+    PackageLoader(marker_listeners=[collector]).load(str(tmp_path / "flow.dv"))
+    msgs = [m.msg for m in collector.markers]
+    assert any("pb.case." in m and "undefined variable 'testname'" in m
+               for m in msgs), msgs

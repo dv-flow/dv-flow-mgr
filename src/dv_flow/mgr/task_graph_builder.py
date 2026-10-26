@@ -1643,9 +1643,11 @@ class TaskGraphBuilder(object):
             # A task with its own strategy but no body runs the nearest
             # base's body over its own matrix (e.g. a narrowed view list).
             body = task.subtasks
+            body_owner = task
             base = task.uses
             while not body and isinstance(base, Task):
                 body = base.subtasks
+                body_owner = base
                 base = base.uses
 
             self.push_task_scope(ret)
@@ -1653,6 +1655,14 @@ class TaskGraphBuilder(object):
                 res = self._applyStrategyMatrix(body, matrix_items, 0, ret.name,
                                                 parent_let=self._get_let(task),
                                                 parent_set=self._get_set(task))
+            except Exception as e:
+                # Name both tasks when the body came from a base via `uses:`
+                leaf = ret.name.rsplit(".", 1)[-1]
+                owner = body_owner.name.rsplit(".", 1)[-1]
+                if owner == leaf or "(inherits strategy from" in str(e):
+                    raise
+                raise Exception("%s (inherits strategy from %s): %s" % (
+                    leaf, owner, e)) from e
             finally:
                 self.pop_task_scope()
 
