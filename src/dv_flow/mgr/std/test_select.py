@@ -230,12 +230,16 @@ def _short_name(task) -> str:
 
 
 def _matrix_of(task):
-    """The task's matrix axes if it is a matrix strategy task, else None."""
-    strategy = getattr(task, "strategy", None)
-    if strategy is None:
-        return None
-    matrix = getattr(strategy, "matrix", None)
-    return matrix if matrix else None
+    """The task's matrix axes if it is a matrix strategy task, else None.
+    A task with no strategy of its own inherits the nearest one up its
+    `uses:` chain."""
+    for t in iter_uses_chain(task):
+        strategy = getattr(t, "strategy", None)
+        if strategy is None:
+            continue
+        matrix = getattr(strategy, "matrix", None)
+        return matrix if matrix else None
+    return None
 
 
 def _case_axis(matrix, test_key):

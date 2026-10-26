@@ -326,3 +326,95 @@ def test_unmatched_selector_fails_the_run(proj):
     assert proc.returncode != 0
     assert "no test matches" in (proc.stdout + proc.stderr)
     assert _ran(proj) == []
+
+
+# ------------------------------------------------- inherited matrices (§3.4)
+
+from .test_strategy_inherit import _REPRO_B
+
+
+@pytest.fixture
+def inh(tmpdir):
+    with open(os.path.join(str(tmpdir), "flow.dv"), "w") as f:
+        f.write(_REPRO_B)
+    collector = MarkerCollector()
+    loader = PackageLoader(marker_listeners=[collector])
+    p = loader.load(os.path.join(str(tmpdir), "flow.dv"))
+    assert [m.msg for m in collector.markers] == []
+    return loader, p
+
+
+def _inh_needs(inh, tmpdir, **overrides):
+    loader, pkg = inh
+    builder = TaskGraphBuilder(
+        root_pkg=pkg, loader=loader,
+        rundir=os.path.join(str(tmpdir), "rundir"),
+        task_param_overrides={"pb.tests": overrides} if overrides else {})
+    node = builder.mkTaskNode("pb.tests")
+    seen = set()
+    def walk(n):
+        if n.name in seen:
+            return
+        seen.add(n.name)
+        for sub in getattr(n, "tasks", None) or []:
+            walk(sub)
+        for need, _ in n.needs:
+            walk(need)
+    walk(node)
+    return seen
+
+
+def _inh_cells(names):
+    import re
+    return sorted(re.sub(r"(_\d+)+$", "", n.split(".", 1)[1])
+                  for n in names
+                  if n.split(".")[1:2] in (["bypass_initial"], ["encrypt_initial"])
+                  and n.count(".") == 2 and not n.endswith(".in"))
+
+
+def _inh_tree(pkg):
+    import types
+    root = types.SimpleNamespace(name="pb.root", needs=[pkg.task_m["pb.uvm-tests"]])
+    return build_tree(root, lambda t: list(t.needs), view_axis="image")
+
+
+def test_inherited_matrix_offers_its_views(inh):
+    tree = _inh_tree(inh[1])
+    resolve(tree, Selection(views=["px"]))       # must not raise
+
+
+def test_inherited_matrix_unknown_view_lists_views(inh):
+    with pytest.raises(SelectionError, match="amd.*px|px.*amd"):
+        resolve(_inh_tree(inh[1]), Selection(views=["nosuch"]))
+
+
+def test_inherited_matrix_unknown_test_is_an_error(inh):
+    with pytest.raises(SelectionError, match="no test matches 'nosuch'"):
+        resolve(_inh_tree(inh[1]), Selection(tests=["nosuch"]))
+
+
+def test_inherited_matrix_runs_everything_by_default(inh, tmpdir):
+    names = _inh_needs(inh, tmpdir)
+    assert _inh_cells(names) == sorted([
+        "bypass_initial.amd", "bypass_initial.px",
+        "encrypt_initial.amd", "encrypt_initial.px"])
+    assert "pb.img-amd" in names and "pb.img-px" in names
+
+
+def test_inherited_matrix_view_selection_prunes_the_image(inh, tmpdir):
+    names = _inh_needs(inh, tmpdir, views="px")
+    assert _inh_cells(names) == ["bypass_initial.px", "encrypt_initial.px"]
+    assert "pb.img-amd" not in names
+
+
+def test_inherited_matrix_test_selection(inh, tmpdir):
+    names = _inh_needs(inh, tmpdir, tests="bypass_initial")
+    assert _inh_cells(names) == ["bypass_initial.amd", "bypass_initial.px"]
+    names = _inh_needs(inh, tmpdir, tests="uvm-tests.bypass_initial", views="amd")
+    assert _inh_cells(names) == ["bypass_initial.amd"]
+    assert "pb.img-px" not in names
+
+
+def test_inherited_matrix_exclude(inh, tmpdir):
+    names = _inh_needs(inh, tmpdir, exclude="bypass_initial")
+    assert _inh_cells(names) == ["encrypt_initial.amd", "encrypt_initial.px"]
