@@ -145,7 +145,6 @@ def test_inherit_multi_level(tmp_path, capsys):
     assert "t_mid on px" in out
 
 
-@pytest.mark.xfail(strict=True, reason="item 3: own strategy keeps base body")
 def test_override_strategy_without_body(tmp_path, capsys):
     """§5 case 5a: own `strategy:` w/o `body:` runs the base body on the new matrix."""
     b = _builder(tmp_path, _PLAIN_BASE % """\

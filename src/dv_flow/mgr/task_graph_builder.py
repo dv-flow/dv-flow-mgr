@@ -1634,9 +1634,17 @@ class TaskGraphBuilder(object):
             # The body sees the task's params as bare names (`${{ testname }}`).
             # `ret.params` are the params of the task being built: when it is
             # reached through `uses:`, the inheriting task's values.
+            # A task with its own strategy but no body runs the nearest
+            # base's body over its own matrix (e.g. a narrowed view list).
+            body = task.subtasks
+            base = task.uses
+            while not body and isinstance(base, Task):
+                body = base.subtasks
+                base = base.uses
+
             self.push_task_scope(ret)
             try:
-                res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name,
+                res = self._applyStrategyMatrix(body, matrix_items, 0, ret.name,
                                                 parent_let=self._get_let(task),
                                                 parent_set=self._get_set(task))
             finally:
