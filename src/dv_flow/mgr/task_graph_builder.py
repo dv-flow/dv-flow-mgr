@@ -792,6 +792,12 @@ class TaskGraphBuilder(object):
         # Add task parameters as 'this' in the scope's variables
         if isinstance(task, TaskNodeCompound):
             scope.variables['this'] = task.params
+        # The reserved `task` namespace names the task being built. A matrix
+        # body is expanded inside its owner's scope, so an inherited body
+        # sees the inheriting task.
+        scope.variables['task'] = {
+            'name': task.name,
+            'leafname': task.name.rsplit('.', 1)[-1]}
         self._name_resolution_stack[-1].task_scopes.append(scope)
 
     def task_scope(self):
@@ -1631,9 +1637,34 @@ class TaskGraphBuilder(object):
                     axis = resolved
                 matrix_items.append((k, axis))
 
-            res = self._applyStrategyMatrix(task.subtasks, matrix_items, 0, ret.name,
-                                            parent_let=self._get_let(task),
-                                            parent_set=self._get_set(task))
+            # The body sees the task's params as bare names (`${{ testname }}`).
+            # `ret.params` are the params of the task being built: when it is
+            # reached through `uses:`, the inheriting task's values.
+            # A task with its own strategy but no body runs the nearest
+            # base's body over its own matrix (e.g. a narrowed view list).
+            body = task.subtasks
+            body_owner = task
+            base = task.uses
+            while not body and isinstance(base, Task):
+                body = base.subtasks
+                body_owner = base
+                base = base.uses
+
+            self.push_task_scope(ret)
+            try:
+                res = self._applyStrategyMatrix(body, matrix_items, 0, ret.name,
+                                                parent_let=self._get_let(task),
+                                                parent_set=self._get_set(task))
+            except Exception as e:
+                # Name both tasks when the body came from a base via `uses:`
+                leaf = ret.name.rsplit(".", 1)[-1]
+                owner = body_owner.name.rsplit(".", 1)[-1]
+                if owner == leaf or "(inherits strategy from" in str(e):
+                    raise
+                raise Exception("%s (inherits strategy from %s): %s" % (
+                    leaf, owner, e)) from e
+            finally:
+                self.pop_task_scope()
 
         tasks = []
         tasks.extend(ret.tasks[1:])
@@ -2265,6 +2296,10 @@ class TaskGraphBuilder(object):
         # (e.g. set: [{ hdlsim.sim: "${{ matrix.sim }}" }]). Popped after
         # the cell's node is fully built.
         _set_scope = self._apply_set(eval_ctx, parent_set, parent_name)
+        # Bind `this`/`matrix` to the cell in the name-resolution scopes too:
+        # an enclosing compound's scope (e.g. the task that `uses:` this
+        # matrix) would otherwise resolve `this` to its own params.
+        _cell_scope = self._push_cell_scope(this_vars, matrix_dict)
         try:
             # Resolve a deferred (matrix-driven) `uses` for this cell: the
             # body task's `uses` expression (e.g. uvm-${{ this.test }}) is
@@ -2316,6 +2351,12 @@ class TaskGraphBuilder(object):
                 except Exception:
                     fq_name = subtask.name
                     leaf_name = subtask.leafname
+            # A body inherited through `uses:` is declared under the base
+            # (`pb.case.amd`); re-root it under the task being built
+            # (`pb.bypass_initial.amd`) so each inheriting task gets its own cells.
+            if (parent_fq and isinstance(fq_name, str) and leaf_name
+                    and fq_name != "%s.%s" % (parent_fq, leaf_name)):
+                fq_name = "%s.%s" % (parent_fq, leaf_name)
             if name is None:
                 # A matrix cell has no identity of its own, so the naming scheme
                 # derives one from the parent and the cell's bindings. A select
@@ -2375,7 +2416,23 @@ class TaskGraphBuilder(object):
 
             return node
         finally:
+            if _cell_scope:
+                self.pop_task_scope()
             self._pop_set_scope(_set_scope)
+
+    def _push_cell_scope(self, this_vars, matrix_dict):
+        """Push a task scope holding a matrix cell's `this`/`matrix` bindings.
+        Returns False (nothing pushed) when there is no name-resolution
+        context."""
+        if not self._name_resolution_stack:
+            return False
+        import types
+        self._name_resolution_stack[-1].task_scopes.append(
+            TaskNameResolutionScope(
+                task=types.SimpleNamespace(params=None),
+                variables={'this': dict(this_vars),
+                           'matrix': dict(matrix_dict)}))
+        return True
 
     def _eval_in_cell(self, eval_ctx, expr):
         """Evaluate `expr` against a matrix cell's bindings with the

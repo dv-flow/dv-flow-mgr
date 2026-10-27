@@ -56,7 +56,8 @@ RUN_NAMES = frozenset(("rundir", "inputs", "name", "result_file", "memento"))
 #   input,
 #   item    -- bound per-element inside map()/select() (also handled
 #              structurally in expr_refs, this is the belt-and-braces case)
-OPAQUE_NAMES = frozenset(("this", "matrix", "input", "item"))
+#   task    -- the task being built (`task.name`, `task.leafname`)
+OPAQUE_NAMES = frozenset(("this", "matrix", "input", "item", "task"))
 
 
 @dc.dataclass

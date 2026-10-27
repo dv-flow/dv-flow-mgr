@@ -19,6 +19,8 @@ rounds." A task expresses this with a ``control:`` block.
 ``control:`` is mutually exclusive with ``strategy:`` (a task uses one or the
 other). It is independent of ``iff:`` -- ``iff:`` gates whether the task runs at
 all, while ``control:`` shapes how its body runs once it does.
+A ``strategy: matrix`` task, and a task that inherits one through ``uses:``,
+is described in :doc:`expressions` ("Inheriting a matrix").
 
 Conditions are ``${{ }}`` expressions and may reference the task's input
 (``${{ in.<field> }}``), loop state (``${{ state.<field> }}``), and the
