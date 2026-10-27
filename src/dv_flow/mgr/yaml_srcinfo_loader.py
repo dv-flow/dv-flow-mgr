@@ -1,7 +1,12 @@
 
-from yaml.loader import SafeLoader
+# Use libyaml's C parser when PyYAML was built with it; it parses several
+# times faster than the pure-Python one and gives the same nodes and marks.
+try:
+    from yaml import CSafeLoader as _BaseLoader
+except ImportError:
+    from yaml.loader import SafeLoader as _BaseLoader
 
-class YamlSrcInfoLoader(SafeLoader):
+class YamlSrcInfoLoader(_BaseLoader):
     # Keys whose entries keep their `srcinfo`. Everything else has it pruned,
     # because a `srcinfo` on every nested mapping would end up inside parameter
     # values and other places where it is data rather than provenance.
