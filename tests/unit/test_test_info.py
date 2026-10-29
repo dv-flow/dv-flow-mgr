@@ -203,3 +203,72 @@ def test_run_reports_and_runs_nothing(proj):
                     ran.extend(l.strip() for l in f
                                if l.startswith(("RAN-", "BUILT-")))
     assert ran == []
+
+
+# ------------------------------------------------- matrix inherited via uses:
+
+from .test_strategy_inherit import _REPRO_B
+
+
+@pytest.fixture
+def inh_proj(tmpdir):
+    d = os.path.join(str(tmpdir), "inh")
+    os.makedirs(d)
+    with open(os.path.join(d, "flow.dv"), "w") as f:
+        f.write(_REPRO_B)
+    return d
+
+
+def _inh_inventory(proj, **overrides):
+    collector = MarkerCollector()
+    loader = PackageLoader(marker_listeners=[collector])
+    pkg = loader.load(os.path.join(proj, "flow.dv"))
+    assert [m.msg for m in collector.markers] == []
+    builder = TaskGraphBuilder(
+        root_pkg=pkg, loader=loader,
+        rundir=os.path.join(proj, "rundir"),
+        task_param_overrides={"pb.tests-info": overrides} if overrides else {})
+    node = builder.mkTaskNode("pb.tests-info")
+    return json.loads(node.params.inventory)
+
+
+def test_inherited_matrix_tests_are_listed_once_with_their_views(inh_proj):
+    inv = _inh_inventory(inh_proj)
+    by_name = {}
+    for t in inv["tests"]:
+        by_name.setdefault(t["name"], []).append(t)
+    assert sorted(by_name) == ["bypass_initial", "encrypt_initial"]
+    for name, rows in by_name.items():
+        assert len(rows) == 1, rows
+        assert sorted(rows[0]["views"]) == ["amd", "px"]
+
+
+def test_inherited_matrix_instances_are_one_per_test_and_view(inh_proj):
+    inv = _inh_inventory(inh_proj, instances=True)
+    runs = sorted((i["test"].split(".")[-1], i["view"])
+                  for i in inv["instances"])
+    assert runs == [("bypass_initial", "amd"), ("bypass_initial", "px"),
+                    ("encrypt_initial", "amd"), ("encrypt_initial", "px")]
+    for i in inv["instances"]:
+        assert i["argv"][:2] == ["run", "pb.tests"]
+        assert i["argv"][-2:] == ["--views", i["view"]]
+
+
+def test_an_inherited_matrix_instance_argv_runs_that_run_alone(inh_proj):
+    inv = _inh_inventory(inh_proj, instances=True)
+    inst = [i for i in inv["instances"]
+            if i["test"].endswith("bypass_initial") and i["view"] == "px"][0]
+    # Run the dv_flow under test, not whichever one a relative PYTHONPATH finds.
+    import dv_flow.mgr
+    src = os.path.dirname(os.path.dirname(os.path.dirname(dv_flow.mgr.__file__)))
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join([src] + [p for p in
+        env.get("PYTHONPATH", "").split(os.pathsep) if p])
+    proc = subprocess.run(
+        [sys.executable, "-m", "dv_flow.mgr"] + inst["argv"],
+        cwd=inh_proj, capture_output=True, text=True, env=env)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    out = proc.stdout + proc.stderr
+    assert "t_bypass on px" in out
+    assert "t_encrypt" not in out
+    assert "build amd image" not in out

@@ -211,6 +211,70 @@ To push a matrix value *down into a subtree* of tasks (rather than referencing
 it directly in each body task), combine ``matrix`` with a ``let:`` block and read
 it with :ref:`resolve() <scoped-resolution>`. See :doc:`scoped_variables`.
 
+Inheriting a matrix
+-------------------
+
+A task that ``uses:`` a matrix task inherits its ``strategy: matrix`` and its
+``body:``. The body expands once per cell, under the inheriting task's name,
+and sees the inheriting task's parameters:
+
+.. code-block:: yaml
+
+    tasks:
+    - name: case
+      with:
+        testname: { type: str, value: "" }
+      strategy:
+        matrix:
+          image: [amd, px]
+      body:
+      - name: "${{ this.image }}"
+        uses: std.Message
+        with: { msg: "${{ testname }} on ${{ this.image }}" }
+
+    - { name: bypass_initial,  uses: case, with: { testname: t_bypass } }
+    - { name: encrypt_initial, uses: case, with: { testname: t_encrypt } }
+
+``bypass_initial`` expands to ``bypass_initial.amd_0`` and
+``bypass_initial.px_1``. Inheritance works through several levels of
+``uses:``; the nearest base with a strategy wins.
+
+Override rules:
+
+* **No** ``strategy:`` **of its own** -- the task inherits strategy and body.
+* **Own** ``strategy:``, **no** ``body:`` -- the task's matrix replaces the
+  base's, and the nearest base's body runs on it. Use this to run a test on a
+  subset of the views.
+* **Own** ``strategy:`` **and** ``body:`` -- nothing is inherited.
+
+The body must declare every parameter it reads on the base task; an inheriting
+task can set those parameters but cannot add new ones the body uses. When an
+inherited body fails to expand, the error names both tasks, for example
+``by_arch (inherits strategy from case): Sub-element 'image' not found in
+'this.image'``.
+
+The ``task`` namespace
+----------------------
+
+``task`` names the task being built:
+
+* ``task.name`` -- its fully-qualified name (``pkg.bypass_initial``).
+* ``task.leafname`` -- the last element of the name (``bypass_initial``).
+
+In an inherited matrix body, ``task`` is the inheriting task, so a base can
+name each run after the test that inherits it:
+
+.. code-block:: yaml
+
+      body:
+      - name: "${{ this.image }}"
+        uses: hdlsim.SimUVMCase
+        with:
+          name: "${{ task.leafname }}"
+
+``task`` is defined only in a task's parameters and body; using it in a
+package parameter is an error.
+
 Advanced Features
 =================
 

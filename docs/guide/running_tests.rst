@@ -59,7 +59,7 @@ Declaring what a test is
 ========================
 
 The runner has to tell a test apart from an image, a flags item, or a helper.
-Two ways, matching the two granularities a project actually has.
+Three ways: a single case, a matrix suite, or a test that inherits a view matrix.
 
 A single case carries a ``std.Test`` tag
 ----------------------------------------
@@ -101,6 +101,46 @@ The suite is named after its task. To give it a different name, tag it:
 The field names are configurable, because a project may already have its own:
 ``test_key`` (default ``name``) is the cell field holding the case name, and
 ``view_axis`` (default ``view``) is the axis holding the configuration.
+
+A test that inherits a view matrix
+----------------------------------
+
+When every test runs on every view, write the view matrix once, in a base
+task, and make each test a task that ``uses:`` the base:
+
+.. code-block:: yaml
+
+    - name: nice-case                      # the base: one run per view
+      with:
+        testname: { type: str, value: "" }
+      strategy:
+        matrix:
+          image: [amd, px]
+      body:
+      - name: "${{ this.image }}"
+        uses: hdlsim.vlt.SimUVMCase
+        needs: ["img-${{ this.image }}"]
+        with:
+          name: "${{ task.leafname }}"
+          testname: "${{ testname }}"
+
+    - { name: bypass_initial,  uses: nice-case, with: { testname: t_bypass } }
+    - { name: encrypt_initial, uses: nice-case, with: { testname: t_encrypt } }
+
+    - { name: uvm-tests, uses: std.TestSuite, needs: [bypass_initial, encrypt_initial] }
+    - root: tests
+      uses: std.TestRunner
+      needs: [uvm-tests]
+      with: { view_axis: image }
+
+Each inheriting task is one test, named after the task; its cells are its
+runs, one per ``image``. ``--tests bypass_initial`` keeps one test,
+``--views px`` keeps the ``px`` cell of every test, and images that no
+surviving cell needs (here ``img-amd``) are not built. ``std.TestInfo``
+lists each test once with its views, and ``--instances`` gives one entry
+per (test, view). This is the recommended form when every test runs on every
+view. See :doc:`expressions` ("Inheriting a matrix") for the override rules
+and the ``task`` namespace.
 
 Suites of suites
 ----------------
