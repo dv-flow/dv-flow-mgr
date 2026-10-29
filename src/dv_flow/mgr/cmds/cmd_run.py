@@ -85,8 +85,8 @@ class CmdRun(object):
 
         cli_overrides = parse_parameter_overrides(getattr(args, "param_overrides", []))
         # Track where each -D key binds so keys that bind nowhere (typically a
-        # typo) can be reported instead of silently ignored. Only -D keys are
-        # tracked; -P entries are not command-line keys.
+        # typo) can be reported instead of silently ignored. -P entries are
+        # registered below, once the file is loaded.
         override_tracker = OverrideBindingTracker(
             keys=parameter_override_keys(getattr(args, "param_overrides", [])))
         file_overrides = {'package': {}, 'task': {}, 'leaf': {}}
@@ -94,6 +94,7 @@ class CmdRun(object):
         if hasattr(args, 'param_file') and args.param_file:
             try:
                 file_overrides = load_param_file(args.param_file)
+                override_tracker.add_param_file(args.param_file, file_overrides)
             except Exception as e:
                 print(f"Error loading parameter file: {e}")
                 sys.exit(1)
