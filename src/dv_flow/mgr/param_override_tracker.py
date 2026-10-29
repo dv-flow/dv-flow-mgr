@@ -17,7 +17,7 @@
 #*
 #****************************************************************************
 import dataclasses as dc
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 
 @dc.dataclass
@@ -119,6 +119,39 @@ class OverrideBindingTracker(object):
                      else self._pfile_task_binds)
             if e.key not in binds:
                 ret.append(e)
+        return ret
+
+    def param_file_warnings(self, lookup : Callable[[str], Optional[Set[str]]]) -> List[str]:
+        """Messages for unmatched `-P` entries, in file order.
+
+        `lookup(task_key)` returns the parameter names of the loaded task(s)
+        that `task_key` names (full or leaf name, as the graph builder matches
+        them), or None when no loaded task has that name. It tells a typo'd
+        task name from a real task that never entered the graph.
+        """
+        ret = []
+        for e in self.unmatched_param_file():
+            if e.kind == 'package':
+                ret.append(
+                    "-P entry %s matched no package variable. Check the "
+                    "spelling of '%s'." % (e.source, e.key))
+                continue
+            params = lookup(e.task)
+            if params is None:
+                ret.append(
+                    "-P entry %s: unknown task '%s'. Check the spelling, or "
+                    "use 'dfm show task <name>' to find the task." % (
+                        e.source, e.task))
+            elif e.param not in params:
+                ret.append(
+                    "-P entry %s: task '%s' has no parameter '%s'. Use "
+                    "'dfm show task %s' to list its parameters." % (
+                        e.source, e.task, e.param, e.task))
+            else:
+                ret.append(
+                    "-P entry %s: task '%s' never entered the graph, so the "
+                    "value was not used. Use 'dfm show task %s' to check how "
+                    "it is reached." % (e.source, e.task, e.task))
         return ret
 
     def unmatched(self) -> List[str]:

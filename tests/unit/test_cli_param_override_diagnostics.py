@@ -13,7 +13,8 @@ from dv_flow.mgr.util import parameter_override_keys
 
 class Args:
     """Minimal args holder for CmdRun"""
-    def __init__(self, root, tasks=None, defines=None):
+    def __init__(self, root, tasks=None, defines=None, param_file=None):
+        self.param_file = param_file
         self.tasks = tasks if tasks is not None else []
         self.ui = 'log'
         self.clean = False
@@ -42,10 +43,12 @@ package:
 ''')
 
 
-def _run(tmp_path, monkeypatch, capsys, defines, tasks=('entry',)):
-    (tmp_path / 'flow.yaml').write_text(FLOW)
+def _run(tmp_path, monkeypatch, capsys, defines, tasks=('entry',),
+         flow=FLOW, param_file=None):
+    (tmp_path / 'flow.yaml').write_text(flow)
     monkeypatch.chdir(tmp_path)
-    CmdRun()(Args(root=str(tmp_path), tasks=list(tasks), defines=defines))
+    CmdRun()(Args(root=str(tmp_path), tasks=list(tasks), defines=defines,
+                  param_file=param_file))
     return capsys.readouterr()
 
 
@@ -178,3 +181,78 @@ def test_ambiguous_bare_key_warns_naming_both(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "ambiguous" in err
     assert "my_pkg" in err
+
+
+# ---------------------------------------------------------------------------
+# -P param-file entries
+# ---------------------------------------------------------------------------
+
+# `entry` plus a root task that the run of `entry` never reaches.
+FLOW_P = FLOW + textwrap.indent(textwrap.dedent('''\
+- name: other
+  scope: root
+  with:
+    mode:
+      type: str
+      value: "a"
+  run: echo "other ${{ mode }}"
+'''), '  ')
+
+
+def _run_p(tmp_path, monkeypatch, capsys, data, defines=None):
+    import json
+    pf = tmp_path / 'params.json'
+    pf.write_text(json.dumps(data))
+    return _run(tmp_path, monkeypatch, capsys, defines or [],
+                flow=FLOW_P, param_file=str(pf))
+
+
+def test_tracker_param_file_warnings_classify():
+    t = OverrideBindingTracker()
+    t.add_param_file("p.json", {
+        'package': {'nope': 1},
+        'task': {'bogus': {'x': 1}, 'other': {'mode': 'b', 'typo': 1}}})
+    params = {'other': {'mode'}}
+    msgs = t.param_file_warnings(lambda k: params.get(k))
+    assert len(msgs) == 4
+    assert "p.json: package.nope" in msgs[0]
+    assert "matched no package variable" in msgs[0]
+    assert "unknown task 'bogus'" in msgs[1]
+    assert "p.json: tasks.bogus.x" in msgs[1]
+    assert "never entered the graph" in msgs[2]
+    assert "'dfm show task other'" in msgs[2]
+    assert "no parameter 'typo'" in msgs[3] and "'other'" in msgs[3]
+
+
+def test_bad_param_file_warns_per_unknown_task_and_runs(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}, 'bld': {'top': 'y'}}})
+    assert cap.err.count("unknown task") == 2
+    assert "tasks.entrry.top" in cap.err and "tasks.bld.top" in cap.err
+    assert "dfm show task" in cap.err
+    # The run still goes ahead.
+    assert "Done: 1" in cap.out
+
+
+def test_correct_param_file_is_silent(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {
+        'package': {'pkg_var': 'v'}, 'tasks': {'entry': {'top': 'hello'}}})
+    assert "-P entry" not in cap.err
+
+
+def test_param_file_unknown_param_names_task_and_param(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'other': {'mod': 'b'}}})
+    assert "task 'other' has no parameter 'mod'" in cap.err
+
+
+def test_param_file_task_outside_graph_warns(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'other': {'mode': 'b'}}})
+    assert "task 'other' never entered the graph" in cap.err
+
+
+def test_param_file_entry_shadowed_by_define_is_silent(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys,
+                 {'tasks': {'entry': {'top': 'p'}}}, defines=["entry.top=d"])
+    assert "-P entry" not in cap.err

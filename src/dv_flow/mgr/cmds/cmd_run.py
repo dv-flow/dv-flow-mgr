@@ -484,6 +484,9 @@ class CmdRun(object):
         # status are unchanged.
         for msg in override_tracker.warnings():
             print("Warning: %s" % msg, file=sys.stderr)
+        for msg in override_tracker.param_file_warnings(
+                self._task_params_lookup(resolver)):
+            print("Warning: %s" % msg, file=sys.stderr)
 
         # A root whose summary is a machine-readable payload (`tests-info
         # --json`) owns stdout: move the console listener to stderr so the
@@ -515,6 +518,29 @@ class CmdRun(object):
             print("Wrote run report to %s" % report_dir)
 
         return runner.status
+
+    @staticmethod
+    def _task_params_lookup(resolver):
+        """A `lookup(task_key)` for OverrideBindingTracker.param_file_warnings:
+        the parameter names of every loaded task whose full or leaf name is
+        `task_key` (the graph builder's matching rule), or None if none is."""
+        from ..task import collect_task_params
+
+        def lookup(task_key):
+            found = None
+            for name, task in resolver._task_m.items():
+                leaf = getattr(task, 'leafname', None) or name.split('.')[-1]
+                if task_key != name and task_key != leaf:
+                    continue
+                if found is None:
+                    found = set()
+                try:
+                    defs, _ = collect_task_params(task)
+                    found.update(defs)
+                except Exception:
+                    pass
+            return found
+        return lookup
 
     def _wire_cli_needs(self, args, builder, resolver, node):
         """Wire `--needs TASK` onto the invoked task's node.
