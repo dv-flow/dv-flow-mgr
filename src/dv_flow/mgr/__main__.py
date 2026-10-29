@@ -141,6 +141,10 @@ def _add_run_opts(p):
                         dest="param_file",
                         metavar="FILE_OR_JSON",
                        help="JSON file or inline JSON string (e.g., '{\"tasks\": {...}}')")
+    p.add_argument("--strict-params",
+                        dest="strict_params", action="store_true",
+                        help="Exit with an error if any -D/-P entry matched nothing "
+                             "(also DFM_STRICT_PARAMS=1)")
     p.add_argument("--runner",
                         help="Runner backend: 'local' (in-process), 'lsf' (embedded LSF pool), "
                              "or omit for auto-detect (daemon if running, else local)",
@@ -257,6 +261,10 @@ def get_parser():
                         help="JSON file path or inline JSON string for complex parameter types. "
                              "Inline example: -P '{\"tasks\": {\"build\": {\"top\": [\"counter\"]}}}'. "
                              "CLI -D options take precedence over -P values")
+    parser.add_argument("--strict-params",
+                        dest="strict_params", action="store_true",
+                        help="Exit with an error if any -D/-P entry matched nothing "
+                             "(also DFM_STRICT_PARAMS=1)")
     parser.add_argument("--package-map",
                         dest="package_map",
                         action="append",

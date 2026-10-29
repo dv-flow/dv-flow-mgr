@@ -344,6 +344,9 @@ def test_cmd_run_reports_to_file_sink(tmp_path, monkeypatch):
     sink = tmp_path / "events.jsonl"
     monkeypatch.setenv("DFM_EVENT_SINK", "file:%s" % sink)
     monkeypatch.setenv("DFM_EVENT_CTX", "WPK_*")
+    # Isolate from WPK_* variables in the caller's environment
+    for k in [k for k in os.environ if k.startswith("WPK_")]:
+        monkeypatch.delenv(k)
     monkeypatch.setenv("WPK_WPID", "wp-1")
     monkeypatch.delenv("DFM_EVENT_PARENT", raising=False)
     monkeypatch.chdir(tmp_path)

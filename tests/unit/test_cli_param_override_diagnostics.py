@@ -13,7 +13,10 @@ from dv_flow.mgr.util import parameter_override_keys
 
 class Args:
     """Minimal args holder for CmdRun"""
-    def __init__(self, root, tasks=None, defines=None):
+    def __init__(self, root, tasks=None, defines=None, param_file=None,
+                 strict_params=False):
+        self.param_file = param_file
+        self.strict_params = strict_params
         self.tasks = tasks if tasks is not None else []
         self.ui = 'log'
         self.clean = False
@@ -42,10 +45,12 @@ package:
 ''')
 
 
-def _run(tmp_path, monkeypatch, capsys, defines, tasks=('entry',)):
-    (tmp_path / 'flow.yaml').write_text(FLOW)
+def _run(tmp_path, monkeypatch, capsys, defines, tasks=('entry',),
+         flow=FLOW, param_file=None):
+    (tmp_path / 'flow.yaml').write_text(flow)
     monkeypatch.chdir(tmp_path)
-    CmdRun()(Args(root=str(tmp_path), tasks=list(tasks), defines=defines))
+    CmdRun()(Args(root=str(tmp_path), tasks=list(tasks), defines=defines,
+                  param_file=param_file))
     return capsys.readouterr()
 
 
@@ -178,3 +183,139 @@ def test_ambiguous_bare_key_warns_naming_both(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "ambiguous" in err
     assert "my_pkg" in err
+
+
+# ---------------------------------------------------------------------------
+# -P param-file entries
+# ---------------------------------------------------------------------------
+
+# `entry` plus a root task that the run of `entry` never reaches.
+FLOW_P = FLOW + textwrap.indent(textwrap.dedent('''\
+- name: other
+  scope: root
+  with:
+    mode:
+      type: str
+      value: "a"
+  run: echo "other ${{ mode }}"
+'''), '  ')
+
+
+def _run_p(tmp_path, monkeypatch, capsys, data, defines=None):
+    import json
+    pf = tmp_path / 'params.json'
+    pf.write_text(json.dumps(data))
+    return _run(tmp_path, monkeypatch, capsys, defines or [],
+                flow=FLOW_P, param_file=str(pf))
+
+
+def test_tracker_param_file_warnings_classify():
+    t = OverrideBindingTracker()
+    t.add_param_file("p.json", {
+        'package': {'nope': 1},
+        'task': {'bogus': {'x': 1}, 'other': {'mode': 'b', 'typo': 1}}})
+    params = {'other': {'mode'}}
+    msgs = t.param_file_warnings(lambda k: params.get(k))
+    assert len(msgs) == 4
+    assert "p.json: package.nope" in msgs[0]
+    assert "matched no package variable" in msgs[0]
+    assert "unknown task 'bogus'" in msgs[1]
+    assert "p.json: tasks.bogus.x" in msgs[1]
+    assert "never entered the graph" in msgs[2]
+    assert "'dfm show task other'" in msgs[2]
+    assert "no parameter 'typo'" in msgs[3] and "'other'" in msgs[3]
+
+
+def test_bad_param_file_warns_per_unknown_task_and_runs(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}, 'bld': {'top': 'y'}}})
+    assert cap.err.count("unknown task") == 2
+    assert "tasks.entrry.top" in cap.err and "tasks.bld.top" in cap.err
+    assert "dfm show task" in cap.err
+    # The run still goes ahead.
+    assert "Done: 1" in cap.out
+
+
+def test_correct_param_file_is_silent(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {
+        'package': {'pkg_var': 'v'}, 'tasks': {'entry': {'top': 'hello'}}})
+    assert "-P entry" not in cap.err
+
+
+def test_param_file_unknown_param_names_task_and_param(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'other': {'mod': 'b'}}})
+    assert "task 'other' has no parameter 'mod'" in cap.err
+
+
+def test_param_file_task_outside_graph_warns(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys, {'tasks': {
+        'other': {'mode': 'b'}}})
+    assert "task 'other' never entered the graph" in cap.err
+
+
+def test_param_file_entry_shadowed_by_define_is_silent(tmp_path, monkeypatch, capsys):
+    cap = _run_p(tmp_path, monkeypatch, capsys,
+                 {'tasks': {'entry': {'top': 'p'}}}, defines=["entry.top=d"])
+    assert "-P entry" not in cap.err
+
+
+# ---------------------------------------------------------------------------
+# strict mode: --strict-params / DFM_STRICT_PARAMS=1
+# ---------------------------------------------------------------------------
+
+def _run_strict(tmp_path, monkeypatch, capsys, data, strict=True, defines=None):
+    import json
+    (tmp_path / 'flow.yaml').write_text(FLOW_P)
+    pf = tmp_path / 'params.json'
+    pf.write_text(json.dumps(data))
+    monkeypatch.chdir(tmp_path)
+    rc = CmdRun()(Args(root=str(tmp_path), tasks=['entry'],
+                       defines=defines or [], param_file=str(pf),
+                       strict_params=strict))
+    return rc, capsys.readouterr()
+
+
+def test_strict_bad_param_file_exits_before_running(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}}})
+    assert rc == 1
+    assert "Error: " in cap.err and "unknown task 'entrry'" in cap.err
+    assert "strict mode" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_unmatched_define_exits(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {},
+                          defines=["no_such_key=1"])
+    assert rc == 1
+    assert "no_such_key" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_via_env(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv('DFM_STRICT_PARAMS', '1')
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}}}, strict=False)
+    assert rc == 1
+    assert "strict mode" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_correct_param_file_runs(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {
+        'package': {'pkg_var': 'v'}, 'tasks': {'entry': {'top': 'hello'}}})
+    assert rc == 0
+    assert "strict mode" not in cap.err
+    assert "Done: 1" in cap.out
+
+
+def test_strict_cli_flag_parses():
+    from dv_flow.mgr.__main__ import get_parser
+    args = get_parser().parse_args(['run', '--strict-params', 'entry'])
+    assert args.strict_params is True
+    args = get_parser().parse_args(['run', 'entry'])
+    assert args.strict_params is False

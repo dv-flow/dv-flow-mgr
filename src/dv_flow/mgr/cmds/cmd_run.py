@@ -85,8 +85,8 @@ class CmdRun(object):
 
         cli_overrides = parse_parameter_overrides(getattr(args, "param_overrides", []))
         # Track where each -D key binds so keys that bind nowhere (typically a
-        # typo) can be reported instead of silently ignored. Only -D keys are
-        # tracked; -P entries are not command-line keys.
+        # typo) can be reported instead of silently ignored. -P entries are
+        # registered below, once the file is loaded.
         override_tracker = OverrideBindingTracker(
             keys=parameter_override_keys(getattr(args, "param_overrides", [])))
         file_overrides = {'package': {}, 'task': {}, 'leaf': {}}
@@ -94,6 +94,7 @@ class CmdRun(object):
         if hasattr(args, 'param_file') and args.param_file:
             try:
                 file_overrides = load_param_file(args.param_file)
+                override_tracker.add_param_file(args.param_file, file_overrides)
             except Exception as e:
                 print(f"Error loading parameter file: {e}")
                 sys.exit(1)
@@ -480,8 +481,21 @@ class CmdRun(object):
         # The graph is now built, so every -D key that was going to bind has
         # bound. Report the ones that did not, and the ones that bound in two
         # namespaces at once. Diagnostics only -- binding semantics and exit
-        # status are unchanged.
-        for msg in override_tracker.warnings():
+        # status are unchanged unless strict mode (--strict-params or
+        # DFM_STRICT_PARAMS=1) is on, in which case any of these stops the run
+        # before a task starts.
+        override_msgs = list(override_tracker.warnings())
+        override_msgs.extend(override_tracker.param_file_warnings(
+                self._task_params_lookup(resolver)))
+        strict = (getattr(args, 'strict_params', False)
+                  or os.environ.get('DFM_STRICT_PARAMS', '') == '1')
+        if override_msgs and strict:
+            for msg in override_msgs:
+                print("Error: %s" % msg, file=sys.stderr)
+            print("Error: unmatched parameter overrides (strict mode)",
+                  file=sys.stderr)
+            return 1
+        for msg in override_msgs:
             print("Warning: %s" % msg, file=sys.stderr)
 
         # A root whose summary is a machine-readable payload (`tests-info
@@ -541,6 +555,29 @@ class CmdRun(object):
         except Exception as e:
             self._log.debug("event sink not started: %s" % e)
             return None
+
+    @staticmethod
+    def _task_params_lookup(resolver):
+        """A `lookup(task_key)` for OverrideBindingTracker.param_file_warnings:
+        the parameter names of every loaded task whose full or leaf name is
+        `task_key` (the graph builder's matching rule), or None if none is."""
+        from ..task import collect_task_params
+
+        def lookup(task_key):
+            found = None
+            for name, task in resolver._task_m.items():
+                leaf = getattr(task, 'leafname', None) or name.split('.')[-1]
+                if task_key != name and task_key != leaf:
+                    continue
+                if found is None:
+                    found = set()
+                try:
+                    defs, _ = collect_task_params(task)
+                    found.update(defs)
+                except Exception:
+                    pass
+            return found
+        return lookup
 
     def _wire_cli_needs(self, args, builder, resolver, node):
         """Wire `--needs TASK` onto the invoked task's node.

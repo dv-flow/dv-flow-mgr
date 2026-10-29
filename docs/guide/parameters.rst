@@ -372,6 +372,25 @@ with a ``seed`` parameter.
 A flag that would collide with one of ``dfm``'s own options is a load-time
 error naming both, rather than a flag that silently never reaches the task.
 
+Unmatched ``-D`` and ``-P`` Entries
+-----------------------------------
+
+Once the task graph is built, ``dfm run`` warns about every override that
+reached nothing, so a typo does not silently leave a default in place. A
+``-P`` file entry is named by its source (the file path, or ``inline JSON``)
+and its key:
+
+.. code-block:: text
+
+    Warning: -P entry bad-params.json: tasks.entrry.top: unknown task 'entrry'. Check the spelling, or use 'dfm show task <name>' to find the task.
+    Warning: -P entry params.json: tasks.build.mod: task 'build' has no parameter 'mod'. Use 'dfm show task build' to list its parameters.
+    Warning: -P entry params.json: tasks.other.mode: task 'other' never entered the graph, so the value was not used. ...
+
+A ``-P`` entry that a ``-D`` for the same parameter overrides is not reported.
+The warnings do not change the exit status. To make them fatal, pass
+``--strict-params`` or set ``DFM_STRICT_PARAMS=1``: each is then printed as an
+error and ``dfm run`` exits nonzero before any task runs.
+
 Overrides
 =========
 

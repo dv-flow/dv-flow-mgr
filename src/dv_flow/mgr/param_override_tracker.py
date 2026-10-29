@@ -17,7 +17,22 @@
 #*
 #****************************************************************************
 import dataclasses as dc
-from typing import Dict, List, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
+
+
+@dc.dataclass
+class ParamFileEntry(object):
+    """One leaf entry of a `-P` param file: `package.<var>` or
+    `tasks.<task>.<param>`."""
+    # Key in the form the consumers report binds under: the var name for a
+    # package entry, `<task>.<param>` for a task entry.
+    key : str
+    # 'package' or 'task'
+    kind : str
+    # Where it came from, e.g. "params.json: tasks.build.top"
+    source : str
+    task : Optional[str] = None
+    param : Optional[str] = None
 
 
 @dc.dataclass
@@ -38,25 +53,106 @@ class OverrideBindingTracker(object):
       * keys that bound in more than one namespace, which is genuinely ambiguous
         and where the qualified form (`-D pkg.key=` / `-D task.key=`) is meant.
 
-    Only keys supplied via `-D` are tracked. `-P` param-file entries reach the
-    same consumers but are not command-line keys, so a bind reported for a key
-    that was never registered is ignored.
+    `-P` param-file entries are registered separately (`add_param_file`) and
+    reported by `unmatched_param_file`. A bind reported for a key that was never
+    registered is ignored. Because a `-D` key and a `-P` entry for the same
+    target share a key, a `-P` entry shadowed by `-D` counts as matched.
     """
 
     # Raw keys as typed on the command line, in order.
     keys : List[str] = dc.field(default_factory=list)
     _package_binds : Dict[str, Set[str]] = dc.field(default_factory=dict)
     _task_binds : Dict[str, Set[str]] = dc.field(default_factory=dict)
+    # `-P` entries, in file order
+    param_file_entries : List[ParamFileEntry] = dc.field(default_factory=list)
+    _pfile_package_keys : Set[str] = dc.field(default_factory=set)
+    _pfile_task_keys : Set[str] = dc.field(default_factory=set)
+    _pfile_package_binds : Set[str] = dc.field(default_factory=set)
+    _pfile_task_binds : Set[str] = dc.field(default_factory=set)
+
+    def add_param_file(self, spec : str, overrides : Dict):
+        """Register the entries of a `-P` param file.
+
+        `spec` is the `-P` argument (a file path or inline JSON) and
+        `overrides` is what load_param_file returned for it.
+        """
+        s = spec.strip()
+        if s.startswith('{') or s.startswith('['):
+            label = "inline JSON"
+        else:
+            label = spec
+        for var in (overrides.get('package') or {}).keys():
+            self.param_file_entries.append(ParamFileEntry(
+                key=var, kind='package',
+                source="%s: package.%s" % (label, var)))
+            self._pfile_package_keys.add(var)
+        for task, params in (overrides.get('task') or {}).items():
+            if not isinstance(params, dict):
+                continue
+            for pname in params.keys():
+                key = "%s.%s" % (task, pname)
+                self.param_file_entries.append(ParamFileEntry(
+                    key=key, kind='task',
+                    source="%s: tasks.%s.%s" % (label, task, pname),
+                    task=task, param=pname))
+                self._pfile_task_keys.add(key)
 
     def note_package_bind(self, key : str, pkg_name : str):
         """Record that `key` bound a variable of package `pkg_name`."""
         if key in self.keys:
             self._package_binds.setdefault(key, set()).add(pkg_name)
+        if key in self._pfile_package_keys:
+            self._pfile_package_binds.add(key)
 
     def note_task_bind(self, key : str, task_name : str):
         """Record that `key` bound a parameter of task `task_name`."""
         if key in self.keys:
             self._task_binds.setdefault(key, set()).add(task_name)
+        if key in self._pfile_task_keys:
+            self._pfile_task_binds.add(key)
+
+    def unmatched_param_file(self) -> List[ParamFileEntry]:
+        """`-P` entries that bound nowhere, in file order."""
+        ret = []
+        for e in self.param_file_entries:
+            binds = (self._pfile_package_binds if e.kind == 'package'
+                     else self._pfile_task_binds)
+            if e.key not in binds:
+                ret.append(e)
+        return ret
+
+    def param_file_warnings(self, lookup : Callable[[str], Optional[Set[str]]]) -> List[str]:
+        """Messages for unmatched `-P` entries, in file order.
+
+        `lookup(task_key)` returns the parameter names of the loaded task(s)
+        that `task_key` names (full or leaf name, as the graph builder matches
+        them), or None when no loaded task has that name. It tells a typo'd
+        task name from a real task that never entered the graph.
+        """
+        ret = []
+        for e in self.unmatched_param_file():
+            if e.kind == 'package':
+                ret.append(
+                    "-P entry %s matched no package variable. Check the "
+                    "spelling of '%s'." % (e.source, e.key))
+                continue
+            params = lookup(e.task)
+            if params is None:
+                ret.append(
+                    "-P entry %s: unknown task '%s'. Check the spelling, or "
+                    "use 'dfm show task <name>' to find the task." % (
+                        e.source, e.task))
+            elif e.param not in params:
+                ret.append(
+                    "-P entry %s: task '%s' has no parameter '%s'. Use "
+                    "'dfm show task %s' to list its parameters." % (
+                        e.source, e.task, e.param, e.task))
+            else:
+                ret.append(
+                    "-P entry %s: task '%s' never entered the graph, so the "
+                    "value was not used. Use 'dfm show task %s' to check how "
+                    "it is reached." % (e.source, e.task, e.task))
+        return ret
 
     def unmatched(self) -> List[str]:
         """Keys that bound nowhere, in command-line order."""

@@ -3331,18 +3331,20 @@ class TaskGraphBuilder(object):
 
         # Also try leaf name
         leaf_name = task.leafname if hasattr(task, 'leafname') else task.name.split('.')[-1]
+        # Keys that named a real param but lost to a higher-precedence entry.
+        # They still "found a target", so the diagnostics must not call them
+        # unmatched -- that would report a typo where there is none.
+        shadowed = []
         if leaf_name in self.task_param_overrides:
             for pname, pvalue in self.task_param_overrides[leaf_name].items():
+                if pname in origin and leaf_name != task.name:
+                    shadowed.append(origin[pname])
                 overrides[pname] = pvalue
                 origin[pname] = "%s.%s" % (leaf_name, pname)
 
         # Also try leaf parameter names (from -D param=value without task name).
         # "Has this parameter" spans the `uses:` chain, so the bare form and the
         # qualified form agree about which params a derived task has.
-        # Keys that named a real param but lost to a higher-precedence entry.
-        # They still "found a target", so the diagnostics must not call them
-        # unmatched -- that would report a typo where there is none.
-        shadowed = []
         if self.leaf_param_overrides and hasattr(task, 'param_defs'):
             task_param_names, _ = collect_task_params(task)
             for param_name, param_value in self.leaf_param_overrides.items():
