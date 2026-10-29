@@ -481,11 +481,21 @@ class CmdRun(object):
         # The graph is now built, so every -D key that was going to bind has
         # bound. Report the ones that did not, and the ones that bound in two
         # namespaces at once. Diagnostics only -- binding semantics and exit
-        # status are unchanged.
-        for msg in override_tracker.warnings():
-            print("Warning: %s" % msg, file=sys.stderr)
-        for msg in override_tracker.param_file_warnings(
-                self._task_params_lookup(resolver)):
+        # status are unchanged unless strict mode (--strict-params or
+        # DFM_STRICT_PARAMS=1) is on, in which case any of these stops the run
+        # before a task starts.
+        override_msgs = list(override_tracker.warnings())
+        override_msgs.extend(override_tracker.param_file_warnings(
+                self._task_params_lookup(resolver)))
+        strict = (getattr(args, 'strict_params', False)
+                  or os.environ.get('DFM_STRICT_PARAMS', '') == '1')
+        if override_msgs and strict:
+            for msg in override_msgs:
+                print("Error: %s" % msg, file=sys.stderr)
+            print("Error: unmatched parameter overrides (strict mode)",
+                  file=sys.stderr)
+            return 1
+        for msg in override_msgs:
             print("Warning: %s" % msg, file=sys.stderr)
 
         # A root whose summary is a machine-readable payload (`tests-info

@@ -13,8 +13,10 @@ from dv_flow.mgr.util import parameter_override_keys
 
 class Args:
     """Minimal args holder for CmdRun"""
-    def __init__(self, root, tasks=None, defines=None, param_file=None):
+    def __init__(self, root, tasks=None, defines=None, param_file=None,
+                 strict_params=False):
         self.param_file = param_file
+        self.strict_params = strict_params
         self.tasks = tasks if tasks is not None else []
         self.ui = 'log'
         self.clean = False
@@ -256,3 +258,64 @@ def test_param_file_entry_shadowed_by_define_is_silent(tmp_path, monkeypatch, ca
     cap = _run_p(tmp_path, monkeypatch, capsys,
                  {'tasks': {'entry': {'top': 'p'}}}, defines=["entry.top=d"])
     assert "-P entry" not in cap.err
+
+
+# ---------------------------------------------------------------------------
+# strict mode: --strict-params / DFM_STRICT_PARAMS=1
+# ---------------------------------------------------------------------------
+
+def _run_strict(tmp_path, monkeypatch, capsys, data, strict=True, defines=None):
+    import json
+    (tmp_path / 'flow.yaml').write_text(FLOW_P)
+    pf = tmp_path / 'params.json'
+    pf.write_text(json.dumps(data))
+    monkeypatch.chdir(tmp_path)
+    rc = CmdRun()(Args(root=str(tmp_path), tasks=['entry'],
+                       defines=defines or [], param_file=str(pf),
+                       strict_params=strict))
+    return rc, capsys.readouterr()
+
+
+def test_strict_bad_param_file_exits_before_running(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}}})
+    assert rc == 1
+    assert "Error: " in cap.err and "unknown task 'entrry'" in cap.err
+    assert "strict mode" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_unmatched_define_exits(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {},
+                          defines=["no_such_key=1"])
+    assert rc == 1
+    assert "no_such_key" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_via_env(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv('DFM_STRICT_PARAMS', '1')
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {'tasks': {
+        'entrry': {'top': 'x'}}}, strict=False)
+    assert rc == 1
+    assert "strict mode" in cap.err
+    assert "Done: 1" not in cap.out
+
+
+def test_strict_correct_param_file_runs(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv('DFM_STRICT_PARAMS', raising=False)
+    rc, cap = _run_strict(tmp_path, monkeypatch, capsys, {
+        'package': {'pkg_var': 'v'}, 'tasks': {'entry': {'top': 'hello'}}})
+    assert rc == 0
+    assert "strict mode" not in cap.err
+    assert "Done: 1" in cap.out
+
+
+def test_strict_cli_flag_parses():
+    from dv_flow.mgr.__main__ import get_parser
+    args = get_parser().parse_args(['run', '--strict-params', 'entry'])
+    assert args.strict_params is True
+    args = get_parser().parse_args(['run', 'entry'])
+    assert args.strict_params is False
