@@ -187,7 +187,9 @@ class TaskNode(object):
             self._log.debug("%d tasks to update" % len(tasks_to_update))
 
             if len(tasks_to_update) > 0:
+                parent = runner
                 runner = TaskSetRunner(rundir=rundir)
+                runner.event_listeners = list(getattr(parent, 'event_listeners', []))
                 await runner.run(tasks_to_update)
                 if runner.status != 0:
                     raise Exception("Error while updating input tasks")

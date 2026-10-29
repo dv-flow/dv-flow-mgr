@@ -497,7 +497,16 @@ class CmdRun(object):
                 (quiet.event, rec) if l == listener.event else (l, rec)
                 for l, rec in runner.listeners]
 
-        asyncio.run(runner.run(tasks))
+        # Live events for an external collector (a dashboard, an IDE), when
+        # DFM_EVENT_SINK names one. Never affects the run: an unreachable
+        # sink is skipped, and a slow one drops events.
+        events = self._open_event_sink(runner, rundir, tasks)
+
+        try:
+            asyncio.run(runner.run(tasks))
+        finally:
+            if events is not None:
+                events.close(runner)
 
         trace.close()
         fp.close()
@@ -514,6 +523,24 @@ class CmdRun(object):
             print("Wrote run report to %s" % report_dir)
 
         return runner.status
+
+    def _open_event_sink(self, runner, rundir, tasks):
+        try:
+            from ..event_sink import EventEmitter, ENV_PARENT
+            from ..task_listener_events import TaskListenerEvents
+            emitter = EventEmitter.from_env()
+            if emitter is None:
+                return None
+            events = TaskListenerEvents(
+                emitter, roots=[t.name for t in tasks], rundir=rundir)
+            runner.add_event_listener(events.event)
+            # A separate `dfm` started by a task reports with this run as its
+            # parent.
+            runner.env[ENV_PARENT] = emitter.sid
+            return events
+        except Exception as e:
+            self._log.debug("event sink not started: %s" % e)
+            return None
 
     def _wire_cli_needs(self, args, builder, resolver, node):
         """Wire `--needs TASK` onto the invoked task's node.

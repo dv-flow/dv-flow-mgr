@@ -51,6 +51,18 @@ class TaskRunner(object):
     # List of [Listener:Callable[Task],Recurisve:bool]
     listeners : List[Tuple[Callable[['Task'],'Reason'], bool]] = dc.field(default_factory=list)
 
+    # Detail listeners, called as l(subject, reason, info). They get every
+    # reason the classic listeners get (with info None) plus the detail
+    # reasons, which classic listeners never see:
+    #   plan     subject=runner, info={'dep_map': {node: deps}}
+    #   extend   subject=runner, info={'scope': name, 'dep_map': {node: deps}}
+    #   skipped  subject=node
+    #   marker   subject=node, info=TaskMarker
+    #   exec     subject=node, info={'phase': 'start'|'end', 'cmd', 'logfile', 'rc'}
+    # Nested runners inherit them. A detail listener must not raise; if it
+    # does, the error is logged and the run goes on.
+    event_listeners : List[Callable] = dc.field(default_factory=list)
+
     _log : ClassVar = logging.getLogger("TaskRunner")
 
     def __post_init__(self):
@@ -64,17 +76,30 @@ class TaskRunner(object):
     def enter(self):
         for l in self.listeners:
             l[0](self, "start")
+        self._notify_detail(self, "start")
 
     def leave(self):
         for l in self.listeners:
             l[0](self, "end")
+        self._notify_detail(self, "end")
 
     def add_listener(self, l, recursive=False):
         self.listeners.append((l, recursive))
 
+    def add_event_listener(self, l):
+        self.event_listeners.append(l)
+
     def _notify(self, task : 'Task', reason : 'Reason'):
         for listener in self.listeners:
             listener[0](task, reason)
+        self._notify_detail(task, reason)
+
+    def _notify_detail(self, subject, reason : str, info=None):
+        for l in self.event_listeners:
+            try:
+                l(subject, reason, info)
+            except Exception as e:
+                self._log.debug("event listener failed on %s: %s" % (reason, e))
 
     async def do_run(self, 
                   task : 'Task',
@@ -259,6 +284,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
         
         # Notify listeners that execution is starting
         self.enter()
+        self._notify_detail(self, "plan", {"dep_map": self._dep_map})
 
         # Find initial ready tasks (no dependencies)
         for t, deps in self._dep_map.items():
@@ -786,6 +812,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
 
         task.result = TaskDataResult(status=1, output=passthrough, changed=False)
         task.output = TaskDataOutput(changed=False, dep_m={}, output=passthrough)
+        self._notify_detail(task, "skipped")
         
         # Signal completion event so dependent tasks can proceed
         if task.name in self._task_completion_events:
@@ -947,6 +974,12 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                         # propagate_failures=True → failure updates global self.status
                         sg_scope.propagate_failures = (sg_max_failures == -1)
                         
+                        added = {t: d for t, d in item['dep_map'].items()
+                                 if t not in self._task_state}
+                        if added:
+                            self._notify_detail(self, "extend", {
+                                "scope": sg_scope.name, "dep_map": added})
+
                         for task, deps in item['dep_map'].items():
                             if task not in self._task_state:
                                 self._dep_map[task] = deps

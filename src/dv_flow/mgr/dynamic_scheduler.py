@@ -117,6 +117,7 @@ class DynamicScheduler:
             'dep_map': sub_dep_map,
             'future': future,
             'max_failures': max_failures,
+            'name': self._active_subgraphs[subgraph_id]['name'],
         })
         
         self._dynamic_log.debug("Sub-graph %d queued, waiting for completion" % subgraph_id)

@@ -367,6 +367,7 @@ class TaskNodeLeaf(TaskNode):
             runner=runner, 
             ctxt=self.ctxt,
             rundir=input.rundir)
+        ctxt._task = self
 
         self._log.debug("--> Call task method %s" % str(self.task))
         try:

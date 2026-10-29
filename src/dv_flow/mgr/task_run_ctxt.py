@@ -46,6 +46,18 @@ class TaskRunCtxt(object):
     # over the graph's). Set through the `env` setter. The graph's env is
     # shared by every task in the run, so a task must never write into it.
     _env : dict = dc.field(default=None)
+    # The node this context runs, when known. Live markers and exec start/end
+    # are reported to the runner's detail listeners against it.
+    _task : 'TaskNode' = dc.field(default=None)
+
+    def _notify_detail(self, reason, info):
+        notify = getattr(self.runner, '_notify_detail', None)
+        if notify is None or self._task is None:
+            return
+        try:
+            notify(self._task, reason, info)
+        except Exception:
+            pass
 
     @property
     def root_pkgdir(self):
@@ -276,7 +288,11 @@ class TaskRunCtxt(object):
         # Notify exec start
         if self._exec_start_callback is not None:
             self._exec_start_callback()
-        
+        self._notify_detail("exec", {
+            "phase": "start", "cmd": cmd,
+            "logfile": os.path.join(self.rundir, logfile)})
+
+        status = None
         try:
             fp = open(os.path.join(self.rundir, logfile), "w")
             proc = await asyncio.create_subprocess_exec(
@@ -306,6 +322,9 @@ class TaskRunCtxt(object):
             # Notify exec end
             if self._exec_end_callback is not None:
                 self._exec_end_callback()
+            self._notify_detail("exec", {
+                "phase": "end", "cmd": cmd,
+                "logfile": os.path.join(self.rundir, logfile), "rc": status})
             
             # Release job token
             if jobserver is not None:
@@ -326,13 +345,16 @@ class TaskRunCtxt(object):
 
     def add_marker(self, marker : TaskMarker):
         self._markers.append(marker)
+        self._notify_detail("marker", marker)
 
     def marker(self, msg : str, severity : SeverityE, loc : TaskMarkerLoc=None):
         """Add a marker related to the task's execution"""
         if loc is not None:
-            self._markers.append(TaskMarker(msg=msg, severity=severity, loc=loc))
+            m = TaskMarker(msg=msg, severity=severity, loc=loc)
         else:
-            self._markers.append(TaskMarker(msg=msg, severity=severity))
+            m = TaskMarker(msg=msg, severity=severity)
+        self._markers.append(m)
+        self._notify_detail("marker", m)
 
     def error(self, msg : str, loc : TaskMarkerLoc=None):
         """Add an error marker related to the task's execution"""
@@ -400,5 +422,6 @@ class TaskRunCtxt(object):
             nproc=1,
             env=self.env
         )
-        
+        runner.event_listeners = list(getattr(self.runner, 'event_listeners', []))
+
         return await runner.run(tasks)
