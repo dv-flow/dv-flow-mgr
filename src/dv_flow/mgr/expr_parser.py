@@ -228,7 +228,7 @@ class ExprParser(object):
 
         # Build the lexer
         self.lexer = lex.lex(module=self)
-        self.parser = yacc.yacc(module=self)
+        self.parser = yacc.yacc(module=self, write_tables=False, debug=False)
 
     @classmethod
     def inst(cls):

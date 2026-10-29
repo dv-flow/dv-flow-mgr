@@ -179,3 +179,7 @@ tmp/
 .codex/
 .cursor/
 
+
+# PLY generated parser tables (built in memory at runtime)
+src/dv_flow/mgr/parsetab.py
+src/dv_flow/mgr/parser.out
