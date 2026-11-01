@@ -39,6 +39,32 @@ import logging
 _log = logging.getLogger("type_match")
 
 
+def type_lineage(type_name, resolve=None):
+    """The `uses:` chain of `type_name`, most-derived first:
+    `["hdlsim.TestResult", "std.TestResult", "std.Result", "std.DataItem"]`.
+
+    `resolve(name) -> Type | None` looks a type up. Without it, or when the
+    name does not resolve, the lineage is just `[type_name]`.
+    """
+    if not type_name:
+        return []
+    ret = [type_name]
+    if resolve is None:
+        return ret
+    try:
+        typ = resolve(type_name)
+    except Exception:
+        typ = None
+    seen = set()
+    while typ is not None and id(typ) not in seen:
+        seen.add(id(typ))
+        name = getattr(typ, 'name', None)
+        if name and name not in ret:
+            ret.append(name)
+        typ = getattr(typ, 'uses', None)
+    return ret
+
+
 def is_a(item_type, wanted_type, resolve=None) -> bool:
     """True when `item_type` is `wanted_type` or derives from it.
 
@@ -51,20 +77,7 @@ def is_a(item_type, wanted_type, resolve=None) -> bool:
         return True
     if resolve is None:
         return False
-
-    typ = None
-    try:
-        typ = resolve(item_type)
-    except Exception:
-        return False
-
-    seen = set()
-    while typ is not None and id(typ) not in seen:
-        seen.add(id(typ))
-        if getattr(typ, 'name', None) == wanted_type:
-            return True
-        typ = getattr(typ, 'uses', None)
-    return False
+    return wanted_type in type_lineage(item_type, resolve)
 
 
 def values_equal(a, b) -> bool:

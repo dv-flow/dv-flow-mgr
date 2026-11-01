@@ -804,7 +804,31 @@ def TestSelect(ctxt, task, name):
         _log.debug("test selection: tests=%s views=%s exclude=%s dropped=%s",
                    sel.tests, sel.views, sel.exclude, sorted(res.dropped))
 
+    # The run record (results/recorder.py) reads the selection back: every
+    # selected test should report a Result, and one that didn't is `notrun`
+    # (naming the task that blocked it) or `error`.
+    node.test_plan = TestPlan(tree=tree, res=res,
+                              test_key=str(getattr(params, "test_key", "name") or "name"))
+
     return node
+
+
+@dc.dataclass
+class TestPlan(object):
+    """A runner's resolved selection, kept on its node for the run record."""
+    tree : Tree
+    res : Resolution
+    test_key : str = "name"
+
+    def runs(self, root_node):
+        """[(test path, run nodes)] for every selected test, in tree order. A
+        test that was never built has no nodes."""
+        nodes = run_nodes(self.tree, self.res, root_node, self.test_key)
+        by_key = {}
+        for (key, _view), ns in nodes.items():
+            by_key.setdefault(key, []).extend(ns)
+        return [(t.path, by_key.get(key, []))
+                for key, t in self.tree.tests.items() if self.res.kept.get(key)]
 
 
 def parse_requires(text : str):

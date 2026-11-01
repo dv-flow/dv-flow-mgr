@@ -18,7 +18,8 @@
 #****************************************************************************
 """Publish declared FileSet deliverables into a per-run output-data directory.
 
-A run's output-data directory is ``<root_rundir>/out/<run-id>`` and
+A run's output-data directory is ``<root_rundir>/out/<run-id>`` (see
+``run_id.py``; ``dfm run`` creates it and writes its run record there) and
 ``out/latest`` symlinks to the newest one. ``std.Publish`` copies the files of
 its consumed ``std.FileSet`` / ``std.PubSet`` inputs into that directory,
 recording provenance in ``.dfm-publish.json`` and detecting when two sources
@@ -52,6 +53,7 @@ from dv_flow.mgr import TaskDataResult
 from dv_flow.mgr import FileSet as _FileSet
 from dv_flow.mgr.task_data import TaskMarker, SeverityE
 from dv_flow.mgr.cache_lock import FileLock
+from dv_flow.mgr.run_id import set_latest
 
 _log = logging.getLogger("Publish")
 
@@ -131,19 +133,6 @@ def _sha256(path):
         for chunk in iter(lambda: fp.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
-
-
-def _atomic_symlink(target, link_path):
-    """Point link_path at target atomically (relative target, os.replace)."""
-    d = os.path.dirname(link_path)
-    tmp = os.path.join(d, ".%s.tmp" % os.path.basename(link_path))
-    try:
-        if os.path.islink(tmp) or os.path.exists(tmp):
-            os.remove(tmp)
-    except OSError:
-        pass
-    os.symlink(target, tmp)
-    os.replace(tmp, link_path)
 
 
 def _manifest_path(out_dir):
@@ -262,7 +251,7 @@ def run_publish_cli(out_dir, run_id, files, basedir, dest, strip, flatten,
     ``out/latest`` symlink. Returns ``(status, published_rel_paths, markers)``.
     """
     os.makedirs(out_dir, exist_ok=True)
-    _atomic_symlink(run_id, os.path.join(os.path.dirname(out_dir), "latest"))
+    set_latest(os.path.dirname(out_dir), run_id)
 
     fs = _FileSet(filetype=filetype or "", basedir=basedir, src=src or "",
                   files=list(files))
@@ -308,7 +297,7 @@ async def PubSetTask(ctxt, input) -> TaskDataResult:
 async def Publish(ctxt, input) -> TaskDataResult:
     out_dir = ctxt.out_dir
     os.makedirs(out_dir, exist_ok=True)
-    _atomic_symlink(ctxt.run_id, os.path.join(ctxt.root_rundir, "out", "latest"))
+    set_latest(os.path.join(ctxt.root_rundir, "out"), ctxt.run_id)
 
     base = input.params.dest
     default_pol = _Policy(base, input.params.strip, input.params.flatten)

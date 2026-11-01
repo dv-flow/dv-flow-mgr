@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="wb-dma-example.tests" tests="4" failures="0" errors="1" skipped="2">
+  <testsuite name="tests/uvm-tests" tests="1" failures="0" errors="0" skipped="0">
+    <testcase name="smoke" classname="tests/uvm-tests/smoke" time="12.5">
+      <properties>
+        <property name="sim" value="vlt"/>
+        <property name="walltime_s" value="12.5s"/>
+        <property name="uvm_errors" value="0"/>
+      </properties>
+      <system-out>log: /abs/rundir/wb-dma-example.smoke/sim.log</system-out>
+    </testcase>
+  </testsuite>
+  <testsuite name="tests/soc-tests" tests="2" failures="0" errors="0" skipped="2">
+    <testcase name="soc-dma-copy" classname="tests/soc-tests/soc-dma-copy">
+      <properties>
+        <property name="sim" value="vlt"/>
+      </properties>
+      <skipped message="notrun: blocked: wb-dma-example.fw-build failed"/>
+    </testcase>
+    <testcase name="soc-dma-copy-two" classname="tests/soc-tests/soc-dma-copy-two">
+      <properties>
+        <property name="sim" value="vlt"/>
+      </properties>
+      <skipped message="notrun: blocked: wb-dma-example.fw-build failed"/>
+    </testcase>
+  </testsuite>
+  <testsuite name="tests/_tasks/fw-build" tests="1" failures="0" errors="1" skipped="0">
+    <testcase name="fw-build" classname="tests/_tasks/fw-build">
+      <error message="error: dma.c:41: error: 'DMA_CSR' undeclared"/>
+      <system-out>log: /abs/rundir/wb-dma-example.fw-build/wb-dma-example.fw-build.log</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

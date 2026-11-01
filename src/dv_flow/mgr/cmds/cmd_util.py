@@ -27,6 +27,10 @@ class CmdUtil(object):
             action="store_true",
             help="Generate schema from Pydantic models instead of "
                  "loading the canonical schema (development mode)")
+        parser.add_argument("--results",
+            action="store_true",
+            help="Output the run-results schema (results.json, "
+                 "dvflow-results/1) instead of the flow schema")
         schema_args = parser.parse_args(args.args)
 
         CmdSchema()(schema_args)

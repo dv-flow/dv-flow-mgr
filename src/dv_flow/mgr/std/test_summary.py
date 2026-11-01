@@ -61,11 +61,27 @@ def collect_cases(output):
     if rollups:
         cases = []
         for r in rollups:
-            cases.extend(getattr(r, "results", None) or [])
+            cases.extend(getattr(r, "results", None) or getattr(r, "children", None) or [])
         if cases:
             return cases, rollups
         return [], rollups
     return [it for it in output if _is_case(it)], []
+
+
+def _rollup_passed(r) -> int:
+    """A roll-up's pass count. On a `std.SuiteResult` `passed` is the suite's
+    own bool verdict and the count is `counts.pass` (hdlsim also keeps an
+    `npassed` alias); an older roll-up carries the count in `passed`."""
+    counts = getattr(r, "counts", None)
+    if isinstance(counts, dict) and "pass" in counts:
+        return int(counts["pass"] or 0)
+    np = getattr(r, "npassed", None)
+    if isinstance(np, int) and not isinstance(np, bool):
+        return np
+    p = getattr(r, "passed", 0)
+    if isinstance(p, bool):
+        return 0
+    return int(p or 0)
 
 
 def tally(cases, rollups):
@@ -73,7 +89,7 @@ def tally(cases, rollups):
     the producer knows better than a structural guess what 'errored' means."""
     if rollups:
         total = sum(int(getattr(r, "total", 0) or 0) for r in rollups)
-        passed = sum(int(getattr(r, "passed", 0) or 0) for r in rollups)
+        passed = sum(_rollup_passed(r) for r in rollups)
         failed = sum(int(getattr(r, "failed", 0) or 0) for r in rollups)
         errored = sum(int(getattr(r, "errored", 0) or 0) for r in rollups)
         return total, passed, failed, errored
@@ -195,6 +211,47 @@ def _case_row(case):
             _fmt_mem(stats))
 
 
+def _has_tests(node) -> bool:
+    if "std.TestResult" in node.types or "std.SuiteResult" in node.types:
+        return True
+    return any(_has_tests(c) for c in node.children)
+
+
+def _results_panel(ctxt, rf):
+    """The test report from the run record: the count headline, then at
+    `normal` the failures (path, headline, failing checks, log line) and at
+    `full` the whole tree after the generic task summary."""
+    from rich.console import Group
+    from rich.panel import Panel
+    from rich.text import Text
+    from ..results.render_text import render_failures, render_tree, STATUS_WORD
+    from ..tui_theme import S_LABEL
+
+    level = _detail_level(ctxt)
+    c = rf.summary.counts
+    total = c.get("total", 0)
+    headline = "%d/%d passed" % (c.get("pass", 0), total)
+    for k, word in (("fail", "failed"), ("error", "errored"), ("timeout", "timed out"),
+                    ("notrun", "not run")):
+        if c.get(k):
+            headline += ", %d %s" % (c[k], word)
+
+    if level == FULL:
+        body = Text(render_tree(rf, expand=True).rstrip("\n"))
+    elif level == NORMAL and rf.summary.failures:
+        # The first line of render_failures repeats the headline
+        body = Text(render_failures(rf).split("\n", 1)[1].strip("\n"))
+    else:
+        body = "[%s]%s[/%s]" % (S_LABEL, rf.summary.msg or (
+            "all cases passed" if total else "no tests ran"), S_LABEL)
+
+    style = "green" if rf.summary.status == "pass" else "red"
+    panel = Panel(body, title="Tests (%s)" % headline, border_style=style)
+    if level == FULL:
+        return Group(ctxt.task_summary(), panel)
+    return panel
+
+
 def test_summary(ctxt):
     """`summary:` callable. Returns a rich renderable, or None when the run
     produced no verdicts at all (nothing to report is not an error here -- the
@@ -205,6 +262,14 @@ def test_summary(ctxt):
 
     from ..tui_theme import S_LABEL, S_SECONDARY
 
+    rf = getattr(ctxt, "results", None)
+    if rf is not None and _has_tests(rf.result):
+        return _results_panel(ctxt, rf)
+
+    # No run record (or no test results in it): the duck-typed path, kept for
+    # one release.
+    _log.debug("test_summary: no run record with test results; using the "
+               "duck-typed output scan (deprecated)")
     cases, rollups = collect_cases(list(ctxt.output))
     if not cases and not rollups:
         return ctxt.task_summary()

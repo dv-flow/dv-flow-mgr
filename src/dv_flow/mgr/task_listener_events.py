@@ -49,8 +49,11 @@ CMD_MAX_CHARS = 1024
 class TaskListenerEvents(object):
 
     def __init__(self, emitter: EventEmitter, roots: Optional[List[str]] = None,
-                 rundir: Optional[str] = None):
+                 rundir: Optional[str] = None, defer_end: bool = False):
         self.emitter = emitter
+        # dfm run sends `run.end` itself, after the run record is written, so
+        # it can carry the record's path.
+        self.defer_end = defer_end
         self.roots = list(roots) if roots else []
         self.rundir = rundir
         self._depth = 0
@@ -73,7 +76,7 @@ class TaskListenerEvents(object):
                 self._start(subject)
         elif reason == "end":
             self._depth -= 1
-            if self._depth == 0:
+            if self._depth == 0 and not self.defer_end:
                 self.close(subject)
         elif reason == "plan":
             nodes = self._nodes(info["dep_map"])
@@ -103,10 +106,11 @@ class TaskListenerEvents(object):
         elif reason == "exec":
             self._exec(subject, info)
 
-    def close(self, runner=None):
+    def close(self, runner=None, results: Optional[str] = None):
         """Send ``run.end`` and shut the emitter down. Safe to call more than
         once; cmd_run calls it again after the run, in case the runner raised
-        before its ``end``."""
+        before its ``end``. ``results`` is the run record's path
+        (``rundir/out/<run-id>/results.json``) when one was written."""
         if self._ended:
             return
         self._ended = True
@@ -116,8 +120,9 @@ class TaskListenerEvents(object):
             result = "error"
         else:
             result = "ok" if status == 0 else "fail"
+        extra = {"results": results} if results else {}
         self.emitter.close("run.end", status=status, result=result,
-                           counts=dict(self._counts))
+                           counts=dict(self._counts), **extra)
 
     def _start(self, runner):
         o = self.emitter.origin()
@@ -217,6 +222,35 @@ class TaskListenerEvents(object):
         for m in (getattr(res, "markers", None) or []):
             self._marker(node, m)
         self.emitter.emit("task.state", **p)
+        self._results(node, nid)
+
+    def _results(self, node, nid):
+        """A `task.result` for each std.Result the task itself produced (not
+        the ones it passed through), as a run-record node with its
+        diagnostics capped -- so a viewer shows tests going green and red as
+        they finish, then reloads `results.json` on `run.end`."""
+        out = getattr(node, "output", None)
+        items = getattr(out, "output", None) or []
+        if not items:
+            return
+        try:
+            from .results.collect import is_result, runtime_resolver
+            from .results.convert import to_dict
+            runner = self._runner
+            resolve = None
+            b = getattr(runner, "builder", None)
+            if b is not None and getattr(b, "loader", None) is not None:
+                resolve = b.loader.findType
+            for it in items:
+                src = getattr(it, "src", None) if not isinstance(it, dict) else it.get("src")
+                if src not in (None, "", node.name):
+                    continue
+                if not is_result(it, resolve):
+                    continue
+                self.emitter.emit("task.result", id=nid, result=to_dict(it, resolve))
+        except Exception:
+            # Events never affect the run
+            pass
 
     def _marker(self, node, m):
         if m is None:

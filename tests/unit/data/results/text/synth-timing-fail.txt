@@ -1,0 +1,8 @@
+Run 20261031-142210  syn.synth  (exit 0)
+
+synth  FAIL  timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)  (wns_ns=-0.12 ns  luts=4211 cells  fmax_mhz=98.8 MHz)
+│  check timing: fail (wns_ns=-0.12, want >= 0)
+├─ synth  pass  (luts=4211 cells)
+└─ pnr  pass  (fmax_mhz=98.8 MHz)
+
+FAIL: timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)  |  total 2: pass 2  |  120.5s

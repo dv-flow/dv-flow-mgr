@@ -125,26 +125,67 @@ def format_elapsed(seconds : Optional[float]) -> str:
     return "%0.2fms" % (seconds * 1000)
 
 
+def node_rundir(node, root_rundir=None) -> Optional[str]:
+    """A node's absolute rundir. After a task runs, the runner replaces the
+    segment list with the resolved path (a string); a node that never ran
+    still has the segment list, resolved against `root_rundir`."""
+    rd = getattr(node, 'rundir', None)
+    if not rd:
+        return None
+    if isinstance(rd, str):
+        if os.path.isabs(rd) or root_rundir is None:
+            return rd
+        return os.path.join(root_rundir, rd)
+    rd = list(rd)
+    if os.path.isabs(rd[0]):
+        return os.path.join(*rd)
+    if root_rundir is None:
+        return os.path.join(*rd)
+    return os.path.join(root_rundir, *rd)
+
+
+def load_exec_data(node, root_rundir=None) -> Optional[dict]:
+    """The exec_data file a node wrote, found through the naming scheme (the
+    legacy scheme writes `<name>.exec_data.json`, not `exec_data.json`).
+    Returns None when there is none."""
+    rundir = node_rundir(node, root_rundir)
+    if not rundir:
+        return None
+    names = []
+    getter = getattr(node, '_get_exec_data_filename', None)
+    if getter is not None:
+        try:
+            names.append(getter())
+        except Exception:
+            pass
+    names.append("exec_data.json")
+    import json
+    for name in names:
+        path = os.path.join(rundir, name)
+        if os.path.isfile(path):
+            try:
+                with open(path, "r") as fp:
+                    return json.load(fp)
+            except Exception:
+                return None
+    return None
+
+
 def _load_disk_result(node):
-    """Fallback for a node with no in-memory result: the exec_data.json it wrote.
+    """Fallback for a node with no in-memory result: the exec_data it wrote,
+    as `{status, markers}`.
 
     This is the inverse of `TaskListenerReport`, which prefers disk. It cannot
     recover the cache/base flags (they are never persisted), so a node recovered
     this way is classified on status and markers alone.
     """
-    rundir = getattr(node, 'rundir', None)
-    if not rundir:
+    data = load_exec_data(node)
+    if data is None:
         return None
-    path = rundir[0] if len(rundir) == 1 and os.path.isabs(rundir[0]) else os.path.join(*rundir)
-    path = os.path.join(path, "exec_data.json")
-    if not os.path.isfile(path):
-        return None
-    try:
-        import json
-        with open(path, "r") as fp:
-            return json.load(fp)
-    except Exception:
-        return None
+    # exec_data keeps the task's verdict under `result`; accept the flat
+    # shape as well.
+    r = data.get('result') if isinstance(data.get('result'), dict) else data
+    return {'status': r.get('status', 0) or 0, 'markers': r.get('markers', []) or []}
 
 
 def _facts_for(node) -> TaskFacts:

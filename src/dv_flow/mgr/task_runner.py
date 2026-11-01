@@ -147,6 +147,21 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
 
     _log : ClassVar = logging.getLogger("TaskSetRunner")
 
+    # Phase B of the root-task rule (results/rootcheck.py). dfm run sets it
+    # from results.filter_roots.
+    filter_root_outputs : bool = True
+
+    def _filter_root_port(self, task):
+        if not self.filter_root_outputs:
+            return
+        try:
+            from .results.rootcheck import filter_root_port
+            builder = getattr(self, "builder", None)
+            loader = getattr(builder, "loader", None) if builder is not None else None
+            filter_root_port(task, getattr(loader, "findType", None) if loader is not None else None)
+        except Exception as e:
+            self._log.debug("root output filter skipped for %s: %s" % (task.name, e))
+
     def __post_init__(self):
         super().__post_init__()
         
@@ -514,6 +529,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             t.end = t.start
             self._notify(t, "enter")
             self._notify(t, "base_hit")
+            self._filter_root_port(t)
             self._task_state[t] = TaskState.COMPLETED
             if t.name in self._task_completion_events:
                 self._task_completion_events[t.name].set()
@@ -1038,6 +1054,7 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
                     completed_task.end = datetime.now()
                     
                     # Mark as completed
+                    self._filter_root_port(completed_task)
                     done_task_s.add(completed_task)
                     self._task_state[completed_task] = TaskState.COMPLETED
                     

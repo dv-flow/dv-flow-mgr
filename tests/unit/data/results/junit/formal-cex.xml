@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="fv.bmc" tests="1" failures="1" errors="0" skipped="0">
+  <testsuite name="bmc" tests="1" failures="1" errors="0" skipped="0">
+    <testcase name="assertions" classname="bmc">
+      <failure message="fail: assertion failed: dma_ch.p_no_overrun at step 14">check assertions: fail (failed=1, want == 0)</failure>
+      <system-out>log: /abs/rundir/fv.bmc/logfile.txt:57</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

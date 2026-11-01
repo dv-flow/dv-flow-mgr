@@ -16,6 +16,8 @@ class CmdSchema(object):
     
     By default, emits the canonical schema from dv.flow.schema.json.
     Use --generate to regenerate from Pydantic models (development mode).
+    Use --results for the run-record schema (results.json, dvflow-results/1),
+    which is always generated from its models.
     """
     
     # Implementation artifacts to exclude from user-facing schema
@@ -100,7 +102,9 @@ class CmdSchema(object):
 
         root = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://dv-flow.github.io/dv.flow.schema.json",
+            # Matches the `# yaml-language-server: $schema=` header of every
+            # std and library flow file.
+            "$id": "https://dv-flow.github.io/flow.dv.schema.json",
             "title": "DV Flow specification schema",
             "description": "JSON Schema for DV Flow YAML workflow definitions",
             "type": "object",
@@ -153,8 +157,11 @@ class CmdSchema(object):
         else:
             fp = open(args.output, "w")
 
+        if getattr(args, 'results', False):
+            from ...results.model import results_json_schema
+            schema = results_json_schema()
         # Generate schema from Pydantic models if requested
-        if hasattr(args, 'generate') and args.generate:
+        elif hasattr(args, 'generate') and args.generate:
             schema = self._generate_schema()
         else:
             # Try to load canonical schema, fall back to generation

@@ -18,6 +18,9 @@ def get_parser():
     schema.add_argument("--generate",
                         action="store_true",
                         help="Generate schema from Pydantic models instead of loading canonical schema (development mode)")
+    schema.add_argument("--results",
+                        action="store_true",
+                        help="Output the run-results schema (results.json, dvflow-results/1) instead of the flow schema")
     schema.set_defaults(f=CmdSchema())
 
     return parser

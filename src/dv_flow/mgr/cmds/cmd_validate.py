@@ -140,6 +140,11 @@ class CmdValidate:
             # Phase 5: Check dataflow compatibility (warning)
             dataflow_warnings = self._check_dataflow_compatibility(pkg, loader, root)
             warnings.extend(dataflow_warnings)
+
+            # The root-task rule (results/rootcheck.py)
+            root_w, root_e = self._check_root_results(pkg, loader, root)
+            warnings.extend(root_w)
+            errors.extend(root_e)
             
             # Phase 6: Collect info about the package
             info.append({
@@ -312,6 +317,27 @@ class CmdValidate:
         
         return errors
     
+    def _check_root_results(self, pkg, loader, root):
+        """A root task declares a std.Result in produces: -- a warning, or an
+        error under results.strict_roots. Only the root package's roots."""
+        from ..results.config import load_results_config
+        from ..results.rootcheck import root_problem
+        strict = load_results_config(root).strict_roots
+        resolve = getattr(loader, "findType", None) if loader is not None else None
+        warnings, errors = [], []
+        for task_name, task in (getattr(pkg, 'task_m', None) or {}).items():
+            if not task_name.startswith(pkg.name + '.'):
+                continue
+            msg = root_problem(task, None, resolve)
+            if msg is None:
+                continue
+            ent = {'type': 'RootWithoutResult', 'task': task_name, 'message': msg}
+            if getattr(task, 'srcinfo', None) is not None:
+                ent['srcinfo'] = str(task.srcinfo.file) + (
+                    ":%d" % task.srcinfo.lineno if getattr(task.srcinfo, 'lineno', None) else "")
+            (errors if strict else warnings).append(ent)
+        return warnings, errors
+
     def _check_unused_tasks(self, pkg) -> List[Dict[str, Any]]:
         """Check for tasks that are defined but never referenced."""
         warnings = []

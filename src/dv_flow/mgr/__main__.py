@@ -193,8 +193,28 @@ def _add_run_opts(p):
                         default=None,
                         metavar="ID",
                         help="Identifier for this run's output-data directory "
-                             "(rundir/out/<ID>), shared by all std.Publish tasks. "
-                             "Default: next zero-padded counter.")
+                             "(rundir/out/<ID>), which holds the run record "
+                             "(results.json) and std.Publish outputs. "
+                             "Default: a local timestamp, YYYYMMDD-HHMMSS.")
+    p.add_argument("--no-results",
+                        dest="no_results",
+                        action="store_true",
+                        help="Do not write the run record "
+                             "(rundir/out/<run-id>/results.json).")
+    p.add_argument("--no-results-tree",
+                        dest="no_results_tree",
+                        action="store_true",
+                        help="Do not build the rundir/out/<run-id>/results/ link tree "
+                             "(results.tree in the config).")
+    p.add_argument("--results-format",
+                        dest="results_formats",
+                        action="append",
+                        default=[],
+                        metavar="FMT",
+                        help="Also write the run record as FMT next to results.json "
+                             "(junit, ctrf, md; comma-separated or repeated). "
+                             "Overrides results.formats in the config and "
+                             "DFM_RESULTS_FORMATS.")
     return p
 
 
@@ -507,6 +527,38 @@ def get_parser():
     show_project_parser.add_argument("--root",
                                      help="Specifies the root directory for the flow")
     show_project_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowProject"))
+
+    # show results
+    show_results_parser = show_subparsers.add_parser('results',
+        help="Show a run's results (rundir/out/<run-id>/results.json)")
+    show_results_parser.add_argument("--rundir",
+        help="Run directory to read (default: ./rundir)")
+    show_results_parser.add_argument("--run",
+        metavar="ID",
+        help="Run id to show, or 'latest' (default)")
+    show_results_parser.add_argument("--list",
+        action="store_true",
+        help="List the recorded runs, newest first")
+    show_results_parser.add_argument("--failures",
+        action="store_true",
+        help="Show only the failures (with --json: only the summary block)")
+    show_results_parser.add_argument("--json",
+        action="store_true",
+        help="Print the record as JSON (results.json, with staleness marked)")
+    show_results_parser.add_argument("--depth",
+        type=int, default=None, metavar="N",
+        help="Descend at most N levels below the root")
+    show_results_parser.add_argument("--all",
+        action="store_true",
+        help="Expand passing subtrees as well")
+    show_results_parser.add_argument("--format",
+        choices=("text", "json", "junit", "ctrf", "md"),
+        default=None,
+        help="Output format (default text; --json is --format json)")
+    show_results_parser.add_argument("-o", "--output",
+        default=None, metavar="FILE",
+        help="Write to FILE instead of stdout")
+    show_results_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowResults"))
 
     # show skills
     show_skills_parser = show_subparsers.add_parser('skills',

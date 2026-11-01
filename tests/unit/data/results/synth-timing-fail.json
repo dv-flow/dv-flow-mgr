@@ -1,0 +1,264 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "syn.synth",
+    "argv": [
+      "dfm",
+      "run",
+      "synth"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 0,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "fail",
+    "msg": "timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)",
+    "counts": {
+      "total": 2,
+      "pass": 2,
+      "fail": 0,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "metrics": {
+      "fmax_mhz": {
+        "value": 98.8,
+        "unit": "MHz",
+        "better": "higher"
+      },
+      "wns_ns": {
+        "value": -0.12,
+        "unit": "ns",
+        "better": "higher"
+      },
+      "luts": {
+        "value": 4211.0,
+        "unit": "cells",
+        "better": "lower"
+      },
+      "walltime_s": {
+        "value": 120.5,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": [
+      {
+        "path": "synth",
+        "status": "fail",
+        "msg": "timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)",
+        "type": "yosys.SynthResult",
+        "task": "syn.synth",
+        "checks": [
+          {
+            "name": "timing",
+            "status": "fail",
+            "metric": "wns_ns",
+            "op": ">=",
+            "goal": 0,
+            "value": -0.12
+          }
+        ]
+      }
+    ]
+  },
+  "result": {
+    "name": "synth",
+    "type": "yosys.SynthResult",
+    "types": [
+      "yosys.SynthResult",
+      "std.Result"
+    ],
+    "status": "fail",
+    "passed": false,
+    "msg": "timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)",
+    "task": "syn.synth",
+    "rundir": "/abs/rundir/syn.synth",
+    "tool": {
+      "name": "yosys",
+      "version": "0.45"
+    },
+    "attrs": {
+      "top": "soc_top",
+      "part": "ice40-up5k"
+    },
+    "metrics": {
+      "fmax_mhz": {
+        "value": 98.8,
+        "unit": "MHz",
+        "better": "higher"
+      },
+      "wns_ns": {
+        "value": -0.12,
+        "unit": "ns",
+        "better": "higher"
+      },
+      "luts": {
+        "value": 4211.0,
+        "unit": "cells",
+        "better": "lower"
+      }
+    },
+    "checks": [
+      {
+        "name": "timing",
+        "status": "fail",
+        "metric": "wns_ns",
+        "op": ">=",
+        "goal": 0,
+        "value": -0.12
+      },
+      {
+        "name": "area",
+        "status": "pass",
+        "metric": "luts",
+        "op": "<=",
+        "goal": 5280,
+        "value": 4211.0
+      }
+    ],
+    "counts": {
+      "total": 2,
+      "pass": 2,
+      "fail": 0,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "artifacts": [
+      {
+        "type": "std.FileSet",
+        "filetype": "textReport",
+        "basedir": "/abs/rundir/syn.synth",
+        "files": [
+          "timing.rpt"
+        ],
+        "attributes": [
+          "role=report",
+          "label=Timing"
+        ],
+        "role": "report",
+        "label": "Timing",
+        "stamps": [
+          {
+            "path": "/abs/rundir/syn.synth/timing.rpt",
+            "mtime": 1793450000.0,
+            "size": 1024
+          }
+        ]
+      }
+    ],
+    "children": [
+      {
+        "name": "synth",
+        "type": "yosys.SynthResult",
+        "types": [
+          "yosys.SynthResult",
+          "std.Result"
+        ],
+        "status": "pass",
+        "passed": true,
+        "msg": "",
+        "task": "syn.synth",
+        "metrics": {
+          "luts": {
+            "value": 4211.0,
+            "unit": "cells",
+            "better": "lower"
+          }
+        },
+        "artifacts": [
+          {
+            "type": "std.FileSet",
+            "filetype": "yosysLog",
+            "basedir": "/abs/rundir/syn.synth",
+            "files": [
+              "synth.log"
+            ],
+            "attributes": [
+              "role=log"
+            ],
+            "role": "log",
+            "stamps": [
+              {
+                "path": "/abs/rundir/syn.synth/synth.log",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "pnr",
+        "type": "yosys.SynthResult",
+        "types": [
+          "yosys.SynthResult",
+          "std.Result"
+        ],
+        "status": "pass",
+        "passed": true,
+        "msg": "",
+        "task": "syn.synth",
+        "metrics": {
+          "fmax_mhz": {
+            "value": 98.8,
+            "unit": "MHz",
+            "better": "higher"
+          }
+        },
+        "artifacts": [
+          {
+            "type": "std.FileSet",
+            "filetype": "yosysLog",
+            "basedir": "/abs/rundir/syn.synth",
+            "files": [
+              "pnr.log"
+            ],
+            "attributes": [
+              "role=log"
+            ],
+            "role": "log",
+            "stamps": [
+              {
+                "path": "/abs/rundir/syn.synth/pnr.log",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          },
+          {
+            "type": "std.FileSet",
+            "filetype": "textReport",
+            "basedir": "/abs/rundir/syn.synth",
+            "files": [
+              "timing.rpt"
+            ],
+            "attributes": [
+              "role=report",
+              "label=Timing"
+            ],
+            "role": "report",
+            "label": "Timing",
+            "stamps": [
+              {
+                "path": "/abs/rundir/syn.synth/timing.rpt",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -26,6 +26,7 @@ from .cmd_show_tags import CmdShowTags
 from .cmd_show_package import CmdShowPackage
 from .cmd_show_project import CmdShowProject
 from .cmd_show_skills import CmdShowSkills
+from .cmd_show_results import CmdShowResults
 
 __all__ = [
     'CmdShowPackages',
@@ -36,4 +37,5 @@ __all__ = [
     'CmdShowPackage',
     'CmdShowProject',
     'CmdShowSkills',
+    'CmdShowResults',
 ]

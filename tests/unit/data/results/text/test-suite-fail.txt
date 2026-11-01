@@ -1,0 +1,13 @@
+Run 20261031-142210  wb-dma-example.tests  (exit 0)
+
+tests  FAIL  1 of 2 failed
+└─ uvm-tests  FAIL
+   ├─ smoke  pass  (uvm_errors=0  walltime_s=12.5 s)
+   └─ two-ch  FAIL  UVM_ERROR x2: ch1 dst mismatch @ 0x40  (uvm_errors=2  walltime_s=12.5 s)
+         check uvm_errors: fail (uvm_errors=2, want == 0)
+         error: UVM_ERROR ch1 dst mismatch @ 0x40 (line 1873)
+         error: UVM_ERROR ch1 dst mismatch @ 0x44 (line 1880)
+         log: /abs/rundir/wb-dma-example.two-ch/sim.log:1873
+         waves: /abs/rundir/wb-dma-example.two-ch/waves.fst
+
+FAIL: 1 of 2 failed  |  total 2: pass 1, fail 1  |  33.0s

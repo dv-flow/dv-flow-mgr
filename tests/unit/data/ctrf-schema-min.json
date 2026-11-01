@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "A minimal subset of the CTRF report schema (https://ctrf.io): the required structure and the status vocabulary. Vendored for tests.",
+  "type": "object",
+  "required": ["reportFormat", "specVersion", "results"],
+  "properties": {
+    "reportFormat": {"const": "CTRF"},
+    "specVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "reportId": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "generatedBy": {"type": "string"},
+    "results": {
+      "type": "object",
+      "required": ["tool", "summary", "tests"],
+      "properties": {
+        "tool": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}},
+        "summary": {
+          "type": "object",
+          "required": ["tests", "passed", "failed", "skipped", "pending", "other", "start", "stop"],
+          "properties": {
+            "tests": {"type": "integer"}, "passed": {"type": "integer"},
+            "failed": {"type": "integer"}, "skipped": {"type": "integer"},
+            "pending": {"type": "integer"}, "other": {"type": "integer"},
+            "start": {"type": "integer"}, "stop": {"type": "integer"}
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "status", "duration"],
+            "properties": {
+              "name": {"type": "string"},
+              "status": {"enum": ["passed", "failed", "skipped", "pending", "other"]},
+              "duration": {"type": "integer"},
+              "message": {"type": "string"},
+              "rawStatus": {"type": "string"},
+              "suite": {"type": "string"},
+              "extra": {"type": "object"}
+            }
+          }
+        },
+        "extra": {"type": "object"}
+      }
+    }
+  }
+}

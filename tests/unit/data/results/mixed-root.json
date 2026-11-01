@@ -1,0 +1,591 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "proj.regress",
+    "argv": [
+      "dfm",
+      "run",
+      "regress"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 0,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "fail",
+    "msg": "2 of 5 failed",
+    "counts": {
+      "total": 5,
+      "pass": 4,
+      "fail": 1,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "metrics": {
+      "walltime_s": {
+        "value": 160.0,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": [
+      {
+        "path": "regress/synth",
+        "status": "fail",
+        "msg": "timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)",
+        "type": "yosys.SynthResult",
+        "task": "syn.synth",
+        "checks": [
+          {
+            "name": "timing",
+            "status": "fail",
+            "metric": "wns_ns",
+            "op": ">=",
+            "goal": 0,
+            "value": -0.12
+          }
+        ]
+      },
+      {
+        "path": "regress/bmc",
+        "status": "fail",
+        "msg": "assertion failed: dma_ch.p_no_overrun at step 14",
+        "type": "formal.FormalResult",
+        "task": "fv.bmc",
+        "checks": [
+          {
+            "name": "assertions",
+            "status": "fail",
+            "metric": "failed",
+            "op": "==",
+            "goal": 0,
+            "value": 1.0
+          }
+        ],
+        "log": {
+          "path": "/abs/rundir/fv.bmc/logfile.txt",
+          "line": 57
+        },
+        "waves": "/abs/rundir/fv.bmc/trace.vcd"
+      }
+    ]
+  },
+  "result": {
+    "name": "regress",
+    "type": "std.Result",
+    "types": [
+      "std.Result"
+    ],
+    "status": "fail",
+    "passed": false,
+    "msg": "",
+    "task": "proj.regress",
+    "counts": {
+      "total": 5,
+      "pass": 4,
+      "fail": 1,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "children": [
+      {
+        "name": "tests",
+        "type": "std.TestRunResult",
+        "types": [
+          "std.TestRunResult",
+          "std.SuiteResult",
+          "std.Result"
+        ],
+        "status": "pass",
+        "passed": true,
+        "msg": "",
+        "task": "wb-dma-example.tests",
+        "counts": {
+          "total": 2,
+          "pass": 2,
+          "fail": 0,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 0
+        },
+        "children": [
+          {
+            "name": "uvm-tests",
+            "type": "hdlsim.SuiteResult",
+            "types": [
+              "hdlsim.SuiteResult",
+              "std.SuiteResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "wb-dma-example.uvm-tests",
+            "counts": {
+              "total": 2,
+              "pass": 2,
+              "fail": 0,
+              "error": 0,
+              "timeout": 0,
+              "skip": 0,
+              "notrun": 0
+            },
+            "children": [
+              {
+                "name": "smoke",
+                "type": "hdlsim.TestResult",
+                "types": [
+                  "hdlsim.TestResult",
+                  "std.TestResult",
+                  "std.Result"
+                ],
+                "status": "pass",
+                "passed": true,
+                "msg": "",
+                "task": "wb-dma-example.smoke",
+                "rundir": "/abs/rundir/wb-dma-example.smoke",
+                "attrs": {
+                  "sim": "vlt"
+                },
+                "metrics": {
+                  "walltime_s": {
+                    "value": 12.5,
+                    "unit": "s",
+                    "better": "lower"
+                  },
+                  "uvm_errors": {
+                    "value": 0.0,
+                    "unit": "",
+                    "better": "none"
+                  }
+                },
+                "checks": [
+                  {
+                    "name": "uvm_errors",
+                    "status": "pass",
+                    "metric": "uvm_errors",
+                    "op": "==",
+                    "goal": 0,
+                    "value": 0.0
+                  },
+                  {
+                    "name": "sim_exit",
+                    "status": "pass",
+                    "metric": "sim_exit",
+                    "op": "==",
+                    "goal": 0,
+                    "value": 0.0
+                  }
+                ],
+                "artifacts": [
+                  {
+                    "type": "std.FileSet",
+                    "filetype": "simLog",
+                    "basedir": "/abs/rundir/wb-dma-example.smoke",
+                    "files": [
+                      "sim.log"
+                    ],
+                    "attributes": [
+                      "role=log"
+                    ],
+                    "role": "log",
+                    "stamps": [
+                      {
+                        "path": "/abs/rundir/wb-dma-example.smoke/sim.log",
+                        "mtime": 1793450000.0,
+                        "size": 1024
+                      }
+                    ]
+                  }
+                ],
+                "start_time": "2026-10-31T14:22:11+00:00",
+                "end_time": "2026-10-31T14:22:24+00:00",
+                "testname": "smoke_test",
+                "seed": 1
+              },
+              {
+                "name": "two-ch",
+                "type": "hdlsim.TestResult",
+                "types": [
+                  "hdlsim.TestResult",
+                  "std.TestResult",
+                  "std.Result"
+                ],
+                "status": "pass",
+                "passed": true,
+                "msg": "",
+                "task": "wb-dma-example.two-ch",
+                "rundir": "/abs/rundir/wb-dma-example.two-ch",
+                "attrs": {
+                  "sim": "vlt"
+                },
+                "metrics": {
+                  "walltime_s": {
+                    "value": 12.5,
+                    "unit": "s",
+                    "better": "lower"
+                  },
+                  "uvm_errors": {
+                    "value": 0.0,
+                    "unit": "",
+                    "better": "none"
+                  }
+                },
+                "checks": [
+                  {
+                    "name": "uvm_errors",
+                    "status": "pass",
+                    "metric": "uvm_errors",
+                    "op": "==",
+                    "goal": 0,
+                    "value": 0.0
+                  },
+                  {
+                    "name": "sim_exit",
+                    "status": "pass",
+                    "metric": "sim_exit",
+                    "op": "==",
+                    "goal": 0,
+                    "value": 0.0
+                  }
+                ],
+                "artifacts": [
+                  {
+                    "type": "std.FileSet",
+                    "filetype": "simLog",
+                    "basedir": "/abs/rundir/wb-dma-example.two-ch",
+                    "files": [
+                      "sim.log"
+                    ],
+                    "attributes": [
+                      "role=log"
+                    ],
+                    "role": "log",
+                    "stamps": [
+                      {
+                        "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+                        "mtime": 1793450000.0,
+                        "size": 1024
+                      }
+                    ]
+                  }
+                ],
+                "start_time": "2026-10-31T14:22:11+00:00",
+                "end_time": "2026-10-31T14:22:24+00:00",
+                "testname": "two_ch_test",
+                "seed": 1
+              }
+            ],
+            "total": 2,
+            "failed": 0,
+            "errored": 0
+          }
+        ]
+      },
+      {
+        "name": "synth",
+        "type": "yosys.SynthResult",
+        "types": [
+          "yosys.SynthResult",
+          "std.Result"
+        ],
+        "status": "fail",
+        "passed": false,
+        "msg": "timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)",
+        "task": "syn.synth",
+        "rundir": "/abs/rundir/syn.synth",
+        "tool": {
+          "name": "yosys",
+          "version": "0.45"
+        },
+        "attrs": {
+          "top": "soc_top",
+          "part": "ice40-up5k"
+        },
+        "metrics": {
+          "fmax_mhz": {
+            "value": 98.8,
+            "unit": "MHz",
+            "better": "higher"
+          },
+          "wns_ns": {
+            "value": -0.12,
+            "unit": "ns",
+            "better": "higher"
+          },
+          "luts": {
+            "value": 4211.0,
+            "unit": "cells",
+            "better": "lower"
+          }
+        },
+        "checks": [
+          {
+            "name": "timing",
+            "status": "fail",
+            "metric": "wns_ns",
+            "op": ">=",
+            "goal": 0,
+            "value": -0.12
+          },
+          {
+            "name": "area",
+            "status": "pass",
+            "metric": "luts",
+            "op": "<=",
+            "goal": 5280,
+            "value": 4211.0
+          }
+        ],
+        "counts": {
+          "total": 2,
+          "pass": 2,
+          "fail": 0,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 0
+        },
+        "artifacts": [
+          {
+            "type": "std.FileSet",
+            "filetype": "textReport",
+            "basedir": "/abs/rundir/syn.synth",
+            "files": [
+              "timing.rpt"
+            ],
+            "attributes": [
+              "role=report",
+              "label=Timing"
+            ],
+            "role": "report",
+            "label": "Timing",
+            "stamps": [
+              {
+                "path": "/abs/rundir/syn.synth/timing.rpt",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          }
+        ],
+        "children": [
+          {
+            "name": "synth",
+            "type": "yosys.SynthResult",
+            "types": [
+              "yosys.SynthResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "syn.synth",
+            "metrics": {
+              "luts": {
+                "value": 4211.0,
+                "unit": "cells",
+                "better": "lower"
+              }
+            },
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "yosysLog",
+                "basedir": "/abs/rundir/syn.synth",
+                "files": [
+                  "synth.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/syn.synth/synth.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "pnr",
+            "type": "yosys.SynthResult",
+            "types": [
+              "yosys.SynthResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "syn.synth",
+            "metrics": {
+              "fmax_mhz": {
+                "value": 98.8,
+                "unit": "MHz",
+                "better": "higher"
+              }
+            },
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "yosysLog",
+                "basedir": "/abs/rundir/syn.synth",
+                "files": [
+                  "pnr.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/syn.synth/pnr.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              },
+              {
+                "type": "std.FileSet",
+                "filetype": "textReport",
+                "basedir": "/abs/rundir/syn.synth",
+                "files": [
+                  "timing.rpt"
+                ],
+                "attributes": [
+                  "role=report",
+                  "label=Timing"
+                ],
+                "role": "report",
+                "label": "Timing",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/syn.synth/timing.rpt",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "bmc",
+        "type": "formal.FormalResult",
+        "types": [
+          "formal.FormalResult",
+          "std.Result"
+        ],
+        "status": "fail",
+        "passed": false,
+        "msg": "assertion failed: dma_ch.p_no_overrun at step 14",
+        "task": "fv.bmc",
+        "rundir": "/abs/rundir/fv.bmc",
+        "attrs": {
+          "engine": "sby",
+          "mode": "bmc",
+          "top": "dma_ch"
+        },
+        "metrics": {
+          "depth": {
+            "value": 20.0,
+            "unit": "cycles",
+            "better": "none"
+          },
+          "proven": {
+            "value": 3.0,
+            "unit": "",
+            "better": "none"
+          },
+          "failed": {
+            "value": 1.0,
+            "unit": "",
+            "better": "none"
+          }
+        },
+        "checks": [
+          {
+            "name": "assertions",
+            "status": "fail",
+            "metric": "failed",
+            "op": "==",
+            "goal": 0,
+            "value": 1.0
+          }
+        ],
+        "counts": {
+          "errors": 1
+        },
+        "diagnostics": [
+          {
+            "severity": "error",
+            "msg": "Assert failed in dma_ch: p_no_overrun",
+            "category": "sva",
+            "loc": {
+              "path": "/abs/rundir/fv.bmc/logfile.txt",
+              "line": 57
+            },
+            "src_loc": {
+              "path": "/abs/rtl/dma_ch.sv",
+              "line": 120
+            }
+          }
+        ],
+        "artifacts": [
+          {
+            "type": "std.FileSet",
+            "filetype": "sbyLog",
+            "basedir": "/abs/rundir/fv.bmc",
+            "files": [
+              "logfile.txt"
+            ],
+            "attributes": [
+              "role=log"
+            ],
+            "role": "log",
+            "stamps": [
+              {
+                "path": "/abs/rundir/fv.bmc/logfile.txt",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          },
+          {
+            "type": "std.FileSet",
+            "filetype": "vcd",
+            "basedir": "/abs/rundir/fv.bmc",
+            "files": [
+              "trace.vcd"
+            ],
+            "attributes": [
+              "role=waves"
+            ],
+            "role": "waves",
+            "stamps": [
+              {
+                "path": "/abs/rundir/fv.bmc/trace.vcd",
+                "mtime": 1793450000.0,
+                "size": 1024
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

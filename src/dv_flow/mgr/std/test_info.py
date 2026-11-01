@@ -403,8 +403,25 @@ async def TestInfoRun(runner, input):
             fp.write(raw)
     except OSError as e:
         _log.warning("test-info: could not write %s: %s", path, e)
+        return TaskDataResult()
 
-    return TaskDataResult()
+    # The run record's root: the inventory file as a `report` artifact.
+    from ..results import api as R
+    res = R.mk_result(runner, "std.TaskResult", name=input.name.rsplit(".", 1)[-1],
+                      task=input.name, rundir=input.rundir, status="pass")
+    try:
+        import json
+        inv = json.loads(raw)
+        tests = inv.get("tests") if isinstance(inv, dict) else None
+        if isinstance(tests, list):
+            res.msg = "%d test(s)" % len(tests)
+            res.metrics = {"tests": R.metric(len(tests), "", "none", "Tests")}
+    except Exception:
+        pass
+    res.artifacts = [R.artifact(None, path, role="report", filetype="testsInfoJson",
+                                label="Test inventory")]
+    R.finish(res)
+    return TaskDataResult(output=[res])
 
 
 # ---------------------------------------------------------------------------

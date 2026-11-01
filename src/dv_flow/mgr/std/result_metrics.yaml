@@ -1,0 +1,61 @@
+# The std metric-name registry: the unit, direction and roll-up rule for
+# metric names that more than one producer reports, so a test library, a
+# synthesis library and a formal library describe the same quantity the same
+# way. `results.api.metric(value, name=...)` fills unit/better/label from here;
+# `results.rollup` uses `rollup` when a parent rolls its children up.
+#
+#   better:  higher | lower | none   (run-to-run compare direction)
+#   rollup:  sum | max | min | mean | none
+#
+# A metric not listed rolls up by its `better`: lower -> sum (times, counts),
+# higher -> min (the conservative choice), none -> not rolled up.
+# A name may use `*` for a family (cov_*_pct).
+metrics:
+# -- run time and resources ------------------------------------------------
+- {name: walltime_s,   unit: s,      better: lower,  rollup: sum,  label: Wall time}
+- {name: cpu_total_s,  unit: s,      better: lower,  rollup: sum,  label: CPU time}
+- {name: cpu_user_s,   unit: s,      better: lower,  rollup: sum}
+- {name: cpu_sys_s,    unit: s,      better: lower,  rollup: sum}
+- {name: maxrss_mb,    unit: MB,     better: lower,  rollup: max,  label: Peak RSS}
+- {name: sim_mem_mb,   unit: MB,     better: lower,  rollup: max}
+- {name: simtime_s,    unit: s,      better: none,   rollup: sum,  label: Sim time}
+- {name: sim_speed_s_per_s, unit: "s/s", better: higher, rollup: mean}
+# -- simulation verdict inputs (counts) -------------------------------------
+- {name: uvm_errors,   unit: "",     better: lower,  rollup: sum,  label: UVM_ERROR}
+- {name: uvm_fatals,   unit: "",     better: lower,  rollup: sum,  label: UVM_FATAL}
+- {name: uvm_warnings, unit: "",     better: lower,  rollup: sum,  label: UVM_WARNING}
+- {name: sim_errors,   unit: "",     better: lower,  rollup: sum,  label: Sim errors}
+- {name: sim_fatals,   unit: "",     better: lower,  rollup: sum,  label: Sim fatals}
+- {name: assertion_failures, unit: "", better: lower, rollup: sum, label: Assertion failures}
+- {name: sim_exit,     unit: "",     better: none,   rollup: none, label: Exit status}
+- {name: cycles,       unit: cycles, better: none,   rollup: sum}
+- {name: transactions, unit: "",     better: none,   rollup: sum}
+# -- coverage -----------------------------------------------------------------
+- {name: "cov_*_pct",  unit: "%",    better: higher, rollup: max,  label: Coverage}
+- {name: "cov_*_covered", unit: "",  better: higher, rollup: none}
+- {name: "cov_*_total",   unit: "",  better: none,   rollup: none}
+# -- synthesis / implementation ---------------------------------------------
+- {name: fmax_mhz,     unit: MHz,    better: higher, rollup: min,  label: Fmax}
+- {name: wns_ns,       unit: ns,     better: higher, rollup: min,  label: WNS}
+- {name: tns_ns,       unit: ns,     better: higher, rollup: min,  label: TNS}
+- {name: luts,         unit: cells,  better: lower,  rollup: sum,  label: LUTs}
+- {name: ffs,          unit: cells,  better: lower,  rollup: sum,  label: FFs}
+- {name: brams,        unit: cells,  better: lower,  rollup: sum,  label: BRAMs}
+- {name: dsps,         unit: cells,  better: lower,  rollup: sum,  label: DSPs}
+- {name: cells,        unit: cells,  better: lower,  rollup: sum,  label: Cells}
+- {name: area_um2,     unit: "um^2", better: lower,  rollup: sum,  label: Area}
+- {name: power_mw,     unit: mW,     better: lower,  rollup: sum,  label: Power}
+# -- formal -------------------------------------------------------------------
+- {name: depth,        unit: cycles, better: higher, rollup: min,  label: Depth}
+- {name: proven,       unit: "",     better: higher, rollup: sum,  label: Proven}
+- {name: failed,       unit: "",     better: lower,  rollup: sum,  label: Failed}
+- {name: unknown,      unit: "",     better: lower,  rollup: sum,  label: Unknown}
+- {name: covered,      unit: "",     better: higher, rollup: sum,  label: Covered}
+# -- lint / build ---------------------------------------------------------------
+- {name: warnings,     unit: "",     better: lower,  rollup: sum,  label: Warnings}
+- {name: errors,       unit: "",     better: lower,  rollup: sum,  label: Errors}
+- {name: image_bytes,  unit: B,      better: lower,  rollup: sum,  label: Image size}
+# -- evals --------------------------------------------------------------------
+- {name: "score_*",    unit: "",     better: higher, rollup: mean, label: Score}
+- {name: verdict,      unit: "",     better: higher, rollup: mean, label: Verdict}
+- {name: trials_passed, unit: "",    better: higher, rollup: sum,  label: Trials passed}

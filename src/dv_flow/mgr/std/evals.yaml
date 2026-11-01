@@ -39,13 +39,17 @@ fragment:
       Base task for a project's benchmark-execution command. A root `uses:`
       it, wires the available cases and suites as `needs:`, and gets
       everything `std.TestRunner` provides -- `--tests`/`--views` selection,
-      the console report, the CTRF file -- plus:
+      the console report, the run record (whose CTRF rendering is the CTRF
+      file: `dfm show results --format ctrf` or `results.formats: [ctrf]`)
+      -- plus:
 
-        * **trials**: each case runs `--epochs` times, and the per-trial
-          scores are combined by `--epochs-reducer`. `pass_at_k` is what
-          makes a nondeterministic agent measurable; `mean` is the default
-          because it is the only reducer that is meaningful for a
-          continuous score.
+        * **trials**: each case runs `--epochs` times, as independent nodes
+          `<case>.e1` ... `<case>.eN`, and the per-trial verdicts are
+          combined by `--epochs-reducer` into one `std.EvalCase` per case.
+          `pass_at_k` is what makes a nondeterministic agent measurable;
+          `mean` is the default because it is the only reducer that is
+          meaningful for a continuous score. (A matrix-suite cell cannot be
+          replicated yet: `epochs > 1` with one is an error.)
         * **an Inspect eval-set log**: every trial contributes one
           `std.EvalSample` item, and the root assembles those into
           `EvalLog` documents under `log_dir`.
@@ -67,6 +71,8 @@ fragment:
         needs: [swe-suite, refactor-suite]
       ```
     elaborate: dv_flow.mgr.std.eval_select:EvalSelect
+    shell: pytask
+    run: dv_flow.mgr.std.eval_log.EvalRunnerRun
     summary: dv_flow.mgr.std.eval_log:eval_summary
     with:
       epochs:
@@ -89,8 +95,9 @@ fragment:
         cli: {name: epochs-reducer}
         doc: |
           How a case's per-trial scores are combined into its verdict. This
-          is also what CTRF `status` derives from, so the console report,
-          the CTRF file, and the `EvalLog` cannot disagree.
+          is also what the case's `status` (and so its CTRF status in the run
+          record's rendering) derives from, so the console report, the CTRF
+          file, and the `EvalLog` cannot disagree.
         values:
         - {value: mean,     desc: "the average score across trials"}
         - {value: median,   desc: "the middle score across trials"}
@@ -103,7 +110,7 @@ fragment:
         value: logs
         doc: |
           Directory, relative to the root rundir, holding the eval set. One
-          `EvalLog` per (suite x view) is written here, plus nothing else --
+          `EvalLog` per (benchmark x view) is written here, plus nothing else --
           the directory is the eval set, so anything else in it would be
           picked up by `list_eval_logs()`.
       log_format:
@@ -178,17 +185,54 @@ fragment:
           to `case`.
 
   #------------------------------------------------------------------
+  # EvalCase -- a replicated case's verdict, at the root.
+  #------------------------------------------------------------------
+  - name: EvalCase
+    uses: std.TestResult
+    doc: |
+      One case run `epochs` times, reduced to one verdict by the root of a
+      `std.EvalRunner` with `epochs > 1`. The verdict is the reducer applied
+      to the trials' own verdicts (1.0 pass, 0.0 otherwise), passing at 0.5:
+      `pass_at_k`/`max` pass when any trial passed, `all`/`min` when every
+      one did, `mean`/`median` on a majority. A trial that reported nothing
+      counts as failed.
+
+      metrics: `verdict`, `trials_passed`, and `score_<name>` for each
+      scorer, reduced the same way. checks: one, named for the reducer,
+      `verdict >= 0.5`. The trials are listed in `trials` (epoch, status,
+      score, task, rundir) rather than held as children, so the case is one
+      leaf of the run record whatever its epoch count.
+    with:
+      epochs:
+        type: int
+        value: 1
+      reducer:
+        type: str
+        value: mean
+      trials:
+        type: list
+        doc: "One entry per trial: epoch, status, score, task, rundir."
+
+  #------------------------------------------------------------------
   # EvalSample -- one trial's result, in flight.
   #
-  # Field-for-field an Inspect `EvalSample`, plus the two fields
-  # `test_summary` collects on structurally (`passed`, `status`). That
-  # overlap is deliberate: it is what lets a graded case flow into the
-  # inherited console report and the CTRF file with no special case.
+  # Field-for-field an Inspect `EvalSample`, and a `std.TestResult`: the
+  # verdict (`status`, `passed`) is the std one, which is what lets a graded
+  # case flow into the run record, the console report and the CTRF
+  # rendering with no special case.
   #------------------------------------------------------------------
   - name: EvalSample
+    uses: std.TestResult
     doc: |
       One trial of one case: what was asked, what the agent did, and how it
       scored. Produced by a grader, consumed by the root.
+
+      It is a `std.TestResult`, so a trial is a test case in the run record
+      (`rundir/out/<run-id>/results.json`) and in every rendering of it --
+      the console report, JUnit, CTRF (`dfm show results --format ctrf`, or
+      `results.formats: [ctrf]`). `status`/`passed` are the verdict;
+      `dv_flow.mgr.std.eval_sample.sample_result` copies numeric `scores`
+      into `metrics` (`score_<name>`) and turns thresholds into `checks`.
 
       A grader populates what it knows and leaves the rest; the runner fills
       in identity (`id`, `epoch`) and timing, and copies `scores` through
@@ -205,18 +249,7 @@ fragment:
         type: int
         value: 1
         doc: "Which trial this is, 1-based. Set by the runner."
-      # -- verdict (also what the inherited report reads) -----------------
-      passed:
-        type: bool
-        value: false
-        doc: |
-          The trial's boolean verdict. Read structurally by the inherited
-          test report and by the CTRF emitter; reduced across epochs to
-          produce the case's verdict.
-      status:
-        type: str
-        value: ""
-        doc: "`pass`, `fail`, `error`, or `timeout`."
+      # -- verdict: `status` / `passed` are std.Result's ------------------
       # -- Inspect payload -----------------------------------------------
       input:
         type: str

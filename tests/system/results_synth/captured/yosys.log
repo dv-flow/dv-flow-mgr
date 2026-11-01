@@ -1,0 +1,5 @@
+Yosys 0.45 (git sha1 9ed031ddd, clang++ 14.0.0 -fPIC -Os)
+-- Running command `synth_ice40 -top soc_top -json soc_top.json' --
+2.1. Executing Verilog-2005 frontend: soc_top.v
+...
+End of script. Logfile hash: 3c2f9a1b07, CPU: user 21.40s system 0.31s

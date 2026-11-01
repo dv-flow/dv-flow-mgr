@@ -370,8 +370,14 @@ package:
 
   - name: TestRunner
     scope: export
+    shell: pytask
+    run: dv_flow.mgr.std.result_collect.TestRunnerRun
     passthrough: all
-    consumes: none
+    consumes: all
+    produces:
+    - type: std.TestRunResult
+    requires:
+    - std.check.Produces: {type: std.Result}
     desc: "Base for a test-running root: selection, arguments, and a report"
     doc: |
       Base task for a project's test-execution command. A root `uses:` it,
@@ -381,7 +387,10 @@ package:
           the need-set at graph build -- a deselected test is never built, and
           neither is anything reachable only through it;
         * an end-of-run **report** of per-case status, with `--detail`
-          controlling how much is shown.
+          controlling how much is shown;
+        * a **`std.TestRunResult`** over the Results its members report
+          (their own items still pass through), which becomes the run
+          record's root.
 
       A case declares its identity with a `std.Test` tag. A suite is either a
       matrix task whose cells carry a `name` field (see `test_key`), or a task
@@ -464,6 +473,8 @@ package:
     passthrough: none
     consumes: none
     uptodate: false
+    produces:
+    - type: std.TaskResult
     desc: "Introspect a test-running root: what cases and views does it offer?"
     doc: |
       The companion to `std.TestRunner`: it reports the inventory the runner
@@ -585,8 +596,12 @@ package:
 
   - name: TestSuite
     scope: export
+    shell: pytask
+    run: dv_flow.mgr.std.result_collect.TestSuiteRun
     passthrough: all
-    consumes: none
+    consumes: all
+    produces:
+    - type: std.SuiteResult
     desc: "A named collection of tests and suites"
     doc: |
       Groups tests -- and other suites -- under one name. The members are the
@@ -604,6 +619,57 @@ package:
       `dfm run tests --tests sanity.` selects everything in it. Run directly,
       a suite simply runs all its members; selection happens in the
       `std.TestRunner` that reaches it.
+
+      When members report `std.Result` items, the suite also emits a
+      `std.SuiteResult` named after it, with those Results as `children`
+      (status the worst member, counts by leaf). Its members' own items still
+      pass through unchanged.
+
+  - name: ResultCollect
+    scope: export
+    shell: pytask
+    run: dv_flow.mgr.std.result_collect.ResultCollect
+    passthrough: none
+    consumes: all
+    produces:
+    - type: std.Result
+    desc: "Gather the Results among the inputs under one verdict"
+    doc: |
+      Collects the `std.Result` items among its inputs (by is-a, so a test
+      run, a synthesis result and a formal result alike) into one node of
+      `type` with them as `children`. The status is the worst child's,
+      `counts` are leaf statuses, and `metrics` roll up per name (the std
+      metric registry's rule, else by direction: lower sums, higher takes
+      the minimum). With no Results among the inputs the node is `notrun`,
+      "no results".
+
+      Inputs that are not Results are **not** passed through; the output is
+      the one node.
+
+      ```yaml
+      - name: regress
+        uses: std.ResultCollect
+        needs: [tests, synth, formal]
+        with:
+          checks:
+          - {name: all_pass, metric: fail, op: "==", goal: 0}
+      ```
+
+      A check's `metric` may name a rolled-up metric or a leaf count
+      (`total`, `pass`, `fail`, `error`, `notrun` ...).
+    with:
+      name:
+        type: str
+        value: ""
+        doc: Display name (default the task's name)
+      type:
+        type: str
+        value: std.Result
+        doc: The node's type (any std.Result subtype)
+      checks:
+        type: list
+        value: []
+        doc: "Checks over the roll-up: maps of {name, metric, op, goal}"
 
   types:
   - name: Check
@@ -836,6 +902,213 @@ package:
       flatten:
         type: bool
         value: false
+
+  #------------------------------------------------------------------
+  # Run results (see docs/reference/results.rst). A Result is a tree of
+  # verdict nodes; every `dfm run` writes the root task's Result to
+  # rundir/out/<run-id>/results.json. Domain profiles (TestResult, a
+  # library's SynthResult/FormalResult) are thin `uses:` subtypes.
+  #------------------------------------------------------------------
+  - name: Diagnostic
+    doc: |
+      One message worth showing: a TaskMarker plus DV fields. Diagnostics
+      travel as maps inside `Result.diagnostics`; this type documents the
+      shape.
+    with:
+      severity:
+        doc: info | warning | error | fatal
+        type: str
+        value: error
+      msg:
+        type: str
+        value: ""
+      category:
+        doc: Where it came from (uvm | sva | sim | tool | check | ...)
+        type: str
+        value: ""
+      loc:
+        doc: "{path, line, pos} -- where to look; path is usually the log"
+        type: map
+      src_loc:
+        doc: "Optional {path, line}: the source file/line the message reports"
+        type: map
+      time:
+        doc: Optional simulation time
+        type: str
+        value: ""
+      hier:
+        doc: Optional instance path
+        type: str
+        value: ""
+
+  - name: Metric
+    doc: |
+      One number worth showing, comparing and trending. `Result.metrics`
+      maps a name to a Metric (or a bare number).
+    with:
+      value:
+        type: float
+        value: 0.0
+      unit:
+        doc: '"ns", "MHz", "cells", "%", "s", "MB" ...'
+        type: str
+        value: ""
+      better:
+        doc: higher | lower | none -- the direction for run-to-run compares
+        type: str
+        value: none
+      label:
+        doc: Optional display name
+        type: str
+        value: ""
+
+  - name: ResultCheck
+    doc: |
+      A named success criterion -- the "why" behind a Result's status
+      (`timing: wns_ns >= 0`, `uvm_errors == 0`). Checks travel as maps in
+      `Result.checks`. (Named ResultCheck because `std.Check` is the
+      graph-build requirement type.)
+    with:
+      name:
+        type: str
+        value: ""
+      status:
+        doc: pass | fail | error | skip
+        type: str
+        value: ""
+      metric:
+        doc: Optional key in the Result's metrics that this check reads
+        type: str
+        value: ""
+      op:
+        doc: Optional comparison (">=", "<=", "==", "!=", ">", "<")
+        type: str
+        value: ""
+      goal:
+        doc: Optional threshold
+        type: float
+        value: 0.0
+      msg:
+        type: str
+        value: ""
+
+  - name: Result
+    uses: std.DataItem
+    doc: |
+      A domain-neutral verdict node. `status` is the verdict and `checks`
+      explain it; `metrics` are typed numbers; `artifacts` are FileSets
+      with a `role=` attribute (log, report, waves, cov, netlist,
+      checkpoint, image, data, profile, other); `children` nest further
+      Results (cases of a suite, stages of a synth run). A task that
+      reports a failing verdict still exits with status 0: failure is data.
+      Build Results with `dv_flow.mgr.results.api`.
+    with:
+      name:
+        doc: Display name, unique among siblings
+        type: str
+        value: ""
+      status:
+        doc: pass | fail | error | timeout | skip | notrun
+        type: str
+        value: ""
+      passed:
+        doc: status == "pass" (derived)
+        type: bool
+        value: false
+      msg:
+        doc: One-line headline ("UVM_ERROR x2 ...", "WNS -0.12ns @ clk_sys")
+        type: str
+        value: ""
+      task:
+        doc: Fully-qualified producing task
+        type: str
+        value: ""
+      rundir:
+        type: str
+        value: ""
+      tool:
+        doc: "{name, version}"
+        type: map
+      attrs:
+        doc: Identity and configuration (testname, seed, top, part ...)
+        type: map
+      metrics:
+        doc: name -> Metric (or a bare number)
+        type: map
+      checks:
+        doc: ResultCheck maps
+        type: list
+      counts:
+        doc: |
+          True totals. Diagnostics by severity (errors, warnings, fatals,
+          infos) and, for a node with children, leaf statuses (pass, fail,
+          error, timeout, skip, notrun, total).
+        type: map
+      diagnostics:
+        doc: Diagnostic maps, capped (the first N, most severe first)
+        type: list
+      artifacts:
+        doc: std.FileSet items with a role= attribute
+        type: list
+      children:
+        doc: Nested Results
+        type: list
+      start_time:
+        type: str
+        value: ""
+      end_time:
+        type: str
+        value: ""
+      reused:
+        doc: Up to date / cache hit -- artifacts are from an earlier run
+        type: bool
+        value: false
+
+  - name: TaskResult
+    uses: std.Result
+    doc: |
+      The Result dfm synthesizes for a task that produced none: status from
+      the task status, markers as diagnostics, output FileSets and the
+      task's log as artifacts. Also used for a failed task that no Result
+      accounts for (a build failure), under the root's `_tasks` node.
+
+  - name: TestResult
+    uses: std.Result
+    doc: |
+      One test case. attrs: sim, view, group, build. metrics: walltime_s,
+      simtime, maxrss_mb, cov_*_pct. checks: uvm_errors, sim_errors,
+      assertions, sim_exit. roles: log, waves, cov, data.
+    with:
+      testname:
+        doc: Test identity (e.g. UVM_TESTNAME)
+        type: str
+        value: ""
+      seed:
+        doc: Seed, when the producer knows it
+        type: int
+        value: 0
+
+  - name: SuiteResult
+    uses: std.Result
+    doc: |
+      A suite: children are TestResult and SuiteResult nodes. `passed` is a
+      bool like every Result; the pass count is `counts.pass`.
+    with:
+      total:
+        type: int
+        value: 0
+      failed:
+        type: int
+        value: 0
+      errored:
+        type: int
+        value: 0
+
+  - name: TestRunResult
+    uses: std.SuiteResult
+    doc: |
+      The root of a test run (`std.TestRunner`): children are suites, plus
+      TaskResult nodes for failures outside any test.
 
   - name: Env
     doc: |
