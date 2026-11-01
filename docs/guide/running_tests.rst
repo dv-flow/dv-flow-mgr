@@ -353,10 +353,48 @@ rather than the generic task panel:
 ``full``
     every case, after the generic task summary
 
-The report is structural, not tied to any one producer: any item exposing
-``passed``/``status`` is read as a case verdict and any item exposing
-``total``/``passed`` counts as a roll-up. A simulator, a formal engine, and a
-lint task can all feed the same report.
+The report is rendered from the run record (``rundir/out/<run-id>/results.json``,
+see :ref:`run-results`), so the console and the record cannot disagree: at
+``normal`` it lists each failing case with its path, its headline, the checks
+that failed and ``log: <path>:<line>``; a test the run could not reach is
+listed as not run with the task that blocked it. When there is no record
+(``--no-results``), it falls back to reading the output structurally (any
+item exposing ``passed``/``status`` is a case verdict, any exposing
+``total`` a roll-up); that path is kept for one release.
+
+How suites roll up
+==================
+
+Cases report ``std.TestResult`` items (a library's subtype, such as
+``hdlsim.TestResult``, is one). Each ``std.TestSuite`` emits a
+``std.SuiteResult`` holding its members' results as ``children``, and
+``std.TestRunner`` wraps the top of the tree in a ``std.TestRunResult``, the
+root of the record. A parent's status is its worst child's (error > timeout >
+fail > notrun > skip > pass), its ``counts`` tally the leaf cases, and its
+metrics roll up per name: ``walltime_s`` sums, ``maxrss_mb`` takes the max,
+coverage percentages the max, and so on, from the std metric registry. The
+members' own items still pass through the suite unchanged.
+
+``std.ResultCollect`` does the same for anything that reports a Result -- a
+test run, a synthesis run and a formal run under one verdict:
+
+.. code-block:: yaml
+
+    - root: regress
+      uses: std.ResultCollect
+      needs: [tests, synth, formal]
+      with:
+        checks:
+        - {name: all_pass, metric: fail, op: "==", goal: 0}
+
+Reading results
+===============
+
+``dfm show results`` prints the latest record as a tree, ``--failures`` just
+the failures, and ``--json --failures`` the summary block a script reads.
+Each failure names the result path (``tests/uvm-tests/two-ch``), the failing
+checks (``uvm_errors: fail (uvm_errors=2, want == 0)``) and where to look
+(``log: .../sim.log:1873``).
 
 Since the report is the invoked root's ``summary:``, it renders for the single
 root ``dfm run tests`` invokes. Entry points that can supply several roots at
@@ -380,6 +418,80 @@ A producer package supplies the roll-up. With ``hdlsim``:
       uses: hdlsim.SimSuiteReport    # which itself uses std.TestRunner
       needs: [regression-suite]
 
-``hdlsim.SimSuiteReport`` also writes ``junit.xml`` into its rundir (disable
-with ``junit: false``), which is what gives GitHub and GitLab a native test
-view.
+``hdlsim.SimSuiteReport`` also writes ``junit.xml`` and ``ctrf.json`` into
+its rundir (disable with ``junit: false`` / ``ctrf: false``).
+
+CI integration
+--------------
+
+The run record renders to the formats CI reads, for any root and any domain.
+Ask for them in the project's ``.dfm/config.yaml``:
+
+.. code-block:: yaml
+
+    results:
+      formats: [junit, ctrf]
+
+or per run with ``dfm run tests --results-format junit,ctrf`` (or
+``DFM_RESULTS_FORMATS=junit``). They are written next to ``results.json``, so
+a CI step publishes ``rundir/out/latest/junit.xml``. ``dfm show results
+--format junit -o junit.xml`` renders an existing record. In the JUnit file a
+test case is a ``<testcase>``; any other result with checks -- a synthesis
+run's ``timing``, a coverage goal -- is a ``<testsuite>`` with one test case
+per check, so a timing failure shows in the CI test view next to the test
+failures. ``error``/``timeout`` are JUnit errors, ``notrun`` is skipped with
+the blocking task in the message.
+
+Evals: graded cases and trials
+==============================
+
+``std.EvalRunner`` is ``std.TestRunner`` for graded, nondeterministic cases --
+an agent benchmark, say. Everything above applies unchanged: a case carries a
+``std.Eval`` tag (which is a ``std.Test``), so ``--tests``/``--views`` select
+over eval cases and ordinary tests alike, and the report, the run record and
+its JUnit/CTRF renderings come from the same place.
+
+.. code-block:: yaml
+
+    - name: fix-issue-17
+      uses: agent-case
+      tags: [{std.Eval: {name: fix-issue-17, benchmark: swe-bench,
+                         sample_id: "django-17"}}]
+
+    - root: evals
+      uses: std.EvalRunner
+      with: { epochs: 4, epochs_reducer: pass_at_k }
+      needs: [fix-issue-17, refactor-suite]
+
+A case's grader returns a ``std.EvalSample`` (a ``std.TestResult``);
+``dv_flow.mgr.std.eval_sample.sample_result`` turns its ``scores`` into
+``score_<name>`` metrics and thresholds into checks.
+
+**Trials.** With ``epochs: N`` (``--epochs N``) each selected eval case is
+built as N independent nodes, ``<case>.e1`` ... ``<case>.eN``, each with its
+own rundir. They run in parallel, are never up-to-date or served from the
+cache, and receive their trial number as the case's ``epoch`` parameter when
+it declares one. Ordinary tests and builds under the same root are not
+replicated. A case that is a cell of a matrix suite cannot be replicated yet;
+``epochs > 1`` with one is an error.
+
+**The verdict.** The root reduces each case's trials to one
+``std.EvalCase`` result, which is what the report and the run record count:
+three cases at four epochs are three results, not twelve. The reducer
+(``--epochs-reducer``) is applied to the trials' verdicts and passes at 0.5 --
+``pass_at_k``/``max`` pass when any trial passed, ``all``/``min`` when every
+trial did, ``mean``/``median`` on a majority. A trial that reported nothing
+counts as failed. The case carries ``verdict``, ``trials_passed`` and each
+reduced ``score_<name>``, and lists its trials (epoch, status, score, rundir)
+in ``trials``.
+
+**The Inspect log.** The root also writes an Inspect eval set under
+``rundir/<root>/<log_dir>`` (default ``logs``): one ``EvalLog`` per
+(benchmark, view), named ``{timestamp}_{task}_{id}.json`` so
+``inspect_ai.log.list_eval_logs()`` and ``inspect view`` find them, all sharing
+``eval_set_id`` (default: the run-id). The log's ``results`` and
+``reductions`` use the same reducer as the case verdicts. ``eval.model`` is
+read from the samples' ``model_usage``; a log whose samples name more than one
+model is an error -- split such cases into views. ``log_format: eval`` converts
+with the ``inspect`` CLI, which must then be on ``PATH``. A log that cannot
+be written fails the root and puts an ``eval_log`` error check on its result.

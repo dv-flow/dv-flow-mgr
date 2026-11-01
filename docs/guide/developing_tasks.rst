@@ -150,6 +150,60 @@ When the task implementation is simple, the code can be in-lined within the YAML
 When this task is executed, the body of the `run` entry will be evaluated as the
 body of an async Python method that has `ctxt`, and `input` parameters.
 
+Producing a Result
+------------------
+
+A task that decides a verdict -- a test check, a lint run, a synthesis run --
+reports it as a ``std.Result`` in its output, so it reaches the run record,
+``dfm show results`` and the CI renderings with no further work. The helpers
+are in ``dv_flow.mgr.results.api``. A lint task that fails on any warning:
+
+.. code-block:: yaml
+
+    - name: lint
+      shell: pytask
+      run: lint.py::Lint
+      produces:
+      - type: std.Result
+
+.. code-block:: python3
+
+    import os, re, subprocess
+    from dv_flow.mgr import TaskDataResult
+    from dv_flow.mgr.results import api as R
+
+    async def Lint(ctxt, input):
+        log = os.path.join(input.rundir, "lint.log")
+        with open(log, "w") as fp:
+            rc = subprocess.call(["verilator", "--lint-only", "top.sv"],
+                                 cwd=input.srcdir, stdout=fp, stderr=fp)
+        warnings = sum(1 for l in open(log) if l.startswith("%Warning"))
+
+        res = R.mk_result(ctxt, name="lint",
+                          metrics={"warnings": R.metric(warnings, name="warnings")})
+        res.checks.append(R.eval_check(res.metrics, "clean", "warnings", "<=", 0))
+        res.checks.append(R.check("tool_exit", "pass" if rc == 0 else "error",
+                                  metric=None, msg="exit %d" % rc))
+        res.artifacts.append(R.artifact(ctxt, log, role="log"))
+        R.finish(res)                         # status from the checks
+        return TaskDataResult(output=[res])   # status 0: failure is data
+
+Three things to keep:
+
+* **Return status 0 for a verdict.** A failing check is data; a non-zero task
+  status means the flow itself broke, and the record lists such a task under
+  ``_tasks``.
+* **Explain the status with checks.** ``finish`` takes the worst of the status
+  you set and the checks, so the two cannot disagree, and a renderer shows the
+  failing check (``clean: fail (warnings=3, want <= 0)``) without knowing what
+  lint is.
+* **Give the log a role.** ``role=log`` (and a diagnostic ``loc`` that points
+  into it) is what lets a reader open the log at the failing line.
+
+A domain library usually defines a subtype (``uses: std.Result``) for its
+results; it needs no fields of its own. See :doc:`/reference/results` for the
+format.
+
 Task-Graph Expansion
 ====================
 
