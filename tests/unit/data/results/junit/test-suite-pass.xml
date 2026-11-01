@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="wb-dma-example.tests" tests="2" failures="0" errors="0" skipped="0">
+  <testsuite name="tests/uvm-tests" tests="2" failures="0" errors="0" skipped="0">
+    <testcase name="smoke" classname="tests/uvm-tests/smoke" time="12.5">
+      <properties>
+        <property name="sim" value="vlt"/>
+        <property name="walltime_s" value="12.5s"/>
+        <property name="uvm_errors" value="0"/>
+      </properties>
+      <system-out>log: /abs/rundir/wb-dma-example.smoke/sim.log</system-out>
+    </testcase>
+    <testcase name="two-ch" classname="tests/uvm-tests/two-ch" time="12.5">
+      <properties>
+        <property name="sim" value="vlt"/>
+        <property name="walltime_s" value="12.5s"/>
+        <property name="uvm_errors" value="0"/>
+      </properties>
+      <system-out>log: /abs/rundir/wb-dma-example.two-ch/sim.log</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

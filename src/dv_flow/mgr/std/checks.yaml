@@ -43,6 +43,21 @@ fragment:
       A slot that a base project declared and a leaf never filled is the
       failure this catches -- it otherwise runs and reports success.
 
+  - name: Produces
+    uses: std.Check
+    check: dv_flow.mgr.std.checks:produces
+    doc: |
+      The task's own `produces:` (with what it inherits) must declare an item
+      of `type` -- an is-a match, so a subtype satisfies it. A root task
+      declares `requires: [{std.check.Produces: {type: std.Result}}]` to say
+      that what it reports is a Result, which is what the run record (and
+      the root-task rule) expects of a root.
+    with:
+      type:
+        type: str
+        value: std.Result
+        doc: The type (or a supertype of it) the task must declare in produces
+
   - name: Needs
     uses: std.Check
     check: dv_flow.mgr.std.checks:needs

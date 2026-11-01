@@ -164,6 +164,20 @@ def test_result_none_falls_back_to_disk(tmp_path):
     assert "from disk" in sb.render_task_summary_text(n)
 
 
+def test_result_none_reads_exec_data_by_naming_scheme(tmp_path):
+    """The file a task actually writes: `<name>.exec_data.json` under the
+    legacy naming scheme, with the verdict under `result`."""
+    n = _node("pkg.t", result=False)
+    n.rundir = str(tmp_path)          # a node that ran has a resolved str rundir
+    with open(tmp_path / n._get_exec_data_filename(), "w") as f:
+        json.dump({"name": "pkg.t", "result": {"status": 2, "markers": [
+            {"severity": "error", "msg": "named file"}]}}, f)
+    assert n._get_exec_data_filename() != "exec_data.json"
+    facts = sb.collect_task_facts(n)
+    assert facts[0].status == sb.ERROR
+    assert "named file" in sb.render_task_summary_text(n)
+
+
 # ---------------------------------------------------------------------------
 # SummaryCtxt / resolution
 # ---------------------------------------------------------------------------

@@ -182,6 +182,7 @@ See [references/agent_runtime.md](references/agent_runtime.md).
 ```bash
 dfm run                      # list the root tasks
 dfm run <task>               # run one root task
+dfm show results --failures  # what failed in the last run, with log:line
 dfm run -c debug build       # run with the 'debug' config
 dfm run -D name=value task   # override a parameter
 dfm run <task> --help        # the task's own arguments (its `cli:` block)
@@ -194,6 +195,25 @@ dfm validate                 # validate the flow (checks dataflow)
 
 Full CLI: [references/cli.md](references/cli.md).
 
+## After a run: read the results, don't search the rundir
+
+Every `dfm run` writes a run record and prints its path as the last line
+(`Results: rundir/out/<run-id>/results.json`). `rundir/out/latest` points at
+the newest one. To find out what failed and where to look:
+
+```bash
+dfm show results --json --failures   # the summary block: status, counts, failures[]
+dfm show results --failures          # the same, as text
+```
+
+Each `failures[]` entry has the result `path`, `status`, `msg` (the headline),
+the failing `checks`, and `log: {path, line}` -- open that file at that line
+next. A failed build or code generator that no test accounts for is listed
+under `_tasks/<task>` with its error and log, and the tests it blocked are
+`notrun` with `msg: "blocked: <task> failed"`. `jq '.summary'
+rundir/out/latest/results.json` reads the same block without dfm. Format:
+`docs/reference/results.rst`.
+
 ## Recommended authoring workflow
 
 1. **Survey** — `dfm show project`, `dfm show tasks`, `dfm context --json`.
@@ -205,6 +225,9 @@ Full CLI: [references/cli.md](references/cli.md).
 5. **Define tasks** — `uses:` a base; `needs` (direct only); typed
    `produces`/`consumes`; parameterize with `with:` / `${{ }}`.
 6. **Set visibility** — `root` / `export` / `local`; leave internals unscoped.
+   A `root` task declares what it reports: `produces: [{type: std.Result}]`
+   (or a subtype); tasks downstream of a root read its files through
+   `results.api.artifacts(input.inputs, role=...)`.
 7. **Wire variants** — put differences in `configs:` via `feeds` / params.
 8. **Validate** — `dfm validate` (fix dataflow warnings); `dfm graph <task>`.
 9. **Run** — `dfm run <root>` (`-c <config>`, `-D` as needed).

@@ -109,6 +109,22 @@ def unimplemented_slot(task, pkg=None) -> bool:
     return True
 
 
+def produces(ctxt) -> None:
+    """The task declares an item of `type` (is-a) in its own produces."""
+    from ..results.rootcheck import declared_produces, produced_types, produces_result
+    want = str(getattr(ctxt.params, 'type', '') or 'std.Result')
+    # The declaration, not the built node: a variant the elaborator builds
+    # (std.TestRunner under --build-only) may produce something else.
+    declared = declared_produces(ctxt.task, getattr(ctxt.node, 'produces', None))
+    if produces_result(declared, _type_resolver(ctxt), want):
+        return
+    have = produced_types(declared)
+    ctxt.error(
+        "does not declare what it produces",
+        detail="'%s' must declare a %s in `produces:`; it declares %s." % (
+            _leaf(ctxt.task), want, ", ".join(have) if have else "nothing"))
+
+
 def needs(ctxt) -> None:
     """Constrain what the task depends on.
 

@@ -1,0 +1,13 @@
+Info: Using uarch 'ice40' for device 'up5k'
+Info: Device utilisation:
+Info: 	         ICESTORM_LC:  4400/ 5280    83%
+Info: 	        ICESTORM_RAM:     4/   30    13%
+Info: 	               SB_IO:    44/   96    45%
+Info: Placed 4492 cells based on constraints.
+Info: Routing complete.
+Info: Critical path report for clock 'clk_sys$SB_IO_IN_$glb_clk' (posedge -> posedge):
+Info: curr total
+Info:  0.8  0.8  Source u_dma.ch1.cnt_SB_DFFER_Q_D_SB_LUT4_O_LC.O
+Info:  9.3 10.1  Setup u_dma.ch1.cnt_SB_DFFER_Q_9_D_SB_LUT4_O_LC.I3
+Info: Max frequency for clock 'clk_sys$SB_IO_IN_$glb_clk': 98.80 MHz (FAIL at 100.00 MHz)
+Info: Program finished normally.

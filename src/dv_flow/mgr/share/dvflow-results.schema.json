@@ -1,0 +1,801 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dv-flow.github.io/dvflow-results.schema.json",
+  "title": "DV Flow run results",
+  "description": "rundir/out/<run-id>/results.json, written at the end of every dfm run",
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": true,
+      "description": "A ``std.FileSet`` dump plus its ``role``/``label`` and file stamps.",
+      "properties": {
+        "type": {
+          "default": "std.FileSet",
+          "title": "Type",
+          "type": "string"
+        },
+        "filetype": {
+          "default": "",
+          "title": "Filetype",
+          "type": "string"
+        },
+        "basedir": {
+          "default": "",
+          "title": "Basedir",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "attributes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "role": {
+          "default": "other",
+          "title": "Role",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "stamps": {
+          "items": {
+            "$ref": "#/$defs/Stamp"
+          },
+          "title": "Stamps",
+          "type": "array"
+        },
+        "stale": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stale"
+        }
+      },
+      "title": "Artifact",
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": true,
+      "description": "A named success criterion. ``value`` is the observed metric value.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "skip"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "op": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op"
+        },
+        "goal": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "msg": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Msg"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": true,
+      "description": "A message worth showing (the TaskMarker shape plus DV fields).",
+      "properties": {
+        "severity": {
+          "default": "error",
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "fatal"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "msg": {
+          "default": "",
+          "title": "Msg",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "loc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Loc"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "src_loc": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Loc"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Time"
+        },
+        "hier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hier"
+        }
+      },
+      "title": "Diagnostic",
+      "type": "object"
+    },
+    "FailureEntry": {
+      "additionalProperties": true,
+      "description": "A non-passing leaf (or TaskResult), ready for triage.",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "timeout",
+            "skip",
+            "notrun"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "msg": {
+          "default": "",
+          "title": "Msg",
+          "type": "string"
+        },
+        "type": {
+          "default": "std.Result",
+          "title": "Type",
+          "type": "string"
+        },
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "log": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "waves": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Waves"
+        }
+      },
+      "required": [
+        "path",
+        "status"
+      ],
+      "title": "FailureEntry",
+      "type": "object"
+    },
+    "Loc": {
+      "additionalProperties": true,
+      "description": "Where to look: a file, and optionally a line and column.",
+      "properties": {
+        "path": {
+          "default": "",
+          "title": "Path",
+          "type": "string"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        },
+        "pos": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pos"
+        }
+      },
+      "title": "Loc",
+      "type": "object"
+    },
+    "LogRef": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "LogRef",
+      "type": "object"
+    },
+    "Metric": {
+      "additionalProperties": true,
+      "description": "A number with a unit and a direction for run-to-run compares.",
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "default": "",
+          "title": "Unit",
+          "type": "string"
+        },
+        "better": {
+          "default": "none",
+          "enum": [
+            "higher",
+            "lower",
+            "none"
+          ],
+          "title": "Better",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Metric",
+      "type": "object"
+    },
+    "ResultNode": {
+      "additionalProperties": true,
+      "description": "One verdict node. ``types`` is its is-a lineage, most-derived first.",
+      "properties": {
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "default": "std.Result",
+          "title": "Type",
+          "type": "string"
+        },
+        "types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Types",
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "timeout",
+            "skip",
+            "notrun"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "passed": {
+          "default": false,
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "msg": {
+          "default": "",
+          "title": "Msg",
+          "type": "string"
+        },
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task"
+        },
+        "rundir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rundir"
+        },
+        "tool": {
+          "additionalProperties": true,
+          "title": "Tool",
+          "type": "object"
+        },
+        "attrs": {
+          "additionalProperties": true,
+          "title": "Attrs",
+          "type": "object"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Metric"
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "title": "Diagnostics",
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/Artifact"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/ResultNode"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Time"
+        },
+        "end_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Time"
+        },
+        "reused": {
+          "default": false,
+          "title": "Reused",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "ResultNode",
+      "type": "object"
+    },
+    "RunInfo": {
+      "additionalProperties": true,
+      "description": "What was run, where and when, and how it exited.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "default": "",
+          "title": "Root"
+        },
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Argv",
+          "type": "array"
+        },
+        "cwd": {
+          "default": "",
+          "title": "Cwd",
+          "type": "string"
+        },
+        "rundir": {
+          "default": "",
+          "title": "Rundir",
+          "type": "string"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Time"
+        },
+        "end_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Time"
+        },
+        "exit_status": {
+          "default": 0,
+          "title": "Exit Status",
+          "type": "integer"
+        },
+        "host": {
+          "default": "",
+          "title": "Host",
+          "type": "string"
+        },
+        "dfm_version": {
+          "default": "",
+          "title": "Dfm Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "RunInfo",
+      "type": "object"
+    },
+    "Stamp": {
+      "description": "A file's mtime and size when the run ended (staleness detection).",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "mtime": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mtime"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "enum": [
+                "ok",
+                "stale",
+                "missing"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "Stamp",
+      "type": "object"
+    },
+    "Summary": {
+      "additionalProperties": true,
+      "description": "The part of the record an agent or CI step reads (computed the same\nway for every domain).",
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "error",
+            "timeout",
+            "skip",
+            "notrun"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "msg": {
+          "default": "",
+          "title": "Msg",
+          "type": "string"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Metric"
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "failures": {
+          "items": {
+            "$ref": "#/$defs/FailureEntry"
+          },
+          "title": "Failures",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "Summary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "dvflow-results/1",
+      "default": "dvflow-results/1",
+      "title": "Schema",
+      "type": "string"
+    },
+    "run": {
+      "$ref": "#/$defs/RunInfo"
+    },
+    "summary": {
+      "$ref": "#/$defs/Summary"
+    },
+    "result": {
+      "$ref": "#/$defs/ResultNode"
+    }
+  },
+  "required": [
+    "schema",
+    "run",
+    "summary",
+    "result"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,306 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "wb-dma-example.tests",
+    "argv": [
+      "dfm",
+      "run",
+      "tests"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 0,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "fail",
+    "msg": "1 of 2 failed",
+    "counts": {
+      "total": 2,
+      "pass": 1,
+      "fail": 1,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "metrics": {
+      "walltime_s": {
+        "value": 33.0,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": [
+      {
+        "path": "tests/uvm-tests/two-ch",
+        "status": "fail",
+        "msg": "UVM_ERROR x2: ch1 dst mismatch @ 0x40",
+        "type": "hdlsim.TestResult",
+        "task": "wb-dma-example.two-ch",
+        "checks": [
+          {
+            "name": "uvm_errors",
+            "status": "fail",
+            "metric": "uvm_errors",
+            "op": "==",
+            "goal": 0,
+            "value": 2.0
+          }
+        ],
+        "log": {
+          "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+          "line": 1873
+        },
+        "waves": "/abs/rundir/wb-dma-example.two-ch/waves.fst"
+      }
+    ]
+  },
+  "result": {
+    "name": "tests",
+    "type": "std.TestRunResult",
+    "types": [
+      "std.TestRunResult",
+      "std.SuiteResult",
+      "std.Result"
+    ],
+    "status": "fail",
+    "passed": false,
+    "msg": "1 of 2 failed",
+    "task": "wb-dma-example.tests",
+    "counts": {
+      "total": 2,
+      "pass": 1,
+      "fail": 1,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "children": [
+      {
+        "name": "uvm-tests",
+        "type": "hdlsim.SuiteResult",
+        "types": [
+          "hdlsim.SuiteResult",
+          "std.SuiteResult",
+          "std.Result"
+        ],
+        "status": "fail",
+        "passed": false,
+        "msg": "",
+        "task": "wb-dma-example.uvm-tests",
+        "counts": {
+          "total": 2,
+          "pass": 1,
+          "fail": 1,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 0
+        },
+        "children": [
+          {
+            "name": "smoke",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "wb-dma-example.smoke",
+            "rundir": "/abs/rundir/wb-dma-example.smoke",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "metrics": {
+              "walltime_s": {
+                "value": 12.5,
+                "unit": "s",
+                "better": "lower"
+              },
+              "uvm_errors": {
+                "value": 0.0,
+                "unit": "",
+                "better": "none"
+              }
+            },
+            "checks": [
+              {
+                "name": "uvm_errors",
+                "status": "pass",
+                "metric": "uvm_errors",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              },
+              {
+                "name": "sim_exit",
+                "status": "pass",
+                "metric": "sim_exit",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "simLog",
+                "basedir": "/abs/rundir/wb-dma-example.smoke",
+                "files": [
+                  "sim.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.smoke/sim.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ],
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "smoke_test",
+            "seed": 1
+          },
+          {
+            "name": "two-ch",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "fail",
+            "passed": false,
+            "msg": "UVM_ERROR x2: ch1 dst mismatch @ 0x40",
+            "task": "wb-dma-example.two-ch",
+            "rundir": "/abs/rundir/wb-dma-example.two-ch",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "metrics": {
+              "walltime_s": {
+                "value": 12.5,
+                "unit": "s",
+                "better": "lower"
+              },
+              "uvm_errors": {
+                "value": 2.0,
+                "unit": "",
+                "better": "none"
+              }
+            },
+            "checks": [
+              {
+                "name": "uvm_errors",
+                "status": "fail",
+                "metric": "uvm_errors",
+                "op": "==",
+                "goal": 0,
+                "value": 2.0
+              },
+              {
+                "name": "sim_exit",
+                "status": "pass",
+                "metric": "sim_exit",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              }
+            ],
+            "counts": {
+              "errors": 2
+            },
+            "diagnostics": [
+              {
+                "severity": "error",
+                "msg": "UVM_ERROR ch1 dst mismatch @ 0x40",
+                "category": "uvm",
+                "loc": {
+                  "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+                  "line": 1873
+                },
+                "src_loc": {
+                  "path": "/abs/uvm/scoreboard.sv",
+                  "line": 88
+                },
+                "time": "1240ns",
+                "hier": "uvm_test_top.env.sb"
+              },
+              {
+                "severity": "error",
+                "msg": "UVM_ERROR ch1 dst mismatch @ 0x44",
+                "category": "uvm",
+                "loc": {
+                  "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+                  "line": 1880
+                }
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "simLog",
+                "basedir": "/abs/rundir/wb-dma-example.two-ch",
+                "files": [
+                  "sim.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              },
+              {
+                "type": "std.FileSet",
+                "filetype": "simTrace",
+                "basedir": "/abs/rundir/wb-dma-example.two-ch",
+                "files": [
+                  "waves.fst"
+                ],
+                "attributes": [
+                  "role=waves"
+                ],
+                "role": "waves",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.two-ch/waves.fst",
+                    "mtime": 1793450000.0,
+                    "size": 88000
+                  }
+                ]
+              }
+            ],
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "two_ch_test",
+            "seed": 1
+          }
+        ],
+        "total": 2,
+        "failed": 1,
+        "errored": 0
+      }
+    ]
+  }
+}

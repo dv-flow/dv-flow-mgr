@@ -131,6 +131,23 @@ def build_dfm_mcp_server(pkg, loader, builder=None, runner=None):
                 },
             ),
             types.Tool(
+                name="dfm_get_results",
+                description=("Read a run's results (rundir/out/<run-id>/results.json): "
+                             "the result tree, or with failures_only just the summary "
+                             "(status, counts, failures with their failing checks and "
+                             "log path:line). Same JSON as `dfm show results --json`."),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "rundir": {"type": "string", "default": "",
+                                   "description": "Run directory (default: the project's rundir)"},
+                        "run": {"type": "string", "default": "latest",
+                                "description": "Run id, or 'latest'"},
+                        "failures_only": {"type": "boolean", "default": False},
+                    },
+                },
+            ),
+            types.Tool(
                 name="dfm_validate",
                 description="Validate the DFM flow configuration.",
                 inputSchema={
@@ -292,6 +309,9 @@ async def _dispatch(name: str, args: Dict[str, Any], pkg, builder, runner) -> st
             result["imports"] = [{"name": p.name, "desc": getattr(p, 'desc', '') or ''} for p in pkg.pkg_m.values()]
         return json.dumps(result, indent=2)
 
+    elif name == "dfm_get_results":
+        return get_results(args, builder)
+
     elif name == "dfm_validate":
         return json.dumps({"valid": True, "errors": [], "warnings": []})
 
@@ -340,3 +360,15 @@ async def run_mcp_server(pkg, loader, builder=None, runner=None):
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, init_opts, raise_exceptions=True)
 from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
+
+
+def get_results(args: Dict[str, Any], builder=None) -> str:
+    """`dfm_get_results`: the run record as `dfm show results --json` prints
+    it. The rundir defaults to the session's (the builder's), else ./rundir."""
+    import os
+    from ...results.store import results_json
+    rundir = (args or {}).get("rundir") or getattr(builder, "rundir", None) \
+        or os.path.join(os.getcwd(), "rundir")
+    return results_json(rundir, (args or {}).get("run") or None,
+                        bool((args or {}).get("failures_only", False)))
+

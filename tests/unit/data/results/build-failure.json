@@ -1,0 +1,317 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "wb-dma-example.tests",
+    "argv": [
+      "dfm",
+      "run",
+      "tests"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 1,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "error",
+    "msg": "1 of 4 errored, 2 not run",
+    "counts": {
+      "total": 4,
+      "pass": 1,
+      "fail": 0,
+      "error": 1,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 2
+    },
+    "metrics": {
+      "walltime_s": {
+        "value": 40.1,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": [
+      {
+        "path": "tests/soc-tests/soc-dma-copy",
+        "status": "notrun",
+        "msg": "blocked: wb-dma-example.fw-build failed",
+        "type": "hdlsim.TestResult",
+        "task": "wb-dma-example.soc-dma-copy"
+      },
+      {
+        "path": "tests/soc-tests/soc-dma-copy-two",
+        "status": "notrun",
+        "msg": "blocked: wb-dma-example.fw-build failed",
+        "type": "hdlsim.TestResult",
+        "task": "wb-dma-example.soc-dma-copy-two"
+      },
+      {
+        "path": "tests/_tasks/fw-build",
+        "status": "error",
+        "msg": "dma.c:41: error: 'DMA_CSR' undeclared",
+        "type": "std.TaskResult",
+        "task": "wb-dma-example.fw-build",
+        "log": {
+          "path": "/abs/rundir/wb-dma-example.fw-build/wb-dma-example.fw-build.log"
+        }
+      }
+    ]
+  },
+  "result": {
+    "name": "tests",
+    "type": "std.TestRunResult",
+    "types": [
+      "std.TestRunResult",
+      "std.SuiteResult",
+      "std.Result"
+    ],
+    "status": "error",
+    "passed": false,
+    "msg": "1 of 4 errored, 2 not run",
+    "task": "wb-dma-example.tests",
+    "counts": {
+      "total": 4,
+      "pass": 1,
+      "fail": 0,
+      "error": 1,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 2
+    },
+    "children": [
+      {
+        "name": "uvm-tests",
+        "type": "hdlsim.SuiteResult",
+        "types": [
+          "hdlsim.SuiteResult",
+          "std.SuiteResult",
+          "std.Result"
+        ],
+        "status": "pass",
+        "passed": true,
+        "msg": "",
+        "task": "wb-dma-example.uvm-tests",
+        "counts": {
+          "total": 1,
+          "pass": 1,
+          "fail": 0,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 0
+        },
+        "children": [
+          {
+            "name": "smoke",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "wb-dma-example.smoke",
+            "rundir": "/abs/rundir/wb-dma-example.smoke",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "metrics": {
+              "walltime_s": {
+                "value": 12.5,
+                "unit": "s",
+                "better": "lower"
+              },
+              "uvm_errors": {
+                "value": 0.0,
+                "unit": "",
+                "better": "none"
+              }
+            },
+            "checks": [
+              {
+                "name": "uvm_errors",
+                "status": "pass",
+                "metric": "uvm_errors",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              },
+              {
+                "name": "sim_exit",
+                "status": "pass",
+                "metric": "sim_exit",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "simLog",
+                "basedir": "/abs/rundir/wb-dma-example.smoke",
+                "files": [
+                  "sim.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.smoke/sim.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ],
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "smoke_test",
+            "seed": 1
+          }
+        ],
+        "total": 1,
+        "failed": 0,
+        "errored": 0
+      },
+      {
+        "name": "soc-tests",
+        "type": "hdlsim.SuiteResult",
+        "types": [
+          "hdlsim.SuiteResult",
+          "std.SuiteResult",
+          "std.Result"
+        ],
+        "status": "notrun",
+        "passed": false,
+        "msg": "",
+        "task": "wb-dma-example.soc-tests",
+        "counts": {
+          "total": 2,
+          "pass": 0,
+          "fail": 0,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 2
+        },
+        "children": [
+          {
+            "name": "soc-dma-copy",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "notrun",
+            "passed": false,
+            "msg": "blocked: wb-dma-example.fw-build failed",
+            "task": "wb-dma-example.soc-dma-copy",
+            "rundir": "/abs/rundir/wb-dma-example.soc-dma-copy",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "soc_dma_copy_test",
+            "seed": 1
+          },
+          {
+            "name": "soc-dma-copy-two",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "notrun",
+            "passed": false,
+            "msg": "blocked: wb-dma-example.fw-build failed",
+            "task": "wb-dma-example.soc-dma-copy-two",
+            "rundir": "/abs/rundir/wb-dma-example.soc-dma-copy-two",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "soc_dma_copy_two_test",
+            "seed": 1
+          }
+        ],
+        "total": 2,
+        "failed": 0,
+        "errored": 0
+      },
+      {
+        "name": "_tasks",
+        "type": "std.Result",
+        "types": [
+          "std.Result"
+        ],
+        "status": "error",
+        "passed": false,
+        "msg": "1 task(s) failed outside any result",
+        "children": [
+          {
+            "name": "fw-build",
+            "type": "std.TaskResult",
+            "types": [
+              "std.TaskResult",
+              "std.Result"
+            ],
+            "status": "error",
+            "passed": false,
+            "msg": "dma.c:41: error: 'DMA_CSR' undeclared",
+            "task": "wb-dma-example.fw-build",
+            "rundir": "/abs/rundir/wb-dma-example.fw-build",
+            "counts": {
+              "errors": 1
+            },
+            "diagnostics": [
+              {
+                "severity": "error",
+                "msg": "dma.c:41: error: 'DMA_CSR' undeclared",
+                "category": "tool",
+                "loc": {
+                  "path": "/abs/fw/dma.c",
+                  "line": 41
+                }
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "taskLog",
+                "basedir": "/abs/rundir/wb-dma-example.fw-build",
+                "files": [
+                  "wb-dma-example.fw-build.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.fw-build/wb-dma-example.fw-build.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

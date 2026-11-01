@@ -28,7 +28,7 @@ import time
 from typing import ClassVar
 from ..ext_rgy import ExtRgy
 from ..util import loadProjPkgDef, parse_parameter_overrides
-from ..task_data import SeverityE
+from ..task_data import SeverityE, TaskMarker
 from ..task_graph_builder import TaskGraphBuilder
 from ..task_runner import TaskSetRunner
 from ..task_listener_log import TaskListenerLog
@@ -355,7 +355,13 @@ class CmdRun(object):
         # Resolve this run's output-data identity. All std.Publish tasks in the
         # run share it (out/<run_id>); export it so shell tasks can publish too.
         from ..run_id import alloc_run_id
-        run_id = getattr(args, "run_id", None) or alloc_run_id(rundir)
+        # The directory exists before the first task runs: every run writes its
+        # record there (results.json), not only runs that publish.
+        run_id = getattr(args, "run_id", None)
+        if run_id:
+            os.makedirs(os.path.join(rundir, "out", run_id), exist_ok=True)
+        else:
+            run_id = alloc_run_id(rundir)
         run_env = os.environ.copy()
         run_env["DFM_RUN_ID"] = run_id
         run_env["DFM_OUT_DIR"] = os.path.join(rundir, "out", run_id)
@@ -473,6 +479,14 @@ class CmdRun(object):
                 print("Error: %s" % str(e), file=sys.stderr)
                 return 1
 
+        # The root-task rule: what a user runs reports a std.Result. A warning
+        # (dfm synthesizes a TaskResult meanwhile); an error under
+        # results.strict_roots.
+        from ..results.config import load_results_config
+        results_cfg = load_results_config(project_root)
+        self._check_roots(resolved_tasks, tasks, loader, results_cfg, _build_marker)
+        runner.filter_root_outputs = results_cfg.filter_roots
+
         if any(m.severity == SeverityE.Error for m in build_markers):
             print("Error(s) encountered while building the task graph",
                   file=sys.stderr)
@@ -516,14 +530,41 @@ class CmdRun(object):
         # sink is skipped, and a slow one drops events.
         events = self._open_event_sink(runner, rundir, tasks)
 
+        # The run record (rundir/out/<run-id>/results.json). The recorder
+        # listens for skipped / up-to-date tasks during the run.
+        recorder = None
+        if not getattr(args, 'no_results', False):
+            from ..results.recorder import ResultsRecorder
+            from ..results.config import parse_formats
+            cli_formats = getattr(args, 'results_formats', None) or []
+            if cli_formats:
+                try:
+                    results_cfg.formats = parse_formats(cli_formats)
+                except ValueError as e:
+                    print("Error: --results-format: %s" % e, file=sys.stderr)
+                    return 1
+            if getattr(args, 'no_results_tree', False):
+                results_cfg.tree = False
+            recorder = ResultsRecorder(runner, tasks, rundir, run_id,
+                                       argv=["dfm"] + sys.argv[1:],
+                                       start_time=time.time(),
+                                       config=results_cfg)
+            runner.add_event_listener(recorder.event)
+
         try:
             asyncio.run(runner.run(tasks))
-        finally:
+        except BaseException:
             if events is not None:
                 events.close(runner)
+            raise
 
         trace.close()
         fp.close()
+
+        results_path = self._record_results(recorder)
+        # `run.end`, now that the record it points at exists
+        if events is not None:
+            events.close(runner, results=results_path)
 
         # End-of-run summary. Post-run and node-graph-based, so it renders the
         # same under every UI -- including the piped/CI runs that previously got
@@ -531,12 +572,49 @@ class CmdRun(object):
         summary_md = self._emit_summary(args, tasks, resolved_tasks, runner,
                                         want_markdown=(report is not None))
 
+        # Leave the pointer off when stdout is a machine-readable payload.
+        if results_path is not None and not any(
+                getattr(t, 'machine_output', False) for t in tasks):
+            print("Results: %s" % os.path.relpath(results_path))
+
         if report is not None:
             report.generate(report_dir, generated_unix=int(time.time()),
                             summary_md=summary_md)
             print("Wrote run report to %s" % report_dir)
 
         return runner.status
+
+    @staticmethod
+    def _check_roots(resolved_tasks, nodes, loader, cfg, marker):
+        from ..results.rootcheck import HINT, root_problem
+        resolve = getattr(loader, "findType", None) if loader is not None else None
+        for task, node in zip(resolved_tasks, nodes):
+            msg = root_problem(task, getattr(node, "produces", None), resolve)
+            if msg is None:
+                continue
+            loc = None
+            si = getattr(task, "srcinfo", None)
+            if si is not None and getattr(si, "file", None):
+                from ..task_data import TaskMarkerLoc
+                loc = TaskMarkerLoc(path=si.file, line=getattr(si, "lineno", -1) or -1)
+            if cfg.strict_roots:
+                marker(TaskMarker(msg="%s (results.strict_roots)\n   %s" % (
+                    msg, HINT.replace("\n", "\n   ")), severity=SeverityE.Error, loc=loc))
+            else:
+                marker(TaskMarker(msg=msg, severity=SeverityE.Warning, loc=loc))
+
+    def _record_results(self, recorder):
+        """Write the run record. Returns its path, or None. Never changes the
+        run's verdict: a failure here is a warning."""
+        if recorder is None:
+            return None
+        try:
+            recorder.record()
+            return recorder.path
+        except Exception as e:
+            self._log.warning("could not write run results: %s" % e)
+            print("Warning: could not write run results: %s" % e, file=sys.stderr)
+            return None
 
     def _open_event_sink(self, runner, rundir, tasks):
         try:
@@ -546,7 +624,7 @@ class CmdRun(object):
             if emitter is None:
                 return None
             events = TaskListenerEvents(
-                emitter, roots=[t.name for t in tasks], rundir=rundir)
+                emitter, roots=[t.name for t in tasks], rundir=rundir, defer_end=True)
             runner.add_event_listener(events.event)
             # A separate `dfm` started by a task reports with this run as its
             # parent.

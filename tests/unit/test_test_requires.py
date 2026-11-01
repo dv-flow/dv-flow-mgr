@@ -110,7 +110,9 @@ def _info(proj, *args):
 
 def _logged(rundir, prefix):
     out = []
-    for root, _, files in os.walk(rundir):
+    for root, dirs, files in os.walk(rundir):
+        # out/ holds the run record's link tree: links to these same logs
+        dirs[:] = [d for d in dirs if d != "out"]
         for fn in files:
             if fn.endswith(".log"):
                 with open(os.path.join(root, fn)) as f:

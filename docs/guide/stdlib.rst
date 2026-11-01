@@ -46,11 +46,29 @@ Choosing a task
      - :dvf:task:`std.TestRunner`
    * - Ask what a test runner offers
      - :dvf:task:`std.TestInfo`
+   * - Run graded eval cases, with trials and an Inspect log
+     - ``std.EvalRunner`` (see :doc:`running_tests`)
    * - Group tests into a named suite
      - :dvf:task:`std.TestSuite`
 
 To run a shell command you do not need a task at all -- see
 `Running Shell Commands`_ below.
+
+Result types
+============
+
+``std.Result`` is the domain-neutral verdict a task reports: a status, a
+headline, the checks that decided it, metrics, diagnostics, artifacts and
+nested results. ``std.TestResult``, ``std.SuiteResult`` and
+``std.TestRunResult`` are the test profile; other domains add thin subtypes in
+their own libraries. ``std.TaskResult`` is what dfm makes for a task that
+reports none. Every ``dfm run`` writes the root task's Result tree to
+``rundir/out/<run-id>/results.json``. See :doc:`/reference/results` for the
+fields and rules, and ``dv_flow.mgr.results.api`` for building one in a
+pytask.
+
+``std.TaskFailure`` (below) is different: it travels in the dataflow so a
+compound can tell that a subtask failed, and it carries no verdict data.
 
 std.TaskFailure
 ===============

@@ -1752,7 +1752,7 @@ class PackageProviderYaml(PackageProvider):
             self._log.debug("No base type")
             if is_type:
                 field_m["src"] = (str, "")
-                field_m["seq"] = (int, "")
+                field_m["seq"] = (int, -1)     # -1: not yet output by a task
 
         for p in taskdef.params.keys():
             param = taskdef.params[p]

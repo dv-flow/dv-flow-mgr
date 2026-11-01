@@ -1,0 +1,49 @@
+# A synthesis-flow fixture for the run-results tests. No synthesis library
+# exists yet, so this package plays one: `yosys.SynthResult` is a std.Result
+# profile, and `synth` parses captured yosys/nextpnr outputs (or runs yosys,
+# when asked and present) into one result with a child per stage.
+package:
+  name: yosys
+
+  types:
+  - name: SynthResult
+    uses: std.Result
+    doc: |
+      A synthesis/implementation run. attrs: top, part. metrics: cells,
+      luts, ffs, brams, fmax_mhz, wns_ns. checks: timing (wns_ns >= 0),
+      area (luts <= max_luts). Children: one per stage (synth, pnr).
+
+  - name: FormalResult
+    uses: std.Result
+    doc: A stand-in formal profile, for the mixed-root test.
+
+  tasks:
+  - root: synth
+    shell: pytask
+    run: synth.py::Synth
+    produces:
+    - type: yosys.SynthResult
+    with:
+      top:      {type: str,   value: soc_top}
+      part:     {type: str,   value: ice40-up5k}
+      fmax_mhz: {type: float, value: 100.0, doc: Target clock (MHz)}
+      max_luts: {type: int,   value: 5280}
+      captured: {type: str,   value: "${{ srcdir }}/captured"}
+      real:     {type: bool,  value: false, doc: Run yosys on design.v instead}
+
+  - name: unit
+    shell: pytask
+    run: synth.py::UnitTest
+    tags: [{std.Test: {name: unit}}]
+
+  - name: tests
+    uses: std.TestRunner
+    needs: [unit]
+
+  - name: formal
+    shell: pytask
+    run: synth.py::Formal
+
+  - root: regress
+    uses: std.ResultCollect
+    needs: [tests, synth, formal]

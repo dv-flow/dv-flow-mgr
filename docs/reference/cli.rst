@@ -204,15 +204,37 @@ Run Options
 
 ``--run-id ID``
     Identifier for this run's output-data directory (``rundir/out/<ID>``),
-    shared by all ``std.Publish`` tasks (and ``dfm-out publish`` calls) in the
-    run. By default the runner allocates the next zero-padded counter
-    (``0001``, ``0002``, ...); pin it to a CI build number or git SHA to give
-    published deliverables a stable, meaningful location. Re-copies of
-    identical content are skipped when a run-id is reused.
+    which holds the run record (``results.json``) and everything
+    ``std.Publish`` tasks (and ``dfm-out publish`` calls) publish in the run.
+    By default it is a local timestamp, ``YYYYMMDD-HHMMSS`` (with ``-2``,
+    ``-3`` ... when two runs start in the same second); pin it to a CI build
+    number or git SHA to give the run a stable, meaningful location. Re-copies
+    of identical content are skipped when a run-id is reused.
 
     .. code-block:: bash
 
         dfm run release --run-id ${GITHUB_RUN_NUMBER}
+
+``--no-results``
+    Don't write the run record (``rundir/out/<run-id>/results.json`` and
+    ``summary.md``). By default every run writes one and prints its path as
+    the last line (``Results: rundir/out/<id>/results.json``); the line is left
+    out when the task's output is a machine-readable payload
+    (``tests-info --json``). See :doc:`results`.
+
+``--no-results-tree``
+    Don't build the ``rundir/out/<run-id>/results/`` link tree (the record is
+    still written). Same as ``results.tree: false`` in the config.
+
+``--results-format FMT``
+    Also write the run record as ``FMT`` next to ``results.json``: ``junit``
+    (``junit.xml``), ``ctrf`` (``ctrf.json``), ``md``. Comma-separated or
+    repeated. Overrides ``results.formats`` in the config and
+    ``DFM_RESULTS_FORMATS``.
+
+    .. code-block:: bash
+
+        dfm run tests --results-format junit,ctrf
 
 Run Examples
 ------------
@@ -263,6 +285,7 @@ The show command supports the following sub-commands:
 * **tags** - List tag types and their usage
 * **package <name>** - Display detailed information about a package
 * **project** - Display current project structure
+* **results** - Show a run's results (``rundir/out/<run-id>/results.json``)
 
 Common Options
 --------------
@@ -470,6 +493,58 @@ Options:
 
 ``--configs``
     Show available configurations.
+
+Show Results
+------------
+
+Read a run record (see :doc:`results`).
+
+.. code-block:: bash
+
+    dfm show results [--rundir R] [--run ID|latest] [--list] [--failures]
+                     [--json] [--depth N] [--all] [--format FMT] [-o FILE]
+
+With no options it prints the latest run as a tree: a status, the name, the
+headline and a few metrics per node. Passing subtrees collapse to one line, and
+a failing node shows its failing checks, first errors, log location and waves.
+A missing record exits with status 1.
+
+``--rundir R``
+    The run directory to read (default ``./rundir``).
+
+``--run ID``
+    The run to show; ``latest`` (the default) follows ``out/latest``, or the
+    newest record when the link is missing.
+
+``--list``
+    List the recorded runs, newest first: id, status, root and pass count.
+
+``--failures``
+    Only the failures: path, status, headline, failing checks, ``log:
+    path:line`` and waves.
+
+``--json``
+    Print ``results.json``. Artifacts are checked against their recorded
+    mtime/size: each stamp gets ``state`` (``ok``, ``stale`` or ``missing``)
+    and each artifact ``stale``. With ``--failures``, print only the
+    ``summary`` block.
+
+``--depth N``
+    Descend at most N levels below the root.
+
+``--all``
+    Expand passing subtrees too.
+
+``--format {text,json,junit,ctrf,md}``
+    Render the record in another format (``--json`` is ``--format json``).
+
+``-o, --output FILE``
+    Write to ``FILE`` instead of stdout.
+
+.. code-block:: bash
+
+    dfm show results --failures
+    dfm show results --json --failures | jq '.failures[0].log'
 
 Legacy Mode
 -----------
@@ -878,6 +953,22 @@ Graph Examples
 .. code-block:: bash
 
     dfm graph build | dot -Tpng | display
+
+Util Command
+============
+
+Utility commands.
+
+.. code-block:: bash
+
+    dfm util schema [-o FILE] [--generate] [--results]
+
+``schema``
+    Print a JSON Schema. By default it is the flow-definition schema
+    (``dv.flow.schema.json``; ``--generate`` rebuilds it from the models).
+    ``--results`` prints the run-record schema instead
+    (``dvflow-results.schema.json``, for ``results.json``; see
+    :doc:`results`).
 
 UI Modes
 ========

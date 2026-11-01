@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dv-flow.github.io/dv.flow.schema.json",
+  "$id": "https://dv-flow.github.io/flow.dv.schema.json",
   "title": "DV Flow specification schema",
   "description": "JSON Schema for DV Flow YAML workflow definitions",
   "type": "object",

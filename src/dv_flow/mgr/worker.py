@@ -172,6 +172,7 @@ async def execute_request(params: Dict[str, Any]) -> Dict[str, Any]:
                 runner=shim,
                 ctxt=None,
                 rundir=rundir,
+                task_name=name,
             )
 
             result = await callable_fn(ctxt, task_input)
@@ -215,6 +216,7 @@ async def execute_request(params: Dict[str, Any]) -> Dict[str, Any]:
                 runner=shim,
                 ctxt=None,
                 rundir=rundir,
+                task_name=name,
             )
 
             result = await shell_callable(ctxt, task_input)

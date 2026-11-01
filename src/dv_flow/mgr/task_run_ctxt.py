@@ -49,6 +49,9 @@ class TaskRunCtxt(object):
     # The node this context runs, when known. Live markers and exec start/end
     # are reported to the runner's detail listeners against it.
     _task : 'TaskNode' = dc.field(default=None)
+    # The running task's name when there is no node to read it from (a remote
+    # worker runs a task from its serialized description).
+    task_name : str = dc.field(default=None)
 
     def _notify_detail(self, reason, info):
         notify = getattr(self.runner, '_notify_detail', None)
@@ -126,6 +129,13 @@ class TaskRunCtxt(object):
             return nproc
 
         return os.cpu_count() or 1
+
+    @property
+    def name(self) -> str:
+        """The fully-qualified name of the running task ("" when unknown)."""
+        if self.task_name:
+            return self.task_name
+        return getattr(self._task, "name", "") or ""
 
     @property
     def run_id(self):

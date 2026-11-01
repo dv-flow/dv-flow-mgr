@@ -437,3 +437,61 @@ def test_heartbeat_off(tmp_path):
     assert by_ev(read_lines(path), "run.alive") == []
     assert EventEmitter.from_env({"DFM_EVENT_SINK": "file:%s" % path,
                                   "DFM_EVENT_HEARTBEAT": "junk"}).heartbeat_s == event_sink.HEARTBEAT_S
+
+
+RESULT_FLOW = textwrap.dedent('''\
+    package:
+      name: evres
+      tasks:
+      - name: case
+        shell: pytask
+        run: case.py::Case
+      - root: tests
+        uses: std.TestRunner
+        needs: [case]
+    ''')
+
+RESULT_PY = '''
+from dv_flow.mgr import TaskDataResult
+from dv_flow.mgr.results import api as R
+
+async def Case(ctxt, input):
+    r = R.mk_result(ctxt, "std.TestResult", name="case")
+    r.diagnostics = [{"severity": "error", "msg": "e%d" % i} for i in range(15)]
+    r.checks.append(R.check("errors", "fail"))
+    R.finish(r)
+    return TaskDataResult(output=[r])
+'''
+
+
+def test_task_result_events_and_run_end_path(tmp_path, monkeypatch):
+    """Each Result a task produces arrives as `task.result` (a schema-valid
+    run-record node, diagnostics capped); `run.end` names results.json."""
+    import jsonschema
+    from dv_flow.mgr.results.model import results_json_schema
+    (tmp_path / "flow.yaml").write_text(RESULT_FLOW)
+    (tmp_path / "case.py").write_text(RESULT_PY)
+    sink = tmp_path / "events.jsonl"
+    monkeypatch.setenv("DFM_EVENT_SINK", "file:%s" % sink)
+    monkeypatch.chdir(tmp_path)
+    from dv_flow.mgr.cmds.cmd_run import CmdRun
+    assert CmdRun()(Args(str(tmp_path), ["tests"])) == 0
+
+    lines = read_lines(sink)
+    res = by_ev(lines, "task.result")
+    by_id = {r["id"]: r["result"] for r in res}
+    assert set(by_id) == {"evres.case", "evres.tests"}   # passthrough not repeated
+    case = by_id["evres.case"]
+    assert case["status"] == "fail" and len(case["diagnostics"]) == 10
+    assert case["counts"]["errors"] == 15
+    schema = results_json_schema()
+    node_schema = dict(schema["$defs"]["ResultNode"], **{"$defs": schema["$defs"]})
+    jsonschema.validate(case, node_schema)
+    assert by_id["evres.tests"]["type"] == "std.TestRunResult"
+
+    end = lines[-1]
+    assert end["ev"] == "run.end"
+    assert end["results"].endswith("results.json") and os.path.isfile(end["results"])
+    # the record exists by then, and agrees
+    rec = json.load(open(end["results"]))
+    assert rec["summary"]["status"] == "fail"

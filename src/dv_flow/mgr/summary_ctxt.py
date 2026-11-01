@@ -94,6 +94,32 @@ class SummaryCtxt(object):
                 ret.extend(result.markers)
         return ret
 
+    @property
+    def results(self):
+        """This run's record (``rundir/out/<run-id>/results.json``) as a
+        ``ResultsFile``, or None when it was not written (``--no-results``,
+        or a caller that runs no recorder). A summary that renders from it
+        cannot disagree with the record."""
+        if hasattr(self, "_results"):
+            return self._results
+        self._results = None
+        ctxt = getattr(self.root, "ctxt", None)
+        rundir = getattr(ctxt, "root_rundir", None)
+        run_id = getattr(ctxt, "run_id", None)
+        if rundir and run_id:
+            import json
+            import os
+            path = os.path.join(rundir, "out", run_id, "results.json")
+            if os.path.isfile(path):
+                try:
+                    from .results.model import ResultsFile
+                    from .results.stale import annotate
+                    with open(path) as fp:
+                        self._results = ResultsFile.model_validate(annotate(json.load(fp)))
+                except Exception:
+                    self._results = None
+        return self._results
+
     def task_summary(self):
         """The built-in renderable, so a custom summary can compose with the
         generic roll-up instead of reimplementing it."""

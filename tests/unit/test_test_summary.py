@@ -220,3 +220,63 @@ def test_full_detail_shows_the_speed_column():
         detail="full"))
     assert "speed" in out
     assert "87us/s" in out
+
+
+# ---------------------------------------------------------------------------
+# From the run record (results.json)
+# ---------------------------------------------------------------------------
+
+def _rf(name):
+    import json
+    import os
+    from dv_flow.mgr.results.model import ResultsFile
+    p = os.path.join(os.path.dirname(__file__), "data", "results", name + ".json")
+    return ResultsFile.model_validate(json.load(open(p)))
+
+
+class RecCtxt(Ctxt):
+    def __init__(self, fixture, detail="normal", output=()):
+        super().__init__(list(output), detail)
+        self.results = _rf(fixture)
+
+
+@pytest.mark.parametrize("fixture,head", [
+    ("test-suite-pass", "Tests (2/2 passed)"),
+    ("test-suite-fail", "Tests (1/2 passed, 1 failed)"),
+    ("build-failure", "Tests (1/4 passed, 1 errored, 2 not run)"),
+])
+def test_record_headline(fixture, head):
+    assert head in _text(RecCtxt(fixture))
+
+
+def test_record_normal_shows_failures_with_log_line():
+    out = _text(RecCtxt("test-suite-fail"))
+    assert "tests/uvm-tests/two-ch" in out
+    assert "check uvm_errors: fail" in out
+    assert "sim.log:1873" in out
+    assert "smoke" not in out
+
+
+def test_record_build_failure_names_the_task():
+    out = _text(RecCtxt("build-failure"))
+    assert "tests/_tasks/fw-build" in out
+    assert "blocked: wb-dma-example.fw-build failed" in out
+
+
+def test_record_quiet_and_full():
+    q = _text(RecCtxt("test-suite-fail", detail="quiet"))
+    assert "1 of 2 failed" in q and "two-ch" not in q
+    f = _text(RecCtxt("test-suite-pass", detail="full"))
+    assert "smoke" in f and "two-ch" in f        # expanded tree
+
+
+def test_record_wins_over_output_scan():
+    # A stale/legacy item in the output does not change what is reported
+    out = _text(RecCtxt("test-suite-pass", output=[Case(name="ghost", passed=False,
+                                                        status="fail")]))
+    assert "2/2 passed" in out and "ghost" not in out
+
+
+def test_record_without_tests_falls_back():
+    out = _text(RecCtxt("synth-timing-fail", output=[Case(name="c", passed=True)]))
+    assert "1/1 passed" in out

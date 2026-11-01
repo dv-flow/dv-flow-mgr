@@ -34,7 +34,8 @@ dfm run <task>
 | `--runner-opt KEY=VALUE` | Runner option. Repeatable. |
 | `--override TARGET=REPLACEMENT` | Replace a task (e.g. `pkg.Task=std.Null`). |
 | `--report DIR` | After the run, write a diagnostics bundle (per-task logs, markers, status) to `DIR` for publishing as a CI artifact. |
-| `--run-id ID` | Identifier for this run's output directory (`rundir/out/<ID>`). |
+| `--run-id ID` | Identifier for this run's output directory (`rundir/out/<ID>`; default a timestamp `YYYYMMDD-HHMMSS`). |
+| `--no-results` | Don't write the run record (`rundir/out/<run-id>/results.json`). |
 | `--no-summary` | Suppress the end-of-run task summary on the console. |
 | `--summary-file PATH` | Also write the summary to `PATH` (`.md` → markdown, else plain text). Written even with `--no-summary`. |
 
@@ -42,6 +43,18 @@ Every run prints an end-of-run **task summary** — counts plus a row per task t
 did something, with its markers. It renders identically under every UI, so piped
 and CI runs get it too. With `--report DIR` it is also written to the bundle as
 `summary.md` and inlined into `report.md`.
+
+Every run also writes a **run record**, `rundir/out/<run-id>/results.json`
+(`rundir/out/latest` is the newest), and prints its path last. Read it with
+`dfm show results`:
+
+| Command | Shows |
+|---|---|
+| `dfm show results` | the latest run as a tree; failing nodes with checks, errors, `log: path:line` |
+| `dfm show results --failures` | only the failures |
+| `dfm show results --json --failures` | the `summary` block (`status`, `counts`, `failures[]`) |
+| `dfm show results --list` | every recorded run, newest first |
+| `dfm show results --run ID` | one run (default `latest`) |
 
 ```bash
 dfm run build
@@ -189,6 +202,7 @@ Utility subcommands. `schema` emits the JSON schema for editor validation;
 ```bash
 dfm util schema -o flow.schema.json   # or: dfm util schema > flow.schema.json
 dfm util schema --generate            # regenerate from models (dev)
+dfm util schema --results             # the results.json (run record) schema
 dfm util workspace                    # resolved project as JSON
 ```
 

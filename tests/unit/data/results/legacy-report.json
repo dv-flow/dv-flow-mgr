@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "assertion_failures": 0,
+      "diagnostics": [],
+      "errors": 0,
+      "fatals": 0,
+      "name": "smoke",
+      "passed": true,
+      "run_status": 0,
+      "runinfo": {"seed": 1, "sim": "vlt", "testname": "smoke_test"},
+      "sim": "vlt",
+      "sim_errors": 0,
+      "sim_fatals": 0,
+      "stats": {"walltime_s": 12.5, "errors": 0},
+      "status": "pass",
+      "testname": "smoke_test"
+    },
+    {
+      "assertion_failures": 1,
+      "diagnostics": [
+        {"category": "assertion", "file": "/abs/rtl/dma_ch.sv", "line": 120,
+         "log_line": 1873, "message": "Assertion p_no_overrun failed", "severity": "error",
+         "time": "1240ns"}
+      ],
+      "errors": 2,
+      "fatals": 0,
+      "name": "two-ch",
+      "passed": false,
+      "run_status": 0,
+      "runinfo": {"seed": 1, "sim": "vlt", "testname": "two_ch_test"},
+      "sim": "vlt",
+      "sim_errors": 1,
+      "sim_fatals": 0,
+      "stats": {"walltime_s": 14.1, "errors": 2},
+      "status": "fail",
+      "testname": "two_ch_test"
+    }
+  ],
+  "counts": {"errored": 0, "failed": 1, "passed": 1, "total": 2},
+  "stats": {"walltime_s": 26.6, "walltime_s_max": 14.1, "walltime_s_mean": 13.3},
+  "suite": "wb-dma-example.uvm-tests",
+  "timestamp": "2026-10-31T14:22:40Z"
+}

@@ -41,6 +41,30 @@ def build_dfm_tools(pkg, loader, builder=None, runner=None):
     from agents import function_tool
 
     # ------------------------------------------------------------------ #
+    # get_results
+    # ------------------------------------------------------------------ #
+    @function_tool
+    async def dfm_get_results(
+        rundir: str = "",
+        run: str = "latest",
+        failures_only: bool = False,
+    ) -> str:
+        """Read a run's results (rundir/out/<run-id>/results.json).
+
+        Args:
+            rundir: Run directory (default: the project's rundir).
+            run: Run id, or "latest".
+            failures_only: Return only the summary block (status, counts,
+                failures with their failing checks and log path:line).
+
+        Returns:
+            The same JSON as `dfm show results --json [--failures]`.
+        """
+        from .dfm_mcp_server import get_results
+        return get_results({"rundir": rundir, "run": run,
+                            "failures_only": failures_only}, builder)
+
+    # ------------------------------------------------------------------ #
     # show_tasks
     # ------------------------------------------------------------------ #
     @function_tool
@@ -277,6 +301,7 @@ def build_dfm_tools(pkg, loader, builder=None, runner=None):
         dfm_show_skills,
         dfm_context,
         dfm_validate,
+        dfm_get_results,
     ]
 
     if builder is not None and runner is not None:

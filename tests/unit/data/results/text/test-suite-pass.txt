@@ -1,0 +1,5 @@
+Run 20261031-142210  wb-dma-example.tests  (exit 0)
+
+tests  pass  [2 passed]
+
+pass: all 2 passed  |  total 2: pass 2  |  31.2s

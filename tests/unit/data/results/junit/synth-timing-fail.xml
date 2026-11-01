@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="syn.synth" tests="2" failures="1" errors="0" skipped="0">
+  <testsuite name="synth" tests="2" failures="1" errors="0" skipped="0">
+    <testcase name="timing" classname="synth">
+      <failure message="fail: timing not met: WNS -0.12 ns on clk_sys (target 100 MHz)">check timing: fail (wns_ns=-0.12, want &gt;= 0)</failure>
+    </testcase>
+    <testcase name="area" classname="synth"/>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,181 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "fv.bmc",
+    "argv": [
+      "dfm",
+      "run",
+      "bmc"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 0,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "fail",
+    "msg": "assertion failed: dma_ch.p_no_overrun at step 14",
+    "counts": {
+      "total": 1,
+      "pass": 0,
+      "fail": 1,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "metrics": {
+      "depth": {
+        "value": 20.0,
+        "unit": "cycles",
+        "better": "none"
+      },
+      "proven": {
+        "value": 3.0,
+        "unit": "",
+        "better": "none"
+      },
+      "failed": {
+        "value": 1.0,
+        "unit": "",
+        "better": "none"
+      },
+      "walltime_s": {
+        "value": 8.2,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": [
+      {
+        "path": "bmc",
+        "status": "fail",
+        "msg": "assertion failed: dma_ch.p_no_overrun at step 14",
+        "type": "formal.FormalResult",
+        "task": "fv.bmc",
+        "checks": [
+          {
+            "name": "assertions",
+            "status": "fail",
+            "metric": "failed",
+            "op": "==",
+            "goal": 0,
+            "value": 1.0
+          }
+        ],
+        "log": {
+          "path": "/abs/rundir/fv.bmc/logfile.txt",
+          "line": 57
+        },
+        "waves": "/abs/rundir/fv.bmc/trace.vcd"
+      }
+    ]
+  },
+  "result": {
+    "name": "bmc",
+    "type": "formal.FormalResult",
+    "types": [
+      "formal.FormalResult",
+      "std.Result"
+    ],
+    "status": "fail",
+    "passed": false,
+    "msg": "assertion failed: dma_ch.p_no_overrun at step 14",
+    "task": "fv.bmc",
+    "rundir": "/abs/rundir/fv.bmc",
+    "attrs": {
+      "engine": "sby",
+      "mode": "bmc",
+      "top": "dma_ch"
+    },
+    "metrics": {
+      "depth": {
+        "value": 20.0,
+        "unit": "cycles",
+        "better": "none"
+      },
+      "proven": {
+        "value": 3.0,
+        "unit": "",
+        "better": "none"
+      },
+      "failed": {
+        "value": 1.0,
+        "unit": "",
+        "better": "none"
+      }
+    },
+    "checks": [
+      {
+        "name": "assertions",
+        "status": "fail",
+        "metric": "failed",
+        "op": "==",
+        "goal": 0,
+        "value": 1.0
+      }
+    ],
+    "counts": {
+      "errors": 1
+    },
+    "diagnostics": [
+      {
+        "severity": "error",
+        "msg": "Assert failed in dma_ch: p_no_overrun",
+        "category": "sva",
+        "loc": {
+          "path": "/abs/rundir/fv.bmc/logfile.txt",
+          "line": 57
+        },
+        "src_loc": {
+          "path": "/abs/rtl/dma_ch.sv",
+          "line": 120
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "type": "std.FileSet",
+        "filetype": "sbyLog",
+        "basedir": "/abs/rundir/fv.bmc",
+        "files": [
+          "logfile.txt"
+        ],
+        "attributes": [
+          "role=log"
+        ],
+        "role": "log",
+        "stamps": [
+          {
+            "path": "/abs/rundir/fv.bmc/logfile.txt",
+            "mtime": 1793450000.0,
+            "size": 1024
+          }
+        ]
+      },
+      {
+        "type": "std.FileSet",
+        "filetype": "vcd",
+        "basedir": "/abs/rundir/fv.bmc",
+        "files": [
+          "trace.vcd"
+        ],
+        "attributes": [
+          "role=waves"
+        ],
+        "role": "waves",
+        "stamps": [
+          {
+            "path": "/abs/rundir/fv.bmc/trace.vcd",
+            "mtime": 1793450000.0,
+            "size": 1024
+          }
+        ]
+      }
+    ]
+  }
+}

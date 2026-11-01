@@ -1,0 +1,40 @@
+{
+   "creator": "Yosys 0.45 (git sha1 9ed031ddd, clang++ 14.0.0 -fPIC -Os)",
+   "invocation": "stat -json",
+   "modules": {
+      "\\soc_top": {
+         "num_wires": 812,
+         "num_wire_bits": 2280,
+         "num_pub_wires": 120,
+         "num_pub_wire_bits": 900,
+         "num_memories": 0,
+         "num_memory_bits": 0,
+         "num_processes": 0,
+         "num_cells": 5321,
+         "num_cells_by_type": {
+            "SB_CARRY": 250,
+            "SB_DFFER": 812,
+            "SB_LUT4": 4211,
+            "SB_RAM40_4K": 4,
+            "SB_IO": 44
+         }
+      }
+   },
+   "design": {
+      "num_wires": 812,
+      "num_wire_bits": 2280,
+      "num_pub_wires": 120,
+      "num_pub_wire_bits": 900,
+      "num_memories": 0,
+      "num_memory_bits": 0,
+      "num_processes": 0,
+      "num_cells": 5321,
+      "num_cells_by_type": {
+         "SB_CARRY": 250,
+         "SB_DFFER": 812,
+         "SB_LUT4": 4211,
+         "SB_RAM40_4K": 4,
+         "SB_IO": 44
+      }
+   }
+}

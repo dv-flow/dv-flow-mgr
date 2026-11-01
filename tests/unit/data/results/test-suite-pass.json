@@ -1,0 +1,235 @@
+{
+  "schema": "dvflow-results/1",
+  "run": {
+    "id": "20261031-142210",
+    "root": "wb-dma-example.tests",
+    "argv": [
+      "dfm",
+      "run",
+      "tests"
+    ],
+    "cwd": "/abs",
+    "rundir": "/abs/rundir",
+    "start_time": "2026-10-31T14:22:10+00:00",
+    "end_time": "2026-10-31T14:25:42+00:00",
+    "exit_status": 0,
+    "host": "host1",
+    "dfm_version": "1.0.0"
+  },
+  "summary": {
+    "status": "pass",
+    "msg": "all 2 passed",
+    "counts": {
+      "total": 2,
+      "pass": 2,
+      "fail": 0,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "metrics": {
+      "walltime_s": {
+        "value": 31.2,
+        "unit": "s",
+        "better": "lower"
+      }
+    },
+    "failures": []
+  },
+  "result": {
+    "name": "tests",
+    "type": "std.TestRunResult",
+    "types": [
+      "std.TestRunResult",
+      "std.SuiteResult",
+      "std.Result"
+    ],
+    "status": "pass",
+    "passed": true,
+    "msg": "",
+    "task": "wb-dma-example.tests",
+    "counts": {
+      "total": 2,
+      "pass": 2,
+      "fail": 0,
+      "error": 0,
+      "timeout": 0,
+      "skip": 0,
+      "notrun": 0
+    },
+    "children": [
+      {
+        "name": "uvm-tests",
+        "type": "hdlsim.SuiteResult",
+        "types": [
+          "hdlsim.SuiteResult",
+          "std.SuiteResult",
+          "std.Result"
+        ],
+        "status": "pass",
+        "passed": true,
+        "msg": "",
+        "task": "wb-dma-example.uvm-tests",
+        "counts": {
+          "total": 2,
+          "pass": 2,
+          "fail": 0,
+          "error": 0,
+          "timeout": 0,
+          "skip": 0,
+          "notrun": 0
+        },
+        "children": [
+          {
+            "name": "smoke",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "wb-dma-example.smoke",
+            "rundir": "/abs/rundir/wb-dma-example.smoke",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "metrics": {
+              "walltime_s": {
+                "value": 12.5,
+                "unit": "s",
+                "better": "lower"
+              },
+              "uvm_errors": {
+                "value": 0.0,
+                "unit": "",
+                "better": "none"
+              }
+            },
+            "checks": [
+              {
+                "name": "uvm_errors",
+                "status": "pass",
+                "metric": "uvm_errors",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              },
+              {
+                "name": "sim_exit",
+                "status": "pass",
+                "metric": "sim_exit",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "simLog",
+                "basedir": "/abs/rundir/wb-dma-example.smoke",
+                "files": [
+                  "sim.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.smoke/sim.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ],
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "smoke_test",
+            "seed": 1
+          },
+          {
+            "name": "two-ch",
+            "type": "hdlsim.TestResult",
+            "types": [
+              "hdlsim.TestResult",
+              "std.TestResult",
+              "std.Result"
+            ],
+            "status": "pass",
+            "passed": true,
+            "msg": "",
+            "task": "wb-dma-example.two-ch",
+            "rundir": "/abs/rundir/wb-dma-example.two-ch",
+            "attrs": {
+              "sim": "vlt"
+            },
+            "metrics": {
+              "walltime_s": {
+                "value": 12.5,
+                "unit": "s",
+                "better": "lower"
+              },
+              "uvm_errors": {
+                "value": 0.0,
+                "unit": "",
+                "better": "none"
+              }
+            },
+            "checks": [
+              {
+                "name": "uvm_errors",
+                "status": "pass",
+                "metric": "uvm_errors",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              },
+              {
+                "name": "sim_exit",
+                "status": "pass",
+                "metric": "sim_exit",
+                "op": "==",
+                "goal": 0,
+                "value": 0.0
+              }
+            ],
+            "artifacts": [
+              {
+                "type": "std.FileSet",
+                "filetype": "simLog",
+                "basedir": "/abs/rundir/wb-dma-example.two-ch",
+                "files": [
+                  "sim.log"
+                ],
+                "attributes": [
+                  "role=log"
+                ],
+                "role": "log",
+                "stamps": [
+                  {
+                    "path": "/abs/rundir/wb-dma-example.two-ch/sim.log",
+                    "mtime": 1793450000.0,
+                    "size": 1024
+                  }
+                ]
+              }
+            ],
+            "start_time": "2026-10-31T14:22:11+00:00",
+            "end_time": "2026-10-31T14:22:24+00:00",
+            "testname": "two_ch_test",
+            "seed": 1
+          }
+        ],
+        "total": 2,
+        "failed": 0,
+        "errored": 0
+      }
+    ]
+  }
+}

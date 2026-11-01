@@ -311,3 +311,55 @@ package:
         loc = errors_with_location[0]['location']
         assert 'file' in loc
         assert flow_file in loc['file'] or 'flow.dv' in loc['file']
+
+
+# ---------------------------------------------------------------------------
+# The root-task rule: a root declares a std.Result in produces:
+# ---------------------------------------------------------------------------
+
+def _validate_json(tmpdir, flow, capsys, config=None):
+    flow_file = os.path.join(str(tmpdir), "flow.dv")
+    with open(flow_file, "w") as f:
+        f.write(flow)
+    if config:
+        os.makedirs(os.path.join(str(tmpdir), ".dfm"), exist_ok=True)
+        with open(os.path.join(str(tmpdir), ".dfm", "config.yaml"), "w") as f:
+            f.write(config)
+    args = Namespace(flow_file=flow_file, json=True, param_overrides=[], config=None,
+                     root=str(tmpdir))
+    rc = CmdValidate()(args)
+    return rc, json.loads(capsys.readouterr().out)
+
+
+ROOTS = """
+package:
+  name: rr
+  tasks:
+  - root: bare
+    shell: bash
+    run: echo hi
+  - root: reports
+    uses: std.ResultCollect
+  - root: suite
+    uses: std.TestRunner
+  - name: helper
+    shell: bash
+    run: echo helper
+"""
+
+
+def test_root_without_result_warns(tmpdir, capsys):
+    rc, d = _validate_json(tmpdir, ROOTS, capsys)
+    assert rc == 0
+    roots = [w for w in d["warnings"] if w["type"] == "RootWithoutResult"]
+    assert [w["task"] for w in roots] == ["rr.bare"]
+    assert "declares no std.Result" in roots[0]["message"]
+
+
+def test_root_without_result_strict_errors(tmpdir, capsys):
+    rc, d = _validate_json(tmpdir, ROOTS, capsys,
+                           config="results:\n  strict_roots: true\n")
+    assert rc != 0
+    roots = [e for e in d["errors"] if e["type"] == "RootWithoutResult"]
+    assert [e["task"] for e in roots] == ["rr.bare"]
+    assert roots[0].get("srcinfo", "").endswith("flow.dv:5") or "srcinfo" in roots[0]

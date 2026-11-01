@@ -7,6 +7,7 @@ from dv_flow.mgr import TaskGraphBuilder, TaskSetRunner
 from dv_flow.mgr.util import loadProjPkgDef
 from dv_flow.mgr.ext_rgy import ExtRgy
 from dv_flow.mgr.std.publish import _Policy, _place, _join, _select
+from dv_flow.mgr.run_id import is_run_id
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +38,7 @@ def _run(tmpdir, flow_dv):
     runner = TaskSetRunner(builder=builder, rundir=rundir, nproc=2)
     task = builder.mkTaskNode("test_pkg.publish")
     asyncio.run(runner.run(task))
+    runner.run_id = builder.run_id
     return rundir, runner
 
 
@@ -102,12 +104,13 @@ package:
 """
     rundir, runner = _run(tmpdir, flow)
     assert runner.status == 0
-    out = os.path.join(rundir, "out", "0001")
+    out = os.path.join(rundir, "out", runner.run_id)
+    assert is_run_id(runner.run_id)
     assert os.path.isfile(os.path.join(out, "pub/include/dma.h"))
     # latest symlink resolves to the run dir
     latest = os.path.join(rundir, "out", "latest")
     assert os.path.islink(latest)
-    assert os.readlink(latest) == "0001"
+    assert os.readlink(latest) == runner.run_id
     # provenance manifest
     with open(os.path.join(out, ".dfm-publish.json")) as fp:
         m = json.load(fp)
@@ -148,7 +151,7 @@ package:
 """
     rundir, runner = _run(tmpdir, flow)
     assert runner.status == 0
-    out = os.path.join(rundir, "out", "0001")
+    out = os.path.join(rundir, "out", runner.run_id)
     # PubSet: pub (task) / include (pubset) / strip 1 -> dma.h
     assert os.path.isfile(os.path.join(out, "pub/include/dma.h"))
     # bare FileSet: task default -> pub/README.md
@@ -207,16 +210,27 @@ package:
         f.write(flow)
     loader, pkg_def = loadProjPkgDef(tmpdir)
 
-    for expect in ("0001", "0002", "0003"):
+    ids = []
+    for _ in range(3):
         builder = TaskGraphBuilder(root_pkg=pkg_def, rundir=rundir, loader=loader)
-        assert builder.run_id == expect
+        rid = builder.run_id
+        assert is_run_id(rid)
         runner = TaskSetRunner(builder=builder, rundir=rundir, nproc=2)
         asyncio.run(runner.run(builder.mkTaskNode("test_pkg.publish")))
         assert runner.status == 0
-        assert os.path.isfile(os.path.join(rundir, "out", expect, "pub/dma.h"))
+        assert os.path.isfile(os.path.join(rundir, "out", rid, "pub/dma.h"))
+        ids.append(rid)
+
+    # ids are distinct and sort in creation order (same-second runs get -2, -3;
+    # compare the suffix numerically)
+    assert len(set(ids)) == 3
+    def _key(rid):
+        parts = rid.split("-")
+        return (parts[0], parts[1], int(parts[2]) if len(parts) > 2 else 1)
+    assert sorted(ids, key=_key) == ids
 
     # latest tracks the newest run
-    assert os.readlink(os.path.join(rundir, "out", "latest")) == "0003"
+    assert os.readlink(os.path.join(rundir, "out", "latest")) == ids[-1]
 
 
 def test_publish_explicit_run_id(tmpdir):
@@ -326,4 +340,4 @@ package:
     rundir, runner = _run(tmpdir, flow)
     # identical content at the same dst is not a conflict
     assert runner.status == 0
-    assert os.path.isfile(os.path.join(rundir, "out", "0001", "rtl/top.sv"))
+    assert os.path.isfile(os.path.join(rundir, "out", runner.run_id, "rtl/top.sv"))

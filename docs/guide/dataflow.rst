@@ -278,6 +278,54 @@ To see validation warnings:
     ✓ Validation passed
       (1 warning(s))
 
+Root Tasks Produce a Result
+===========================
+
+A ``scope: root`` task -- what a user runs: ``tests``, ``synth``, ``lint`` --
+declares a ``std.Result`` (or a subtype) in its ``produces:``. Its output has
+no consumer in the graph except the run record, so it should be in the
+record's format, and "what does ``dfm run X`` give me" then has one answer for
+every ``X``.
+
+.. code-block:: yaml
+
+    - root: lint
+      shell: pytask
+      run: lint.py::Lint
+      produces:
+      - type: std.Result
+
+``std.check.Produces`` states the same thing as a requirement
+(``requires: [{std.check.Produces: {type: std.Result}}]``); ``std.TestRunner``
+declares it, so every test runner root does.
+
+**Dependants of a root reach files through its Result.** A root that
+declares a Result passes only Result items (with ``std.Env`` and
+``std.TaskFailure``) to tasks that ``needs:`` it. A task downstream of
+``tests`` -- a coverage merge, a publish step -- reads the files through the
+Results' artifacts, which also tells it which test each file came from:
+
+.. code-block:: python3
+
+    from dv_flow.mgr.results import api as R
+
+    async def Merge(ctxt, input):
+        for db in R.artifacts(input.inputs, role="cov"):
+            # db is a std.FileSet; its attributes carry result_path=,
+            # testname= and seed= of the result it came from
+            ...
+
+The rule is being rolled out in stages:
+
+* A root with no Result in ``produces:`` gets a **warning** in ``dfm
+  validate`` and when ``dfm run`` builds the graph; at run time dfm makes a
+  ``std.TaskResult`` for it. Its output is passed on unfiltered.
+* A root that declares a Result has its output port **filtered** to Results.
+  ``results.filter_roots: false`` (in ``.dfm/config.yaml``) turns that off.
+* ``results.strict_roots: true`` makes the missing Result an **error**, with
+  the task's location. It is off by default until the std and library roots
+  all comply.
+
 Task Discovery
 ==============
 

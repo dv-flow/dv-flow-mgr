@@ -185,10 +185,11 @@ class BuilderElabCtxt(object):
             # `eval` must be threaded: without it a variant of a task that
             # carries an `iff:` (or any expression evaluated during node build)
             # hits a None evaluation context.
+            # kwargs are parameter values, applied as for the name form.
             return self.builder._mkTaskNode(
                 name_or_task,
                 name=name if name is not None else name_or_task.name,
-                srcdir=srcdir, eval=self.eval, **kwargs)
+                srcdir=srcdir, eval=self.eval, node_params=kwargs or None)
         return self.builder.mkTaskNode(
             name_or_task, name=name, srcdir=srcdir, needs=needs, **kwargs)
 
@@ -381,8 +382,9 @@ class TaskGraphBuilder(object):
     # each task-param override that actually binds is recorded, so the CLI can
     # report `-D` keys that bound nowhere. None for programmatic callers.
     override_tracker : Any = dc.field(default=None)
-    # Per-run output-data identity (see run_id.py). None -> allocate the next
-    # counter by scanning <rundir>/out. Threaded into TaskNodeCtxt so
+    # Per-run output-data identity (see run_id.py). None -> pick the next
+    # timestamp id under <rundir>/out without creating it (dfm run allocates
+    # and creates the directory itself and passes the id in). Threaded into TaskNodeCtxt so
     # std.Publish tasks share one output directory across the run.
     run_id : str = None
     _pkg_m : Dict[PackageSpec,Package] = dc.field(default_factory=dict)
@@ -470,7 +472,7 @@ class TaskGraphBuilder(object):
 
         if self.run_id is None:
             from .run_id import alloc_run_id
-            self.run_id = alloc_run_id(self.rundir)
+            self.run_id = alloc_run_id(self.rundir, create=False)
 
         self._eval.set("env", self.env)
         
@@ -3112,6 +3114,9 @@ class TaskGraphBuilder(object):
                     else:
                         new_val.append(elem)
                 elif isinstance(elem, dict):
+                    # Expand each map element into ONE new map (not one
+                    # single-key map per string-valued key).
+                    new_elem = {}
                     for k, v in elem.items():
                         if isinstance(v, str):
                             if v.find("${{") != -1:
@@ -3126,7 +3131,7 @@ class TaskGraphBuilder(object):
                                             static_context = dict(eval.expr_eval.variables) if len(self._name_resolution_stack) > 0 else {}
                                         else:
                                             static_context = {}
-                                        new_val.append({k: DeferredExpr(v, ast, static_context)})
+                                        new_elem[k] = DeferredExpr(v, ast, static_context)
                                         continue
                                 except:
                                     pass
@@ -3134,11 +3139,12 @@ class TaskGraphBuilder(object):
                                 if len(self._name_resolution_stack) > 0:
                                     eval.set_name_resolution(self._name_resolution_stack[-1])
                                 resolved = eval.eval(v)
-                                new_val.append({k: resolved})
+                                new_elem[k] = resolved
                             else:
-                                new_val.append({k: v})
+                                new_elem[k] = v
                         else:
-                            new_val.append(elem)
+                            new_elem[k] = v
+                    new_val.append(new_elem)
                 else:
                     new_val.append(elem)
         elif isinstance(value, dict):
