@@ -45,7 +45,7 @@ jobs:
           python3 -m venv py
           ./py/bin/pip install --upgrade --pre ivpm
           ./py/bin/ivpm update -a -d default-dev 
-          ./packages/python/bin/pip install -U typing_extensions build pytest-json-ctrf pytest-timeout
+          ./packages/python/bin/pip install -U typing_extensions build pytest-json-ctrf pytest-timeout jsonschema
 
       - name: Build package
         run: |
