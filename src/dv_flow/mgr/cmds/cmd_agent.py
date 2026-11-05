@@ -96,8 +96,15 @@ class CmdAgent:
         # Check if tasks were specified
         task_refs = getattr(args, 'tasks', [])
         
-        # Determine rundir
-        rundir = os.path.join(os.getcwd(), "rundir")
+        # Determine rundir: <package-root>/rundir (local, or a store link)
+        from ..rundir_store import resolve_rundir, RundirError
+        try:
+            self._rundir_info = resolve_rundir(
+                pkg.basedir, create=True, args=args, package=pkg.name)
+        except RundirError as e:
+            print("Error: %s" % e, file=sys.stderr)
+            return 1
+        rundir = self._rundir_info.path
         
         # Build context from task references (if any)
         if task_refs:

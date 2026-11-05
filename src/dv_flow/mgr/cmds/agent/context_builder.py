@@ -146,8 +146,9 @@ class AgentContextBuilder:
         """
         # Clean rundir if requested
         if self.clean and os.path.exists(self.rundir):
+            from ...rundir_store import clean_rundir
             self._log.debug(f"Cleaning rundir: {self.rundir}")
-            shutil.rmtree(self.rundir)
+            clean_rundir(self.rundir)
         
         # Ensure rundir exists
         os.makedirs(self.rundir, exist_ok=True)

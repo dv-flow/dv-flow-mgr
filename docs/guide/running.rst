@@ -98,10 +98,23 @@ re-run. To override that behavior:
     Re-run all tasks, ignoring up-to-date checks (preserves the rundir).
 
 ``--clean``
-    Remove the rundir before starting, forcing a complete rebuild.
+    Empty the rundir before starting, forcing a complete rebuild.
 
 See :doc:`incremental` for how up-to-date checking works and how to reuse a
 prior build's artifacts with ``--base-rundir``.
+
+Where the rundir lives
+======================
+
+Results go in ``<package-root>/rundir``, where the package root is the
+directory of the root ``flow.yaml`` (found by walking up from the current
+directory). Starting ``dfm run`` from a subdirectory of the project uses the
+same rundir.
+
+``rundir`` may be a symlink -- for example into a rundir store on a scratch
+filesystem, which keeps large results out of your home directory. See
+:doc:`rundir_store`. When ignoring it in git, write ``rundir`` (no trailing
+slash): ``rundir/`` does not match a symlink.
 
 Watching progress
 =================

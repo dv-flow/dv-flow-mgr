@@ -39,6 +39,12 @@ dfm-out = "dv_flow.mgr.out:main"
 [project.entry-points."agent.skills"]
 dv-flow-manager = "dv_flow.mgr.skills:get_skill_dirs"
 
+# Site-config plugins (rundir-store placement, ...) are registered by site
+# packages, not by dv-flow-mgr itself. Example, in a site package:
+#   [project.entry-points."dv_flow.mgr.site_config"]
+#   acme = "acme_dfm.site:AcmeSiteConfig"
+# See docs/reference/site_config.rst.
+
 [tool.setuptools.package-data]
 "dv_flow.mgr" = [
     'share/*',

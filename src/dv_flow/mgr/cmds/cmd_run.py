@@ -286,8 +286,16 @@ class CmdRun(object):
                 for line in opt_lines:
                     print(line)
 
-        # TODO: allow user to specify run root -- maybe relative to some fixed directory?
-        rundir = os.path.join(os.getcwd(), "rundir")
+        # The rundir is <package-root>/rundir: a local directory, or a symlink
+        # into a rundir store (see rundir_store). Always use the logical path.
+        from ..rundir_store import resolve_rundir, clean_rundir, RundirError
+        try:
+            self._rundir_info = resolve_rundir(
+                pkg.basedir, create=True, args=args, package=pkg.name)
+        except RundirError as e:
+            print("Error: %s" % e, file=sys.stderr)
+            return 1
+        rundir = self._rundir_info.path
 
         # Validate --base-rundir
         base_rundir = getattr(args, 'base_rundir', None)
@@ -299,9 +307,7 @@ class CmdRun(object):
 
         if args.clean:
             print("Note: Cleaning rundir %s" % rundir)
-            if os.path.exists(rundir):
-                shutil.rmtree(rundir)
-            os.makedirs(rundir)
+            clean_rundir(rundir)
 
         # Load runner configuration and resolve backend
         cli_runner = getattr(args, 'runner', None)
@@ -313,10 +319,11 @@ class CmdRun(object):
             else:
                 self._log.warning("Ignoring malformed --runner-opt: %s" % opt)
 
-        # The project root is the directory containing the flow file.
-        # The daemon writes .dfm/daemon.json here; we look for it to
-        # decide whether to delegate to a running daemon.
-        project_root = get_rootdir(args)
+        # The project root is the directory containing the flow file (the
+        # package root, where the rundir also lives). The daemon writes
+        # .dfm/daemon.json here; we look for it to decide whether to delegate
+        # to a running daemon.
+        project_root = pkg.basedir
 
         runner_config = load_runner_config(
             project_root=project_root,
@@ -756,9 +763,10 @@ class CmdRun(object):
             return None
         try:
             from ..task_graph_builder import TaskGraphBuilder
+            from ..rundir_store import rundir_path
             b = TaskGraphBuilder(
                 root_pkg=pkg,
-                rundir=os.path.join(os.getcwd(), "rundir"),
+                rundir=rundir_path(pkg.basedir),
                 loader=loader,
                 task_param_overrides=(overrides or {}).get('task', {}),
                 leaf_param_overrides=(overrides or {}).get('leaf', {}))

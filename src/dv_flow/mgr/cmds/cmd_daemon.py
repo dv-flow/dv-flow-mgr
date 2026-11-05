@@ -49,7 +49,13 @@ class CmdDaemon:
             return 1
 
     def _get_project_root(self, args):
-        return getattr(args, "root", None) or os.getcwd()
+        # The package root (directory of the root flow file), so .dfm/ sits
+        # next to the rundir and matches what `dfm run` looks for.
+        from ..rundir_store import find_pkg_root
+        root = find_pkg_root(args)
+        if root is None:
+            root = os.path.abspath(getattr(args, "root", None) or os.getcwd())
+        return root
 
     def _start(self, args):
         project_root = self._get_project_root(args)

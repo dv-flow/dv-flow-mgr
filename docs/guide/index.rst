@@ -34,6 +34,7 @@ User Guide
    running_tests
    incremental
    caching
+   rundir_store
    runners
 
 .. toctree::

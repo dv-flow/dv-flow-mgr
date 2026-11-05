@@ -423,7 +423,10 @@ class AgentTUI:
         try:
             from .context_builder import AgentContextBuilder
             from .prompt_builder import SystemPromptBuilder
-            rundir = os.path.join(os.getcwd(), "rundir")
+            from ...rundir_store import resolve_rundir
+            rundir = resolve_rundir(
+                getattr(self.pkg, "basedir", None), create=True,
+                package=self.pkg.name, lock=False).path
             cb = AgentContextBuilder(pkg=self.pkg, loader=self.loader, rundir=rundir)
             new_context = cb.build_context([full_name])
         except Exception as e:

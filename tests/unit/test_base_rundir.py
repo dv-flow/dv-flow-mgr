@@ -391,3 +391,29 @@ def test_base_rundir_satisfies_compound_task(tmpdir):
     local_compound_dir = os.path.join(local_dir, "rundir", "pkg.compound")
     assert not os.path.isdir(local_compound_dir), \
         "Compound task should be satisfied from base-rundir, not create a local directory"
+
+
+@pytest.mark.parametrize("via", ["link", "realpath"])
+def test_base_rundir_symlinked(tmpdir, via):
+    """The base rundir is a symlink (e.g. a rundir-store entry): it satisfies
+    tasks whether --base-rundir names the link or its resolved target."""
+    base_dir = str(tmpdir.mkdir("base"))
+    store_entry = str(tmpdir.mkdir("store").mkdir("entry"))
+    link = os.path.join(base_dir, "rundir")
+    os.symlink(store_entry, link)
+    local_dir = str(tmpdir.mkdir("local"))
+
+    r1, n1 = _run_flow(base_dir, SIMPLE_FLOW, "pkg.build", rundir=link)
+    assert r1.status == 0
+    assert os.path.isdir(os.path.join(store_entry, "pkg.build"))
+
+    base = link if via == "link" else os.path.realpath(link)
+    r2, n2 = _run_flow(local_dir, SIMPLE_FLOW, "pkg.build",
+                       rundir=os.path.join(local_dir, "rundir"),
+                       base_rundir=base)
+    assert r2.status == 0
+    assert n2.result.base_hit is True
+    for fs in n2.output.output:
+        bd = getattr(fs, "basedir", None)
+        if bd:
+            assert bd.startswith(base), bd

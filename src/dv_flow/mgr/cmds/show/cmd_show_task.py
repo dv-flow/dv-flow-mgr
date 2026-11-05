@@ -103,9 +103,10 @@ class CmdShowTask:
             return None
         try:
             from ...task_graph_builder import TaskGraphBuilder
+            from ...rundir_store import rundir_path
             return TaskGraphBuilder(
                 root_pkg=pkg,
-                rundir=os.path.join(os.getcwd(), "rundir"),
+                rundir=rundir_path(pkg.basedir),
                 loader=loader)
         except Exception as e:
             self._log.debug(f"No builder for value resolution: {e}")
@@ -346,7 +347,8 @@ class CmdShowTask:
         import toposort
         
         try:
-            rundir = os.path.join(pkg.basedir, "rundir")
+            from ...rundir_store import rundir_path
+            rundir = rundir_path(pkg.basedir)
             builder = TaskGraphBuilder(root_pkg=pkg, rundir=rundir, loader=loader,
                                        naming_scheme=get_naming_scheme())
             

@@ -49,6 +49,7 @@ class CmdShow(object):
         print("  project   - Display current project structure")
         print("  skills    - List and query agent skills")
         print("  results   - Show a run's results (rundir/out/<run-id>/results.json)")
+        print("  site-config - Show site config plugins, config files and the rundir store")
         print("")
         print("Run 'dfm show <subcommand> --help' for more information on a command.")
         

@@ -1,7 +1,7 @@
 #****************************************************************************
 #* runner_config.py
 #*
-#* Layered runner configuration: install -> site -> project -> env/CLI.
+#* Layered runner configuration: install -> site -> user -> project -> env/CLI.
 #*
 #* Copyright 2023-2025 Matthew Ballance and Contributors
 #*
@@ -25,6 +25,8 @@ import sys
 from typing import Any, ClassVar, Dict, List, Optional
 
 import yaml
+
+from . import config_paths
 
 
 _log = logging.getLogger("RunnerConfig")
@@ -78,23 +80,15 @@ class RunnerConfig:
 
 
 def _install_config_path() -> Optional[str]:
-    """Resolve installation config path.
-
-    Checks DFM_INSTALL_CONFIG env var first, then
-    <sys.prefix>/etc/dfm/config.yaml.
-    """
-    env_path = os.environ.get("DFM_INSTALL_CONFIG")
-    if env_path:
-        return env_path
-    prefix_path = os.path.join(sys.prefix, "etc", "dfm", "config.yaml")
-    if os.path.isfile(prefix_path):
-        return prefix_path
-    return None
+    """Resolve installation config path (DFM_INSTALL_CONFIG or
+    <sys.prefix>/etc/dfm/config.yaml)."""
+    return config_paths.install_config_path()
 
 
 def _site_config_path() -> Optional[str]:
-    """Resolve site (user-level) config path: ~/.config/dfm/site.yaml."""
-    path = os.path.join(os.path.expanduser("~"), ".config", "dfm", "site.yaml")
+    """Deprecated: the legacy user-level ~/.config/dfm/site.yaml, if present.
+    User config now lives in config.yaml (see config_paths)."""
+    path = os.path.join(config_paths.user_config_dir(), "site.yaml")
     if os.path.isfile(path):
         return path
     return None
@@ -102,8 +96,7 @@ def _site_config_path() -> Optional[str]:
 
 def _project_config_path(project_root: Optional[str] = None) -> Optional[str]:
     """Resolve project config path: <project>/.dfm/config.yaml."""
-    root = project_root or os.getcwd()
-    path = os.path.join(root, ".dfm", "config.yaml")
+    path = config_paths.project_config_path(project_root)
     if os.path.isfile(path):
         return path
     return None
@@ -239,45 +232,27 @@ def load_runner_config(
     Merge order (later overrides earlier):
       1. Built-in defaults
       2. Installation config (<prefix>/etc/dfm/config.yaml or DFM_INSTALL_CONFIG)
-      3. Site config (~/.config/dfm/site.yaml)
-      4. Project config (<project>/.dfm/config.yaml)
-      5. Environment variable DFM_RUNNER
-      6. CLI flags (--runner, --runner-opt)
+      3. Site config (/etc/dfm/config.yaml or DFM_SITE_CONFIG)
+      4. User config (~/.config/dfm/config.yaml, legacy site.yaml, or
+         DFM_USER_CONFIG)
+      5. Project config (<project>/.dfm/config.yaml)
+      6. Environment variable DFM_RUNNER
+      7. CLI flags (--runner, --runner-opt)
 
     Returns:
         Fully merged RunnerConfig
     """
     config = RunnerConfig()
 
-    # Layer 1 & 2: install config
-    install_path = _install_config_path()
-    if install_path:
-        try:
-            install_data = _load_yaml(install_path)
-            config = _merge_layer(config, install_data)
-            _log.debug("Loaded install config from %s", install_path)
-        except Exception as e:
-            _log.warning("Failed to load install config %s: %s", install_path, e)
-
-    # Layer 3: site config
-    site_path = _site_config_path()
-    if site_path:
-        try:
-            site_data = _load_yaml(site_path)
-            config = _merge_layer(config, site_data)
-            _log.debug("Loaded site config from %s", site_path)
-        except Exception as e:
-            _log.warning("Failed to load site config %s: %s", site_path, e)
-
-    # Layer 4: project config
-    project_path = _project_config_path(project_root)
-    if project_path:
-        try:
-            project_data = _load_yaml(project_path)
-            config = _merge_layer(config, project_data)
-            _log.debug("Loaded project config from %s", project_path)
-        except Exception as e:
-            _log.warning("Failed to load project config %s: %s", project_path, e)
+    # Layers: install, site (/etc/dfm), user (~/.config/dfm), project.
+    # Later layers override earlier ones.
+    for layer, path, data in config_paths.config_layers(project_root):
+        if data:
+            try:
+                config = _merge_layer(config, data)
+                _log.debug("Loaded %s config from %s", layer, path)
+            except Exception as e:
+                _log.warning("Failed to load %s config %s: %s", layer, path, e)
 
     # Layer 5: environment variable
     env_runner = os.environ.get("DFM_RUNNER")

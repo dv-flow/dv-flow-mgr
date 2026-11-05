@@ -22,6 +22,7 @@
 import hashlib
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from .cache_provider import CacheEntry, CompressionType
@@ -219,31 +220,46 @@ async def store_in_cache(
     return stored_count > 0
 
 
+def _rel_to_rundir(path, rundir: str) -> Optional[str]:
+    """Return ``path`` relative to ``rundir`` (as a POSIX string), or None if
+    it is outside. The rundir may be a symlink (e.g. into a rundir store), and
+    tools may report either the logical or the resolved form of a path, so
+    both forms of each are tried."""
+    p = Path(path)
+    if not p.is_absolute():
+        return None
+    logical = Path(os.path.abspath(rundir))
+    real = Path(os.path.realpath(rundir))
+    for cand, base in ((Path(os.path.abspath(p)), logical),
+                       (Path(os.path.realpath(p)), real),
+                       (Path(os.path.abspath(p)), real)):
+        try:
+            return cand.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    return None
+
+
 def validate_output_paths(output: List[Any], rundir: str) -> bool:
     """Validate that all output filesets reference paths within rundir.
     
     Args:
         output: List of output items
-        rundir: Run directory path
+        rundir: Run directory path (logical; may be a symlink)
         
     Returns:
         True if all filesets are within rundir, False otherwise
     """
-    rundir_path = Path(rundir).resolve()
-    
     for item in output:
         if isinstance(item, FileSet):
             # Check basedir
             basedir = Path(item.basedir)
-            if basedir.is_absolute():
-                try:
-                    basedir.relative_to(rundir_path)
-                except ValueError:
-                    _log.warning(
-                        f"Fileset basedir {basedir} is outside rundir {rundir_path}, "
-                        "task not cacheable"
-                    )
-                    return False
+            if basedir.is_absolute() and _rel_to_rundir(basedir, rundir) is None:
+                _log.warning(
+                    f"Fileset basedir {basedir} is outside rundir {rundir}, "
+                    "task not cacheable"
+                )
+                return False
     
     return True
 
@@ -253,12 +269,11 @@ def convert_output_to_template(output: List[Any], rundir: str) -> Dict[str, Any]
     
     Args:
         output: List of output items
-        rundir: Run directory path
+        rundir: Run directory path (logical; may be a symlink)
         
     Returns:
         Output template dict
     """
-    rundir_path = Path(rundir).resolve()
     template_output = []
     
     for item in output:
@@ -269,12 +284,10 @@ def convert_output_to_template(output: List[Any], rundir: str) -> Dict[str, Any]
             if isinstance(item, FileSet):
                 basedir = Path(item_dict['basedir'])
                 if basedir.is_absolute():
-                    try:
-                        rel_path = basedir.relative_to(rundir_path)
+                    rel_path = _rel_to_rundir(basedir, rundir)
+                    if rel_path is not None:
                         item_dict['basedir'] = f"${{{{ rundir }}}}/{rel_path}"
-                    except ValueError:
-                        # Path is outside rundir, keep as-is
-                        pass
+                    # else: path is outside rundir, keep as-is
             
             template_output.append(item_dict)
         else:

@@ -1,7 +1,11 @@
 # Rundir layout
 
-What `dfm run` writes, as the code does it today. `rundir` is `./rundir` in
-the directory `dfm run` is invoked from.
+What `dfm run` writes, as the code does it today. `rundir` is
+`<package-root>/rundir`, where the package root is the directory of the root
+`flow.yaml`/`flow.dv` (found by walking up from where `dfm run` is invoked).
+It is either a real directory or a symlink into a rundir store (see
+`docs/guide/rundir_store.rst`); dfm always records the link path, never the
+resolved path.
 
 ```
 rundir/
@@ -46,3 +50,31 @@ Notes:
   as `$DFM_OUT_DIR` (with `$DFM_RUN_ID`).
 - Older versions used zero-padded counters (`0001`) for run-ids; those
   directories are still recognized.
+
+
+## Rundir store
+
+When the rundir is a link into a rundir store, the entry it points at holds
+the layout above plus:
+
+```
+<entry>/
+  .dfm-rundir.json             # owner metadata: link, project root, package,
+                               # user, uid, host, git remote/branch, store
+                               # source, dfm version, created, last used, sessions
+  .dfm-rundir.lock             # shared flock held by a dfm session; gc and the
+                               # lifecycle commands take it exclusively
+  .dfm-rundir-stats.json       # cached size measurement (dfm store stats/list)
+```
+
+The store root:
+
+```
+$DFM_STORE/
+  .dfm-store.yaml              # store marker (version, created, mode); gc
+                               # refuses a directory without it
+  .dfm-store.lock              # held exclusively while `dfm store gc` runs
+  <mangled-link-path>/         # one entry per project: the link path with `/`
+                               # replaced by `_` (plus `__<hash>` on a collision
+                               # or for very long paths)
+```

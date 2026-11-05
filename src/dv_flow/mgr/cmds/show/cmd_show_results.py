@@ -35,7 +35,11 @@ class CmdShowResults:
         from ...results.model import ResultsFile
         from ...results import render_text as RT
 
-        rundir = getattr(args, "rundir", None) or os.path.join(os.getcwd(), "rundir")
+        rundir = getattr(args, "rundir", None)
+        if not rundir:
+            # <package-root>/rundir, as `dfm run` uses (may be a store link)
+            from ...rundir_store import find_pkg_root, rundir_path
+            rundir = rundir_path(find_pkg_root(args))
         rundir = os.path.abspath(rundir)
 
         if getattr(args, "list", False):

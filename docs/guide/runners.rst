@@ -58,7 +58,7 @@ Local vs Remote Runners
 Configuration Hierarchy
 =======================
 
-Runner configuration is loaded from up to four layers, merged in order
+Runner configuration is loaded from up to five layers, merged in order
 (later layers override earlier ones for scalar fields; list fields are
 accumulated across layers):
 
@@ -67,13 +67,18 @@ accumulated across layers):
    organization-wide defaults (queues, resource classes, wrapper
    scripts).
 
-2. **Site config** -- ``~/.config/dfm/site.yaml``. Per-user preferences
-   (default runner, project strings).
+2. **Site config** -- ``/etc/dfm/config.yaml`` or the path in
+   ``DFM_SITE_CONFIG``. Machine- or site-wide settings.
 
-3. **Project config** -- ``<project>/.dfm/config.yaml``. Project-specific
-   tuning (pool sizes, queue overrides, resource classes).
+3. **User config** -- ``~/.config/dfm/config.yaml`` (honors
+   ``XDG_CONFIG_HOME``; override with ``DFM_USER_CONFIG``). Per-user
+   preferences (default runner, project strings). The older name
+   ``~/.config/dfm/site.yaml`` is still read.
 
-4. **CLI / env** -- ``--runner``, ``--runner-opt``, ``DFM_RUNNER``.
+4. **Project config** -- ``<package-root>/.dfm/config.yaml``.
+   Project-specific tuning (pool sizes, queue overrides, resource classes).
+
+5. **CLI / env** -- ``--runner``, ``--runner-opt``, ``DFM_RUNNER``.
 
 See :doc:`/reference/runner_config` for a full field reference.
 

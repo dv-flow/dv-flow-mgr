@@ -17,6 +17,7 @@ DV Flow Manager provides several commands for working with flows:
 * **agent**: Launch AI assistants with DV Flow context
 * **context**: Output project context for LLM agents
 * **graph**: Generate visual task dependency graphs
+* **store**: Inspect and manage the rundir store
 * **util**: Internal utility commands
 
 Common Options
@@ -186,6 +187,19 @@ Run Options
     See :doc:`/guide/incremental` for full details on how base-rundir
     satisfaction works.
 
+    The base-rundir may be a symlink (for example a rundir-store link); paths
+    recorded through either the link or its resolved target are rewritten.
+
+``--store DIR`` / ``--no-store``
+    Place the rundir in the rundir store at ``DIR``, or use a local
+    ``<package-root>/rundir``, overriding ``DFM_STORE`` and config files.
+    See :doc:`/guide/rundir_store`.
+
+``--store-recreate``
+    If the ``rundir`` link is dangling (its store is missing), recreate it
+    in the configured store instead of stopping with an error. Also
+    ``DFM_STORE_RECREATE=1``.
+
 ``--report DIR``
     After the run completes, write a self-contained diagnostics bundle to
     ``DIR`` (per-task logs, markers, and status). This is intended for CI,
@@ -286,6 +300,8 @@ The show command supports the following sub-commands:
 * **package <name>** - Display detailed information about a package
 * **project** - Display current project structure
 * **results** - Show a run's results (``rundir/out/<run-id>/results.json``)
+* **site-config** - Show config files, site-config plugins and the rundir
+  store decision (see :doc:`site_config`)
 
 Common Options
 --------------
@@ -510,7 +526,7 @@ a failing node shows its failing checks, first errors, log location and waves.
 A missing record exits with status 1.
 
 ``--rundir R``
-    The run directory to read (default ``./rundir``).
+    The run directory to read (default ``<package-root>/rundir``, as ``dfm run`` uses).
 
 ``--run ID``
     The run to show; ``latest`` (the default) follows ``out/latest``, or the
@@ -558,6 +574,72 @@ For backward compatibility, the following legacy invocations are supported:
     
     # Show task with dependency tree (legacy behavior)
     dfm show <task> -a
+
+Store Command
+=============
+
+``dfm store`` inspects and manages the rundir store. See
+:doc:`/guide/rundir_store` for concepts and :doc:`site_config` for
+configuration.
+
+``dfm store info [--json] [--size] [--store DIR | --no-store]``
+    Show the store in effect, every config layer consulted and what it said,
+    and the state of the current project's rundir (``none``, ``local``,
+    ``ok``, ``dangling``, ``copied``, ``moved``, ``unmanaged-symlink``).
+    ``--size`` measures the rundir and shows its largest top-level
+    directories.
+
+``dfm store init DIR [--shared | --group]``
+    Create a store root and its ``.dfm-store.yaml`` marker. ``--shared``
+    sets mode 1777 (sticky, like ``/tmp``); ``--group`` sets 2775.
+
+Selection options shared by ``list``, ``stats``, ``candidates`` and ``gc``:
+``--store DIR`` (default: the configured store), ``--user U`` /
+``--all-users`` (default: your own entries), ``--larger-than SIZE``,
+``--package GLOB``, ``--host GLOB`` and (except ``gc``, where it is a
+criterion) ``--older-than AGE``. Sizes accept ``500M``, ``10G``, ``1.5T``;
+ages accept ``30d``, ``12h``, ``2w``. Size options: ``--size`` / ``--refresh``
+(``list``), ``--no-measure`` / ``--refresh`` (others). All accept ``--json``
+(``"schema": 1``; bytes, ISO-8601 UTC times, ages in seconds).
+
+``dfm store list [--status S] [--sort name|size|last-used|created] [--limit N] [-l/--long] [--format table|names|links|paths]``
+    One row per entry: status, size and share, last used, created, number of
+    sessions, host, package and project. ``--long`` shows a detail block per
+    entry (git, last modification, file count, largest directories, paths).
+
+``dfm store stats [--top N] [--stale AGE]``
+    Filesystem usage, totals, breakdowns by status, last use, project, user
+    and host with bar charts, the largest entries, the reclaimable space and
+    suggested commands.
+
+``dfm store candidates [--tier safe|review] [--stale AGE] [--limit N] [--format table|names|links|paths] [--annotate] [--force]``
+    Entries worth deleting, biggest first. ``safe``: the project is gone or
+    no longer links here. ``review``: unverifiable from this host, or unused
+    for ``--stale`` (default 30d). ``--format names --annotate`` produces a
+    file for ``gc --from``.
+
+``dfm store gc [ENTRY...] [--from FILE] [--orphans] [--older-than AGE] [--include-unknown] [--reclaim SIZE] [--target-free SIZE] [-n/--dry-run] [-y] [--force]``
+    Delete entries. With no criteria, selects orphaned and retargeted
+    entries. ``--older-than`` alone selects all entries unused that long;
+    with ``--orphans`` both must hold. ``--reclaim`` / ``--target-free`` keep
+    only as much of the selection as needed (dead entries first, then least
+    recently used). ``ENTRY`` and ``--from`` name entries explicitly (entry
+    names, entry paths or project link paths; ``-`` reads stdin). Prints the
+    plan and asks for confirmation unless ``-y``; never deletes busy or
+    unmanaged entries, nor (without ``--force``) entries used in the last
+    hour. Refuses a directory without a store marker.
+
+``dfm store migrate [--store DIR] [-n]``
+    Move the project's local rundir into the store and replace it with a
+    link.
+
+``dfm store unlink [--local] [--keep]``
+    Remove the rundir link; ``--local`` moves the contents back into a local
+    directory; ``--keep`` leaves the store entry for ``gc``.
+
+``dfm store relink [--store DIR]``
+    Move the project's entry to the configured store (or ``DIR``), or
+    recreate a dangling link there.
 
 Validate Command
 ================

@@ -27,6 +27,7 @@ from .cmd_show_package import CmdShowPackage
 from .cmd_show_project import CmdShowProject
 from .cmd_show_skills import CmdShowSkills
 from .cmd_show_results import CmdShowResults
+from .cmd_show_site_config import CmdShowSiteConfig
 
 __all__ = [
     'CmdShowPackages',
@@ -38,4 +39,5 @@ __all__ = [
     'CmdShowProject',
     'CmdShowSkills',
     'CmdShowResults',
+    'CmdShowSiteConfig',
 ]

@@ -34,6 +34,29 @@ from .task_node import TaskNode, RundirE
 from .dynamic_scheduler import DynamicScheduler
 from .runner_backend import RunnerBackend
 
+
+def _rebase_path(path: str, old_root: str, new_root: str) -> str:
+    """Rewrite ``path`` from under ``old_root`` to under ``new_root``.
+
+    Matches whole path components (``/x/rundir`` does not match
+    ``/x/rundir2``), and tries both the recorded and the resolved form of
+    ``old_root`` -- a rundir may be a symlink into a rundir store, and tools
+    may have recorded either form. Paths outside ``old_root`` are returned
+    unchanged."""
+    if not isinstance(path, str) or not path:
+        return path
+    roots = [old_root.rstrip(os.sep) or os.sep]
+    real = os.path.realpath(old_root).rstrip(os.sep) or os.sep
+    if real not in roots:
+        roots.append(real)
+    for r in roots:
+        if path == r:
+            return new_root
+        if path.startswith(r + os.sep):
+            return new_root + path[len(r):]
+    return path
+
+
 class TaskState(enum.Enum):
     """State of a task in the execution pipeline"""
     NOT_STARTED = enum.auto()   # Task exists but not yet ready
@@ -486,7 +509,8 @@ class TaskSetRunner(TaskRunner, DynamicScheduler):
             out_data = dict(out_data)  # shallow copy to avoid mutating stored data
             # Rewrite basedir to reference base-rundir instead of original rundir
             if "basedir" in out_data and saved_rundir:
-                out_data["basedir"] = out_data["basedir"].replace(saved_rundir, base_task_dir)
+                out_data["basedir"] = _rebase_path(
+                    out_data["basedir"], saved_rundir, base_task_dir)
             try:
                 item = _BaseItem.model_validate(out_data)
                 output.append(item)

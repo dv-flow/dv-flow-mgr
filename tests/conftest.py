@@ -32,6 +32,26 @@ def disable_cache_by_default(request):
         del os.environ['DV_FLOW_CACHE']
 
 
+@pytest.fixture(autouse=True)
+def isolate_dfm_config(monkeypatch, tmp_path_factory):
+    """Keep the developer's own rundir-store and dfm config out of tests.
+
+    Unsets DFM_STORE and friends and points the user and site config files at
+    paths that do not exist. Tests that need config set these explicitly.
+    """
+    d = tmp_path_factory.mktemp("dfm-noconfig")
+    for var in ("DFM_STORE", "DFM_STORE_RECREATE", "DFM_SITE_CONFIG_NAME"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("DFM_USER_CONFIG", str(d / "user.yaml"))
+    monkeypatch.setenv("DFM_SITE_CONFIG", str(d / "site.yaml"))
+    try:
+        from dv_flow.mgr.site_config import SiteConfigRgy
+        SiteConfigRgy.reset()
+    except Exception:
+        pass
+    yield
+
+
 # Lazy import to avoid import issues in test collection
 def _get_assistant_registry():
     from dv_flow.mgr.std.ai_assistant import ASSISTANT_REGISTRY

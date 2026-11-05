@@ -248,6 +248,38 @@ def _is_package_file(fpath: str) -> bool:
     return is_pkg
 
 
+def find_root_flow_file(start_dir: str):
+    """Walk up from ``start_dir`` to the first flow file that defines a
+    package (``flow.dv``, ``flow.yaml``, ``flow.yml``, ``flow.toml``, in that
+    order per directory). Fragment files are skipped. A file that fails to
+    parse is returned, so the caller's full load reports the real error.
+    Returns None if there is no package. Does not elaborate anything."""
+    dir = start_dir
+    while dir != "/" and dir != "" and os.path.isdir(dir):
+        for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
+            fpath = os.path.join(dir, name)
+            _log.debug("Trying path %s (%s)" % (
+                fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
+            if os.path.exists(fpath):
+                # Check if this is actually a package file, not a fragment
+                is_pkg, parse_error = _classify_flow_file(fpath)
+                if parse_error is not None:
+                    # The file exists but does not parse. Select it as the
+                    # rootfile so the full loader re-parses it and reports the
+                    # real syntax error *with source location*, instead of
+                    # silently skipping it and mis-reporting "no flow.yaml
+                    # found" once the search runs out.
+                    _log.debug("Flow file %s failed to parse: %s" % (
+                        fpath, parse_error))
+                    return fpath
+                elif is_pkg:
+                    return fpath
+                else:
+                    _log.debug("Skipping %s (fragment file, not a package)" % fpath)
+        dir = os.path.dirname(dir)
+    return None
+
+
 def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | None = None,
                    package_maps=None, override_tracker=None):
     """Locates the project's flow spec and returns the PackageDef.
@@ -270,35 +302,7 @@ def loadProjPkgDef(path, listener=None, parameter_overrides=None, config: str | 
         rootfile = path
     else:
         dir = path
-        rootfile = None
-
-        while dir != "/" and dir != "" and os.path.isdir(dir):
-            for name in ("flow.dv", "flow.yaml", "flow.yml", "flow.toml"):
-                fpath = os.path.join(dir, name)
-                _log.debug("Trying path %s (%s)" % (
-                    fpath, ("exists" if os.path.exists(fpath) else "doesn't exist")))
-                if os.path.exists(fpath):
-                    # Check if this is actually a package file, not a fragment
-                    is_pkg, parse_error = _classify_flow_file(fpath)
-                    if parse_error is not None:
-                        # The file exists but does not parse. Select it as the
-                        # rootfile so the full loader below re-parses it and
-                        # reports the real syntax error *with source location*,
-                        # instead of silently skipping it and mis-reporting
-                        # "no flow.yaml found" once the search runs out.
-                        _log.debug("Flow file %s failed to parse: %s" % (
-                            fpath, parse_error))
-                        rootfile = fpath
-                        break
-                    elif is_pkg:
-                        rootfile = fpath
-                        break
-                    else:
-                        _log.debug("Skipping %s (fragment file, not a package)" % fpath)
-            if rootfile is not None:
-                break
-            else:
-                dir = os.path.dirname(dir)
+        rootfile = find_root_flow_file(dir)
 
         if rootfile is None:
             _log.debug("Failed to find flow.yaml/flow.toml with 'package' key")

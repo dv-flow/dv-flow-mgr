@@ -3,7 +3,8 @@ Runner Config
 ################
 
 Reference for all runner configuration fields. Configuration is loaded
-from YAML files and merged across layers (install, site, project, CLI).
+from YAML files and merged across layers (install, site, user, project,
+CLI); see :doc:`site_config` for the file locations.
 
 Top-Level Structure
 ===================
@@ -152,3 +153,12 @@ Environment Variables
 ``DFM_INSTALL_CONFIG``
     Path to the installation config file (overrides the default
     ``<sys.prefix>/etc/dfm/config.yaml``).
+
+``DFM_SITE_CONFIG``
+    Path to the site config file (overrides the default
+    ``/etc/dfm/config.yaml``).
+
+``DFM_USER_CONFIG``
+    Path to the user config file (overrides the default
+    ``$XDG_CONFIG_HOME/dfm/config.yaml``, i.e.
+    ``~/.config/dfm/config.yaml``).

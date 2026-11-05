@@ -95,6 +95,216 @@ def _get_skill_path():
     pkg_dir = os.path.dirname(os.path.abspath(dv_flow.mgr.__file__))
     return os.path.join(pkg_dir, "share", "skills", "dv-flow-manager", "SKILL.md")
 
+def _add_store_opts(p):
+    """Rundir-store selection options (see `dfm store info`)."""
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--store",
+                   dest="store",
+                   default=None,
+                   metavar="DIR",
+                   help="Place the rundir in the rundir store at DIR "
+                        "(overrides DFM_STORE and config files)")
+    g.add_argument("--no-store",
+                   dest="no_store",
+                   action="store_true",
+                   help="Use a local <package-root>/rundir, ignoring any "
+                        "configured rundir store")
+    p.add_argument("--store-recreate",
+                   dest="store_recreate",
+                   action="store_true",
+                   help="If the rundir link is dangling, re-create it in the "
+                        "configured store without asking (also DFM_STORE_RECREATE=1)")
+
+def _add_store_parser(subparsers):
+    store_parser = subparsers.add_parser('store',
+        help='Inspect and manage the rundir store')
+    store_sub = store_parser.add_subparsers(dest='store_subcommand')
+
+    def _common(sp, project=True):
+        if project:
+            sp.add_argument("--root",
+                help="Specifies the root directory for the flow")
+        sp.add_argument("--json", action="store_true",
+            help="Output JSON")
+
+    sp = store_sub.add_parser('info',
+        help="Show the resolved store, where the setting came from, and the "
+             "state of this project's rundir")
+    _common(sp)
+    sp.add_argument("--store", dest="store", default=None, metavar="DIR",
+        help="Resolve as if --store DIR were given")
+    sp.add_argument("--no-store", dest="no_store", action="store_true",
+        help="Resolve as if --no-store were given")
+    sp.add_argument("--size", action="store_true",
+        help="Measure the rundir and show its largest directories")
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_info", "CmdStoreInfo"))
+
+    sp = store_sub.add_parser('init',
+        help='Create a rundir store root (writes the .dfm-store.yaml marker)')
+    sp.add_argument("dir", help="Store root directory")
+    g = sp.add_mutually_exclusive_group()
+    g.add_argument("--shared", action="store_true",
+        help="World-writable with the sticky bit (mode 1777), like /tmp")
+    g.add_argument("--group", action="store_true",
+        help="Group-writable, setgid (mode 2775)")
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_init", "CmdStoreInit"))
+
+    def _select(sp):
+        sp.add_argument("--store", dest="store", default=None, metavar="DIR",
+            help="Store root to operate on (default: the configured store)")
+        g = sp.add_mutually_exclusive_group()
+        g.add_argument("--user", dest="user", default=None,
+            help="Only entries owned by USER (default: you)")
+        g.add_argument("--all-users", dest="all_users", action="store_true",
+            help="Entries of all users")
+
+    def _filters(sp, older=True):
+        if older:
+            sp.add_argument("--older-than", dest="older_than", default=None,
+                metavar="AGE",
+                help="Only entries not used for AGE (e.g. 30d, 12h, 2w)")
+        sp.add_argument("--larger-than", dest="larger_than", default=None,
+            metavar="SIZE", help="Only entries of at least SIZE (e.g. 500M, 10G)")
+        sp.add_argument("--package", default=None, metavar="GLOB",
+            help="Only entries whose root package matches GLOB")
+        sp.add_argument("--host", default=None, metavar="GLOB",
+            help="Only entries last used on a host matching GLOB")
+
+    def _sizes(sp, measure_default):
+        g = sp.add_mutually_exclusive_group()
+        if measure_default:
+            g.add_argument("--no-measure", dest="no_measure", action="store_true",
+                help="Use cached sizes only; do not walk entries")
+        else:
+            g.add_argument("--size", action="store_true",
+                help="Measure entries whose size is unknown or stale "
+                     "(slow on network filesystems)")
+        g.add_argument("--refresh", action="store_true",
+            help="Re-measure every entry")
+
+    _status_choices = ["ok", "orphan", "retargeted", "unknown", "busy", "unmanaged"]
+
+    sp = store_sub.add_parser('list', help='List store entries: status, size, age, owner')
+    _select(sp)
+    sp.add_argument("--status", action="append", default=[],
+        choices=_status_choices,
+        help="Only entries with this status (repeatable)")
+    _filters(sp)
+    _sizes(sp, measure_default=False)
+    sp.add_argument("--sort", choices=["name", "size", "last-used", "age", "created"],
+        default="name",
+        help="Sort order (default: name; 'size' measures sizes; "
+             "'age'/'last-used' put the longest-unused first)")
+    sp.add_argument("--limit", type=int, default=None, metavar="N",
+        help="Show only the first N entries")
+    sp.add_argument("-l", "--long", action="store_true",
+        help="Also show git remote/branch, last modification and file count")
+    sp.add_argument("--format", choices=["table", "names", "links", "paths"],
+        default="table",
+        help="names/links/paths print one entry per line, for scripts")
+    _common(sp, project=False)
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_list", "CmdStoreList"))
+
+    sp = store_sub.add_parser('stats',
+        help='Summarize store usage: totals, by status, age, project and user, '
+             'largest entries, and what can be reclaimed')
+    _select(sp)
+    _filters(sp)
+    _sizes(sp, measure_default=True)
+    sp.add_argument("--top", type=int, default=10, metavar="N",
+        help="Rows in the largest-entries and by-project tables (default: 10)")
+    sp.add_argument("--stale", default=None, metavar="AGE",
+        help="Unused for AGE counts as stale (default: 30d)")
+    _common(sp, project=False)
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_stats", "CmdStoreStats"))
+
+    sp = store_sub.add_parser('candidates',
+        help='List entries worth cleaning up, biggest first, with the reason')
+    _select(sp)
+    _filters(sp)
+    _sizes(sp, measure_default=True)
+    sp.add_argument("--stale", default=None, metavar="AGE",
+        help="Entries of existing projects unused for AGE are listed for "
+             "review (default: 30d)")
+    sp.add_argument("--tier", action="append", choices=["safe", "review"],
+        default=[],
+        help="Only this tier (repeatable). safe: the project is gone; "
+             "review: unverifiable from this host, or stale")
+    sp.add_argument("--limit", type=int, default=None, metavar="N",
+        help="Only the N largest candidates")
+    sp.add_argument("--format", choices=["table", "names", "links", "paths"],
+        default="table",
+        help="names/links/paths print one candidate per line (feed to "
+             "'dfm store gc --from')")
+    sp.add_argument("--annotate", action="store_true",
+        help="With --format, add '# tier size reason' to each line")
+    sp.add_argument("--force", action="store_true",
+        help="Include entries used within the last hour")
+    _common(sp, project=False)
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_candidates", "CmdStoreCandidates"))
+
+    sp = store_sub.add_parser('gc', help='Delete orphaned, stale or selected store entries')
+    _select(sp)
+    sp.add_argument("entries", nargs="*", metavar="ENTRY",
+        help="Delete these entries (names, entry paths or project link paths)")
+    sp.add_argument("--from", dest="from_file", default=None, metavar="FILE",
+        help="Delete the entries listed in FILE ('-' for stdin), one per line; "
+             "'#' starts a comment (output of 'dfm store candidates --format names')")
+    sp.add_argument("--orphans", action="store_true",
+        help="Select entries whose project link is gone or retargeted (default)")
+    sp.add_argument("--older-than", dest="older_than", default=None,
+        metavar="AGE",
+        help="Select entries not used for AGE (e.g. 30d, 12h, 2w). With "
+             "--orphans, both must hold")
+    sp.add_argument("--include-unknown", dest="include_unknown",
+        action="store_true",
+        help="Also delete entries whose project cannot be checked from this host")
+    _filters(sp, older=False)
+    sp.add_argument("--reclaim", default=None, metavar="SIZE",
+        help="Delete only as much of the selection as needed to free SIZE: "
+             "orphans first, then least recently used. Alone, selects from all "
+             "entries")
+    sp.add_argument("--target-free", dest="target_free", default=None,
+        metavar="SIZE",
+        help="Like --reclaim, sized so the filesystem ends with SIZE free")
+    sp.add_argument("-n", "--dry-run", dest="dry_run", action="store_true",
+        help="Show what would be deleted, delete nothing")
+    sp.add_argument("-y", "--yes", dest="yes", action="store_true",
+        help="Do not ask for confirmation")
+    sp.add_argument("--force", action="store_true",
+        help="Also delete entries used within the last hour")
+    _sizes(sp, measure_default=True)
+    _common(sp, project=False)
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_gc", "CmdStoreGc"))
+
+    sp = store_sub.add_parser('migrate',
+        help="Move this project's local rundir into the store")
+    _common(sp)
+    sp.add_argument("--store", dest="store", default=None, metavar="DIR",
+        help="Store to migrate into (default: the configured store)")
+    sp.add_argument("-n", "--dry-run", dest="dry_run", action="store_true",
+        help="Show what would be done")
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_migrate", "CmdStoreMigrate"))
+
+    sp = store_sub.add_parser('unlink',
+        help="Remove this project's rundir link")
+    _common(sp)
+    sp.add_argument("--local", action="store_true",
+        help="Move the contents back into a local <package-root>/rundir")
+    sp.add_argument("--keep", action="store_true",
+        help="Leave the store entry in place (for gc to remove later)")
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_unlink", "CmdStoreUnlink"))
+
+    sp = store_sub.add_parser('relink',
+        help="Move this project's rundir entry to another store, or "
+             "re-create a dangling one")
+    _common(sp)
+    sp.add_argument("--store", dest="store", default=None, metavar="DIR",
+        help="Target store (default: the configured store)")
+    sp.set_defaults(store_func=_lazy(".cmds.store.cmd_relink", "CmdStoreRelink"))
+
+    store_parser.set_defaults(func=_lazy(".cmds.cmd_store", "CmdStore"))
+
 def _add_run_opts(p):
     """Add the `run` options.
 
@@ -123,6 +333,7 @@ def _add_run_opts(p):
                             help="Show all tasks including up-to-date ones")
     p.add_argument("--root",
                               help="Specifies the root directory for the flow")
+    _add_store_opts(p)
     p.add_argument("-c", "--config",
                             help="Specifies the active configuration for the root package")
     p.add_argument("-u", "--ui",
@@ -532,7 +743,7 @@ def get_parser():
     show_results_parser = show_subparsers.add_parser('results',
         help="Show a run's results (rundir/out/<run-id>/results.json)")
     show_results_parser.add_argument("--rundir",
-        help="Run directory to read (default: ./rundir)")
+        help="Run directory to read (default: <package-root>/rundir)")
     show_results_parser.add_argument("--run",
         metavar="ID",
         help="Run id to show, or 'latest' (default)")
@@ -561,6 +772,14 @@ def get_parser():
     show_results_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowResults"))
 
     # show skills
+    show_site_parser = show_subparsers.add_parser('site-config',
+        help='Show site config plugins, config files and the rundir store decision')
+    show_site_parser.add_argument("--json", action="store_true",
+        help="Output JSON")
+    show_site_parser.add_argument("--root",
+        help="Specifies the root directory for the flow")
+    show_site_parser.set_defaults(func=_lazy(".cmds.show", "CmdShowSiteConfig"))
+
     show_skills_parser = show_subparsers.add_parser('skills',
                                                      help='List and query agent skills (DataSet types tagged with AgentSkillTag)')
     show_skills_parser.add_argument("name",
@@ -607,6 +826,9 @@ def get_parser():
     cache_init_parser.set_defaults(cache_func=_lazy(".cmds.cache.cmd_init", "CmdCacheInit"))
     
     cache_parser.set_defaults(func=_lazy(".cmds.cmd_cache", "CmdCache"))
+
+    # Rundir store commands
+    _add_store_parser(subparsers)
 
     # Validate command
     validate_parser = subparsers.add_parser('validate',
@@ -669,6 +891,7 @@ def get_parser():
         help="Specify the AI model to use (default: the assistant's own default model)")
     agent_parser.add_argument('--root',
         help='Specifies the root directory for the flow')
+    _add_store_opts(agent_parser)
     agent_parser.add_argument('-c', '--config',
         help='Specifies the active configuration for the root package')
     agent_parser.add_argument('-D',

@@ -364,11 +364,12 @@ from ...cli_task_resolver import CLITaskResolver, TaskResolutionError
 
 def get_results(args: Dict[str, Any], builder=None) -> str:
     """`dfm_get_results`: the run record as `dfm show results --json` prints
-    it. The rundir defaults to the session's (the builder's), else ./rundir."""
-    import os
+    it. The rundir defaults to the session's (the builder's), else the
+    project's <package-root>/rundir."""
     from ...results.store import results_json
+    from ...rundir_store import find_pkg_root, rundir_path
     rundir = (args or {}).get("rundir") or getattr(builder, "rundir", None) \
-        or os.path.join(os.getcwd(), "rundir")
+        or rundir_path(find_pkg_root(None))
     return results_json(rundir, (args or {}).get("run") or None,
                         bool((args or {}).get("failures_only", False)))
 
