@@ -174,6 +174,25 @@ VS Code, …).
 dfm mcp [tasks...]
 ```
 
+## store
+
+The rundir is `<package-root>/rundir`; with `DFM_STORE` (or `store:` in
+`~/.config/dfm/config.yaml`) it is a symlink into a shared store. Every
+report takes `--json` (`"schema": 1`, sizes in bytes, ages in seconds).
+
+```bash
+dfm store info [--size]               # where this project's rundir lives, and why
+dfm store stats                       # space by status/age/project, largest, reclaimable
+dfm store list --sort size --limit 10 # biggest entries (--long: all details)
+dfm store candidates --json           # what to clean up: tier safe|review, reason
+dfm store gc -y                       # delete entries whose project is gone
+dfm store gc --from FILE -y           # delete a reviewed list (candidates --format names)
+dfm store gc --reclaim 50G --dry-run  # what freeing 50G would remove
+dfm store migrate | unlink --local | relink   # move a rundir in/out of the store
+```
+
+`dfm run --store DIR` / `--no-store` override the store for one run.
+
 ## cache
 
 Manage the artifact/memento cache.

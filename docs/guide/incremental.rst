@@ -396,7 +396,7 @@ without re-building.
 
 .. code-block:: bash
 
-    # Phase 1: build (writes to ./rundir)
+    # Phase 1: build (writes to <package-root>/rundir)
     dfm run build
 
     # Phase 2: fan out independent test runs

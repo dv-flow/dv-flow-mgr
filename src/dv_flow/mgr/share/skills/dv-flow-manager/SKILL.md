@@ -214,6 +214,12 @@ under `_tasks/<task>` with its error and log, and the tests it blocked are
 rundir/out/latest/results.json` reads the same block without dfm. Format:
 `docs/reference/results.rst`.
 
+`rundir` here means `<package-root>/rundir` -- next to the root `flow.yaml`,
+not the directory you ran from -- and it may be a symlink into a rundir store
+on a scratch filesystem (`dfm store info` shows where). Use `rundir/...`
+paths relative to the package root, and do not `rm -rf rundir`: use
+`dfm run --clean`, which keeps the store link.
+
 ## Recommended authoring workflow
 
 1. **Survey** — `dfm show project`, `dfm show tasks`, `dfm context --json`.
