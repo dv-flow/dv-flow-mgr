@@ -23,6 +23,10 @@ description = "DV Flow Manager - Data-driven, parameterizable workflow orchestra
 license = {file = "LICENSE" }
 
 [project.optional-dependencies]
+test = [
+    "pytest",
+    "jsonschema",     # results-schema tests validate results.json
+]
 agent = [
     "openai-agents[litellm]>=0.9.0",
     "prompt_toolkit>=3.0",

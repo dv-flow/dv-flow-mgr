@@ -8,6 +8,8 @@ package:
     deps:
     - name: pytest
       src: pypi
+    - name: jsonschema
+      src: pypi
     - name: pydantic
       src: pypi
     - name: pyyaml
@@ -40,6 +42,8 @@ package:
   - name: default-dev-all
     deps:
     - name: pytest
+      src: pypi
+    - name: jsonschema
       src: pypi
     - name: pydantic
       src: pypi
